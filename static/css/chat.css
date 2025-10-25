@@ -1,0 +1,604 @@
+/* Set query-form background to dark, and query-form-inner transparent */
+
+/* Hide self-retriever context by default */
+#self-retriever-context {
+  display: none;
+}
+
+.query-form-container {
+  position: fixed;
+  bottom: 0;
+  left: 20%;
+  right: 20%;
+  width: 100%;
+  z-index: 1050;
+  background: transparent !important;  
+}
+
+.query-form {
+  background: #2A2A2A !important;
+}
+.query-form-inner {
+  background: transparent !important;
+  border: none !important;
+  width: 100%;
+}
+
+/* Match input wrapper background to form background */
+.query-input-wrapper {
+  background: inherit !important;
+}
+
+/* Textarea styling: curve, border, theme background */
+#query-input {
+  border-radius: 10px !important;
+  border: 1px solid var(--bs-border-color, #dee2e6) !important;
+  background: var(--bs-body-bg) !important;
+  color: inherit !important;
+  box-shadow: none !important;
+  transition: border-color 0.15s;
+  margin-top: 6px !important;
+  margin-bottom: 6px !important;
+}
+#query-input:focus {
+  border-color: var(--bs-primary, #0d6efd) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 0.15rem rgba(13,110,253,.15);
+}
+
+/* Placeholder color for query input */
+#query-input::placeholder {
+  color: #6c757d !important; /* Bootstrap secondary text color for light mode */
+  opacity: 1;
+}
+[data-bs-theme="dark"] #query-input::placeholder {
+  color: #adb5bd !important; /* Bootstrap secondary text color for dark mode */
+  opacity: 1;
+}
+
+/* Consistent font style/size for all input row dropdown menus */
+.query-input-wrapper .dropdown-menu {
+  font-size: 0.8rem !important;
+  font-family: inherit !important;
+  font-weight: 400 !important;
+}
+
+/* Center dropdown menu under button */
+.dropdown-menu-center {
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  right: auto !important;
+}
+
+/* Force dropup menu to open above the button, centered */
+.dropup .dropdown-menu-center {
+  top: auto !important;
+  bottom: 100% !important;
+  margin-bottom: 0 !important;
+  border-bottom-left-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
+  /* Optionally, match border color to button */
+  /* border-color: var(--bs-border-color, #dee2e6) !important; */
+}
+
+/* --- Query Input Icon Buttons Consistency --- */
+.query-input-btn {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  margin-right: 2px !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: background 0.15s, border-radius 0.15s;
+}
+.query-input-btn:last-child {
+  margin-right: 0 !important;
+}
+
+.send-icon-rotated {
+  transform: rotate(45deg);
+}
+.query-input-btn i {
+  color: #fff !important;
+  transition: color 0.15s;
+  font-size: 1.25rem !important;
+}
+.query-input-btn {
+  border-color: #fff !important;
+}
+[data-bs-theme="dark"] .query-input-btn i {
+  color: #adb5bd !important;
+}
+[data-bs-theme="dark"] .query-input-btn {
+  border-color: #adb5bd !important;
+}
+
+/* Make show-files-btn fit its icon */
+#show-files-btn {
+  width: auto !important;
+  min-width: 0 !important;
+}
+#show-files-btn i,
+#historyBtn i,
+#knowledgeSelectBtn i,
+#knowledgeGlobalSelectBtn i,
+#libraryBtn i {
+  color: var(--bs-secondary-color, #6c757d);
+}
+
+/* Hover/focus: background matches page with 0.9 opacity, no outline */
+/* Light theme: button hover background with opacity */
+.query-input-btn:hover,
+.query-input-btn:focus {
+  background: rgba(255,255,255,0.6) !important;
+  outline: none;
+  box-shadow: none;
+  border-radius: 10px !important;
+}
+
+/* Theming support for dark mode */
+[data-bs-theme="dark"] .query-input-btn:hover,
+[data-bs-theme="dark"] .query-input-btn:focus {
+  background: var(--bs-body-bg) !important;
+  border-radius: 10px !important;
+}
+
+/* Image Preview Styles */
+.image-preview-container {
+  position: relative;
+  margin: 10px 0;
+  max-width: 400px;
+}
+
+.image-preview {
+  max-width: 100%;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.remove-image-badge {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  background: #ff4444;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.remove-image-badge:hover {
+  transform: scale(1.1);
+}
+
+/* Chat Container Styles */
+
+
+/* --- Typing Indicator Animation --- */
+.typing-indicator {
+  display: inline-block; 
+  padding: 8px 12px; /* Add some padding around the dots */
+  background-color: rgba(0,0,0,0.05); /* Very subtle background for the indicator itself */
+  border-radius: 12px; /* Rounded corners for the indicator's background */
+  margin: 5px 0; /* Some margin if it's the only content */
+  opacity: 0.7;
+}
+
+.typing-indicator span {
+  height: 8px;
+  width: 8px;
+  background-color: currentColor; /* Use the bubble's text color */
+  border-radius: 50%;
+  display: inline-block;
+  margin: 0 2px;
+  animation: typing-pulse 1.4s infinite ease-in-out both;
+}
+
+.typing-indicator span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+[data-bs-theme="dark"] .typing-indicator {
+  background-color: rgba(255,255,255,0.08); /* Subtle background for dark mode */
+}
+
+/* Keep the third span's delay at 0 */
+
+@keyframes typing-pulse {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  40% {
+    transform: scale(1.0);
+    opacity: 1;
+  }
+}
+
+/* Add other chat styles below */
+/* ... */
+
+
+
+.chat-messages-container {
+  padding: 20px 20px 50px 20px; /* Adjusted padding: T, R, B, L - gives 20px on right */
+  width: clamp(320px, 90vw, 1100px); /* Match query form width for consistent centering */
+  margin-left: auto; /* Center the container horizontally */
+  margin-right: auto; /* Center the container horizontally */
+  min-height: 400px;
+  max-height: calc(100vh - 220px); /* Adjust 220px based on your header & query form height */
+  overflow-y: auto; /* Enable vertical scrolling when content exceeds max-height */
+  display: flex; /* Ensure this is a flex container */
+  flex-direction: column;
+  gap: 16px;
+  background: var(--bs-body-bg);
+}
+
+/* Message Bubble Styles */
+.chat-bubble {
+  max-width: 90%;
+  padding: 24px 22px;
+  margin: 8px 0;
+  border-radius: 22px; /* left: 20px; REMOVED this as it interferes with align-self */
+  position: relative;
+  word-wrap: break-word;
+  animation: fadeIn 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.user-bubble {
+  align-self: flex-end;
+  background: var(--bs-primary);
+  color: white;
+  /* Text inside the bubble should be left-aligned */
+  text-align: left; 
+  width: fit-content; /* Make the bubble only as wide as its content, up to max-width */
+  max-width: 70%;  
+}
+
+.agent-bubble {
+  align-self: flex-start; /* Align agent bubbles to the left (start) */
+  background: var(--bs-tertiary-bg, #f0f2f5); /* Use a theme-aware subtle background, with a light fallback */
+  color: var(--bs-body-color);
+  /* max-width: 85%; Give it a max-width like a typical bubble */
+  /* width: 95%; Make it take up most of the available width on the right */
+  max-width: 85%; /* Let it use a comfortable max-width, can shrink if content is short */
+  /* width: auto; */ /* Let content define width up to max-width */
+  /* padding-left: 22px; */ /* Restore horizontal padding from .chat-bubble if needed */
+  /* padding-right: 22px; */ /* Restore horizontal padding from .chat-bubble if needed */
+}
+
+[data-bs-theme="dark"] .agent-bubble {
+  background: var(--bs-tertiary-bg, #2c2f33); /* Darker fallback for dark theme */
+}
+
+/* Message Footer Styles */
+.message-footer {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(var(--bs-primary-rgb), 0.1);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+/* Modern section styling */
+.footer-section {
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(var(--bs-primary-rgb), 0.05);
+  border: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.footer-section:hover {
+  background: rgba(var(--bs-primary-rgb), 0.08);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* Section headers */
+.footer-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-weight: 500;
+  color: var(--bs-primary);
+}
+
+/* Feedback section */
+.feedback-section {
+  padding: 16px;
+}
+
+.feedback-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.feedback-actions button {
+  padding: 0.5rem 1rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.feedback-actions button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.like-btn:hover {
+  background: rgba(var(--bs-success-rgb), 0.1);
+}
+
+.dislike-btn:hover {
+  background: rgba(var(--bs-danger-rgb), 0.1);
+}
+
+.copy-btn:hover {
+  background: rgba(var(--bs-primary-rgb), 0.1);
+}
+
+/* Citations section */
+.citations .citation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.citation-item {
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(var(--bs-primary-rgb), 0.05);
+  border: 1px solid rgba(var(--bs-primary-rgb), 0.1);
+  transition: all 0.2s ease;
+}
+
+.citation-item:hover {
+  background: rgba(var(--bs-primary-rgb), 0.08);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+/* Questions section */
+.suggested-questions .questions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.question-card {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(var(--bs-info-rgb), 0.1);
+  border: 1px solid rgba(var(--bs-info-rgb), 0.2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.question-card:hover {
+  background: rgba(var(--bs-info-rgb), 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(var(--bs-info-rgb), 0.1);
+}
+
+.followups .questions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.question-pill {
+  padding: 10px 16px;
+  border-radius: 20px;
+  background: rgba(111, 66, 193, 0.1);
+  border: 1px solid rgba(111, 66, 193, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.2s ease;
+}
+
+.question-pill:hover {
+  background: rgba(111, 66, 193, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(111, 66, 193, 0.1);
+}
+
+/* Token usage styling */
+.tokens-usage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.token-details {
+  font-weight: 600;
+  font-size: 1.1em;
+}
+
+.token-breakdown {
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+/* Self-Retriever Questions Grid and Box Styles */
+.self-retriever-questions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, auto);
+  gap: 1rem;
+  margin: 0.5rem 0 0.2rem 0;
+  padding: 0;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.question-box {
+  background: var(--custom-agent-bg, #f0f2f5);
+  color: var(--custom-agent-text, #1a1a1a);
+  border-radius: 1.1rem;
+  box-shadow: 0 2px 8px rgba(80,180,255,0.08);
+  padding: 1rem 1.2rem;
+  font-size: 1.04em;
+  font-weight: 500;
+  text-align: left;
+  transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+  cursor: pointer;
+  border: 1px solid rgba(80,180,255,0.10);
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  word-break: break-word;
+}
+
+.question-box:hover, .question-box:focus {
+  background: var(--custom-primary, #e6f0ff);
+  color: var(--custom-text-on-primary, #1a1a1a);
+  box-shadow: 0 4px 16px rgba(110,168,254,0.18);
+  outline: none;
+}
+
+[data-bs-theme="dark"] .question-box {
+  background: var(--custom-agent-bg-dark, #232526);
+  color: var(--custom-agent-text-dark, #e4e6eb);
+  border: 1px solid rgba(110,168,254,0.13);
+}
+
+[data-bs-theme="dark"] .question-box:hover, [data-bs-theme="dark"] .question-box:focus {
+  background: var(--custom-primary-accent, #4f8cff);
+  color: var(--custom-text-on-primary, #fff);
+  box-shadow: 0 4px 16px rgba(110,168,254,0.22);
+  outline: none;
+}
+
+/* --- Q&A UI/UX Fix for #self-retriever-context --- */
+#self-retriever-context .question-box {
+  font-size: 0.85em;
+  padding: 0.5rem 0.8rem;
+  min-height: 36px;
+  border-radius: 0.7rem;
+  font-weight: 500;
+}
+#self-retriever-context .self-retriever-questions-grid {
+  gap: 0.5rem;
+}
+
+/* Set width of self-retriever-context to 70% and center it */
+#self-retriever-context {
+  width: 60%;
+  margin-left: auto;
+  margin-right: auto;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Hide any title/heading in self-retriever-context */
+/* if needed */
+/* #self-retriever-context > h1,
+#self-retriever-context > h2,
+#self-retriever-context > h3,
+#self-retriever-context > h4,
+#self-retriever-context > h5,
+#self-retriever-context > h6 {
+  display: none !important;
+} */
+
+/* Hide 'Suggested questions:' label in self-retriever-context */
+#self-retriever-context > strong:first-child {
+  display: none !important;
+}
+
+.chat-content {
+  width: 80%;
+  margin: 0 auto;  
+}
+
+.query-form-container {
+  background: var(--bs-body-bg) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1050;
+  width: clamp(320px, 90vw, 1100px);
+}
+
+/* Styles for the replacement placeholder (e.g., "start me ask" animation) */
+#replacement-placeholder {
+  /* These styles will be applied if not overridden by inline styles from HTML/JS */
+  /* The JS startPlaceholderAnimationAndShow sets display: flex; */
+  display: none; /* Initially hidden, JS makes it flex */
+  position: fixed !important; /* Override potential inline style from HTML */
+  inset: 0px !important; /* Override potential inline style from HTML - makes it full viewport */
+  align-items: center !important; /* Override potential inline style from HTML */
+  justify-content: center !important; /* Override potential inline style from HTML */
+  z-index: 2000 !important; /* Match the high z-index, override if needed */
+  pointer-events: none !important; /* Match inline style, override if needed */
+
+  /* Add any specific width, height, padding, or styling for your animation here */
+  /* width: 300px; */
+}
+
+.no-conversation-placeholder {
+  /* These styles are from your console output, they seem fine except the transform */
+  width: auto;
+  height: auto;
+  padding: 1.5rem 3rem;
+  border-radius: 2rem;
+  background: transparent; /* Or your desired background */
+  text-align: center;
+  /* Override the problematic transform to ensure true centering */
+  transform: translateY(0) !important;
+}
+
+/* Scrollbar Styling for WebKit (Chrome, Safari, Edge) */
+.chat-messages-container::-webkit-scrollbar {
+  width: 8px; /* Width of the scrollbar */
+}
+
+.chat-messages-container::-webkit-scrollbar-track {
+  background: transparent; /* Make the track transparent */
+  border-radius: 10px;
+}
+
+.chat-messages-container::-webkit-scrollbar-thumb {
+  background-color: var(--bs-border-color); /* Color of the scroll thumb */
+  border-radius: 10px; /* Roundness of the scroll thumb */
+  border: 2px solid transparent; /* Creates padding around thumb if track is transparent */
+  background-clip: content-box; /* Ensures border doesn't make thumb thicker */
+}
+
+.chat-messages-container::-webkit-scrollbar-thumb:hover {
+  background-color: var(--bs-secondary-color); /* Darker color on hover */
+}
+
+/* Scrollbar Styling for Firefox */
+.chat-messages-container {
+  scrollbar-width: thin; /* "auto" or "thin" */
+  scrollbar-color: var(--bs-border-color) transparent; /* thumb color track color */
+}

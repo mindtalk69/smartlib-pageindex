@@ -1,0 +1,72 @@
+# ============================================================================
+# WEB ULTRALIGHT REQUIREMENTS.TXT - Target: ~200-300MB footprint
+# Flask web-only container with API-based embeddings (no local doc processing)
+# ============================================================================
+
+# Core Web Framework
+Flask==3.1.0
+Flask-Login==0.6.3
+Flask-Migrate==4.1.0
+Flask-SQLAlchemy==3.1.1
+Flask-WTF==1.2.1
+gunicorn>=20.1.0
+Werkzeug==3.1.3
+
+# Celery Client (minimal - just to submit tasks)
+celery==5.5.2
+redis==5.0.1
+
+# Database (SQLite only)
+SQLAlchemy==2.0.39
+alembic==1.15.2
+
+# OpenAI API (primary embedding method - NO local ML)
+openai==1.100.2
+tiktoken==0.9.0
+langchain-openai==0.2.10
+langchain>=0.3.18
+langchain-community>=0.3.17
+
+# Document loading handled by worker container (remote API only)
+
+# HTTP & Utilities (minimal)
+httpx==0.28.1
+requests==2.32.3
+python-dotenv==1.0.1
+pydantic==2.11.4
+
+# Microsoft Authentication (needed for MS login)
+msal==1.30.0
+
+# Vector database interactions handled via worker microservice
+
+# Additional dependencies
+lark==1.2.2
+Pillow==11.0.0
+folium==0.18.0
+geopy==2.4.1
+langgraph>=0.2.60
+pandas==2.2.3
+
+# Experimental dependencies for agent tools are loaded in worker image
+
+# ============================================================================
+# REMOVED FOR SIZE OPTIMIZATION:
+# ============================================================================
+# - sentence-transformers (~200MB with dependencies)
+# - scikit-learn (~50MB)
+# - PyMuPDF (~50MB)
+# - pdfminer.six (~20MB)
+# - Most other ML and document processing libraries
+#
+# Functionality now provides:
+# - Web interface and API
+# - OpenAI API-based embeddings (text-embedding-3-small)
+# - Task submission to worker
+# - Database operations
+# - User authentication and admin interface
+#
+# Expected size: ~200-300MB
+# - Supports: text-embedding-3-small (API-based)
+# - Delegates document parsing and local embeddings to worker container
+# ============================================================================

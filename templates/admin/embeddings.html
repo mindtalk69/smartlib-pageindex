@@ -1,0 +1,104 @@
+{% extends "admin/base.html" %}
+
+{% block admin_title %}Embedding Models{% endblock %}
+
+{% block admin_content %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title mb-4">Select Default Embedding Model</h4>
+                    <p class="text-muted mb-4">Choose the embedding model to use for document vectorization. Changes take effect immediately for new content processing.</p>
+
+                    {% if current_model %}
+                        <div class="alert alert-info">
+                            <strong>Current Model:</strong> {{ models[current_model].name }} ({{ models[current_model].type }})
+                        </div>
+                    {% endif %}
+
+                    <form id="embedding-model-form">
+                        {% for model_key, model_info in models.items() %}
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="embedding_model"
+                                               value="{{ model_key }}" id="model_{{ loop.index }}"
+                                               {{ 'checked' if model_key == current_model else '' }}>
+                                        <label class="form-check-label" for="model_{{ loop.index }}">
+                                            <h5 class="mb-1">{{ model_info.name }}</h5>
+                                            <small class="text-muted">{{ model_info.type }} • Size: {{ model_info.size }} • Speed: {{ model_info.speed }}</small>
+                                        </label>
+                                    </div>
+                                    <div class="mt-2 ms-4">
+                                        <p class="mb-0">{{ model_info.description }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-primary" id="save-button">
+                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                Save Selection
+                            </button>
+                            <button type="button" class="btn btn-secondary ms-2" onclick="location.reload()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block admin_scripts %}
+<script>
+document.getElementById('embedding-model-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const selectedModel = document.querySelector('input[name="embedding_model"]:checked');
+    if (!selectedModel) {
+        alert('Please select an embedding model');
+        return;
+    }
+
+    const saveButton = document.getElementById('save-button');
+    const spinner = saveButton.querySelector('.spinner-border');
+    const buttonText = saveButton.textContent.trim();
+
+    // Show loading state
+    saveButton.disabled = true;
+    spinner.classList.remove('d-none');
+
+    // Send request
+    fetch('/admin/embeddings/set-default', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+            model_name: selectedModel.value
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            // Success - reload the page to show updated current model
+            location.reload();
+        } else {
+            // Error
+            alert('Error: ' + (data.message || 'Unknown error occurred'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Network error occurred. Please try again.');
+    })
+    .finally(() => {
+        // Hide loading state
+        saveButton.disabled = false;
+        spinner.classList.add('d-none');
+    });
+});
+</script>
+{% endblock %}

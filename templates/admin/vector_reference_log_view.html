@@ -1,0 +1,174 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="level">
+        <div class="level-left">
+            <h1 class="title">Vector Reference Log</h1>
+        </div>
+        <div class="level-right">
+            <a href="{{ url_for('admin.list_vector_reference_logs') }}" class="button is-light">
+                ← Back to Logs
+            </a>
+        </div>
+    </div>
+
+    <div class="box">
+        <div class="level">
+            <div class="level-left">
+                <h2 class="subtitle">
+                    <code>{{ log_filename }}</code>
+                </h2>
+            </div>
+            <div class="level-right">
+                <div class="field is-grouped">
+                    <div class="control">
+                        <input type="text" class="input" id="searchInput" placeholder="Search logs...">
+                    </div>
+                    <div class="control">
+                        <button class="button is-info" onclick="exportLogs()">Export CSV</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if log_stats %}
+        <div class="columns">
+            <div class="column">
+                <div class="notification is-info">
+                    <strong>Statistics</strong><br>
+                    Total Entries: {{ log_stats.total_entries }}<br>
+                    Unique Files: {{ log_stats.unique_files }}<br>
+                    Date Range: {{ log_stats.date_range }}
+                </div>
+            </div>
+            <div class="column">
+                <div class="notification is-success">
+                    <strong>File Distribution</strong><br>
+                    {% for file_id, count in log_stats.file_counts.items() %}
+                    File {{ file_id }}: {{ count }} entries<br>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="table-container">
+            <table class="table is-fullwidth is-striped" id="vectorReferencesTable">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>File ID</th>
+                        <th>URL Download ID</th>
+                        <th>Chunk Index</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if references %}
+                        {% for ref in references %}
+                        <tr>
+                            <td><code>{{ ref.timestamp }}</code></td>
+                            <td>
+                                {% if ref.file_id %}
+                                    <span class="tag is-primary">{{ ref.file_id }}</span>
+                                {% else %}
+                                    <span class="tag is-light">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if ref.url_download_id %}
+                                    <span class="tag is-info">{{ ref.url_download_id }}</span>
+                                {% else %}
+                                    <span class="tag is-light">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if ref.chunk_index is not none %}
+                                    <span class="tag is-warning">{{ ref.chunk_index }}</span>
+                                {% else %}
+                                    <span class="tag is-light">N/A</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+$(document).ready(function() {
+    // Check if there's data to initialize DataTables
+    var hasData = {{ 'true' if references else 'false' }};
+    
+    if (hasData) {
+        // Initialize DataTable only when there's data
+        var table = $('#vectorReferencesTable').DataTable({
+            "order": [[ 0, "desc" ]], // Order by timestamp descending
+            "pageLength": 25,
+            "responsive": true,
+            "language": {
+                "emptyTable": "No references found in this log file."
+            }
+        });
+
+        // Search functionality
+        $('#searchInput').on('keyup', function() {
+            table.search(this.value).draw();
+        });
+    } else {
+        // Hide search when no data
+        $('#searchInput').parent().hide();
+        
+        // Show empty state message
+        $('#vectorReferencesTable').hide();
+        $('.table-container').append(
+            '<div class="notification is-warning">' +
+            '<strong>No references found in this log file.</strong><br>' +
+            'This log file appears to be empty or contains no valid vector reference entries.' +
+            '</div>'
+        );
+    }
+});
+
+// Export to CSV function
+function exportLogs() {
+    var csv = 'Timestamp,File ID,URL Download ID,Chunk Index\n';
+    
+    $('#vectorReferencesTable tbody tr').each(function() {
+        var row = $(this);
+        var timestamp = row.find('td:eq(0)').text().trim();
+        var fileId = row.find('td:eq(1) .tag').text().trim();
+        var urlId = row.find('td:eq(2) .tag').text().trim();
+        var chunkIndex = row.find('td:eq(3) .tag').text().trim();
+        
+        // Handle N/A values
+        if (fileId === 'N/A') fileId = '';
+        if (urlId === 'N/A') urlId = '';
+        if (chunkIndex === 'N/A') chunkIndex = '';
+        
+        csv += '"' + timestamp + '","' + fileId + '","' + urlId + '","' + chunkIndex + '"\n';
+    });
+    
+    // Create download link
+    var hiddenElement = document.createElement('a');
+    hiddenElement.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv));
+    hiddenElement.setAttribute('download', '{{ log_filename }}.csv');
+    document.body.appendChild(hiddenElement);
+    hiddenElement.click();
+    document.body.removeChild(hiddenElement);
+}
+</script>
+{% endblock %}

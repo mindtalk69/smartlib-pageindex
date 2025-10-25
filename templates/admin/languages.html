@@ -1,0 +1,129 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Admin - LLM Language Management{% endblock %}
+
+{% block admin_title %}LLM Language Management{% endblock %}
+
+{% block admin_content %}
+<script src="{{ url_for('static', filename='js/admin/admin-languages-debug.js') }}"></script>
+<div class="d-flex justify-content-end mb-3">
+    <button type="button" class="btn btn-primary"
+            data-bs-toggle="modal"
+            data-bs-target="#languageModal"
+            id="addLanguageBtn">
+        <i class="bi bi-plus-lg me-1"></i>
+        Add New Language
+    </button>
+</div>
+<!-- Removed test form button as requested -->
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="table-responsive">
+    <table class="table table-striped" id="languagesTable">
+        <thead>
+            <tr>
+                <th>No.</th>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Active</th>
+                <th>Created By</th>
+                <th>Created At</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if languages %}
+                {% for lang in languages %}
+                <tr data-id="{{ lang.id }}">
+                    <td>{{ loop.index }}</td>
+                    <td class="language-code">{{ lang.language_code }}</td>
+                    <td class="language-name">{{ lang.language_name }}</td>
+                    <td class="language-active" data-active="{{ lang.is_active }}">
+                        {% if lang.is_active %}
+                            <span class="badge bg-success">Yes</span>
+                        {% else %}
+                            <span class="badge bg-secondary">No</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ lang.created_by | default('N/A', true) }}</td>
+                    <td>{{ lang.created_at.strftime('%Y-%m-%d %H:%M:%S') if lang.created_at else 'N/A' }}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-sm btn-warning edit-btn"
+                                    data-id="{{ lang.id }}"
+                                    data-form-edit="languageForm"
+                                    data-api-endpoint="/admin/languages/data/{{ lang.id }}"
+                                    title="Edit Language">
+                                <i class="bi bi-pencil-fill"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger delete-btn"
+                                    data-id="{{ lang.id }}"
+                                    data-name="{{ lang.language_name }}"
+                                    title="Delete Language">
+                                <i class="bi bi-trash-fill"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="7" class="text-center">No languages found. Add one to get started.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add/Edit Language Modal -->
+<div class="modal fade" id="languageModal" tabindex="-1" aria-labelledby="languageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="languageForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="languageModalLabel">Add Language</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="languageId" name="language_id">
+                    <div class="mb-3">
+                        <label for="languageCode" class="form-label">Language Code <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="languageCode" name="language_code" required placeholder="e.g., en, id, es">
+                        <div class="form-text">Standard language code (e.g., ISO 639-1).</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="languageName" class="form-label">Language Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="languageName" name="language_name" required placeholder="e.g., English, Indonesian">
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" value="1" id="languageIsActive" name="is_active" checked>
+                        <label class="form-check-label" for="languageIsActive">
+                            Active (used for description generation)
+                        </label>
+                    </div>
+                    <div id="formError" class="text-danger mt-2" style="display: none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="saveLanguageBtn">Save Language</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block admin_scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/admin/admin-languages.js') }}?v=4"></script>
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "admin/base.html" %}
+
+{% block admin_title %}File Management{% endblock %} {# Set the page title #}
+
+{% block admin_content %}
+<div class="container mt-4">
+    {# Removed H2 and H6 as title is now in admin_title block #}
+    
+    <div class="table-responsive">
+        <table class="table table-striped" id="filesTable"> 
+            <thead>
+                <tr>
+                    <th>No.</th>
+                    <th>Filename</th>
+                    <th>Library</th>
+                    <th>Knowledge</th>
+                    <th>Uploaded By</th>
+                    <th>Upload Date</th>
+                    <th>Is OCR</th>
+                    <th>Size</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for file in files %}
+                <tr data-id="{{ file['id'] }}">
+                    <td>{{ loop.index }}</td>
+                    <td>{{ file['filename'] }}</td>
+                    <td>{{ file['library_name'] or 'N/A' }}</td>
+                    <td>{{ file['knowledge_name'] or 'N/A' }}</td>
+                    <td>{{ file['username'] }}</td>
+                    <td>{% if file['upload_time'] %}{{ file['upload_time'].strftime('%Y-%m-%d %H:%M') }}{% else %}N/A{% endif %}</td>
+                    <td>{% if file['is_ocr'] %}Yes{% else %}No{% endif %}</td>
+                    <td>{{ file['file_size']|filesizeformat }}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-sm btn-danger delete-file-btn"
+                                    data-id="{{ file['id'] }}"
+                                    data-filename="{{ file['filename'] }}"
+                                    title="Delete File Record & Vectors">
+                                <i class="bi bi-trash-fill"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    // Add basic delete confirmation (requires backend endpoint for DB and FAISS deletion)
+    $(document).ready(function() {
+        $('#filesTable').on('click', '.delete-file-btn', function() {
+            const button = $(this);
+            const fileId = button.data('id');
+            const filename = button.data('filename');
+            
+            if (confirm(`Are you sure you want to delete the file record and associated vectors for:\n${filename} (ID: ${fileId})?\n\nWARNING: This action is irreversible and will remove data from the vector index.`)) {
+                // --- Backend Call Required ---
+                // This backend endpoint needs to:
+                // 1. Delete the file record from the 'uploaded_files' table.
+                // 2. Delete associated records from 'vector_references'.
+                // 3. Delete the corresponding vectors from the FAISS index using the file_id/chunk_indices.
+                // 4. Optionally delete the actual stored file from the server.
+                
+                /* 
+                const csrfToken = $('meta[name="csrf-token"]').attr('content'); 
+                fetch(`/admin/files/delete/${fileId}`, { // Define this route in Flask
+                    method: 'POST', // Or DELETE
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Use the AdminDatatables utility to remove the row
+                        const table = $('#filesTable').DataTable();
+                        table.row(button.closest('tr')).remove().draw();
+                        alert('File record and associated vectors deleted successfully.'); 
+                    } else {
+                        alert('Error deleting file: ' + (data.message || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while trying to delete the file.');
+                });
+                */
+               alert('Delete functionality requires backend implementation (including FAISS index update).'); // Placeholder alert
+            }
+        });
+    });
+</script>
+{% endblock %}

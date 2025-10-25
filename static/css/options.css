@@ -1,0 +1,66 @@
+/* options.css */
+/* Styles for the animation options modal content (if needed) */
+
+/* Style for the options toggle button in the navbar (adjust selector if needed) */
+#options-toggle-btn {
+    /* Add specific styles if needed, e.g., cursor */
+    cursor: pointer;
+}
+
+/* Styling for elements within the modal body (adjust as needed) */
+#animationOptionsModal .modal-body .form-check-switch .form-check-input {
+    border-radius: var(--custom-button-radius); /* Apply custom curve to switch */
+    /* Note: Might look slightly different than buttons due to switch aspect ratio */
+}
+
+#animationOptionsModal .modal-body .form-check-label,
+#animationOptionsModal .modal-body label {
+    font-size: 0.9rem; /* Slightly smaller font */
+}
+
+#animationOptionsModal .modal-body .form-select {
+    font-size: 0.9rem; /* Match label font size */
+    margin-top: 0.5rem; /* Space above the dropdown */
+    border-radius: var(--custom-button-radius); /* Apply custom curve */
+}
+
+/* Ensure dropdown is hidden correctly when disabled */
+#animationOptionsModal .modal-body #select-bg-animation[style*="display: none"] {
+    /* Optional: Add styles for the hidden state if needed, */
+    /* e.g., hide the parent container if it adds extra padding */
+}
+
+/* Removed styles for #animation-options-panel and #animation-options-panel.visible */
+/* Bootstrap handles modal display */
+
+
+/* Apply form container styling look to the options modal content */
+#animationOptionsModal .modal-content {
+  border-radius: 16px; /* Match form container radius */
+  transition: all 0.3s ease; /* Match form container transition */
+}
+
+[data-bs-theme="light"] #animationOptionsModal .modal-content {
+  border: 1px solid rgba(109, 92, 174, 0.1); /* Match light form border */
+  background: linear-gradient(145deg, rgba(255, 255, 255, 1), rgba(248, 249, 250, 0.95)); /* Slightly less transparent than form */
+  box-shadow: 0 4px 20px rgba(109, 92, 174, 0.08); /* Match light form shadow */
+}
+
+[data-bs-theme="dark"] #animationOptionsModal .modal-content {
+  border: 1px solid var(--bs-border-color); /* Match dark form border */
+  background: linear-gradient(145deg, #2f3337, #2a2e31); /* Match dark form background */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); /* Match dark form shadow */
+}
+
+/* Ensure modal header/footer backgrounds are consistent (might need slight adjustment) */
+[data-bs-theme="light"] #animationOptionsModal .modal-header,
+[data-bs-theme="light"] #animationOptionsModal .modal-footer {
+  background-color: transparent; /* Blend with gradient */
+  border-color: rgba(109, 92, 174, 0.1); /* Match border */
+}
+
+[data-bs-theme="dark"] #animationOptionsModal .modal-header,
+[data-bs-theme="dark"] #animationOptionsModal .modal-footer {
+  background-color: transparent; /* Blend with gradient */
+   border-color: var(--bs-border-color); /* Match border */
+}

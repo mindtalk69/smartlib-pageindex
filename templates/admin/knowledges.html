@@ -1,0 +1,286 @@
+{% extends "admin/base.html" %}
+
+{% block admin_title %}Knowledge Management{% endblock %} {# Set the page title #}
+
+{% block head_extra %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/knowledge-form.css') }}">
+{% endblock %}
+
+{% block admin_content %}
+{# Removed the H1 title row as title is now in admin_title block #}
+<div class="d-flex justify-content-end mb-3"> {# Simple div for Add button for now #}
+    {# Updated button style and added modal attributes #}
+    <button type="button" class="btn btn-primary"
+                data-bs-toggle="modal" 
+                data-bs-target="#knowledgeModal" 
+                id="addKnowledgeBtn">
+            <i class="bi bi-plus-lg me-1"></i>
+            Add New Knowledge
+        </button>
+    </div>
+</div>
+
+{# Display flashed messages #}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="table-responsive">
+    <table class="table table-striped" id="knowledgesTable">
+        <thead>
+            <tr>
+                <th>No.</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Categories</th>
+                <th>Libraries</th>
+                <th>Groups</th>
+                <th>Created By</th>
+                <th>Created At</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if knowledges %}
+                {% for knowledge in knowledges %}
+                <tr data-id="{{ knowledge.id }}">
+                    <td>{{ loop.index }}</td>
+                    <td class="knowledge-name">{{ knowledge.name }}</td>
+                    <td class="knowledge-description" title="{{ knowledge.description }}">
+                        {{ knowledge.description[:80] ~ ('...' if knowledge.description and knowledge.description|length > 80 else '') }}
+                    </td>
+                    <td class="knowledge-categories">{{ knowledge.categories|map(attribute='name')|join(', ') if knowledge.categories else 'N/A' }}</td>
+                    <td class="knowledge-libraries">{{ knowledge.libraries|map(attribute='name')|join(', ') if knowledge.libraries else 'N/A' }}</td>
+                    <td class="knowledge-groups">{{ knowledge.groups|map(attribute='name')|join(', ') if knowledge.groups else 'N/A' }}</td>
+                    <td>{{ knowledge.creator.username | default('N/A', true) }}</td>
+                    <td>{{ knowledge.created_at.strftime('%Y-%m-%d %H:%M:%S') if knowledge.created_at else 'N/A' }}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-sm btn-warning edit-btn"
+                                    data-id="{{ knowledge.id }}"
+                                    data-form-edit="knowledgeForm"
+                                    data-api-endpoint="/admin/knowledges/data/{{ knowledge.id }}"
+                                    title="Edit Knowledge">
+                                <i class="bi bi-pencil-fill"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger delete-btn" 
+                                    data-id="{{ knowledge.id }}"
+                                    data-name="{{ knowledge.name }}"
+                                    title="Delete Knowledge">
+                                <i class="bi bi-trash-fill"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="9" class="text-center">No knowledge entries found.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add/Edit Knowledge Modal -->
+<div class="modal fade" id="knowledgeModal" tabindex="-1" aria-labelledby="knowledgeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form id="knowledgeForm" method="post" action="{{ url_for('admin_knowledges.add_knowledge') }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="knowledgeModalLabel">Add Knowledge</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="knowledgeId" name="knowledge_id">
+                    
+                    {# Tabs navigation #}
+                    <ul class="nav nav-tabs mb-3" id="knowledgeFormTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#basic-tab-pane" type="button" role="tab" aria-controls="basic-tab-pane" aria-selected="true">Basic Info</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="categories-tab" data-bs-toggle="tab" data-bs-target="#categories-tab-pane" type="button" role="tab" aria-controls="categories-tab-pane" aria-selected="false">Categories</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="catalogs-tab" data-bs-toggle="tab" data-bs-target="#catalogs-tab-pane" type="button" role="tab" aria-controls="catalogs-tab-pane" aria-selected="false">Catalogs</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="libraries-tab" data-bs-toggle="tab" data-bs-target="#libraries-tab-pane" type="button" role="tab" aria-controls="libraries-tab-pane" aria-selected="false">Libraries</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups-tab-pane" type="button" role="tab" aria-controls="groups-tab-pane" aria-selected="false">Groups</button>
+                        </li>
+                    </ul>
+                    
+                    {# Tab content #}
+                    <div class="tab-content" id="knowledgeFormTabContent">
+                        {# Basic Info tab #}
+                        <div class="tab-pane fade show active" id="basic-tab-pane" role="tabpanel" aria-labelledby="basic-tab" tabindex="0">
+                            <div class="mb-3">
+                                <label for="knowledgeName" class="form-label">Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="knowledgeName" name="name" required>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label for="knowledgeDescription" class="form-label mb-0">Description</label>
+                                    <button class="btn btn-secondary btn-sm" type="button" id="generateDescBtn" title="Generate Description (AI)">
+                                        <i class="bi bi-magic"></i>
+                                        <span class="spinner-border spinner-border-sm ms-1 d-none" role="status" aria-hidden="true"></span>
+                                    </button>
+                                </div>
+                                <textarea class="form-control" id="knowledgeDescription" name="description" rows="5"></textarea>
+                            </div>
+                        </div>
+                        
+                        {# Categories tab #}
+                        <div class="tab-pane fade" id="categories-tab-pane" role="tabpanel" aria-labelledby="categories-tab" tabindex="0">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold mb-2">Categories</label>
+                                {# Display area for selected categories #}
+                                <div id="selectedCategoriesDisplay" class="mb-2 p-2 border rounded bg-light" style="min-height: 38px; font-size: 0.875em;">
+                                    <span class="text-muted">Selected: None</span>
+                                </div>
+                                {# Filter input for categories #}
+                                <div class="input-group mb-2">
+                                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                    <input type="text" id="categoryFilterInput" class="form-control" placeholder="Filter categories...">
+                                </div>
+                                {# Checkbox list for categories with improved styling #}
+                                <div id="knowledgeCategories" class="border rounded p-2" style="max-height: 300px; overflow-y: auto;">
+                                    {% if categories %}
+                                        {% for category in categories %}
+                                        <div class="category-item border-bottom">
+                                            <input class="form-check-input category-checkbox" type="checkbox" name="category_ids" value="{{ category.id }}" id="category_{{ category.id }}">
+                                            <label class="form-check-label" for="category_{{ category.id }}">
+                                                {{ category.name }}
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <small class="text-muted">No categories available.</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {# Catalogs tab #}
+                        <div class="tab-pane fade" id="catalogs-tab-pane" role="tabpanel" aria-labelledby="catalogs-tab" tabindex="0">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold mb-2">Catalogs</label>
+                                {# Display area for selected catalogs #}
+                                <div id="selectedCatalogsDisplay" class="mb-2 p-2 border rounded bg-light" style="min-height: 38px; font-size: 0.875em;">
+                                    <span class="text-muted">Selected: None</span>
+                                </div>
+                                {# Filter input for catalogs #}
+                                <div class="input-group mb-2">
+                                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                    <input type="text" id="catalogFilterInput" class="form-control" placeholder="Filter catalogs...">
+                                </div>
+                                {# Checkbox list for catalogs with improved styling #}
+                                <div id="knowledgeCatalogs" class="border rounded p-2" style="max-height: 300px; overflow-y: auto;">
+                                    {% if catalogs %}
+                                        {% for catalog in catalogs %}
+                                        <div class="catalog-item border-bottom">
+                                            <input class="form-check-input catalog-checkbox" type="checkbox" value="{{ catalog.id }}" id="catalog_{{ catalog.id }}">
+                                            <label class="form-check-label" for="catalog_{{ catalog.id }}">
+                                                {{ catalog.name }}
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <small class="text-muted">No catalogs available.</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        {# Libraries tab #}
+                        <div class="tab-pane fade" id="libraries-tab-pane" role="tabpanel" aria-labelledby="libraries-tab" tabindex="0">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold mb-2">Libraries</label>
+                                {# Display area for selected libraries #}
+                                <div id="selectedLibrariesDisplay" class="mb-2 p-2 border rounded bg-light" style="min-height: 38px; font-size: 0.875em;">
+                                    <span class="text-muted">Selected: None</span>
+                                </div>
+                                {# Filter input for libraries #}
+                                <div class="input-group mb-2">
+                                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                    <input type="text" id="libraryFilterInput" class="form-control" placeholder="Filter libraries...">
+                                </div>
+                                {# Checkbox list for libraries with improved styling #}
+                                <div id="knowledgeLibraries" class="border rounded p-2" style="max-height: 300px; overflow-y: auto;">
+                                    {% if libraries %}
+                                        {% for library in libraries %}
+                                        <div class="library-item border-bottom">
+                                            <input class="form-check-input library-checkbox" type="checkbox" name="library_ids" value="{{ library.library_id }}" id="library_{{ library.library_id }}">
+                                            <label class="form-check-label" for="library_{{ library.library_id }}">
+                                                {{ library.name }}
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <small class="text-muted">No libraries available.</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {# Groups tab #}
+                        <div class="tab-pane fade" id="groups-tab-pane" role="tabpanel" aria-labelledby="groups-tab" tabindex="0">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold mb-2">Groups</label>
+                                {# Display area for selected groups #}
+                                <div id="selectedGroupsDisplay" class="mb-2 p-2 border rounded bg-light" style="min-height: 38px; font-size: 0.875em;">
+                                    <span class="text-muted">Selected: None</span>
+                                </div>
+                                {# Filter input for groups #}
+                                <div class="input-group mb-2">
+                                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                    <input type="text" id="groupFilterInput" class="form-control" placeholder="Filter groups...">
+                                </div>
+                                {# Checkbox list for groups with improved styling #}
+                                <div id="knowledgeGroups" class="border rounded p-2" style="max-height: 300px; overflow-y: auto;">
+                                    {% if groups %}
+                                        {% for group in groups %}
+                                        <div class="group-item border-bottom">
+                                            <input class="form-check-input group-checkbox" type="checkbox" name="group_ids" value="{{ group.group_id }}" id="group_{{ group.group_id }}">
+                                            <label class="form-check-label" for="group_{{ group.group_id }}">
+                                                {{ group.name }}
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <small class="text-muted">No groups available.</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="formError" class="text-danger mt-2" style="display: none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="saveKnowledgeBtn">Save Knowledge</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block admin_scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/admin/knowledges.js') }}"></script>
+{% endblock %}
+
+</file_content>
+</write_to_file>

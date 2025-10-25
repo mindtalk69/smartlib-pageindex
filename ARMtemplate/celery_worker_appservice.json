@@ -1,0 +1,280 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "existingRedisName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the existing Azure Cache for Redis instance."
+      }
+    },
+    "existingRedisResourceGroup": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().name]",
+      "metadata": {
+        "description": "The resource group of the existing Azure Cache for Redis instance."
+      }
+    },
+    "existingKeyVaultName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the existing Azure Key Vault instance."
+      }
+    },
+    "existingKeyVaultResourceGroup": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().name]",
+      "metadata": {
+        "description": "The resource group of the existing Azure Key Vault instance."
+      }
+    },
+    "azureOpenAIKey": {
+      "type": "secureString",
+      "metadata": {
+        "description": "Azure OpenAI API Key"
+      }
+    },
+    "azureOpenAIEndpoint": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure OpenAI Endpoint"
+      }
+    },
+    "azureOpenAIDeployment": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure OpenAI Deployment Name"
+      }
+    },
+    "azureOpenAIAPIVersion": {
+      "type": "string",
+      "defaultValue": "2024-10-21",
+      "metadata": {
+        "description": "Azure OpenAI API Version"
+      }
+    },
+    "workerAppName": {
+      "type": "string",
+      "defaultValue": "flaskrag3-worker",
+      "metadata": {
+        "description": "Name of the Celery Worker App Service"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "indonesiacentral",
+      "allowedValues": [
+        "indonesiacentral",
+        "southeastasia",
+        "eastasia"
+      ],
+      "metadata": {
+        "description": "Location for all resources."
+      }
+    },
+    "acrLoginServer": {
+      "type": "string",
+      "defaultValue": "atgmpnregistry.azurecr.io",
+      "metadata": {
+        "description": "Full login server name of your Azure Container Registry"
+      }
+    },
+    "acrUsername": {
+      "type": "string",
+      "defaultValue": "atgmpnregistry",
+      "metadata": {
+        "description": "Username for the Azure Container Registry"
+      }
+    },
+    "acrPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Password for the Azure Container Registry"
+      }
+    },
+    "dockerImageName": {
+      "type": "string",
+      "defaultValue": "smarthing-app:latest",
+      "metadata": {
+        "description": "Docker image name in ACR"
+      }
+    },
+    "APP_CLIENT_ID": {
+      "type": "string",
+      "metadata": {
+        "description": "Application Client ID"
+      }
+    },
+    "APP_CLIENT_SECRET": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Application Client Secret"
+      }
+    },
+    "appAdminUsername": {
+      "type": "string",
+      "defaultValue": "admin",
+      "metadata": {
+        "description": "Admin username"
+      }
+    },
+    "appAdminPassword": {
+      "type": "securestring",
+      "defaultValue": "admin",
+      "metadata": {
+        "description": "Admin password"
+      }
+    },
+    "appAdminEmail": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Admin email"
+      }
+    },
+    "appServicePlanSkuName": {
+      "type": "string",
+      "defaultValue": "B1",
+      "allowedValues": [
+        "B1",
+        "S1",
+        "P1v2"
+      ],
+      "metadata": {
+        "description": "SKU for the Worker App Service Plan. B1 is sufficient for background workers."
+      }
+    }
+  },
+  "variables": {
+    "appServicePlanName": "[concat(parameters('workerAppName'), '-plan')]",
+    "skuMap": {
+      "B1": {
+        "name": "B1",
+        "tier": "Basic"
+      },
+      "S1": {
+        "name": "S1",
+        "tier": "Standard"
+      },
+      "P1v2": {
+        "name": "P1v2",
+        "tier": "PremiumV2"
+      }
+    },
+    "selectedSku": "[variables('skuMap')[parameters('appServicePlanSkuName')]]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2022-03-01",
+      "name": "[variables('appServicePlanName')]",
+      "location": "[parameters('location')]",
+      "sku": "[variables('selectedSku')]",
+      "kind": "linux",
+      "properties": {
+        "reserved": true
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2022-03-01",
+      "name": "[parameters('workerAppName')]",
+      "location": "[parameters('location')]",
+      "kind": "app,linux",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+      ],
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+        "siteConfig": {
+          "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/', parameters('dockerImageName'))]",
+          "appCommandLine": "./docker-entrypoint.sh worker",
+          "alwaysOn": true,
+          "appSettings": [
+            {
+              "name": "CELERY_BROKER_URL",
+              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380)]"
+            },
+            {
+              "name": "CELERY_RESULT_BACKEND",
+              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380)]"
+            },
+            {
+              "name": "AZURE_OPENAI_API_KEY",
+              "value": "[parameters('azureOpenAIKey')]"
+            },
+            {
+              "name": "AZURE_OPENAI_ENDPOINT",
+              "value": "[parameters('azureOpenAIEndpoint')]"
+            },
+            {
+              "name": "AZURE_OPENAI_DEPLOYMENT",
+              "value": "[parameters('azureOpenAIDeployment')]"
+            },
+            {
+              "name": "AZURE_OPENAI_API_VERSION",
+              "value": "[parameters('azureOpenAIAPIVersion')]"
+            },
+            {
+              "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
+              "value": "false"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_URL",
+              "value": "[concat('https://', parameters('acrLoginServer'))]"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_USERNAME",
+              "value": "[parameters('acrUsername')]"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_PASSWORD",
+              "value": "[parameters('acrPassword')]"
+            },
+            {
+              "name": "DOCKER_ENABLE_CI",
+              "value": "true"
+            },
+            {
+              "name": "KEY_VAULT_NAME",
+              "value": "[parameters('existingKeyVaultName')]"
+            },
+            {
+              "name": "APP_CLIENT_ID",
+              "value": "[parameters('APP_CLIENT_ID')]"
+            },
+            {
+              "name": "APP_CLIENT_SECRET",
+              "value": "[parameters('APP_CLIENT_SECRET')]"
+            },
+            {
+              "name": "APP_ADMIN_USERNAME",
+              "value": "[parameters('appAdminUsername')]"
+            },
+            {
+              "name": "APP_ADMIN_PASSWORD",
+              "value": "[parameters('appAdminPassword')]"
+            },
+            {
+              "name": "APP_ADMIN_EMAIL",
+              "value": "[parameters('appAdminEmail')]"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "workerAppName": {
+      "type": "string",
+      "value": "[parameters('workerAppName')]"
+    },
+    "workerAppServicePlan": {
+      "type": "string",
+      "value": "[variables('appServicePlanName')]"
+    }
+  }
+}

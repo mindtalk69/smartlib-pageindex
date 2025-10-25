@@ -1,0 +1,1254 @@
+// --- Global State Variables ---
+// Declared outside DOMContentLoaded to be accessible by query-form.js
+var selectedLibraryId = ""; // Use var for older browser compatibility or ensure build step handles block scope
+var selectedLibraryName = ""; 
+
+document.addEventListener("DOMContentLoaded", function() {
+  console.log("Main.js loaded - Core Functionality");
+
+  // Check if we're in the authenticated view (by looking for query form)
+  const isAuthenticated = document.getElementById("query-form") !== null;
+  if (!isAuthenticated) {
+    console.log("Main.js: Non-authenticated view - skipping chat functionality initialization");
+    return;
+  }
+
+  // --- Core Elements (Chat Display Related) ---
+  const chatMessages = document.getElementById("chat-messages");
+
+  // Debug: Log restoreLastChatEnabled and initialConversation
+  console.log("RestoreLastChatEnabled (localStorage):", localStorage.getItem('restoreLastChatEnabled'));
+  console.log("window.initialConversation:", window.initialConversation);
+
+  // --- Helper Functions (Core Chat Display) ---
+  // Append message to chat (Make globally accessible)
+  window.appendMessage = function(role, text, citations, usageMetadata, suggestedQuestions, messageId) {
+    const li = document.createElement("li");
+    li.className = "px-3 py-2"; 
+    // Set data-message-id for feedback actions only on agent messages
+    if (role === "agent") {
+      li.setAttribute('data-message-id', messageId || '');
+    }
+    const messageDiv = document.createElement("div");
+    messageDiv.className = `chat-message ${role}`; 
+    const bubbleDiv = document.createElement("div");
+    bubbleDiv.className = `chat-bubble ${role}`; 
+
+    if (role === "agent") {
+        if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+            bubbleDiv.innerHTML = DOMPurify.sanitize(marked.parse(text));
+        } else {
+            bubbleDiv.textContent = text;
+        }
+    } else {
+        bubbleDiv.textContent = text;
+    }
+    messageDiv.appendChild(bubbleDiv);
+
+    if (role === "agent" && usageMetadata) {
+      const usageDiv = document.createElement("div");
+      usageDiv.className = "agent-metadata small text-muted mt-2"; 
+      usageDiv.innerText = `Model: ${usageMetadata.model}, input token: ${usageMetadata.input_tokens}, output token: ${usageMetadata.output_tokens}`;
+      messageDiv.appendChild(usageDiv);
+    }
+
+    if (role === "agent") {
+      const feedbackDiv = document.createElement("div");
+      feedbackDiv.className = "feedback-icons mt-2";
+      feedbackDiv.innerHTML = `
+        <button class="like-btn btn btn-sm btn-icon" aria-label="Like" title="Like"><i class="bi bi-hand-thumbs-up"></i></button>
+        <button class="dislike-btn btn btn-sm btn-icon" aria-label="Dislike" title="Dislike"><i class="bi bi-hand-thumbs-down"></i></button>
+        <button class="copy-btn btn btn-sm btn-icon" aria-label="Copy answer" title="Copy answer"><i class="bi bi-clipboard"></i></button>
+      `;
+      messageDiv.appendChild(feedbackDiv);
+
+      // --- REVISED CITATION HANDLING (Individual Toggles + Icon Button) ---
+      if (citations && citations.length > 0) {
+        const citationsListContainer = document.createElement('div');
+        citationsListContainer.className = 'citations-list-container mt-2'; // Container for all citation groups
+
+        // Limit to max 3 citations and iterate
+        citations.slice(0, 3).forEach((citation, index) => {
+            const uniqueId = `citation-detail-${index}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+            const metadata = citation.metadata || {};
+            const documentId = metadata.id || metadata.doc_id;
+            const hasVisualGrounding = documentId && metadata.docling_json_path;
+            const source = metadata.source || 'Unknown Source';
+            const truncatedSource = source.length > 20 ? source.substring(0, 20) + '...' : source; // Truncate source
+
+            // Create a container for this citation's elements (button wrapper + details)
+            const citationItemGroup = document.createElement('div');
+            citationItemGroup.className = 'citation-item-group mb-1 me-1'; // Group for layout
+
+            // Create Wrapper for button and potential badge icon
+            const buttonWrapper = document.createElement('div');
+            buttonWrapper.className = 'citation-button-wrapper'; // Class for positioning context
+
+            // Create Main Toggle Button (for details)
+            const toggleButton = document.createElement('button');
+            toggleButton.className = 'btn btn-sm citation-toggle-btn'; // Main button to toggle details
+            
+            // Prepare tooltip content with metadata preview
+            let tooltipContent = source; // Default tooltip content
+            if (metadata.page !== undefined && metadata.page !== null && metadata.page !== '') {
+                tooltipContent += ` (Page: ${metadata.page})`;
+            }
+            if (metadata.knowledge_name) {
+                tooltipContent += `<br><small class="tooltip-knowledge">Knowledge: ${metadata.knowledge_name}</small>`;
+            }
+            
+            // Apply both classes for proper theme support
+            toggleButton.className = 'btn btn-sm citation-toggle-btn theme-aware-tooltip'; 
+            toggleButton.setAttribute('data-bs-custom-class', 'theme-aware-tooltip'); // For theme support
+
+            // Initialize button text
+            toggleButton.innerHTML = `Citation ${index + 1}: ${truncatedSource}`; // remove  ">" prefix
+            
+            // Store data for later tooltip and popover initialization
+            toggleButton.dataset.tooltipContent = tooltipContent;
+            toggleButton.dataset.citationId = uniqueId;
+            
+            // Append the main button directly to the group
+            citationItemGroup.appendChild(toggleButton);
+
+            // Create and Append *Separate* Visual Grounding Icon Button if available
+            if (hasVisualGrounding) {
+                const evidenceBadge = document.createElement('button');
+                evidenceBadge.className = 'citation-visual-badge visual-grounding-btn';
+                evidenceBadge.type = 'button';
+                evidenceBadge.title = 'Show Visual Evidence';
+                evidenceBadge.setAttribute('data-bs-toggle', 'tooltip');
+                evidenceBadge.setAttribute('data-bs-placement', 'top');
+                evidenceBadge.innerHTML = '<i class="bi bi-camera" style="font-size:1.1em;vertical-align:middle;"></i>';
+                evidenceBadge.dataset.doclingJsonPath = metadata.docling_json_path;
+                if (documentId) {
+                  evidenceBadge.dataset.documentId = documentId;
+                }
+                // Do NOT set pageNo or bbox; let backend handle it from DB
+                citationItemGroup.appendChild(evidenceBadge);
+            }
+
+            // --- Create Popover Content HTML ---
+            // Add a container and the close button at the top
+            let popoverContentHTML = `<div class="citation-popover-content position-relative theme-aware-popover">`; // Add theme-aware class
+            popoverContentHTML += `<button type="button" class="btn-close popover-close-btn" aria-label="Close" data-bs-dismiss="popover"></button>`; // Using data-bs-dismiss attribute
+            // Populate with metadata (Source, Page, Knowledge, Categories, Catalogs)
+            popoverContentHTML += `<div class="detail-source fw-bold">${source}</div>`; // Full source here
+            const page = metadata.page;
+            if (page !== undefined && page !== null && page !== '') {
+                popoverContentHTML += `<div class="detail-page small text-muted">Page: ${page}</div>`;
+            }
+            if (metadata.knowledge_name) {
+                popoverContentHTML += `<div class="detail-knowledge small text-info">Knowledge: ${metadata.knowledge_name}</div>`;
+            }
+            if (metadata.category_names && metadata.category_names.length > 0) {
+                popoverContentHTML += `<div class="detail-categories small text-success">Categories: ${metadata.category_names.join(', ')}</div>`;
+            }
+            if (metadata.catalog_names && metadata.catalog_names.length > 0) {
+                popoverContentHTML += `<div class="detail-catalogs small text-warning">Catalogs: ${metadata.catalog_names.join(', ')}</div>`;
+            }
+            popoverContentHTML += '</div>'; // Close citation-popover-content div
+            
+            // Store popover content for later initialization
+            toggleButton.dataset.popoverContent = popoverContentHTML;
+            // --- End Popover Content ---
+
+
+            // --- REMOVED Collapsible Div Creation ---
+            // const collapseDiv = document.createElement('div'); ...
+            // const detailItem = document.createElement('div'); ...
+            // collapseDiv.appendChild(detailItem);
+            // citationItemGroup.appendChild(collapseDiv);
+
+            // Append the group (now just button + optional icon) to the main list container
+            citationsListContainer.appendChild(citationItemGroup);
+        });
+
+        messageDiv.appendChild(citationsListContainer); // Append the container with all toggles/details
+      }
+      // --- END REVISED CITATION HANDLING ---
+      
+      // --- Add Suggested Questions if available ---
+      console.log("Checking for suggested questions:", suggestedQuestions);
+      if (suggestedQuestions && suggestedQuestions.length > 0) {
+        console.log("Adding suggested questions to UI:", suggestedQuestions);
+        const suggestionsContainer = document.createElement("div");
+        suggestionsContainer.className = "suggested-questions-container";
+        
+        // Add a small header
+        const suggestionsHeader = document.createElement("div");
+        suggestionsHeader.className = "suggested-questions-header";
+        suggestionsHeader.textContent = "Suggested questions:";
+        suggestionsContainer.appendChild(suggestionsHeader);
+        
+        // Add the questions as buttons
+        const questionsWrapper = document.createElement("div");
+        questionsWrapper.className = "suggested-questions-wrapper";
+        
+        suggestedQuestions.forEach(question => {
+            const questionBtn = document.createElement("button");
+            questionBtn.className = "btn btn-sm suggested-question-btn";
+            questionBtn.textContent = question;
+            questionBtn.addEventListener("click", function() {
+                // Fill the query input with this question
+                const queryInput = document.querySelector("textarea[name='query']");
+                if (queryInput) {
+                    queryInput.value = question;
+                    queryInput.focus();
+                    
+                    // Adjust height of textarea using the global function
+                    if (typeof window.adjustTextareaHeight === 'function') {
+                        window.adjustTextareaHeight(queryInput);
+                    }
+                    
+                    // Auto-submit the form
+                    const queryForm = document.getElementById("query-form");
+                    if (queryForm) queryForm.requestSubmit();
+                }
+            });
+            questionsWrapper.appendChild(questionBtn);
+        });
+        
+        suggestionsContainer.appendChild(questionsWrapper);
+        messageDiv.appendChild(suggestionsContainer);
+      }
+    }
+    
+    li.appendChild(messageDiv);
+    
+    const replacementPlaceholder = document.getElementById('replacement-placeholder');
+    if (replacementPlaceholder) replacementPlaceholder.style.display = 'none'; 
+ 
+     if (chatMessages) {
+         chatMessages.appendChild(li);
+         // Scroll the main scrollable container and initialize popovers
+         const mainScrollContainer = document.querySelector('.chat-content');
+         if (mainScrollContainer) {
+             requestAnimationFrame(() => {
+                 console.log("Attempting to scroll .chat-content to bottom via rAF"); // Update log
+                 mainScrollContainer.scrollTop = mainScrollContainer.scrollHeight + 50; // Scroll the correct container with offset
+
+                 // Process citation buttons - initialize tooltips and popovers properly
+                 const citationButtons = messageDiv.querySelectorAll('.citation-toggle-btn');
+                 citationButtons.forEach(function(button) {
+                     // Initialize tooltip (hover behavior)
+                     const tooltip = new bootstrap.Tooltip(button, {
+                         trigger: 'hover',
+                         html: true,
+                         title: button.dataset.tooltipContent,
+                         customClass: 'theme-aware-tooltip',
+                         boundary: 'window'
+                     });
+                     
+                     // Initialize popover (click behavior)
+                     if (button.dataset.popoverContent) {
+                         // Create a unique ID for the popover
+                         const popoverId = `popover-${button.dataset.citationId}`;
+                         
+                         // Create popover with proper dismissal settings - using 'manual' trigger for complete control
+                         const popover = new bootstrap.Popover(button, {
+                             trigger: 'manual', // Change to manual trigger for better control
+                             html: true,
+                             content: button.dataset.popoverContent,
+                             placement: 'bottom',
+                             customClass: 'theme-aware-popover',
+                             sanitize: false,
+                             container: 'body'
+                         });
+                         
+                         // Store popover reference on the button element for easier access
+                         button._popover = popover;
+                         
+                         // Improved toggle behavior for the popover
+                         button.addEventListener('click', function(e) {
+                             // Hide tooltip when showing popover
+                             tooltip.hide();
+                             
+                             // Close all other popovers first
+                             citationButtons.forEach(function(otherButton) {
+                                 if (otherButton !== button && otherButton._popover) {
+                                     otherButton._popover.hide();
+                                 }
+                             });
+                             
+                             // Toggle this popover manually
+                             const isShown = button.getAttribute('aria-describedby')?.includes('popover');
+                             if (isShown) {
+                                 popover.hide();
+                             } else {
+                                 popover.show();
+                             }
+                             
+                             e.stopPropagation();
+                             e.preventDefault();
+                         });
+                         
+                         // Add manual close button event handler to each popover
+                         button.addEventListener('shown.bs.popover', function() {
+                             const popoverElement = document.getElementById(button.getAttribute('aria-describedby'));
+                             if (popoverElement) {
+                                 const closeBtn = popoverElement.querySelector('.popover-close-btn');
+                                 if (closeBtn) {
+                                     closeBtn.addEventListener('click', function(e) {
+                                         popover.hide();
+                                         e.stopPropagation();
+                                         e.preventDefault();
+                                     });
+                                 }
+                             }
+                         });
+                     }
+                 });
+                 
+                 // Global document handler to close popovers when clicking outside
+                 if (!document.citationPopoverHandlerAdded) {
+                     document.addEventListener('click', function(e) {
+                         if (!e.target.closest('.popover') && !e.target.closest('.citation-toggle-btn')) {
+                             // Close all popovers when clicking outside
+                             const allPopovers = document.querySelectorAll('.citation-toggle-btn');
+                             allPopovers.forEach(btn => {
+                                 if (btn._popover) {
+                                     btn._popover.hide();
+                                 }
+                             });
+                         }
+                     });
+                     document.citationPopoverHandlerAdded = true;
+                 }
+             });
+         }
+         checkOverflow();
+     }
+  }
+
+  // --- Restore last chat preference ---
+  const restoreLastChatPref = localStorage.getItem('restoreLastChatEnabled');
+  const restoreLastChat = restoreLastChatPref === null ? true : (restoreLastChatPref === 'true');
+
+  // Only render initial conversation if restoreLastChat is enabled
+  if (restoreLastChat && window.initialConversation && Array.isArray(window.initialConversation)) {
+    if (!chatMessages) {
+      console.error("main.js: chatMessages element not found in DOM.");
+    }
+    if (typeof window.appendMessage !== 'function') {
+      console.error("main.js: window.appendMessage is not a function.");
+    }
+    chatMessages.innerHTML = '';
+    window.initialConversation.forEach((msg, idx) => {
+      console.log("main.js: Rendering message", idx, msg);
+      // Map backend roles to frontend roles
+      let role = msg.role;
+      if (role === 'agent') role = 'agent';
+      else if (role === 'user') role = 'user';
+      else if (role === 'welcome') role = 'welcome';
+      // Only render welcome, user, and agent messages
+      if (typeof window.appendMessage === 'function') {
+        window.appendMessage(
+          role,
+          msg.message,
+          msg.citations || [],
+          msg.usage_metadata || null,
+          msg.suggested_questions || [],
+          msg.message_id || null
+        );
+      } else {
+        console.error("main.js: window.appendMessage is not defined when trying to render message", idx);
+      }
+    });
+  } else if (!restoreLastChat) {
+    // If restore is disabled, clear the chat and window.initialConversation
+    chatMessages.innerHTML = '';
+    window.initialConversation = [];
+    // Show the center animation/placeholder
+    const replacementPlaceholder = document.getElementById('replacement-placeholder');
+    if (replacementPlaceholder) {
+      replacementPlaceholder.style.display = 'flex';
+      // Restart the animation cycle if available
+      if (typeof startRandomCycle === 'function') {
+        startRandomCycle();
+      }
+    }
+  }
+
+  // --- Initialize History Panel ---
+  initializeHistoryPanel();
+  
+  // --- Function to Refresh History Panel ---
+  window.refreshHistoryPanel = function() {
+    const historyOffcanvasBody = document.getElementById('historyOffcanvasBody');
+    if (!historyOffcanvasBody) {
+      console.warn("History panel not found for refresh.");
+      return;
+    }
+    
+    fetch("/api/history", {
+      method: "GET",
+      credentials: "include",
+      headers: { "X-Requested-With": "XMLHttpRequest" }
+    })
+    .then(response => {
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return response.json();
+    })
+    .then(data => {
+      if (!data.success) throw new Error(data.error || "Failed to fetch history");
+      
+      // Clear existing history
+      historyOffcanvasBody.innerHTML = '';
+      
+      // Check if history is empty
+      const historyData = data.history;
+      const dates = Object.keys(historyData).sort().reverse();
+      
+      if (dates.length === 0) {
+        historyOffcanvasBody.innerHTML = '<p class="text-muted">No query history found.</p>';
+        return;
+      }
+      
+      // Populate with new history data
+      dates.forEach(date => {
+        const messages = historyData[date];
+        const dateHeading = document.createElement('h6');
+        dateHeading.textContent = date;
+        historyOffcanvasBody.appendChild(dateHeading);
+        
+        const messagesList = document.createElement('ul');
+        messagesList.className = 'list-unstyled mb-3';
+        
+        messages.forEach(msg => {
+          const listItem = document.createElement('li');
+          listItem.className = 'small mb-1 p-1 border-bottom border-secondary-subtle d-flex justify-content-between align-items-center history-item';
+
+          // Set data-message-id for agent messages
+          if (msg.role === "agent" && msg.message_id) {
+            listItem.setAttribute('data-message-id', msg.message_id);
+          }
+
+          const messageSpan = document.createElement('span');
+          messageSpan.className = 'me-2';
+          messageSpan.style.cursor = 'pointer';
+          messageSpan.title = `${msg.timestamp} - ${msg.message_text}`;
+          messageSpan.textContent = msg.message_text.length > 45 ? 
+                                   msg.message_text.substring(0, 45) + '...' : 
+                                   msg.message_text;
+
+          listItem.appendChild(messageSpan);
+
+          // Feedback buttons for agent messages
+          if (msg.role === "agent" && msg.message_id) {
+            const feedbackDiv = document.createElement("div");
+            feedbackDiv.className = "feedback-icons ms-2";
+            feedbackDiv.innerHTML = `
+              <button class="like-btn btn btn-xs btn-icon" aria-label="Like" title="Like"><i class="bi bi-hand-thumbs-up"></i></button>
+              <button class="dislike-btn btn btn-xs btn-icon" aria-label="Dislike" title="Dislike"><i class="bi bi-hand-thumbs-down"></i></button>
+            `;
+            listItem.appendChild(feedbackDiv);
+          }
+
+          // Copy button for all messages
+          const copyButton = document.createElement('button');
+          copyButton.className = 'btn btn-outline-secondary rounded-circle p-0 copy-history-btn flex-shrink-0 d-flex align-items-center justify-content-center';
+          copyButton.style.width = '1.5rem';
+          copyButton.style.height = '1.5rem';
+          copyButton.style.fontSize = '0.8rem';
+          copyButton.dataset.text = msg.message_text;
+          copyButton.title = 'Copy query';
+          copyButton.innerHTML = '<i class="bi bi-clipboard"></i>';
+          listItem.appendChild(copyButton);
+
+          messagesList.appendChild(listItem);
+        });
+        
+        historyOffcanvasBody.appendChild(messagesList);
+      });
+    })
+    .catch(error => {
+      console.error("Error refreshing history panel:", error);
+      historyOffcanvasBody.innerHTML = `<p class="text-danger">Error loading history: ${error.message}</p>`;
+    });
+  };
+
+  // --- Helper Functions (Core Chat Display) ---
+
+  // Check for content overflow 
+  function checkOverflow() {
+    const chatContent = document.querySelector('.chat-content');
+    if (chatContent) {
+      chatContent.classList.toggle('overflow', chatContent.scrollHeight > chatContent.clientHeight);
+    }
+  }
+
+  // Append message to chat (Make globally accessible)
+    window.appendMessage = function(role, text, citations, usageMetadata, suggestedQuestions, messageId) {
+    const li = document.createElement("li");
+    li.className = "px-3 py-2"; 
+    // Set data-message-id for feedback actions only on agent messages
+    if (role === "agent") {
+      li.setAttribute('data-message-id', messageId || '');
+    }
+
+  // --- HITL Confirmation Controls (Human-in-the-Loop) ---
+
+  // Helper to add confirmation buttons and listeners
+  window.addConfirmationControls = function(messageElement, threadId) {
+    if (!messageElement) {
+      console.error("addConfirmationControls: messageElement is null/undefined");
+      return;
+    }
+    // Prevent duplicate controls
+    if (messageElement.querySelector('.confirmation-controls')) return;
+
+    const controlsDiv = document.createElement('div');
+    controlsDiv.classList.add('confirmation-controls', 'mt-2');
+    controlsDiv.innerHTML = `
+      <button class="btn btn-sm btn-success confirm-yes" data-thread-id="${threadId}">Yes, Search Web</button>
+      <button class="btn btn-sm btn-danger confirm-no" data-thread-id="${threadId}">No</button>
+    `;
+    messageElement.appendChild(controlsDiv);
+
+    // Add event listeners
+    controlsDiv.querySelector('.confirm-yes').addEventListener('click', window.handleConfirmationYes);
+    controlsDiv.querySelector('.confirm-no').addEventListener('click', window.handleConfirmationNo);
+  };
+
+  // Handler for "Yes" confirmation
+  window.handleConfirmationYes = async function(event) {
+    event.preventDefault();
+    const button = event.target;
+    const threadId = button.dataset.threadId;
+    const controlsDiv = button.closest('.confirmation-controls');
+
+    // Disable buttons
+    controlsDiv.querySelectorAll('button').forEach(btn => btn.disabled = true);
+    button.textContent = 'Searching...'; // Indicate activity
+
+    if (typeof window.showLoading === 'function') window.showLoading();
+
+    try {
+      // Use CSRF token from meta tag or global variable
+      let csrfToken = null;
+      if (typeof window.csrfToken !== 'undefined') {
+        csrfToken = window.csrfToken;
+      } else {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta) csrfToken = meta.getAttribute('content');
+      }
+
+      const response = await fetch('/api/resume_rag', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...(csrfToken ? {'X-CSRFToken': csrfToken} : {})
+        },
+        body: JSON.stringify({
+          thread_id: threadId,
+          confirmation: 'yes'
+        })
+      });
+
+      if (typeof window.hideLoading === 'function') window.hideLoading();
+      controlsDiv.remove();
+
+      if (!response.ok) {
+        let errorData = {};
+        try { errorData = await response.json(); } catch {}
+        console.error('Error resuming RAG:', errorData);
+        if (typeof window.appendMessage === 'function') {
+          window.appendMessage('error', `Error resuming search: ${errorData.error || response.statusText}`);
+        }
+        return;
+      }
+
+      const finalData = await response.json();
+      console.log('Received final answer after resume:', finalData);
+
+      // Display the final answer (non-streaming resume response)
+      const answerText = finalData.answer || finalData.result || "Error retrieving final answer.";
+      const citations = finalData.citations || [];
+      const suggestions = finalData.suggested_questions || [];
+      const messageId = finalData.message_id;
+
+      if (typeof window.appendMessage === 'function') {
+        window.appendMessage('agent', answerText, citations, null, suggestions, messageId);
+      }
+
+    } catch (error) {
+      if (typeof window.hideLoading === 'function') window.hideLoading();
+      controlsDiv.remove();
+      console.error('Network or other error resuming RAG:', error);
+      if (typeof window.appendMessage === 'function') {
+        window.appendMessage('error', `Failed to resume search: ${error.message}`);
+      }
+    }
+  };
+
+  // Handler for "No" confirmation
+  window.handleConfirmationNo = function(event) {
+    event.preventDefault();
+    const button = event.target;
+    const controlsDiv = button.closest('.confirmation-controls');
+
+    // Disable buttons and remove them
+    controlsDiv.querySelectorAll('button').forEach(btn => btn.disabled = true);
+    // Optionally add a small message or just remove controls
+    // const cancelledMsg = document.createElement('small');
+    // cancelledMsg.textContent = ' Web search cancelled.';
+    // controlsDiv.parentNode.appendChild(cancelledMsg);
+    controlsDiv.remove();
+    // Optionally, show a toast or message
+    if (typeof window.showToast === 'function') {
+      window.showToast('Web search cancelled.', 'info');
+    }
+  };
+    const messageDiv = document.createElement("div");
+    messageDiv.className = `chat-message ${role}`; 
+    const bubbleDiv = document.createElement("div");
+    bubbleDiv.className = `chat-bubble ${role}`; 
+
+    if (role === "agent") {
+        if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+            bubbleDiv.innerHTML = DOMPurify.sanitize(marked.parse(text));
+        } else {
+            bubbleDiv.textContent = text;
+        }
+    } else {
+        bubbleDiv.textContent = text;
+    }
+    messageDiv.appendChild(bubbleDiv);
+
+    if (role === "agent" && usageMetadata) {
+      const usageDiv = document.createElement("div");
+      usageDiv.className = "agent-metadata small text-muted mt-2"; 
+      usageDiv.innerText = `Model: ${usageMetadata.model}, input token: ${usageMetadata.input_tokens}, output token: ${usageMetadata.output_tokens}`;
+      messageDiv.appendChild(usageDiv);
+    }
+
+    if (role === "agent") {
+      const feedbackDiv = document.createElement("div");
+      feedbackDiv.className = "feedback-icons mt-2";
+      feedbackDiv.innerHTML = `
+        <button class="like-btn btn btn-sm btn-icon" aria-label="Like" title="Like"><i class="bi bi-hand-thumbs-up"></i></button>
+        <button class="dislike-btn btn btn-sm btn-icon" aria-label="Dislike" title="Dislike"><i class="bi bi-hand-thumbs-down"></i></button>
+        <button class="copy-btn btn btn-sm btn-icon" aria-label="Copy answer" title="Copy answer"><i class="bi bi-clipboard"></i></button>
+      `;
+      messageDiv.appendChild(feedbackDiv);
+
+      // --- REVISED CITATION HANDLING (Individual Toggles + Icon Button) ---
+      if (citations && citations.length > 0) {
+        const citationsListContainer = document.createElement('div');
+        citationsListContainer.className = 'citations-list-container mt-2'; // Container for all citation groups
+
+        // Limit to max 3 citations and iterate
+        citations.slice(0, 3).forEach((citation, index) => {
+            const uniqueId = `citation-detail-${index}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+            const metadata = citation.metadata || {};
+            const hasVisualGrounding = metadata.dl_meta && metadata.docling_json_path;
+            const source = metadata.source || 'Unknown Source';
+            const truncatedSource = source.length > 20 ? source.substring(0, 20) + '...' : source; // Truncate source
+
+            // Create a container for this citation's elements (button wrapper + details)
+            const citationItemGroup = document.createElement('div');
+            citationItemGroup.className = 'citation-item-group mb-1 me-1'; // Group for layout
+
+            // Create Wrapper for button and potential badge icon
+            const buttonWrapper = document.createElement('div');
+            buttonWrapper.className = 'citation-button-wrapper'; // Class for positioning context
+
+            // Create Main Toggle Button (for details)
+            const toggleButton = document.createElement('button');
+            toggleButton.className = 'btn btn-sm citation-toggle-btn'; // Main button to toggle details
+            
+            // Prepare tooltip content with metadata preview
+            let tooltipContent = source; // Default tooltip content
+            if (metadata.page !== undefined && metadata.page !== null && metadata.page !== '') {
+                tooltipContent += ` (Page: ${metadata.page})`;
+            }
+            if (metadata.knowledge_name) {
+                tooltipContent += `<br><small class="tooltip-knowledge">Knowledge: ${metadata.knowledge_name}</small>`;
+            }
+            
+            // Apply both classes for proper theme support
+            toggleButton.className = 'btn btn-sm citation-toggle-btn theme-aware-tooltip'; 
+            toggleButton.setAttribute('data-bs-custom-class', 'theme-aware-tooltip'); // For theme support
+
+            // Initialize button text
+            toggleButton.innerHTML = `> Citation ${index + 1}: ${truncatedSource}`; // Add ">" prefix
+            
+            // Store data for later tooltip and popover initialization
+            toggleButton.dataset.tooltipContent = tooltipContent;
+            toggleButton.dataset.citationId = uniqueId;
+            
+            // Append the main button directly to the group
+            citationItemGroup.appendChild(toggleButton);
+
+            // Create and Append *Separate* Visual Grounding Icon Button if available
+            if (hasVisualGrounding) {
+                 try {
+                    const dlMeta = metadata.dl_meta;
+                    if (dlMeta.doc_items && dlMeta.doc_items.length > 0 && dlMeta.doc_items[0].prov && dlMeta.doc_items[0].prov.length > 0) {
+                        const prov = dlMeta.doc_items[0].prov[0];
+                        const doclingJsonPath = metadata.docling_json_path;
+                        const pageNo = prov.page_no;
+                        const bbox = prov.bbox;
+                        if (doclingJsonPath && pageNo !== undefined && bbox) {
+                            const evidenceIconButton = document.createElement('button');
+                            // Add visual-grounding-btn class for the existing event listener
+                            evidenceIconButton.className = 'btn btn-sm visual-grounding-btn citation-icon-btn py-0 px-1 ms-1'; // Added ms-1 for spacing
+                            evidenceIconButton.innerHTML = '<i class="bi bi-image"></i>';
+                            evidenceIconButton.title = 'Show Visual Grounding';
+                            evidenceIconButton.dataset.doclingJsonPath = doclingJsonPath;
+                            evidenceIconButton.dataset.pageNo = pageNo;
+                            evidenceIconButton.dataset.bbox = JSON.stringify(bbox);
+                            // Append this separate button right after the main toggle button
+                            citationItemGroup.appendChild(evidenceIconButton);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Error processing dl_meta for citation:", e, metadata.dl_meta);
+                }
+            }
+
+            // --- Create Popover Content HTML ---
+            // Add a container and the close button at the top
+            let popoverContentHTML = `<div class="citation-popover-content position-relative theme-aware-popover">`; // Add theme-aware class
+            popoverContentHTML += `<button type="button" class="btn-close popover-close-btn" aria-label="Close" data-bs-dismiss="popover"></button>`; // Using data-bs-dismiss attribute
+            // Populate with metadata (Source, Page, Knowledge, Categories, Catalogs)
+            popoverContentHTML += `<div class="detail-source fw-bold">${source}</div>`; // Full source here
+            const page = metadata.page;
+            if (page !== undefined && page !== null && page !== '') {
+                popoverContentHTML += `<div class="detail-page small text-muted">Page: ${page}</div>`;
+            }
+            if (metadata.knowledge_name) {
+                popoverContentHTML += `<div class="detail-knowledge small text-info">Knowledge: ${metadata.knowledge_name}</div>`;
+            }
+            if (metadata.category_names && metadata.category_names.length > 0) {
+                popoverContentHTML += `<div class="detail-categories small text-success">Categories: ${metadata.category_names.join(', ')}</div>`;
+            }
+            if (metadata.catalog_names && metadata.catalog_names.length > 0) {
+                popoverContentHTML += `<div class="detail-catalogs small text-warning">Catalogs: ${metadata.catalog_names.join(', ')}</div>`;
+            }
+            popoverContentHTML += '</div>'; // Close citation-popover-content div
+            
+            // Store popover content for later initialization
+            toggleButton.dataset.popoverContent = popoverContentHTML;
+            // --- End Popover Content ---
+
+
+            // --- REMOVED Collapsible Div Creation ---
+            // const collapseDiv = document.createElement('div'); ...
+            // const detailItem = document.createElement('div'); ...
+            // collapseDiv.appendChild(detailItem);
+            // citationItemGroup.appendChild(collapseDiv);
+
+            // Append the group (now just button + optional icon) to the main list container
+            citationsListContainer.appendChild(citationItemGroup);
+        });
+
+        messageDiv.appendChild(citationsListContainer); // Append the container with all toggles/details
+      }
+      // --- END REVISED CITATION HANDLING ---
+      
+      // --- Add Suggested Questions if available ---
+      console.log("Checking for suggested questions:", suggestedQuestions);
+      if (suggestedQuestions && suggestedQuestions.length > 0) {
+        console.log("Adding suggested questions to UI:", suggestedQuestions);
+        const suggestionsContainer = document.createElement("div");
+        suggestionsContainer.className = "suggested-questions-container";
+        
+        // Add a small header
+        const suggestionsHeader = document.createElement("div");
+        suggestionsHeader.className = "suggested-questions-header";
+        suggestionsHeader.textContent = "Suggested questions:";
+        suggestionsContainer.appendChild(suggestionsHeader);
+        
+        // Add the questions as buttons
+        const questionsWrapper = document.createElement("div");
+        questionsWrapper.className = "suggested-questions-wrapper";
+        
+        suggestedQuestions.forEach(question => {
+            const questionBtn = document.createElement("button");
+            questionBtn.className = "btn btn-sm suggested-question-btn";
+            questionBtn.textContent = question;
+            questionBtn.addEventListener("click", function() {
+                // Fill the query input with this question
+                const queryInput = document.querySelector("textarea[name='query']");
+                if (queryInput) {
+                    queryInput.value = question;
+                    queryInput.focus();
+                    
+                    // Adjust height of textarea using the global function
+                    if (typeof window.adjustTextareaHeight === 'function') {
+                        window.adjustTextareaHeight(queryInput);
+                    }
+                    
+                    // Auto-submit the form
+                    const queryForm = document.getElementById("query-form");
+                    if (queryForm) queryForm.requestSubmit();
+                }
+            });
+            questionsWrapper.appendChild(questionBtn);
+        });
+        
+        suggestionsContainer.appendChild(questionsWrapper);
+        messageDiv.appendChild(suggestionsContainer);
+      }
+    }
+    
+    li.appendChild(messageDiv);
+    
+    const replacementPlaceholder = document.getElementById('replacement-placeholder');
+    if (replacementPlaceholder) replacementPlaceholder.style.display = 'none'; 
+ 
+     if (chatMessages) {
+         chatMessages.appendChild(li);
+         // Scroll the main scrollable container and initialize popovers
+         const mainScrollContainer = document.querySelector('.chat-content');
+         if (mainScrollContainer) {
+             requestAnimationFrame(() => {
+                 console.log("Attempting to scroll .chat-content to bottom via rAF"); // Update log
+                 mainScrollContainer.scrollTop = mainScrollContainer.scrollHeight + 50; // Scroll the correct container with offset
+
+                 // Process citation buttons - initialize tooltips and popovers properly
+                 const citationButtons = messageDiv.querySelectorAll('.citation-toggle-btn');
+                 citationButtons.forEach(function(button) {
+                     // Initialize tooltip (hover behavior)
+                     const tooltip = new bootstrap.Tooltip(button, {
+                         trigger: 'hover',
+                         html: true,
+                         title: button.dataset.tooltipContent,
+                         customClass: 'theme-aware-tooltip',
+                         boundary: 'window'
+                     });
+                     
+                     // Initialize popover (click behavior)
+                     if (button.dataset.popoverContent) {
+                         // Create a unique ID for the popover
+                         const popoverId = `popover-${button.dataset.citationId}`;
+                         
+                         // Create popover with proper dismissal settings - using 'manual' trigger for complete control
+                         const popover = new bootstrap.Popover(button, {
+                             trigger: 'manual', // Change to manual trigger for better control
+                             html: true,
+                             content: button.dataset.popoverContent,
+                             placement: 'bottom',
+                             customClass: 'theme-aware-popover',
+                             sanitize: false,
+                             container: 'body'
+                         });
+                         
+                         // Store popover reference on the button element for easier access
+                         button._popover = popover;
+                         
+                         // Improved toggle behavior for the popover
+                         button.addEventListener('click', function(e) {
+                             // Hide tooltip when showing popover
+                             tooltip.hide();
+                             
+                             // Close all other popovers first
+                             citationButtons.forEach(function(otherButton) {
+                                 if (otherButton !== button && otherButton._popover) {
+                                     otherButton._popover.hide();
+                                 }
+                             });
+                             
+                             // Toggle this popover manually
+                             const isShown = button.getAttribute('aria-describedby')?.includes('popover');
+                             if (isShown) {
+                                 popover.hide();
+                             } else {
+                                 popover.show();
+                             }
+                             
+                             e.stopPropagation();
+                             e.preventDefault();
+                         });
+                         
+                         // Add manual close button event handler to each popover
+                         button.addEventListener('shown.bs.popover', function() {
+                             const popoverElement = document.getElementById(button.getAttribute('aria-describedby'));
+                             if (popoverElement) {
+                                 const closeBtn = popoverElement.querySelector('.popover-close-btn');
+                                 if (closeBtn) {
+                                     closeBtn.addEventListener('click', function(e) {
+                                         popover.hide();
+                                         e.stopPropagation();
+                                         e.preventDefault();
+                                     });
+                                 }
+                             }
+                         });
+                     }
+                 });
+                 
+                 // Global document handler to close popovers when clicking outside
+                 if (!document.citationPopoverHandlerAdded) {
+                     document.addEventListener('click', function(e) {
+                         if (!e.target.closest('.popover') && !e.target.closest('.citation-toggle-btn')) {
+                             // Close all popovers when clicking outside
+                             const allPopovers = document.querySelectorAll('.citation-toggle-btn');
+                             allPopovers.forEach(btn => {
+                                 if (btn._popover) {
+                                     btn._popover.hide();
+                                 }
+                             });
+                         }
+                     });
+                     document.citationPopoverHandlerAdded = true;
+                 }
+             });
+         }
+         checkOverflow();
+     }
+  }
+
+  // Loading indicator functions (Make globally accessible)
+  let dotsAnimation = null;
+  window.animateLoadingDots = function() { 
+    if (typeof anime === 'undefined') { console.error("anime.js not loaded"); return null; }
+    return anime({ targets: '.dots-container .dot', scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3], duration: 1200, delay: anime.stagger(150, {from: 'center'}), loop: true, easing: 'cubicBezier(.45,.05,.55,.95)' });
+  }
+  window.showLoading = function() { 
+    const loadingIndicator = document.getElementById("loading-indicator");
+    if (loadingIndicator) { loadingIndicator.style.display = "flex"; if (!dotsAnimation) { dotsAnimation = animateLoadingDots(); } }
+  }
+  window.hideLoading = function() { 
+    const loadingIndicator = document.getElementById("loading-indicator");
+    if (loadingIndicator) { if (dotsAnimation) { dotsAnimation.pause(); anime({ targets: '.dots-container .dot', scale: 1, opacity: 0.4, duration: 100 }); dotsAnimation = null; } loadingIndicator.style.display = "none"; }
+  }
+
+  // Refresh counters (Make globally accessible)
+  window.refreshCounters = function() {
+    fetch("/api/counters", { method: "GET", credentials: "include" })
+    .then(response => response.ok ? response.json() : Promise.reject('Failed to fetch counters'))
+    .then(data => {
+      const msgCountEl = document.getElementById("message-count");
+      const docCountEl = document.getElementById("docs-count");
+      if (msgCountEl) msgCountEl.innerText = data.message_count;
+      if (docCountEl) docCountEl.innerText = data.uploaded_docs_count;
+    })
+    .catch(error => console.error("Error refreshing counters:", error));
+  }
+
+  // --- Visual Grounding Modal Handling ---
+  const visualGroundingModalElement = document.getElementById('visualGroundingModal');
+  const visualGroundingImage = document.getElementById('visualGroundingImage');
+  const visualGroundingError = document.getElementById('visualGroundingError');
+  // Loader reference is removed
+  let visualGroundingModal = null;
+  if (visualGroundingModalElement) {
+    visualGroundingModal = new bootstrap.Modal(visualGroundingModalElement);
+  }
+
+  // Updated function signature to accept doclingJsonPath
+  function showVisualEvidence(doclingJsonPath, pageNo, bboxJson, documentId) {
+    if (!visualGroundingModal || !visualGroundingImage || !visualGroundingError) {
+      console.error("Visual grounding modal elements not found.");
+      showToast("Error: Could not display visual evidence.", "danger");
+      return;
+    }
+
+    visualGroundingImage.src = '';
+    visualGroundingImage.style.display = 'none';
+    visualGroundingError.style.display = 'none';
+    visualGroundingError.textContent = '';
+
+    // Clear metadata panel
+    const metaPanel = document.getElementById('visualGroundingMeta');
+    if (metaPanel) {
+      metaPanel.querySelector('.evidence-meta-source').textContent = '';
+      metaPanel.querySelector('.evidence-meta-page').textContent = '';
+      metaPanel.querySelector('.evidence-meta-snippet').textContent = '';
+    }
+
+    // Prefer documentId for DB-backed evidence, fallback to legacy params
+    let url;
+    if (documentId) {
+      url = `/api/visual_evidence?document_id=${encodeURIComponent(documentId)}`;
+      if (pageNo) url += `&page_no=${encodeURIComponent(pageNo)}`;
+      if (bboxJson) url += `&bbox=${encodeURIComponent(bboxJson)}`;
+    } else {
+      url = `/api/visual_evidence?docling_json_path=${encodeURIComponent(doclingJsonPath)}&page_no=${encodeURIComponent(pageNo)}&bbox=${encodeURIComponent(bboxJson)}`;
+    }
+    console.log("Fetching visual evidence from:", url);
+
+    visualGroundingModal.show();
+
+    // Fetch metadata for the evidence (simulate, as actual API may need to be extended)
+    if (documentId) {
+      fetch(`/api/document_meta?document_id=${encodeURIComponent(documentId)}`)
+        .then(resp => resp.ok ? resp.json() : null)
+        .then(meta => {
+          if (metaPanel && meta) {
+            metaPanel.querySelector('.evidence-meta-source').textContent = meta.source || '';
+            metaPanel.querySelector('.evidence-meta-page').textContent = meta.page ? `Page: ${meta.page}` : '';
+            metaPanel.querySelector('.evidence-meta-snippet').textContent = meta.snippet || '';
+          }
+        })
+        .catch(() => {});
+    }
+
+    visualGroundingImage.onload = () => {
+        console.log("Visual evidence image loaded successfully.");
+        visualGroundingImage.style.display = 'block';
+    };
+    visualGroundingImage.onerror = () => {
+        console.error("Failed to load visual evidence image from:", url);
+        visualGroundingError.textContent = 'Failed to load visual evidence image.';
+        visualGroundingError.style.display = 'block';
+        visualGroundingImage.style.display = 'none';
+    };
+    visualGroundingImage.src = url;
+
+    // Download button
+    const downloadBtn = document.getElementById('downloadEvidenceBtn');
+    if (downloadBtn) {
+      downloadBtn.onclick = function() {
+        if (visualGroundingImage.src) {
+          const link = document.createElement('a');
+          link.href = visualGroundingImage.src;
+          link.download = 'visual-evidence.png';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      };
+    }
+    // Copy button
+    const copyBtn = document.getElementById('copyEvidenceBtn');
+    if (copyBtn) {
+      copyBtn.onclick = function() {
+        if (visualGroundingImage.src) {
+          fetch(visualGroundingImage.src)
+            .then(resp => resp.blob())
+            .then(blob => {
+              const item = new ClipboardItem({ 'image/png': blob });
+              navigator.clipboard.write([item]);
+              showToast('Visual evidence copied to clipboard', 'success');
+            })
+            .catch(() => showToast('Failed to copy image', 'danger'));
+        }
+      };
+    }
+  }
+
+
+  // Feedback button handlers
+  function handleLikeClick(messageElement, buttonElement) {
+    const li = messageElement.closest('li[data-message-id]');
+    if (!li) return;
+    const messageId = li.getAttribute('data-message-id');
+    if (!messageId) return;
+
+    fetch('/api/message_feedback', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message_id: messageId, feedback_type: 'like' })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        buttonElement.classList.add('active');
+        // Remove active from dislike button
+        const siblingDislike = messageElement.querySelector('.dislike-btn');
+        if (siblingDislike) siblingDislike.classList.remove('active');
+        // Show counts (add or update count spans)
+        updateFeedbackCounts(messageElement, data.like_count, data.dislike_count);
+      } else {
+        showToast(data.error || "Failed to save feedback", "danger");
+      }
+    })
+    .catch(err => {
+      showToast("Error saving feedback", "danger");
+      console.error(err);
+    });
+  }
+
+  function handleDislikeClick(messageElement, buttonElement) { 
+    const li = messageElement.closest('li[data-message-id]');
+    if (!li) return;
+    const messageId = li.getAttribute('data-message-id');
+    if (!messageId) return;
+
+    fetch('/api/message_feedback', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message_id: messageId, feedback_type: 'dislike' })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        buttonElement.classList.add('active');
+        // Remove active from like button
+        const siblingLike = messageElement.querySelector('.like-btn');
+        if (siblingLike) siblingLike.classList.remove('active');
+        // Show counts (add or update count spans)
+        updateFeedbackCounts(messageElement, data.like_count, data.dislike_count);
+      } else {
+        showToast(data.error || "Failed to save feedback", "danger");
+      }
+    })
+    .catch(err => {
+      showToast("Error saving feedback", "danger");
+      console.error(err);
+    });
+  }
+
+  // Helper to update feedback counts in the UI
+  function updateFeedbackCounts(messageElement, likeCount, dislikeCount) {
+    let likeBtn = messageElement.querySelector('.like-btn');
+    let dislikeBtn = messageElement.querySelector('.dislike-btn');
+    if (likeBtn) {
+      let countSpan = likeBtn.querySelector('.feedback-count');
+      if (!countSpan) {
+        countSpan = document.createElement('span');
+        countSpan.className = 'feedback-count ms-1';
+        likeBtn.appendChild(countSpan);
+      }
+      countSpan.textContent = likeCount > 0 ? likeCount : '';
+    }
+    if (dislikeBtn) {
+      let countSpan = dislikeBtn.querySelector('.feedback-count');
+      if (!countSpan) {
+        countSpan = document.createElement('span');
+        countSpan.className = 'feedback-count ms-1';
+        dislikeBtn.appendChild(countSpan);
+      }
+      countSpan.textContent = dislikeCount > 0 ? dislikeCount : '';
+    }
+  }
+  function handleCopyClick(textToCopy, buttonElement) { 
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            const originalIcon = buttonElement.innerHTML; buttonElement.innerHTML = '<i class="bi bi-check-lg"></i>'; setTimeout(() => { buttonElement.innerHTML = originalIcon; }, 1500);
+        }).catch(err => { console.error('Failed to copy text: ', err); alert('Failed to copy text.'); });
+    } else { alert('Copying to clipboard is not supported.'); }
+  }
+
+  // History panel functions
+  function initializeHistoryPanel() { 
+    const historyOffcanvasBody = document.getElementById('historyOffcanvasBody');
+    const queryInput = document.querySelector("textarea[name='query']"); // Query input might be needed here too
+    if (!historyOffcanvasBody || !queryInput) {
+        console.warn("History panel or query input not found for init.");
+        return;
+    }
+    historyOffcanvasBody.addEventListener('click', function(e) {
+        if (e.target.closest('.history-item span')) { 
+            const span = e.target.closest('.history-item span');
+            const titleAttr = span.getAttribute('title');
+            let historyText = span.textContent.trim(); 
+            if (titleAttr) { const parts = titleAttr.split(' - '); if (parts.length > 1) { historyText = parts.slice(1).join(' - ').trim(); } }
+            queryInput.value = historyText;
+            const historyOffcanvasEl = document.getElementById('historyOffcanvas');
+            if (historyOffcanvasEl) { const historyOffcanvas = bootstrap.Offcanvas.getInstance(historyOffcanvasEl); if (historyOffcanvas) { historyOffcanvas.hide(); } }
+            queryInput.focus();
+        }
+        if (e.target.closest('.copy-history-btn')) { 
+            const button = e.target.closest('.copy-history-btn'); const textToCopy = button.getAttribute('data-text');
+            if (textToCopy && navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(textToCopy).then(() => { const originalHTML = button.innerHTML; button.innerHTML = '<i class="bi bi-check"></i>'; setTimeout(() => { button.innerHTML = originalHTML; }, 1500); }).catch(err => console.error('Failed to copy history item:', err));
+            }
+        }
+    });
+  }
+
+  // Function to show toast messages (Make globally accessible)
+  window.showToast = function(message, type = 'info') {
+      let toastContainer = document.querySelector('.toast-container');
+      if (!toastContainer) {
+          const container = document.createElement('div');
+          container.className = 'toast-container position-fixed top-0 end-0 p-3';
+          container.style.zIndex = '1100'; 
+          document.body.appendChild(container);
+          toastContainer = container; 
+          console.warn('Created fallback toast container.');
+      }
+      const toastId = `toast-${Date.now()}`;
+      const toastClass = { info: 'text-bg-info', success: 'text-bg-success', warning: 'text-bg-warning', danger: 'text-bg-danger' }[type] || 'text-bg-secondary';
+      const toastHTML = `
+          <div id="${toastId}" class="toast align-items-center ${toastClass} border-0" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+              <div class="d-flex"> <div class="toast-body"> ${message} </div> <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button> </div>
+          </div>`;
+      toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+      const toastElement = document.getElementById(toastId);
+      if (toastElement) {
+          const toast = new bootstrap.Toast(toastElement);
+          toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove());
+          toast.show();
+      }
+  }
+
+  // --- Event Listeners (Chat Display Specific) ---
+
+  // Event delegation for chat messages area
+  if (chatMessages) {
+      chatMessages.addEventListener('click', function(e) {
+          const target = e.target;
+          const button = target.closest('button'); // Find the closest button clicked
+
+          if (!button) return; // Exit if the click wasn't on or inside a button
+
+          const messageLi = button.closest('li');
+          if (!messageLi) return;
+
+          // --- Handle Visual Grounding Button Click ---
+          if (button.classList.contains('visual-grounding-btn')) {
+              const doclingJsonPath = button.dataset.doclingJsonPath;
+              const pageNo = button.dataset.pageNo;
+              const bboxJson = button.dataset.bbox;
+              const documentId = button.dataset.documentId;
+              if (documentId || (doclingJsonPath && pageNo && bboxJson)) {
+                  showVisualEvidence(doclingJsonPath, pageNo, bboxJson, documentId);
+              } else {
+                  console.error("Missing data attributes on visual grounding button:", button.dataset);
+                  showToast("Error: Could not retrieve evidence details.", "danger");
+              }
+              return;
+          }
+
+          // --- Handle Feedback/Copy Buttons (only for agent messages) ---
+          const messageDiv = messageLi.querySelector('.chat-message.agent');
+          if (!messageDiv) return; // Only handle feedback for agent messages
+
+          const bubbleDiv = messageDiv.querySelector('.chat-bubble.agent');
+          if (!bubbleDiv) return;
+
+          // Try to get text content robustly
+          const messageContent = bubbleDiv.querySelector('.message-content') || bubbleDiv;
+          let messageText = "";
+          if (messageContent.innerHTML) { // Prefer innerHTML if marked was used
+              // Basic attempt to strip HTML for copy, might need improvement
+              const tempDiv = document.createElement('div');
+              tempDiv.innerHTML = messageContent.innerHTML;
+              messageText = tempDiv.textContent || tempDiv.innerText || "";
+          } else {
+               messageText = messageContent.textContent || messageContent.innerText || "";
+          }
+
+
+          if (button.classList.contains('like-btn')) {
+              console.log("[Feedback] Like button clicked. Closest <li>:", messageLi, "data-message-id:", messageLi.getAttribute('data-message-id'));
+              handleLikeClick(messageLi, button);
+          } else if (button.classList.contains('dislike-btn')) {
+              console.log("[Feedback] Dislike button clicked. Closest <li>:", messageLi, "data-message-id:", messageLi.getAttribute('data-message-id'));
+              handleDislikeClick(messageLi, button);
+          } else if (button.classList.contains('copy-btn')) {
+              handleCopyClick(messageText.trim(), button); // Pass the extracted text
+          }
+      });
+  }
+
+  // Window resize for overflow check
+  window.addEventListener('resize', checkOverflow);
+
+  // --- Initial Setup Calls ---
+  checkOverflow();
+  refreshCounters(); // Call global version
+
+  // Make functions globally accessible if needed by query-form.js
+  // Already done above by attaching to window
+
+});

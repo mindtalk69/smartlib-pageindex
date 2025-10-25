@@ -1,0 +1,139 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Admin - Library Management{% endblock %}
+
+{% block admin_title %}Library Management{% endblock %} {# Set the page title #}
+
+{% block admin_content %}
+{# Removed the H1 title row as title is now in admin_title block #}
+{# Moved Add button to be inline with title like other pages - TODO: Re-add button next to header in base? #}
+<div class="d-flex justify-content-end mb-3"> {# Simple div for Add button for now #}
+    <button type="button" class="btn btn-primary"
+            data-bs-toggle="modal"
+                data-bs-target="#libraryModal" 
+                id="addLibraryBtn">
+            <i class="bi bi-plus-lg me-1"></i>
+            Add New Library
+        </button>
+    </div>
+
+<!-- Library List Table -->
+<div class="table-responsive">
+    <table class="table table-striped" id="librariesTable">
+        <thead>
+            <tr>
+                <th>No.</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Knowledges</th>
+                <th>Created By</th>
+                <th>Created At</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if libraries %}
+                {% for library in libraries %}
+                <tr id="libraryRow-{{ library.library_id }}">
+                    <td>{{ loop.index }}</td>
+                    <td>{{ library.name }}</td>
+                    <!-- <td>{{ library.description | default('N/A', true) }}</td> -->
+                    <td>{{ library.description[:80] ~ ('...' if library.description and library.description|length > 80 else '') }}</td>
+                    <td>
+                      {% if library.knowledges %}
+                        {% for knowledge in library.knowledges %}
+                          <span class="badge rounded-pill bg-info text-dark me-1">{{ knowledge.name }}</span>
+                        {% endfor %}
+                      {% else %}
+                        <span class="text-muted">None</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ library.creator.username | default('Unknown', true) }}</td>
+                    <td>{{ library.created_at.strftime('%Y-%m-%d %H:%M') if library.created_at else 'N/A' }}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-sm btn-warning edit-btn"
+                                    data-id="{{ library.library_id }}"
+                                    data-form-edit="libraryForm"
+                                    data-api-endpoint="/admin/libraries/data/{{ library.library_id }}"
+                                    title="Edit Library">
+                                <i class="bi bi-pencil-fill"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger delete-btn"
+                                    data-id="{{ library.library_id }}"
+                                    data-name="{{ library.name }}"
+                                    title="Delete Library">
+                                <i class="bi bi-trash-fill"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="6" class="text-center">No libraries found.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add/Edit Library Modal -->
+<div class="modal fade" id="libraryModal" tabindex="-1" aria-labelledby="libraryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="libraryModalLabel">Add Library</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="libraryForm">
+                    <input type="hidden" id="library_id" name="library_id">
+                    <div class="mb-3">
+                        <label for="libraryName" class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="libraryName" name="name" required>
+                        <div class="invalid-feedback">
+                            Please provide a library name.
+                        </div>
+                    </div>
+                    <!-- <div class="mb-3">
+                        <label for="libraryKnowledge" class="form-label">Knowledge</label>
+                        <select class="form-select" id="libraryKnowledge" name="knowledge_id">
+                            <option value="">-- Select Knowledge --</option>
+                            {% for knowledge in knowledges_data %}
+                                <option value="{{ knowledge.id }}">{{ knowledge.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div> -->
+
+                    <!-- Knowledge Selection -->
+
+<div class="mb-3">
+  <div class="d-flex justify-content-between align-items-center mb-1">
+    <label for="libraryDescription" class="form-label mb-0">Description</label>
+    <button class="btn btn-secondary btn-sm" type="button" id="generateDescBtn" title="Generate Description (AI)">
+      <i class="bi bi-magic"></i>
+      <span class="spinner-border spinner-border-sm ms-1 d-none" role="status" aria-hidden="true"></span>
+    </button>
+  </div>
+  <textarea class="form-control" id="libraryDescription" name="description" rows="3"></textarea>
+</div>
+<!-- Alert placeholder -->
+<div id="modalAlertPlaceholder"></div>
+</form>
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+  <button type="submit" class="btn btn-primary" form="libraryForm" id="saveLibraryBtn">Save</button>
+</div>
+</div>
+</div>
+</div>
+
+{% endblock %}
+
+{% block admin_scripts %}
+{{ super() }}
+<!-- Add specific JS for library management -->
+<script src="{{ url_for('static', filename='js/admin/admin-libraries.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,109 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Admin | Folder Upload{% endblock %}
+
+{% block admin_title %}
+<i class="fas fa-folder-plus me-2"></i>Folder Upload
+{% endblock %}
+
+{% block admin_content %}
+<div class="mb-3">
+  <h5>Admin Folder Upload (Background Processing)</h5>
+  <form id="folder-upload-form" enctype="multipart/form-data" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-3">
+      <label class="form-label">Select Library — Knowledge</label>
+      <select class="form-select" id="library-knowledge-select" required>
+        <option value="">-- Select Library — Knowledge --</option>
+        {% for pair in library_knowledge_pairs %}
+        <option value="{{ pair.library_id }}|{{ pair.knowledge_id }}"
+                data-library-id="{{ pair.library_id }}"
+                data-knowledge-id="{{ pair.knowledge_id }}">
+          {{ pair.library_name }} — {{ pair.knowledge_name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3">
+      <label for="folder-input" class="form-label">Select Folder or Files</label>
+      <input class="form-control" id="folder-input" name="folder_files" type="file" webkitdirectory directory multiple required>
+      <div class="form-text">You can select an entire folder or multiple files.</div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">File Types to Include</label>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="file_types" value="pdf" id="type-pdf" checked>
+        <label class="form-check-label" for="type-pdf">PDF</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="file_types" value="docx" id="type-docx" checked>
+        <label class="form-check-label" for="type-docx">DOCX</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="file_types" value="xlsx" id="type-xlsx" checked>
+        <label class="form-check-label" for="type-xlsx">XLSX</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="file_types" value="pptx" id="type-pptx" checked>
+        <label class="form-check-label" for="type-pptx">PPTX</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="file_types" value="md" id="type-md" checked>
+        <label class="form-check-label" for="type-md">Markdown</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="file_types" value="adoc" id="type-adoc" checked>
+        <label class="form-check-label" for="type-adoc">AsciiDoc</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="file_types" value="html" id="type-html" checked>
+        <label class="form-check-label" for="type-html">HTML</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="file_types" value="csv" id="type-csv" checked>
+        <label class="form-check-label" for="type-csv">CSV</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="file_types" value="png" id="type-png" checked>
+        <label class="form-check-label" for="type-png">PNG</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="file_types" value="jpeg" id="type-jpeg" checked>
+        <label class="form-check-label" for="type-jpeg">JPEG</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="file_types" value="tiff" id="type-tiff" checked>
+        <label class="form-check-label" for="type-tiff">TIFF</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="file_types" value="bmp" id="type-bmp" checked>
+        <label class="form-check-label" for="type-bmp">BMP</label>
+      </div>
+    </div>
+    <div class="mb-3 form-check">
+      <input class="form-check-input" type="checkbox" id="background-enabled" name="background_enabled" checked>
+      <label class="form-check-label" for="background-enabled">Enable Background Processing</label>
+    </div>
+    <div class="mb-3" id="schedule-time-group">
+      <label for="scheduled-time" class="form-label">Schedule Processing Time</label>
+      <input type="text" class="form-control" id="scheduled-time" name="scheduled_time" placeholder="Select date and time">
+      <div class="form-text">Leave blank to process immediately.</div>
+    </div>
+    <button type="submit" class="btn btn-primary">Upload & Schedule</button>
+  </form>
+</div>
+<hr>
+<div>
+  <h6>Upload Jobs Status</h6>
+  <div id="jobs-table-container">
+    <!-- Job status table will be loaded here by JS -->
+  </div>
+</div>
+{% endblock %}
+
+{% block admin_scripts %}
+<!-- Flatpickr for date/time picker -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="{{ url_for('static', filename='js/admin/admin-folder-upload.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %}Upload Document | ChatApp{% endblock %}
+
+{% block styles %}
+{{ super() }} {# Include styles from base.html if any #}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/upload.css') }}"> {# Link the new CSS #}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5 upload-section-row"> {# ADDED custom class #}
+  {# Use the new shared styled container class and a page-specific class #}
+  <div class="col-md-10 styled-form-container upload-page-container"> 
+    {# REMOVED unnecessary inner card and card-body divs #}
+
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <h3>Upload And Download</h3>
+      {% if vector_store_setting == 'user' %}
+      {# Reset functionality temporarily disabled - endpoint not available in optimized web container #}
+      {# To re-enable: create reset_vector_store endpoint or use admin reset functionality #}
+      {% endif %}
+     </div>
+
+    {# --- Vector Store Mode Banner REMOVED for minimal UI --- #}
+
+
+        <!-- Nav tabs -->
+        <ul class="nav nav-tabs mb-3" id="uploadTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="url-tab" data-bs-toggle="tab" data-bs-target="#url-content"
+                type="button" role="tab" aria-controls="url-content" aria-selected="true">Download</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="batch-tab" data-bs-toggle="tab" data-bs-target="#batch-content"
+                type="button" role="tab" aria-controls="batch-content" aria-selected="false">Upload</button>
+      </li>
+    </ul>
+
+    <!-- Tab content -->
+    <div class="tab-content" id="uploadTabsContent">
+
+      <!-- File Upload Tab (Hidden) -->
+      <!--
+      <div class="tab-pane fade" id="file-content" role="tabpanel" aria-labelledby="file-tab">
+        <!- REMOVED inner card ->
+          <!- REMOVED inner card-body ->
+            <form id="fileUploadForm" action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data"> {# Added ID to form #}
+              {{ form.hidden_tag() }}
+              <div class="mb-3">
+              <label for="librarySelectFile" class="form-label">Select Library</label>
+              <select class="form-select" id="librarySelectFile" name="library_id" required>
+                  <option value="" selected disabled>Choose a library...</option>
+                  {# Options will be populated by the backend #}
+                  {% for library in libraries %}
+                    {% for knowledge in library.knowledges %}
+                      <option value="{{ library.library_id }}"
+                              data-knowledge-id="{{ knowledge.id }}"
+                              data-knowledge-name="{{ knowledge.name }}"
+                              data-categories="{{ knowledge.categories|map(attribute='name')|join(', ') if knowledge.categories else '' }}"
+                              data-catalogs="{{ knowledge.catalogs|map(attribute='name')|join(', ') if knowledge.catalogs else '' }}">
+                          {{ library.name }} — {{ knowledge.name }}
+                      </option>
+                    {% endfor %}
+                  {% endfor %}
+              </select>
+              <input type="hidden" name="library_name" id="libraryNameFile"> {# Hidden input for library name #}
+              {# Placeholder for library details - File Upload Tab (Currently hidden) #}
+              <div id="library-details-file" class="mt-2 small text-muted"></div>
+          </div>
+          <div class="mb-3">
+            <label for="fileInput" class="form-label">Upload File</label>
+            <input type="file" class="form-control" id="fileInput" name="file" required accept=".pdf,.docx,.xlsx,.pptx,.md,.adoc,.asciidoc,.html,.xhtml,.csv,.png,.jpeg,.jpg,.tiff,.tif,.bmp,.txt,.odt">
+          </div>
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="enableVisualGrounding" name="enableVisualGrounding">
+            <label class="form-check-label" for="enableVisualGrounding">Enable Visual Grounding</label>
+          </div>
+              <button type="submit" class="btn btn-custom w-100" id="uploadFileBtn">Upload File to Library</button> {# Added ID #}
+            </form>
+            <div id="file-status" class="mt-2"></div> {# Status div #}
+          <!- /REMOVED inner card-body ->
+        <!- /REMOVED inner card ->
+      </div>
+      -->
+
+      <!-- URL Input Tab -->
+      <div class="tab-pane fade show active" id="url-content" role="tabpanel" aria-labelledby="url-tab">
+        <!- REMOVED inner card ->
+          <!- REMOVED inner card-body ->
+            <div id="url-form">
+              <div class="mb-3">
+                <label for="librarySelectUrl" class="form-label">
+                Select Library
+                <span tabindex="0" class="ms-1" data-bs-toggle="tooltip" data-bs-placement="right" title="
+                {% if vector_store_setting == 'user' %}
+                  Per User Mode: Each user has a separate vector store. Only you can access your uploads.
+                {% elif vector_store_setting == 'global' %}
+                  Centralized/Global Mode: All uploads are shared across all users and knowledge bases. Deletions affect the entire system.
+                {% elif vector_store_setting == 'knowledge' %}
+                  Per Knowledge Mode: Select the target Library — Knowledge from the dropdown. Each upload will be stored in the chosen knowledge base.
+                {% endif %}
+                ">
+                  <i class="bi bi-info-circle" aria-label="Info"></i>
+                </span>
+              </label>
+                <select class="form-select" id="librarySelectUrl" name="library_id" required>
+                    <option value="" selected disabled>Choose a library...</option>
+                    {% for library in libraries %}
+                      {% for knowledge in library.knowledges %}
+                        <option value="{{ library.library_id }}"
+                                data-knowledge-id="{{ knowledge.id }}"
+                                data-knowledge-name="{{ knowledge.name }}"
+                                data-categories="{{ knowledge.categories|map(attribute='name')|join(', ') if knowledge.categories else '' }}"
+                                data-catalogs="{{ knowledge.catalogs|map(attribute='name')|join(', ') if knowledge.catalogs else '' }}">
+                            {{ library.name }} — {{ knowledge.name }}
+                        </option>
+                      {% endfor %}
+                    {% endfor %}
+                </select>
+                <div id="library-details-url" class="mt-2 small text-muted"></div>
+                <input type="hidden" name="knowledge_id" id="knowledgeIdUrl">
+              </div>
+          <div class="mb-3">
+            <label for="url-textarea" class="form-label">Enter URLs</label>
+            <textarea class="form-control" id="url-textarea" rows="5" placeholder="Enter URLs, separated by commas or newlines..." required></textarea>
+            {# Removed invalid-feedback div as validation is now more complex #}
+          </div>
+           <div class="mb-3">
+             <button id="add-urls-btn" type="button" class="btn btn-secondary w-100">Add URLs to List</button> {# Renamed button #}
+           </div>
+           <div id="url-list-display" class="mb-3">
+             {# URL list will be populated by JS here #}
+           </div>
+          <div class="d-grid gap-2">
+                <button id="process-urls-btn" class="btn btn-custom" disabled>Download & Process URLs</button> {# Changed class back to btn-custom #}
+              </div>
+              {# Progress bar for URL processing - Initially hidden #}
+              <div class="progress mt-3" id="url-progress-bar" style="display: none;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%">Processing...</div>
+              </div>
+              <div id="url-status" class="mt-2"></div> {# Status area remains #}
+            </div>
+          <!- /REMOVED inner card-body ->
+        <!- /REMOVED inner card ->
+      </div>
+
+      <!-- Batch Upload Tab -->
+      <div class="tab-pane fade" id="batch-content" role="tabpanel" aria-labelledby="batch-tab">
+        <!- REMOVED inner card ->
+          <!- REMOVED inner card-body ->
+            <form id="batchUploadForm"> {# No action/method needed as JS handles it #}
+              {# CSRF token will be handled by JS fetch headers #}
+              <div class="mb-3">
+                <label for="librarySelectBatch" class="form-label">
+                  Select Library
+                  <span tabindex="0" class="ms-1" data-bs-toggle="tooltip" data-bs-placement="right" title="
+                  {% if vector_store_setting == 'user' %}
+                    Per User Mode: Each user has a separate vector store. Only you can access your uploads.
+                  {% elif vector_store_setting == 'global' %}
+                    Centralized/Global Mode: All uploads are shared across all users and knowledge bases. Deletions affect the entire system.
+                  {% elif vector_store_setting == 'knowledge' %}
+                    Per Knowledge Mode: Select the target Library — Knowledge from the dropdown. Each upload will be stored in the chosen knowledge base.
+                  {% endif %}
+                  ">
+                    <i class="bi bi-info-circle" aria-label="Info"></i>
+                  </span>
+                </label>
+                <select class="form-select" id="librarySelectBatch" name="library_id" required>
+                    <option value="" selected disabled>Choose a library...</option>
+                    {% for library in libraries %}
+                      {% for knowledge in library.knowledges %}
+                        <option value="{{ library.library_id }}"
+                                data-knowledge-id="{{ knowledge.id }}"
+                                data-knowledge-name="{{ knowledge.name }}"
+                                data-categories="{{ knowledge.categories|map(attribute='name')|join(', ') if knowledge.categories else '' }}"
+                                data-catalogs="{{ knowledge.catalogs|map(attribute='name')|join(', ') if knowledge.catalogs else '' }}">
+                            {{ library.name }} — {{ knowledge.name }}
+                        </option>
+                      {% endfor %}
+                    {% endfor %}
+                </select>
+                <div id="library-details-batch" class="mt-2 small text-muted"></div>
+                <input type="hidden" name="knowledge_id" id="knowledgeIdBatch">
+              </div>
+          <div class="mb-3">
+            <label for="batchFileInput" class="form-label">Select Files for Batch Upload</label>
+            <input type="file" class="form-control" id="batchFileInput" name="batchFiles" required accept=".pdf,.docx,.xlsx,.pptx,.md,.adoc,.asciidoc,.html,.xhtml,.csv,.png,.jpeg,.jpg,.tiff,.tif,.bmp,.txt,.odt" multiple>
+            <div id="batch-file-list" class="mt-2 small"></div> {# Area to list selected files #}
+          </div>
+
+          {# --- Conditional Visual Grounding Checkbox --- #}
+          {% if config.get('VISUAL_GROUNDING_ENABLED', False) and current_user.is_admin %}
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input rounded-pill" type="checkbox" role="switch" id="enableVisualGroundingBatch" name="enable_visual_grounding"> {# Use distinct ID and name, ADDED rounded-pill #}
+            <label class="form-check-label" for="enableVisualGroundingBatch">Enable Visual Grounding (Admin Only)</label>
+            <small class="form-text text-muted d-block">Generates data to link answers to document locations. Requires more processing time/resources.</small>
+          </div>
+          {% endif %}
+          {# --- End Conditional Checkbox --- #}
+
+          <button type="submit" class="btn btn-custom w-100" id="uploadBatchBtn">Upload Batch to Library</button>
+        </form>
+        {# Progress bar for indeterminate progress - Initially hidden, controlled by JS #}
+        <div class="progress mt-3" id="batch-progress-bar" style="display: none;">
+          <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">Processing...</div>
+        </div>
+        {# Status div for batch results - JS should update this with formatted messages #}
+        {# Expected format: <p class="small text-body-secondary mb-1">uploaded X of Y - filename</p> #}
+            {# Progress bar for indeterminate progress - Initially hidden, controlled by JS #}
+            <div class="progress mt-3" id="batch-progress-bar" style="display: none;">
+              <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">Processing...</div>
+            </div>
+            {# Status div for batch results - JS should update this with formatted messages #}
+            {# Expected format: <p class="small text-body-secondary mb-1">uploaded X of Y - filename</p> #}
+            <div id="batch-status" class="mt-3" style="max-height: 150px; overflow-y: auto;"></div> {# Added max-height and scroll for safety, though aiming for no scroll via JS logic #}
+          <!- /REMOVED inner card-body ->
+        <!- /REMOVED inner card ->
+      </div>
+
+    </div> {# End tab-content #}
+
+    {# /REMOVED unnecessary inner card and card-body divs #}
+  </div> {# End col-md-10 styled-form-container #}
+
+  {# Reset Button functionality temporarily disabled - endpoint not available in optimized web container #}
+  {# To re-enable: create reset_vector_store endpoint or use admin reset functionality #}
+
+</div> {# End row #}
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
+  <!-- Toasts will be appended here by JS -->
+</div>
+{% endblock %} {# End of content block #}
+
+{% block page_scripts %}
+{{ super() }}
+<script>
+  console.log('[Upload Page] Type of bootstrap before upload.js:', typeof bootstrap);
+  if (typeof bootstrap !== 'undefined') {
+    console.log('[Upload Page] Bootstrap.Tooltip:', typeof bootstrap.Tooltip);
+    console.log('[Upload Page] Bootstrap.Modal:', typeof bootstrap.Modal);
+  }
+</script>
+<script src="{{ url_for('static', filename='js/upload.js') }}?v={{ config.get('APP_VERSION', '1.0') }}"></script>
+{% endblock %}

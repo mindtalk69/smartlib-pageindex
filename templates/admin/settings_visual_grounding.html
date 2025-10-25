@@ -1,0 +1,43 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Visual Grounding Settings - Admin{% endblock %}
+
+{% block admin_content %} {# Corrected block name #}
+<div class="container mt-4">
+    {# Removed redundant h2 as the card header in base provides title space #}
+    {# <h2 class="mb-4">Visual Grounding Settings</h2> #}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('admin.visual_grounding_settings') }}">
+                {{ form.csrf_token }} {# Render the actual hidden CSRF token field #}
+
+                <div class="mb-3 form-check">
+                    <input type="checkbox" class="form-check-input" id="visual_grounding_enabled" name="visual_grounding_enabled" value="true" {% if settings.get('visual_grounding_enabled') == 'true' %}checked{% endif %}>
+                    <label class="form-check-label" for="visual_grounding_enabled">Globally Enable Visual Grounding Feature</label>
+                    <small class="form-text text-muted">Allows admins to enable visual grounding during file uploads. Requires significant server resources (GPU recommended).</small>
+                </div>
+
+                <div class="mb-3">
+                    <label for="visual_grounding_doc_store_path" class="form-label">Path for Visual Grounding Document Store</label>
+                    <input type="text" class="form-control" id="visual_grounding_doc_store_path" name="visual_grounding_doc_store_path" value="{{ settings.get('visual_grounding_doc_store_path', 'data/doc_store') }}" required>
+                    <small class="form-text text-muted">Path (relative to project root) where full converted documents (including images) will be stored for grounding. Ensure this path is writable by the application. Use forward slashes (/) for compatibility across operating systems.</small>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} {# Corrected block name #}

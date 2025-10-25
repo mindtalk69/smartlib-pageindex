@@ -1,0 +1,121 @@
+{% extends "admin/base.html" %}
+
+{% block admin_title %}Catalog Management{% endblock %} {# Set the page title #}
+
+{% block admin_content %}
+{# Removed the H1 title row as title is now in admin_title block #}
+<div class="d-flex justify-content-end mb-3"> {# Simple div for Add button for now #}
+    {# Updated button style to match libraries.html and added modal attributes #}
+    <button type="button" class="btn btn-primary"
+                data-bs-toggle="modal" 
+                data-bs-target="#catalogModal" 
+                id="addCatalogBtn">
+            <i class="bi bi-plus-lg me-1"></i>
+            Add New Catalog
+        </button>
+    </div>
+</div>
+
+{# Display flashed messages #}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="table-responsive">
+    <table class="table table-striped" id="catalogsTable">
+        <thead>
+            <tr>
+                <th>No.</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Created By</th>
+                <th>Created At</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if catalogs %}
+                {% for catalog in catalogs %}
+                <tr data-id="{{ catalog.id }}">
+                    <td>{{ loop.index }}</td>
+                    <td class="catalog-name">{{ catalog.name }}</td>
+                    <td class="catalog-description">{{ catalog.description[:80] ~ ('...' if catalog.description and catalog.description|length > 80 else '') }}</td>                    
+                    <td>{{ catalog.creator_name | default('N/A', true) }}</td>                    
+                    <td>{{ catalog.created_at.strftime('%Y-%m-%d %H:%M:%S') if catalog.created_at else 'N/A' }}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-sm btn-warning edit-btn"
+                                    data-id="{{ catalog.id }}"
+                                    data-form-edit="catalogForm"
+                                    data-api-endpoint="/admin/catalogs/data/{{ catalog.id }}"
+                                    title="Edit Catalog">
+                                <i class="bi bi-pencil-fill"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger delete-btn" 
+                                    data-id="{{ catalog.id }}"
+                                    data-name="{{ catalog.name }}"
+                                    title="Delete Catalog">
+                                <i class="bi bi-trash-fill"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="6" class="text-center">No catalogs found.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add/Edit Catalog Modal -->
+<div class="modal fade" id="catalogModal" tabindex="-1" aria-labelledby="catalogModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="catalogForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="catalogModalLabel">Add Catalog</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="catalogId" name="catalog_id">
+                    <div class="mb-3">
+                        <label for="catalogName" class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="catalogName" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1"> {# Flex container for label and button #}
+                            <label for="catalogDescription" class="form-label mb-0">Description</label> {# Remove bottom margin from label #}
+                            <button class="btn btn-secondary btn-sm" type="button" id="generateDescBtn" title="Generate Description (AI)"> {# Style like knowledges.html #}
+                                <i class="bi bi-magic"></i>
+                                <span class="spinner-border spinner-border-sm ms-1 d-none" role="status" aria-hidden="true"></span> {# Loading spinner #}
+                            </button>
+                        </div>
+                        <textarea class="form-control" id="catalogDescription" name="description" rows="3"></textarea>
+                    </div>
+                    <div id="formError" class="text-danger mt-2" style="display: none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="saveCatalogBtn">Save Catalog</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block admin_scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/admin/admin-catalogs.js') }}"></script>
+{% endblock %}

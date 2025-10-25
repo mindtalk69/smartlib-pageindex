@@ -1,0 +1,336 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "tenantId": {
+      "type": "string",
+      "metadata": {
+        "description": "The Azure AD tenant ID (required)"
+      }
+    },
+    "existingRedisName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the existing Azure Cache for Redis instance."
+      }
+    },
+    "existingRedisResourceGroup": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().name]",
+      "metadata": {
+        "description": "The resource group of the existing Azure Cache for Redis instance. Defaults to the current resource group."
+      }
+    },
+    "existingKeyVaultName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the existing Azure Key Vault instance."
+      }
+    },
+    "existingKeyVaultResourceGroup": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().name]",
+      "metadata": {
+        "description": "The resource group of the existing Azure Key Vault instance. Defaults to the current resource group."
+      }
+    },
+    "createRoleAssignment": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "If true, a role assignment will be created to grant the web app access to the Key Vault. Set to false on subsequent deployments to avoid errors."
+      }
+    },
+  "azureOpenAIKey": {
+    "type": "secureString",
+    "defaultValue": "[reference(resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults/secrets', parameters('existingKeyVaultName'), 'AZURE_OPENAI_API_KEY')).value]"
+  },
+  "azureOpenAIEndpoint": {
+    "type": "string",
+    "defaultValue": "",
+    "metadata": {
+      "description": "Fill with: [reference(resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults/secrets', parameters('existingKeyVaultName'), 'AZURE_OPENAI_ENDPOINT')).value]"
+    }
+  },
+  "azureOpenAIDeployment": {
+    "type": "string",
+    "defaultValue": "",
+    "metadata": {
+      "description": "Fill with: [reference(resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults/secrets', parameters('existingKeyVaultName'), 'AZURE_OPENAI_DEPLOYMENT')).value]"
+    }
+  },
+  "azureOpenAIAPIVersion": {
+    "type": "string",
+    "defaultValue": "2024-10-21",
+    "metadata": {
+      "description": "Fill with: [reference(resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults/secrets', parameters('existingKeyVaultName'), 'AZURE_OPENAI_API_VERSION')).value]"
+    }
+  },
+    "openAIAzureName": {
+    "type": "string",
+    "metadata": {
+      "description": "Name of the existing Azure OpenAI resource that must exist prior to deployment."
+    }
+  },
+    "webAppName": {
+      "type": "string",
+      "defaultValue": "flaskrag3-app",
+      "metadata": {
+        "description": "Name of the Web App"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "indonesiacentral",
+      "allowedValues": [
+        "indonesiacentral",
+        "southeastasia",
+        "eastasia"
+      ],
+      "metadata": {
+        "description": "Location for all resources."
+      }
+    },
+    "acrLoginServer": {
+      "type": "string",
+      "defaultValue": "atgmpnregistry.azurecr.io",
+      "metadata": {
+        "description": "Full login server name of your existing Azure Container Registry (e.g., myregistry.azurecr.io)"
+      }
+    },
+    "acrUsername": {
+      "type": "string",
+      "defaultValue": "atgmpnregistry",
+      "metadata": {
+        "description": "Username for the Azure Container Registry"
+      }
+    },
+    "acrPassword": {
+      "type": "securestring",
+      "defaultValue": "YKcqIqD4SROyXx366E4VyicHuq+qtRN+LaB6mnjCgb+ACRB4aJoJ",
+      "metadata": {
+        "description": "Password for the Azure Container Registry"
+      }
+    },
+    "dockerImageName": {
+      "type": "string",
+      "defaultValue": "smarthing-app:latest",
+      "metadata": {
+        "description": "Docker image name in ACR (e.g., flaskapp:latest)"
+      }
+    },
+    "APP_CLIENT_ID": {
+      "type": "string",
+      "metadata": {
+        "description": "Application Client ID"
+      }
+    },
+    "APP_CLIENT_SECRET": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Application Client Secret"
+      }
+    },
+    "appAdminUsername": {
+      "type": "string",
+      "defaultValue": "admin",
+      "metadata": {
+        "description": "Admin username for the application"
+      }
+    },
+    "appAdminPassword": {
+      "type": "securestring",
+      "defaultValue": "admin",
+      "metadata": {
+        "description": "Admin password for the application"
+      }
+    },
+    "appAdminEmail": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Admin email for the application"
+      }
+    },    
+    "appServicePlanSkuName": {
+      "type": "string",
+      "defaultValue": "B1",
+      "allowedValues": [
+        "B1",        
+        "S1",
+        "P1v2"
+      ],
+      "metadata": {
+        "description": "The SKU for the App Service Plan. Determines the pricing tier and capacity. B1=Basic, S1=Standard, P1v2=PremiumV2."
+      }
+    }
+  },
+  "variables": {
+    "appServicePlanName": "[concat(parameters('webAppName'), '-plan')]",
+    "skuMap": {
+      "B1": {
+        "name": "B1",
+        "tier": "Basic"
+      },
+      "S1": {
+        "name": "S1",
+        "tier": "Standard"
+      },
+      "P1v2": {
+        "name": "P1v2",
+        "tier": "PremiumV2"
+      }
+    },
+    "selectedSku": "[variables('skuMap')[parameters('appServicePlanSkuName')]]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2022-03-01",
+      "name": "[variables('appServicePlanName')]",
+      "location": "[parameters('location')]",
+      "sku": "[variables('selectedSku')]",
+      "kind": "linux",
+      "properties": {
+        "reserved": true
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2022-03-01",
+      "name": "[parameters('webAppName')]",
+      "location": "[parameters('location')]",
+      "kind": "app,linux",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+      ],
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+        "siteConfig": {
+          "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/', parameters('dockerImageName'))]",
+          "appCommandLine": "./docker-entrypoint.sh web",
+          "alwaysOn": true,
+          "appSettings": [
+            {
+              "name": "CELERY_BROKER_URL",
+              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380)]"
+            },
+            {
+              "name": "CELERY_RESULT_BACKEND",
+              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380)]"
+            },
+            {
+              "name": "AZURE_OPENAI_API_KEY",
+              "value": "[parameters('azureOpenAIKey')]"
+            },
+            {
+              "name": "AZURE_OPENAI_ENDPOINT",
+              "value": "[parameters('azureOpenAIEndpoint')]"
+            },
+            {
+              "name": "AZURE_OPENAI_DEPLOYMENT",
+              "value": "[parameters('azureOpenAIDeployment')]"
+            },
+            {
+              "name": "AZURE_OPENAI_API_VERSION",
+              "value": "[parameters('azureOpenAIAPIVersion')]"
+            },
+            {
+              "name": "WEBSITES_PORT",
+              "value": "8000"
+            },
+            {
+              "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
+              "value": "false"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_URL",
+              "value": "[concat('https://', parameters('acrLoginServer'))]"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_USERNAME",
+              "value": "[parameters('acrUsername')]"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_PASSWORD",
+              "value": "[parameters('acrPassword')]"
+            },
+            {
+              "name": "DOCKER_ENABLE_CI",
+              "value": "true"
+            },
+            {
+              "name": "KEY_VAULT_NAME",
+              "value": "[parameters('existingKeyVaultName')]"
+            },
+            {
+              "name": "WEB_APP_NAME",
+              "value": "[parameters('webAppName')]"
+            },
+            {
+              "name": "APP_CLIENT_ID",
+              "value": "[parameters('APP_CLIENT_ID')]"
+            },
+            {
+              "name": "APP_CLIENT_SECRET",
+              "value": "[parameters('APP_CLIENT_SECRET')]"
+            },
+            {
+              "name": "APP_ADMIN_USERNAME",
+              "value": "[parameters('appAdminUsername')]"
+            },
+            {
+              "name": "APP_ADMIN_PASSWORD",
+              "value": "[parameters('appAdminPassword')]"
+            },
+            {
+              "name": "APP_ADMIN_EMAIL",
+              "value": "[parameters('appAdminEmail')]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[concat(parameters('webAppName'), '-ai')]",
+      "location": "[parameters('location')]",
+      "kind": "web",
+      "properties": {
+        "Application_Type": "web"
+      }
+    },
+    {
+      "condition": "[parameters('createRoleAssignment')]",
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(resourceId('Microsoft.Web/sites', parameters('webAppName')), resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName')))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('webAppName'))]"
+      ],
+      "scope": "[resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName'))]",
+      "properties": {
+                "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')]",         "principalId": "[reference(resourceId('Microsoft.Web/sites', parameters('webAppName')), '2022-03-01', 'Full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      }
+    }
+  ],
+  "outputs": {
+    "webAppUrl": {
+      "type": "string",
+      "value": "[concat('https://', parameters('webAppName'), '.azurewebsites.net')]"
+    },
+    "acrLoginServer": {
+      "type": "string",
+      "value": "[parameters('acrLoginServer')]"
+    },
+    "keyVaultName": {
+    "type": "string",
+    "value": "[parameters('existingKeyVaultName')]"
+  }
+  }
+}

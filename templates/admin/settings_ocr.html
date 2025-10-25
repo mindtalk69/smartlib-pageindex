@@ -1,0 +1,99 @@
+{% extends "admin/base.html" %}
+{% block title %}OCR Settings{% endblock %}
+
+{% block admin_content %}
+<div class="container mt-4">
+  <h2>OCR Settings</h2>
+  <form method="POST" id="ocrSettingsForm">
+    {{ form.csrf_token }}
+    <div class="mb-3 form-check form-switch">
+      <input class="form-check-input ms-3" type="checkbox" id="isEnabledOcr" name="is_enabled_ocr" value="1" {% if is_enabled_ocr %}checked{% endif %}>
+      <label class="form-check-label" for="isEnabledOcr">
+        Enable OCR Features
+      </label>
+    </div>
+    <div id="autoOcrSection" style="display: none; margin-left:2.5em;">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="isAutoOcr" name="is_auto_ocr" value="1" {% if is_auto_ocr %}checked{% endif %}>
+        <label class="form-check-label" for="isAutoOcr">
+          Allow automatic OCR if PDF is image-only
+        </label>
+        <div class="form-text text-muted" style="margin-left:1.5em;">
+          If enabled, the system will automatically use OCR for PDFs that are detected as fully image-based. This may incur Azure costs if Azure Document Intelligence is selected.
+        </div>
+      </div>
+    </div>
+    <div id="ocrModeSection" style="display: none;">
+      <div class="mb-3">
+        <label class="form-label">OCR Mode</label>
+        <div>
+          <input type="radio" class="form-check-input" id="modeAzure" name="ocr_mode" value="azure"
+            {% if form.ocr_mode.data == 'azure' %}checked{% endif %}>
+          <label class="form-check-label me-3" for="modeAzure">
+            Azure Document Intelligence <span class="text-muted">(Incurs cost/trx)</span>
+          </label>
+          <input type="radio" class="form-check-input" id="modeOther" name="ocr_mode" value="default"
+            {% if form.ocr_mode.data == 'default' %}checked{% endif %}>
+          <label class="form-check-label" for="modeOther">
+            Default<span class="text-muted">(local)</span>
+          </label>
+        </div>
+      </div>
+      <div id="azureFields" style="display: none;">
+        <div class="mb-3">
+          <label class="form-label" for="endpoint">Azure Document Intelligence Endpoint</label>
+          {{ form.endpoint(class="form-control", id="endpoint", placeholder="your azure doc Intelligence service Endpoint (https://...)") }}
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="key">Azure Document Intelligence Key</label>
+          {{ form.key(class="form-control", id="key", placeholder=key_placeholder) }}
+        </div>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Save Settings</button>
+    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary ms-2">Cancel</a>
+  </form>
+
+  <div class="mt-3">
+    <h5>OCR Descriptions</h5>
+    <ul>
+      <li><strong>Azure Document Intelligence:</strong> Best for quality, please check for pricing.</li>
+      <li><strong>Default:</strong> Free, but needs GPU installed for best performance.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+  function updateOcrFormVisibility() {
+    const enabled = document.getElementById('isEnabledOcr').checked;
+    const ocrModeSection = document.getElementById('ocrModeSection');
+    const azureFields = document.getElementById('azureFields');
+    const autoOcrSection = document.getElementById('autoOcrSection');
+    if (enabled) {
+      ocrModeSection.style.display = '';
+      autoOcrSection.style.display = '';
+      // Show/hide Azure fields based on selected radio
+      const azureRadio = document.getElementById('modeAzure');
+      if (azureRadio.checked) {
+        azureFields.style.display = '';
+      } else {
+        azureFields.style.display = 'none';
+      }
+    } else {
+      ocrModeSection.style.display = 'none';
+      azureFields.style.display = 'none';
+      autoOcrSection.style.display = 'none';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    // Initial state
+    updateOcrFormVisibility();
+    // Switch event
+    document.getElementById('isEnabledOcr').addEventListener('change', updateOcrFormVisibility);
+    // Radio events
+    document.getElementById('modeAzure').addEventListener('change', updateOcrFormVisibility);
+    document.getElementById('modeOther').addEventListener('change', updateOcrFormVisibility);
+  });
+</script>
+{% endblock %}

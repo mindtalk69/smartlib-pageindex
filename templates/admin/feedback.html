@@ -1,0 +1,161 @@
+{% extends "admin/base.html" %}
+{% block title %}User Feedback{% endblock %}
+
+{% block admin_content %}
+<div class="container mt-4">
+  <h2 class="mb-4">User Feedback on Q&A</h2>
+
+  <!-- Toggle Buttons -->
+  <div class="btn-group mb-3" role="group" aria-label="Feedback Table Toggle">
+    <button type="button" class="btn btn-primary" id="showAggBtn">Aggregate Feedback</button>
+    <button type="button" class="btn btn-outline-primary" id="showUserBtn">All User Feedback Entries</button>
+  </div>
+
+  <!-- Aggregate Feedback Table -->
+  <div id="aggFeedbackSection">
+    <h4>Aggregate Feedback (Likes/Dislikes per Answer)</h4>
+    <div class="table-responsive mb-5">
+      <table id="aggFeedbackTable" class="table table-bordered table-striped align-middle datatable">
+        <thead class="table-light">
+          <tr>
+            <th>No</th>
+            <th>Question</th>
+            <th>Answer</th>
+            <th>Likes</th>
+            <th>Dislikes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in agg_data %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td style="max-width: 300px; word-break: break-word;">
+              {{ row.question[:80] }}{% if row.question|length > 80 %}...{% endif %}
+              <button type="button" class="btn btn-link btn-sm p-0 ms-1 view-full-btn" data-fulltext="{{ row.question|e }}" data-title="Full Question" title="View full question">
+                <i class="bi bi-eye"></i>
+              </button>
+            </td>
+            <td style="max-width: 400px; word-break: break-word;">
+              {{ row.answer[:80] }}{% if row.answer|length > 80 %}...{% endif %}
+              <button type="button" class="btn btn-link btn-sm p-0 ms-1 view-full-btn" data-fulltext="{{ row.answer|e }}" data-title="Full Answer" title="View full answer">
+                <i class="bi bi-eye"></i>
+              </button>
+            </td>
+            <td class="text-success fw-bold">{{ row.like_count }}</td>
+            <td class="text-danger fw-bold">{{ row.dislike_count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- User Feedback Table -->
+  <div id="userFeedbackSection" style="display: none;">
+    <h4>All User Feedback Entries</h4>
+    <div class="table-responsive">
+      <table id="userFeedbackTable" class="table table-bordered table-hover align-middle datatable">
+        <thead class="table-light">
+          <tr>
+            <th>No</th>
+            <th>User</th>
+            <th>Question</th>
+            <th>Answer</th>
+            <th>Feedback</th>
+            <th>Timestamp</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in feedback_data %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ entry.user }}</td>
+            <td style="max-width: 300px; word-break: break-word;">
+              {{ entry.question[:80] }}{% if entry.question|length > 80 %}...{% endif %}
+              <button type="button" class="btn btn-link btn-sm p-0 ms-1 view-full-btn" data-fulltext="{{ entry.question|e }}" data-title="Full Question" title="View full question">
+                <i class="bi bi-eye"></i>
+              </button>
+            </td>
+            <td style="max-width: 400px; word-break: break-word;">
+              {{ entry.answer[:80] }}{% if entry.answer|length > 80 %}...{% endif %}
+              <button type="button" class="btn btn-link btn-sm p-0 ms-1 view-full-btn" data-fulltext="{{ entry.answer|e }}" data-title="Full Answer" title="View full answer">
+                <i class="bi bi-eye"></i>
+              </button>
+            </td>
+            <td>
+              {% if entry.feedback_type == 'like' %}
+                <span class="text-success"><i class="bi bi-hand-thumbs-up"></i> Like</span>
+              {% else %}
+                <span class="text-danger"><i class="bi bi-hand-thumbs-down"></i> Dislike</span>
+              {% endif %}
+            </td>
+            <td>{{ entry.timestamp.strftime('%Y-%m-%d %H:%M:%S') if entry.timestamp else '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block admin_scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const aggBtn = document.getElementById('showAggBtn');
+    const userBtn = document.getElementById('showUserBtn');
+    const aggSection = document.getElementById('aggFeedbackSection');
+    const userSection = document.getElementById('userFeedbackSection');
+
+    function showAgg() {
+      aggSection.style.display = '';
+      userSection.style.display = 'none';
+      aggBtn.classList.add('btn-primary');
+      aggBtn.classList.remove('btn-outline-primary');
+      userBtn.classList.remove('btn-primary');
+      userBtn.classList.add('btn-outline-primary');
+    }
+    function showUser() {
+      aggSection.style.display = 'none';
+      userSection.style.display = '';
+      userBtn.classList.add('btn-primary');
+      userBtn.classList.remove('btn-outline-primary');
+      aggBtn.classList.remove('btn-primary');
+      aggBtn.classList.add('btn-outline-primary');
+    }
+    aggBtn.addEventListener('click', showAgg);
+    userBtn.addEventListener('click', showUser);
+    // Default: show aggregate
+    showAgg();
+
+    // Modal logic for "View Full"
+    const modalHtml = `
+      <div class="modal fade" id="fullTextModal" tabindex="-1" aria-labelledby="fullTextModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="fullTextModalLabel"></h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="fullTextModalBody" style="white-space: pre-wrap; word-break: break-word;"></div>
+          </div>
+        </div>
+      </div>
+    `;
+    if (!document.getElementById('fullTextModal')) {
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+    const fullTextModal = new bootstrap.Modal(document.getElementById('fullTextModal'));
+    document.body.addEventListener('click', function(e) {
+      const btn = e.target.closest('.view-full-btn');
+      if (btn) {
+        const text = btn.getAttribute('data-fulltext');
+        const title = btn.getAttribute('data-title') || 'Full Text';
+        document.getElementById('fullTextModalLabel').textContent = title;
+        document.getElementById('fullTextModalBody').textContent = text;
+        fullTextModal.show();
+      }
+    });
+  });
+</script>
+{% endblock %}

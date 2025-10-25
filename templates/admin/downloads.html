@@ -1,0 +1,120 @@
+{% extends "admin/base.html" %}
+
+{% block admin_title %}Download Management{% endblock %} {# Set the page title #}
+
+{% block admin_content %}
+<div class="container mt-4">
+    {# Removed H2 and H6 as title is now in admin_title block #}
+    
+    <div class="table-responsive">
+        <table class="table table-striped" id="downloadsTable"> 
+            <thead>
+                <tr>
+                    <th>No.</th>
+                    <th>URL</th>
+                    <th>Library</th>
+                    <th>Knowledge</th>
+                    <th>Status</th>
+                    <th>Content Type</th>
+                    <th>User</th>
+                    <th>Downloaded At</th>
+                    <th>Is OCR</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for download in downloads %}
+                <tr data-id="{{ download.id }}">
+                    <td>{{ loop.index }}</td>
+                    <td>
+                        <a href="{{ download.url }}" target="_blank" rel="noopener noreferrer" title="{{ download.url }}">
+                            {{ download.url|truncate(50) }}
+                        </a>
+                    </td>
+                    <td>{{ download.library_name or 'N/A' }}</td>
+                    <td>{{ download.knowledge_name or 'N/A' }}</td>
+                    <td>
+                        <span class="badge 
+                            {% if download.status == 'success' %}
+                                {% if not light_theme %}bg-success{% else %}bg-primary{% endif %}
+                            {% else %}
+                                {% if not light_theme %}bg-danger{% else %}bg-warning text-dark{% endif %}
+                            {% endif %}">
+                            {{ download.status|title }}
+                        </span>
+                        {% if download.error_message %}
+                        <div class="small text-muted mt-1">{{ download.error_message }}</div>
+                        {% endif %}
+                    </td>
+                    <td>{{ download.content_type or 'N/A' }}</td>
+                    <td>{{ download.username }}</td>
+                    <td>
+                        {% if download.processed_at %}
+                            {{ download.processed_at.strftime('%Y-%m-%d %H:%M') }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+                    <td>{% if download.is_ocr %}Yes{% else %}No{% endif %}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-sm btn-danger delete-download-btn" 
+                                    data-id="{{ download.id }}"
+                                    data-url="{{ download.url }}"
+                                    title="Delete Download Record">
+                                <i class="bi bi-trash-fill"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    // Add basic delete confirmation (requires backend endpoint)
+    $(document).ready(function() {
+        $('#downloadsTable').on('click', '.delete-download-btn', function() {
+            const button = $(this);
+            const downloadId = button.data('id');
+            const downloadUrl = button.data('url');
+            
+            if (confirm(`Are you sure you want to delete the download record for:\n${downloadUrl} (ID: ${downloadId})?\n\nNote: This only deletes the record, not the downloaded content if it was saved elsewhere.`)) {
+                // --- Backend Call Required ---
+                // Example using fetch API (replace with your actual endpoint and logic)
+                /* 
+                const csrfToken = $('meta[name="csrf-token"]').attr('content'); 
+                fetch(`/admin/downloads/delete/${downloadId}`, {
+                    method: 'POST', // Or DELETE
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Use the DataTable API to remove the row
+                        const table = $('#downloadsTable').DataTable();
+                        table.row(button.closest('tr')).remove().draw();
+                        alert('Download record deleted successfully.'); 
+                    } else {
+                        alert('Error deleting download record: ' + (data.message || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while trying to delete the record.');
+                });
+                */
+               alert('Delete functionality requires backend implementation.'); // Placeholder alert
+            }
+        });
+    });
+</script>
+{% endblock %}

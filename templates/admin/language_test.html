@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Language Form Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Language Form Test Page</h1>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        Test Form
+                    </div>
+                    <div class="card-body">
+                        <form id="testForm">
+                            <div class="mb-3">
+                                <label for="testId" class="form-label">ID</label>
+                                <input type="text" class="form-control" id="testId" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label for="testCode" class="form-label">Language Code</label>
+                                <input type="text" class="form-control" id="testCode">
+                            </div>
+                            <div class="mb-3">
+                                <label for="testName" class="form-label">Language Name</label>
+                                <input type="text" class="form-control" id="testName">
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="testActive">
+                                <label class="form-check-label" for="testActive">Is Active</label>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-primary" id="loadDataBtn">Load Data</button>
+                                <button type="button" class="btn btn-success" id="setDummyDataBtn">Set Dummy Data</button>
+                                <button type="button" class="btn btn-danger" id="resetFormBtn">Reset Form</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        Debug Output
+                    </div>
+                    <div class="card-body">
+                        <div id="debugOutput" class="border p-3 bg-light" style="min-height: 200px; overflow-y: auto;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Test page loaded');
+        addDebugMessage('Test page loaded and script running');
+        
+        // Get form elements
+        const testId = document.getElementById('testId');
+        const testCode = document.getElementById('testCode');
+        const testName = document.getElementById('testName');
+        const testActive = document.getElementById('testActive');
+        const loadDataBtn = document.getElementById('loadDataBtn');
+        const setDummyDataBtn = document.getElementById('setDummyDataBtn');
+        const resetFormBtn = document.getElementById('resetFormBtn');
+        const debugOutput = document.getElementById('debugOutput');
+        
+        function addDebugMessage(message) {
+            const time = new Date().toLocaleTimeString();
+            const messageElement = document.createElement('div');
+            messageElement.innerHTML = `<strong>[${time}]</strong> ${message}`;
+            debugOutput.appendChild(messageElement);
+            debugOutput.scrollTop = debugOutput.scrollHeight;
+            console.log(`[${time}] ${message}`);
+        }
+        
+        // Check if elements were found
+        if (testId && testCode && testName && testActive && loadDataBtn && setDummyDataBtn) {
+            addDebugMessage('All form elements found successfully');
+        } else {
+            addDebugMessage('WARNING: Some form elements not found!');
+        }
+        
+        // Reset form handler
+        resetFormBtn.addEventListener('click', function() {
+            testId.value = '';
+            testCode.value = '';
+            testName.value = '';
+            testActive.checked = false;
+            addDebugMessage('Form reset');
+        });
+        
+        // Set dummy data handler
+        setDummyDataBtn.addEventListener('click', function() {
+            testId.value = '99';
+            testCode.value = 'test-code';
+            testName.value = 'Test Language';
+            testActive.checked = true;
+            addDebugMessage('Dummy data set to form');
+        });
+        
+        // Load real data handler
+        loadDataBtn.addEventListener('click', function() {
+            addDebugMessage('Fetching data from the API...');
+            
+            // Try to load first language with ID 1
+            fetch('/admin/languages/data/1')
+                .then(response => {
+                    addDebugMessage(`Response status: ${response.status}`);
+                    return response.text();
+                })
+                .then(text => {
+                    addDebugMessage(`Raw response: ${text}`);
+                    const data = JSON.parse(text);
+                    addDebugMessage(`Parsed data: ${JSON.stringify(data)}`);
+                    
+                    // Populate form fields
+                    testId.value = data.id || '';
+                    testCode.value = data.language_code || '';
+                    testName.value = data.language_name || '';
+                    testActive.checked = data.is_active === true;
+                    
+                    addDebugMessage('Form populated from API data');
+                })
+                .catch(error => {
+                    addDebugMessage(`Error: ${error.message}`);
+                });
+        });
+    });
+    </script>
+</body>
+</html>

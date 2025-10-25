@@ -1,0 +1,59 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu.micro
+    ports:
+      - "8000:8000"
+    volumes:
+      - my_data:/app/data
+    env_file:
+      - .env.dev
+    environment:
+      - LOCAL_MODE=true
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - VECTOR_STORE_PROVIDER=chromadb
+      - DEFAULT_EMBEDDING_MODEL=text-embedding-3-small
+    command: ["web"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker-optimized
+    volumes:
+      - my_data:/app/data
+    env_file:
+      - .env.dev
+    environment:
+      - LOCAL_MODE=true
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - VECTOR_STORE_PROVIDER=chromadb
+      - DEFAULT_EMBEDDING_MODEL=all-MiniLM-L6-v2
+    command: ["worker"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  my_data:
+  redis_data:

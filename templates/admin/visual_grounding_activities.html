@@ -1,0 +1,54 @@
+{% extends "admin/base.html" %}
+
+{% block admin_title %}Visual Grounding Activities{% endblock %}
+
+{% block admin_content %}
+<div class="container mt-4">
+    <div class="table-responsive">
+        <table class="table table-striped" id="visualGroundingActivitiesTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>User</th>
+                    <th>Group</th>
+                    <th>File</th>
+                    <th>Status</th>
+                    <th>Created At</th>
+                    <th>Updated At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if activities %}
+                    {% for activity in activities %}
+                    <tr>
+                        <td>{{ activity.id }}</td>
+                        <td>{{ activity.user_username if activity.user_username is defined else (activity.user.username if activity.user else 'N/A') }}</td>
+                        <td>{{ activity.group_name if activity.group_name is defined else (activity.group.name if activity.group is defined and activity.group else 'N/A') }}</td>
+                        <td>{{ activity.file_name if activity.file_name is defined else (activity.uploaded_file.original_filename if activity.uploaded_file else 'N/A') }}</td>
+                        <td>{{ activity.status }}</td>
+                        <td>{{ activity.created_at.strftime('%Y-%m-%d %H:%M') if activity.created_at else 'N/A' }}</td>
+                        <td>{{ activity.updated_at.strftime('%Y-%m-%d %H:%M') if activity.updated_at else 'N/A' }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-danger delete-btn" data-id="{{ activity.id }}" title="Delete Activity">
+                                <i class="bi bi-trash-fill"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center">No visual grounding activities found.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block admin_scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/admin/visual_grounding_activities.js') }}"></script>
+{% endblock %}

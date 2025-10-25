@@ -1,0 +1,254 @@
+/* Restore Movement Animations */
+@keyframes floating {
+    0% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-10px) rotate(5deg); }
+    100% { transform: translateY(0px) rotate(0deg); }
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-15px) scale(1.1); }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+/* Restore Movement Animation Classes */
+.floating-animation {
+    animation: floating 3s ease-in-out infinite;
+}
+
+.bounce-animation {
+    animation: bounce 2s ease-in-out infinite;
+}
+
+.shake-animation {
+    animation: shake 1.5s ease-in-out infinite;
+}
+
+.pulse-animation {
+    animation: pulse 2.5s ease-in-out infinite;
+}
+
+/* Remove Gradient Animation Keyframes */
+/* @keyframes gradient-animation { ... } */
+
+/* Base style with enhanced smooth transitions */
+.ai-text-animation {
+    font-size: 2.5rem; 
+    font-weight: bold; 
+    color: #0dcaf0; /* Fallback solid color */
+    display: inline-block; 
+    opacity: 1;
+    visibility: visible;
+    position: relative; 
+    z-index: 1; 
+    background-image: linear-gradient(to right, #ff0066, #6600ff);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: none;
+    will-change: transform, background-image, opacity;
+    
+    /* Enhanced smooth transitions */
+    transition: 
+        background-image 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+        transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+        color 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    backface-visibility: hidden; /* Reduce flickering */
+    transform: translateZ(0); /* Enable hardware acceleration */
+}
+
+/* Add transition properties to pseudo-elements */
+.ai-text-animation::before,
+.ai-text-animation::after,
+.no-conversation-placeholder::before {
+    transition: 
+        background 0.8s ease-in-out,
+        transform 0.4s ease-in-out,
+        opacity 0.4s ease-in-out,
+        filter 0.8s ease-in-out;
+}
+
+/* Define static gradient classes */
+.gradient-1 {
+    background-image: linear-gradient(to right, #ff0066, #6600ff);
+}
+.gradient-2 {
+    background-image: linear-gradient(to right, #00ffcc, #0066ff);
+}
+.gradient-3 {
+    background-image: linear-gradient(to right, #ff6600, #00ff99);
+}
+.gradient-4 {
+     background-image: linear-gradient(to right, #9933ff, #ff0066);
+}
+
+/* Override color only if background-clip is supported */
+@supports (-webkit-background-clip: text) or (background-clip: text) {
+  .ai-text-animation {
+    color: transparent !important; /* Ensure transparency if clip works */
+    -webkit-text-fill-color: transparent !important;
+  }
+}
+
+/* Background Animation Effects */
+@keyframes glow-ring {
+    0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.3; }
+    50% { transform: scale(1.1) rotate(180deg); opacity: 0.7; }
+}
+
+@keyframes float-particle {
+    0% { transform: rotate(0deg) translateX(15px); opacity: 0; filter: blur(0); }
+    15% { opacity: 1; }
+    35% { transform: rotate(120deg) translateX(10px); filter: blur(1px); }
+    70% { opacity: 1; transform: rotate(240deg) translateX(15px); filter: blur(0); }
+    100% { transform: rotate(360deg) translateX(15px); opacity: 0; filter: blur(1px); }
+}
+
+@keyframes border-dance {
+    0% { background-position: 0% 50%; filter: hue-rotate(0deg); }
+    50% { background-position: 100% 50%; filter: hue-rotate(180deg); }
+    100% { background-position: 0% 50%; filter: hue-rotate(360deg); }
+}
+
+/* Background Container */
+.no-conversation-placeholder {
+    position: relative !important;
+    display: inline-block;
+}
+
+/* Glowing Ring Effect - Responsive to current gradient */
+.ai-text-animation::before {
+    content: '';
+    position: absolute;
+    inset: -20px;
+    border-radius: 50%;
+    background: radial-gradient(circle, 
+        var(--ring-color, rgba(13,202,240,0.2)) 0%,
+        var(--ring-fade, rgba(13,202,240,0.1)) 45%,
+        transparent 70%
+    );
+    z-index: -1;
+    animation: glow-ring 3s ease-in-out infinite;
+    mix-blend-mode: screen;
+}
+
+/* Floating Particles - Matching current theme */
+.ai-text-animation::after {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: var(--particle-color, rgba(13,202,240,0.5));
+    border-radius: 50%;
+    left: 50%;
+    top: 50%;
+    transform-origin: -15px 0;
+    animation: float-particle 6s linear infinite;
+    box-shadow:
+        25px -5px 0 -2px var(--particle-color-fade, rgba(13,202,240,0.3)),
+        -25px -5px 0 -2px var(--particle-color-fade, rgba(13,202,240,0.3)),
+        0 25px 0 -2px var(--particle-color-fade, rgba(13,202,240,0.3)),
+        15px 20px 0 -3px var(--particle-color-fade, rgba(13,202,240,0.2)),
+        -15px 20px 0 -3px var(--particle-color-fade, rgba(13,202,240,0.2));
+    mix-blend-mode: plus-lighter;
+    filter: blur(0.5px);
+    will-change: transform, opacity, filter;
+}
+
+/* Animated Border Container - Removed as it might be causing background perception issues */
+/* .no-conversation-placeholder::before { ... } */
+
+/* Loading Dots Animation */
+.loading-dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-width: 120px;
+    min-height: 48px;
+    background: transparent;
+}
+
+.dots-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #0dcaf0;
+    opacity: 0.3;
+    animation: dot-bounce 1.2s infinite cubic-bezier(.45,.05,.55,.95);
+}
+
+.dot:nth-child(2) {
+    animation-delay: 0.15s;
+}
+.dot:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+@keyframes dot-bounce {
+    0%, 80%, 100% { transform: scale(1); opacity: 0.3; }
+    40% { transform: scale(1.5); opacity: 1; }
+}
+
+/* Enhanced gradient themes with transition properties */
+.gradient-1 {
+    --ring-color: rgba(255,0,102,0.2);
+    --ring-fade: rgba(102,0,255,0.1);
+    --particle-color: rgba(255,0,102,0.5);
+    --particle-color-fade: rgba(102,0,255,0.3);
+    --border-color-1: rgba(255,0,102,0.5);
+    --border-color-2: rgba(102,0,255,0.5);
+    --border-color-3: rgba(255,0,102,0.5);
+    transition: --ring-color 0.8s ease-in-out,
+                --particle-color 0.8s ease-in-out,
+                --border-color-1 0.8s ease-in-out;
+}
+
+.gradient-2 {
+    --ring-color: rgba(0,255,204,0.2);
+    --ring-fade: rgba(0,102,255,0.1);
+    --particle-color: rgba(0,255,204,0.5);
+    --particle-color-fade: rgba(0,102,255,0.3);
+    --border-color-1: rgba(0,255,204,0.5);
+    --border-color-2: rgba(0,102,255,0.5);
+    --border-color-3: rgba(0,255,204,0.5);
+}
+
+.gradient-3 {
+    --ring-color: rgba(255,102,0,0.2);
+    --ring-fade: rgba(0,255,153,0.1);
+    --particle-color: rgba(255,102,0,0.5);
+    --particle-color-fade: rgba(0,255,153,0.3);
+    --border-color-1: rgba(255,102,0,0.5);
+    --border-color-2: rgba(0,255,153,0.5);
+    --border-color-3: rgba(255,102,0,0.5);
+}
+
+.gradient-4 {
+    --ring-color: rgba(153,51,255,0.2);
+    --ring-fade: rgba(255,0,102,0.1);
+    --particle-color: rgba(153,51,255,0.5);
+    --particle-color-fade: rgba(255,0,102,0.3);
+    --border-color-1: rgba(153,51,255,0.5);
+    --border-color-2: rgba(255,0,102,0.5);
+    --border-color-3: rgba(153,51,255,0.5);
+}

@@ -1,0 +1,267 @@
+<!DOCTYPE html> {# Start fresh, don't extend base.html's head directly #}
+<html lang="en" style="height: 100%;">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Admin | Smarthing{% endblock %}</title> {# Admin specific title #}
+    <!-- Bootswatch Cosmo Theme CSS from CDN -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.0/dist/cosmo/bootstrap.min.css" crossorigin="anonymous">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <!-- Font Awesome (if used by admin icons like fas fa-*) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <!-- Favicon -->
+    <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
+    <!-- *** Link Admin Dark Mode CSS *** -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/darkmode.css') }}">
+    <!-- DataTables Bootstrap 5 CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" crossorigin="anonymous">
+    <!-- DataTables Theme Integration -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/datatables-theme.css') }}">
+    <!-- Bootstrap Toggle CSS -->
+    <link href="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/css/bootstrap4-toggle.min.css" rel="stylesheet">
+    <!-- CSRF Token for AJAX requests -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <style>
+      /* Base UI improvements (copied from base.html, could be moved to a shared CSS) */
+      .theme-toggle-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s ease;
+      }
+      .theme-toggle-btn:hover {
+        transform: scale(1.1);
+      }
+      .theme-toggle-btn i {
+        font-size: 1.2rem;
+      }
+      /* Disable particles animation in admin pages */
+      #particles-js {
+        display: none !important;
+      }
+      /* High-contrast group titles in dark mode */
+      [data-bs-theme="dark"] .admin-menu-container .list-group-item.fw-bold {
+        color: #fff !important;
+        background: transparent;
+      }
+    </style>
+    {% block admin_head_extra %}{% endblock %} {# Allow specific pages to add more head content #}
+</head>
+<body style="height: 100%; margin: 0; padding: 0;"> {# Body tag needed as we are not extending #}
+
+    <!-- Bootstrap Navbar (Copied from base.html for consistency) -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+      <div class="container">
+        <a class="navbar-brand d-flex align-items-center" href="#">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="me-2">
+            <circle cx="16" cy="16" r="15" stroke="currentColor" stroke-width="2"/>
+            <path d="M10 16L14 20L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="fw-semibold">Smarthing</span> {# Reverted to original title #}
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="true" aria-label="Toggle navigation" style="z-index: 500;">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse show" id="navbarSupportedContent" style="display: flex !important;">
+          <ul class="navbar-nav ms-auto mb-0 mb-lg-0">
+            {% if current_user.is_authenticated %}
+              {# Note: Removed mb-2 from Home link as it might not be desired globally #}
+              <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('upload_page') }}">Upload</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('change_password') }}">Change Password</a></li>
+            {% else %}
+              {# Use the correct endpoint name defined in the route decorator #}
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('login_route') }}">Login</a></li>
+            {% endif %}
+                    {% if current_user.is_admin %}
+              <li class="nav-item"><a class="nav-link" href="/admin/">Admin Panel</a></li>
+            {% endif %}
+            <li class="nav-item">
+              <button id="theme-toggle" class="nav-link theme-toggle-btn" style="background: none; border: none; cursor: pointer;">
+                <i class="bi bi-sun-fill d-none d-lg-inline"></i>
+                <span class="d-lg-none">Toggle Theme</span>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    {# Main Admin Content Area #}
+    <div class="container mt-4">
+      <div class="row">
+        <div class="col-md-3">
+            {# Removed conditional bg-dark class - handled by CSS #}
+            <div class="card admin-menu-container"> 
+                {# Removed conditional bg-primary/bg-light/text-dark classes - handled by CSS #}
+                <div class="card-header"> 
+                    Admin Menu
+                </div>
+                 {# Removed conditional bg-dark class - handled by CSS #}
+                <div class="list-group list-group-flush">
+                  <!-- Dashboard (standalone at top) -->
+                  <a href="{{ url_for('admin.dashboard') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+                    <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                  </a>
+                  <!-- User Management (collapsible) -->
+                  <button class="list-group-item fw-bold text-secondary small d-flex justify-content-between align-items-center"
+                          type="button" data-bs-toggle="collapse" data-bs-target="#collapseUserMgmt" aria-expanded="true" aria-controls="collapseUserMgmt">
+                    User Management
+                    <span class="fas fa-chevron-down small"></span>
+                  </button>
+                  <div class="collapse show" id="collapseUserMgmt">
+                    <a href="{{ url_for('admin_users.user_management') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_users.user_management' %}active{% endif %}">
+                      <i class="fas fa-user me-2"></i>Users
+                    </a>
+                    <a href="{{ url_for('admin_user_groups.user_groups') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_user_groups.user_groups' %}active{% endif %}">
+                      <i class="fas fa-users me-2"></i>User Groups
+                    </a>
+                    <a href="{{ url_for('admin_groups.groups') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_groups.groups' %}active{% endif %}">
+                      <i class="fas fa-users-cog me-2"></i>Groups
+                    </a>
+                    <a href="{{ url_for('change_password') }}" class="list-group-item list-group-item-action">
+                      <i class="fas fa-key me-2"></i>Change Password
+                    </a>
+                  </div>
+                  <!-- Content & Data Management (collapsible) -->
+                  <button class="list-group-item fw-bold text-secondary small mt-2 d-flex justify-content-between align-items-center"
+                          type="button" data-bs-toggle="collapse" data-bs-target="#collapseContentData" aria-expanded="true" aria-controls="collapseContentData">
+                    Content & Data
+                    <span class="fas fa-chevron-down small"></span>
+                  </button>
+                  <div class="collapse show" id="collapseContentData">
+                    <a href="{{ url_for('admin_files.file_management') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_files.file_management' %}active{% endif %}">
+                      <i class="fas fa-file-alt me-2"></i>File Management
+                    </a>
+                    <a href="{{ url_for('admin_downloads.download_management') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_downloads.download_management' %}active{% endif %}">
+                      <i class="fas fa-cloud-download-alt me-2"></i>URL Downloads
+                    </a>
+                    <a href="{{ url_for('admin_folder_upload.folder_upload') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_folder_upload.folder_upload' %}active{% endif %}">
+                      <i class="fas fa-folder-plus me-2"></i>Folder Upload
+                    </a>
+                    <a href="{{ url_for('admin_libraries.library_management') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_libraries.library_management' %}active{% endif %}">
+                      <i class="fas fa-book-open me-2"></i>Library Management
+                    </a>
+                    <a href="{{ url_for('admin_catalogs.catalog_management') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_catalogs.catalog_management' %}active{% endif %}">
+                      <i class="fas fa-tags me-2"></i>Catalog Management
+                    </a>
+                    <a href="{{ url_for('admin.category_management') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin.category_management' %}active{% endif %}">
+                      <i class="fas fa-folder-open me-2"></i>Category Management
+                    </a>
+                    <a href="{{ url_for('admin_knowledges.knowledge_management') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_knowledges.knowledge_management' %}active{% endif %}">
+                      <i class="fas fa-brain me-2"></i>Knowledge Management
+                    </a>
+                    <a href="{{ url_for('admin_languages.language_management') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_languages.language_management' %}active{% endif %}">
+                      <i class="fas fa-language me-2"></i>LLM Languages
+                    </a>
+                  </div>
+                  <!-- AI & Vector Features (collapsible) -->
+                  <button class="list-group-item fw-bold text-secondary small mt-2 d-flex justify-content-between align-items-center"
+                          type="button" data-bs-toggle="collapse" data-bs-target="#collapseAI" aria-expanded="true" aria-controls="collapseAI">
+                    AI & Vector
+                    <span class="fas fa-chevron-down small"></span>
+                  </button>
+                  <div class="collapse show" id="collapseAI">
+                    <a href="{{ url_for('admin.vector_references') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin.vector_references' %}active{% endif %}">
+                      <i class="fas fa-project-diagram me-2"></i>Vector References
+                    </a>
+                    <a href="{{ url_for('admin.vector_store_settings') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin.vector_store_settings' %}active{% endif %}">
+                      <i class="fas fa-database me-2"></i>Vector Store Settings
+                    </a>
+                    {% if is_enabled_ocr %}
+                    <a href="{{ url_for('admin.ocr_settings') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin.ocr_settings' %}active{% endif %}">
+                      <i class="fas fa-file-alt me-2"></i>OCR Settings
+                    </a>
+                    {% endif %}
+                    <a href="{{ url_for('admin_visual_grounding.visual_grounding_activities') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_visual_grounding.visual_grounding_activities' %}active{% endif %}">
+                      <i class="fas fa-eye me-2"></i>Visual Grounding Activities
+                    </a>
+                    <a href="{{ url_for('admin.visual_grounding_settings') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin.visual_grounding_settings' %}active{% endif %}">
+                      <i class="fas fa-cog me-2"></i>Visual Grounding Settings
+                    </a>
+                    <a href="{{ url_for('admin.prompt_management') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin.prompt_management' %}active{% endif %}">
+                      <i class="fas fa-terminal me-2"></i>Prompts
+                    </a>
+                    <a href="{{ url_for('admin_models.model_management') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_models.model_management' %}active{% endif %}">
+                      <i class="fas fa-cogs me-2"></i>Models
+                    </a>
+                    <a href="{{ url_for('admin_embeddings.embedding_models') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_embeddings.embedding_models' %}active{% endif %}">
+                      <i class="fas fa-brain me-2"></i>Embedding Models
+                    </a>
+                  </div>
+                  <!-- System & Messaging (collapsible) -->
+                  <button class="list-group-item fw-bold text-secondary small mt-2 d-flex justify-content-between align-items-center"
+                          type="button" data-bs-toggle="collapse" data-bs-target="#collapseSystem" aria-expanded="true" aria-controls="collapseSystem">
+                    System & Messaging
+                    <span class="fas fa-chevron-down small"></span>
+                  </button>
+                  <div class="collapse show" id="collapseSystem">
+                    <a href="{{ url_for('admin_messages.message_viewer') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_messages.message_viewer' %}active{% endif %}">
+                      <i class="fas fa-envelope me-2"></i>Message History
+                    </a>
+                    <a href="{{ url_for('admin_feedback.feedback_list') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_feedback.feedback_list' %}active{% endif %}">
+                      <i class="fas fa-comment-dots me-2"></i>User Feedback
+                    </a>
+                    <a href="{{ url_for('admin.admin_reset_data') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin.admin_reset_data' %}active{% endif %}">
+                      <i class="fas fa-exclamation-triangle me-2"></i>Reset Upload/Download Logs 
+                    </a>
+                  </div>
+                </div>
+            </div>
+        </div>
+        {# Removed conditional bg-dark/text-light/bg-light/text-dark classes - handled by CSS #}
+        <div class="col-md-9 admin-content-scrollable">
+            <div class="card"> {# Added card wrapper for content area #}
+                <div class="card-header"> {# Added consistent card header #}
+                    <h4>{% block admin_title %}Admin Section{% endblock %}</h4> {# Placeholder/Block for title #}
+                </div>
+                <div class="card-body"> {# Added card body wrapper #}
+                    {# Flash messages specific to admin area #}
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                      {% if messages %}
+                {% for category, message in messages %}
+                  <div class="alert alert-{{ category if category else 'info' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                  </div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+                    {% block admin_content %}{% endblock %} {# Renamed block for clarity #}
+                </div> {# Close card-body #}
+            </div> {# Close card #}
+        </div>
+      </div>
+    </div>
+
+    {# Re-add Footer structure from base.html #}
+    <footer class="text-center py-1 text-body-secondary small position-absolute bottom-0 start-0 end-0" style="font-size: 0.7rem; z-index: 1;">
+      Copyright© 2025 smarthing.ai. All rights reserved. [Admin]
+    </footer>
+
+    {# Re-add Scripts structure from base.html #}
+    <!-- jQuery (required for DataTables Bootstrap 5 integration JS) -->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js" integrity="sha256-2Pmvv0kuTBOenSvLm6bvfBSSHrUJ+3A7x6P5Ebd07/g=" crossorigin="anonymous"></script>
+    <!-- Bootstrap Bundle JS from CDN (includes Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <!-- DataTables Core JS -->
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js" crossorigin="anonymous"></script>
+    <!-- DataTables Bootstrap 5 Integration JS -->
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js" crossorigin="anonymous"></script>
+    <!-- Bootstrap Toggle JS -->
+    <!-- <script src="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/js/bootstrap4-toggle.min.js"></script> -->
+    <!-- Custom JavaScript (Link main darkmode script for toggle functionality) -->
+    <script src="{{ url_for('static', filename='js/darkmode.js') }}"></script>
+    <!-- CSRF Utilities (load early as other scripts depend on it) -->
+    <script src="{{ url_for('static', filename='js/csrf-utils.js') }}"></script>
+    <!-- Admin Form Utils - Universal form handler -->
+    <script src="{{ url_for('static', filename='js/admin/admin-form-utils.js') }}"></script>
+    <!-- Admin DataTables - Standardized admin tables -->
+    <script src="{{ url_for('static', filename='js/admin/admin-datatables.js') }}"></script>
+    {# Link admin-specific JS if needed in the future #}
+    {# <script src="{{ url_for('static', filename='js/admin/main.js') }}"></script> #}
+    {% block admin_scripts %}{% endblock %}
+</body>
+</html>

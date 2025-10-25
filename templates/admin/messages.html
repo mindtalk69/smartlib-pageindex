@@ -1,0 +1,44 @@
+{% extends "admin/base.html" %}
+{% block title %}Message Viewer{% endblock %}
+
+{% block admin_title %}Messages History{% endblock %} {# Set the page title #}
+
+{% block admin_content %}
+<div class="container mt-4">
+    {# Removed H2 and H6 as title is now in admin_title block #}
+    
+    <div class="mb-3">
+        <a href="{{ url_for('admin.export_message_history_csv') }}" class="btn btn-outline-primary">
+            <i class="fas fa-download me-1"></i> Export as CSV
+        </a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-striped" id="messagesTable"> 
+            <thead>
+                <tr>
+                    <th style="width: 15%;">User</th>
+                    <th style="width: 40%;">Message</th>
+                    <th style="width: 35%;">Answer</th>
+                    <th style="width: 20%;">Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for msg in messages %} {# msg is a MessageHistory object #}
+                <tr data-id="{{ msg.message_id }}">
+                    <td>{{ msg.author.username if msg.author else 'Unknown User' }}</td>
+                    <td style="word-wrap: break-word;">{{ msg.message_text }}</td>
+                    <td style="word-wrap: break-word;">{{ msg.answer or '' }}</td>
+                    <td>{{ msg.timestamp.strftime('%Y-%m-%d %H:%M:%S') if msg.timestamp else 'N/A' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {# Removed server-side pagination controls as DataTables will handle it #}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+{# DataTables initialization moved to admin-datatables.js #}
+{% endblock %}

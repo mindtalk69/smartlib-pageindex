@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en" style="height: 100%;"> {# Removed overflow: hidden; #}
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Smarthing{% endblock %}</title>
+    <!-- Bootswatch Cosmo Theme CSS from CDN -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.0/dist/cosmo/bootstrap.min.css" crossorigin="anonymous">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <!-- Favicon -->
+    <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}?v={{ config['APP_VERSION'] }}">
+    <!-- Application styles -->
+    <style>
+      /* Base UI improvements */
+      .theme-toggle-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s ease;
+      }
+      
+      .theme-toggle-btn:hover {
+        transform: scale(1.1);
+      }
+      
+      .theme-toggle-btn i {
+        font-size: 1.2rem;
+      }
+    </style>
+    <!-- Dark mode stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/darkmode.css') }}?v={{ config['APP_VERSION'] }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}?v={{ config['APP_VERSION'] }}"> {# Added shared form styles #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}?v={{ config['APP_VERSION'] }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/options.css') }}?v={{ config['APP_VERSION'] }}"> {# Added options CSS #}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <!-- Citation tooltips & popovers -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/citation-tooltips.css') }}">
+    <!-- CSRF Token for AJAX requests -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <!-- DataTables Bootstrap 5 CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" crossorigin="anonymous">
+    <!-- Bootstrap Toggle CSS -->
+    <link href="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/css/bootstrap4-toggle.min.css" rel="stylesheet" crossorigin="anonymous">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/query-form.css') }}"> {# Added Query Form CSS #}
+    {% block styles %}{% endblock %} {# Add styles block here #}
+    {% block head %}{% endblock %}
+  </head>
+  {# Apply flexbox layout to body #}
+  <body style="height: 100vh; margin: 0; display: flex; flex-direction: column;"> 
+    <!-- Bootstrap Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="overflow: visible !important; flex-shrink: 0;"> {# Added flex-shrink: 0 #}
+      <div class="container" style="overflow: visible !important;"> {# Added overflow visible #}
+        <a class="navbar-brand d-flex align-items-center" href="#">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="me-2">
+            <circle cx="16" cy="16" r="15" stroke="currentColor" stroke-width="2"/>
+            <path d="M10 16L14 20L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="fw-semibold">Smarthing</span>
+        </a>
+        <button class="navbar-toggler" type="button" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation" style="z-index: 500;" onclick="event.preventDefault(); var menu = document.getElementById('navbarSupportedContent'); menu.classList.toggle('show'); this.setAttribute('aria-expanded', menu.classList.contains('show'));">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+          <ul class="navbar-nav ms-auto mb-0 mb-lg-0">
+            {% if current_user.is_authenticated %}
+              <li class="nav-item mb-2"><a class="nav-link" href="/">Home</a></li> {# Assuming Home is New Conversation? Added mb-2 #}
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('upload_page') }}">Upload</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('change_password') }}">Change Password</a></li>
+            {% else %}
+              {# Use the correct endpoint name defined in the route decorator #}
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('login_route') }}">Login</a></li>
+            {% endif %}
+            {% if current_user.is_admin %}
+              <li class="nav-item"><a class="nav-link" href="/admin/">Admin Panel</a></li>
+            {% endif %}
+            {# Added Options Toggle Button - Now triggers modal #}
+            {% if current_user.is_authenticated %}
+            <li class="nav-item">
+                <a href="#" id="options-toggle-btn" class="nav-link" title="Options" data-bs-toggle="modal" data-bs-target="#animationOptionsModal">
+                    <i class="bi bi-gear-fill d-none d-lg-inline"></i>
+                    <span class="d-lg-none">Options</span>
+                </a>
+                <!-- Old panel removed -->
+            </li>
+            {% endif %}
+            <li class="nav-item">
+              <button id="theme-toggle" class="nav-link theme-toggle-btn" style="background: none; border: none; cursor: pointer;">
+                <i class="bi bi-sun-fill d-none d-lg-inline"></i>
+                <span class="d-lg-none">Toggle Theme</span>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Animation Options Panel (Removed) -->
+
+    <!-- Main Content Container -->
+    {# Let this container grow and handle scrolling #}
+    <div class="container pt-2" style="flex-grow: 1; position: relative; overflow-y: auto; padding-bottom: 20px;"> {# Added padding-bottom to lift content above footer #}
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category if category else 'info' }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </div>
+
+    <!-- Footer (reduced size, normal flow) -->
+    <footer class="text-center py-1 text-body-secondary small" style="font-size: 0.7rem; z-index: 1; flex-shrink: 0;"> {# Removed position-absolute, added flex-shrink #}
+      Copyright© {{ current_year if current_year is defined else 2025 }} smarthing.ai. All rights reserved.
+    </footer>
+    
+    <!-- jQuery (required for DataTables Bootstrap 5 integration JS) -->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js" integrity="sha256-2Pmvv0kuTBOenSvLm6bvfBSSHrUJ+3A7x6P5Ebd07/g=" crossorigin="anonymous"></script>
+    <!-- Bootstrap Bundle JS from CDN (includes Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+    <script>
+        console.log('[Base.html] Type of bootstrap immediately after its script tag:', typeof bootstrap);
+        if (typeof bootstrap !== 'undefined') {
+            console.log('[Base.html] Bootstrap.Tooltip immediately after:', typeof bootstrap.Tooltip);
+            console.log('[Base.html] Bootstrap.Modal immediately after:', typeof bootstrap.Modal);
+        } else {
+            console.error('[Base.html] BOOTSTRAP IS UNDEFINED IMMEDIATELY AFTER ITS SCRIPT TAG! Check for errors above this message or issues with bootstrap.bundle.min.js loading/execution.');
+        }
+    </script>
+    <!-- DataTables Core JS -->
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js" crossorigin="anonymous"></script>
+<!-- DataTables Bootstrap 5 Integration JS --> 
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js" crossorigin="anonymous"></script>
+    <!-- Bootstrap Toggle JS -->
+    <!-- <script src="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/js/bootstrap4-toggle.min.js"></script> -->
+    <!-- Core Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    
+    <!-- CSRF Utilities (load early as other scripts depend on it) -->
+    <script src="{{ url_for('static', filename='js/csrf-utils.js') }}?v={{ config['APP_VERSION'] }}"></script>
+
+    <!-- Application Scripts -->
+    <script src="{{ url_for('static', filename='js/darkmode.js') }}?v={{ config['APP_VERSION'] }}"></script>
+    <!-- Chat Modules -->
+    <script src="{{ url_for('static', filename='js/utilities.js') }}?v={{ config['APP_VERSION'] }}"></script>
+    <script src="{{ url_for('static', filename='js/chat-core.js') }}?v={{ config['APP_VERSION'] }}"></script>
+    <script src="{{ url_for('static', filename='js/chat-ui.js') }}?v={{ config['APP_VERSION'] }}"></script>
+    <script src="{{ url_for('static', filename='js/chat-init.js') }}?v={{ config['APP_VERSION'] }}"></script>
+
+    <!-- Main Application -->
+    <script src="{{ url_for('static', filename='js/main.js') }}?v={{ config['APP_VERSION'] }}"></script>
+    <!-- zoom for visual evidence zoom -->
+    <script src="https://cdn.jsdelivr.net/npm/medium-zoom/dist/medium-zoom.min.js"></script>
+
+    <!-- New Modular JS -->
+    <script src="{{ url_for('static', filename='js/feedback.js') }}?v={{ config['APP_VERSION'] }}"></script>
+    <script src="{{ url_for('static', filename='js/visual-evidence.js') }}?v={{ config['APP_VERSION'] }}"></script>
+    
+    <!-- Animation System -->
+    <script src="{{ url_for('static', filename='js/particles.js') }}?v={{ config['APP_VERSION'] }}"></script>
+    <script src="{{ url_for('static', filename='js/flow.js') }}?v={{ config['APP_VERSION'] }}"></script>
+    <script src="{{ url_for('static', filename='js/constellation.js') }}?v={{ config['APP_VERSION'] }}"></script>
+    <script src="{{ url_for('static', filename='js/animation-manager.js') }}?v={{ config['APP_VERSION'] }}"></script>
+    <script src="{{ url_for('static', filename='js/text-animations.js') }}?v={{ config['APP_VERSION'] }}"></script>
+
+    <!-- Options Controller -->
+    <script src="{{ url_for('static', filename='js/options-controller.js') }}?v={{ config['APP_VERSION'] }}"></script>
+    
+    <!-- Animation Options Modal -->
+    {% if current_user.is_authenticated %}
+    <div class="modal fade" id="animationOptionsModal" tabindex="-1" aria-labelledby="animationOptionsModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="animationOptionsModalLabel">Options</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+  <div class="form-check form-switch mb-3">
+    <input class="form-check-input" type="checkbox" role="switch" id="enable-stream-answers">
+    <label class="form-check-label" for="enable-stream-answers">Stream answers (faster, experimental)</label>
+    <div class="form-text text-muted" style="font-size: 0.85em;">
+      When enabled, answers will appear as they are generated. Disable if you experience issues.
+    </div>
+  </div>
+  <div class="form-check form-switch mb-3">
+    <input class="form-check-input" type="checkbox" role="switch" id="enable-mmr-mode">
+    <label class="form-check-label" for="enable-mmr-mode">Enable MMR Mode</label>
+    <div class="form-text text-muted" style="font-size: 0.85em;">
+      Enable or disable Maximal Marginal Relevance (MMR) for search results.
+    </div>
+  </div>
+  <div class="form-check form-switch mb-3">
+    <input class="form-check-input" type="checkbox" role="switch" id="enable-restore-chat">
+    <label class="form-check-label" for="enable-restore-chat">Restore last chat on login</label>
+    <div class="form-text text-muted" style="font-size: 0.85em;">
+      <div class="mt-2">
+        <label for="max-chat-messages" class="form-label mb-0" style="font-size: 0.9em;">Max chat messages to restore</label>
+        <input type="number" id="max-chat-messages" class="form-control form-control-sm" value="100" min="1" max="1000" step="1" style="width: 100px; display: inline-block; margin-left: 8px;">
+        <button type="button" id="clear-chat-history-btn" class="btn btn-outline-danger btn-sm ms-2" style="vertical-align: middle;">Clear</button>
+      </div>
+      <span>This setting takes effect on your next login or page reload.</span>
+      When enabled, your last N messages will be restored after logout/login. Disable for a fresh chat each time.
+    </div>
+  </div>
+  <div class="form-check form-switch mb-3"> {# Increased margin #}
+    <input class="form-check-input" type="checkbox" role="switch" id="enable-bg-animation">
+    <label class="form-check-label" for="enable-bg-animation">Enable Background Animation</label>
+  </div>
+            <div class="form-group mb-3"> {# Added margin #}
+              <label for="select-bg-animation" class="form-label">Animation Style</label>
+              <select class="form-select form-select-sm" id="select-bg-animation">
+                  <option value="particles">Particles</option>
+                  <option value="flow">Flow</option>
+                  <option value="constellation">Constellation</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            {# No save button needed as changes apply instantly via JS #}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% block page_scripts %}{% endblock %}
+    {% block scripts %}{% endblock %}
+    <script src="{{ url_for('static', filename='js/speech-recognition.js') }}?v={{ config['APP_VERSION'] }}"></script>
+    <script src="{{ url_for('static', filename='js/query-form.js') }}?v={{ config['APP_VERSION'] }}"></script> {# Moved Query Form JS to end of body #}
+  
+    
+    <!-- Mobile Menu Auto-Close Script -->
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // Get references to navbar elements
+        const navbarToggler = document.querySelector('.navbar-toggler');
+        const navbarCollapse = document.getElementById('navbarSupportedContent');
+        const navLinks = document.querySelectorAll('.navbar-nav .nav-link');
+        
+        // Ensure the menu is collapsed by default
+        navbarCollapse.classList.remove('show');
+        navbarToggler.setAttribute('aria-expanded', 'false');
+        
+        // Removed Bootstrap collapse instance creation
+        
+        // Removed toggler click handler as it's now handled directly with onclick attribute
+        
+        // Auto-close mobile menu when a nav link is clicked
+        navLinks.forEach(function(link) {
+          link.addEventListener('click', function() {
+            if (window.innerWidth < 992) { // Only on mobile
+              navbarCollapse.classList.remove('show');
+              navbarToggler.setAttribute('aria-expanded', 'false');
+            }
+          });
+        });
+        
+        // Also close when clicking outside
+        document.addEventListener('click', function(event) {
+          if (window.innerWidth < 992 && // Only on mobile
+              navbarCollapse.classList.contains('show') && // Menu is open
+              !navbarToggler.contains(event.target) && // Not clicking the toggler
+              !navbarCollapse.contains(event.target)) { // Not clicking inside the menu
+            
+            navbarCollapse.classList.remove('show');
+            navbarToggler.setAttribute('aria-expanded', 'false');
+          }
+        });
+      });
+    </script>
+</body>
+</html>

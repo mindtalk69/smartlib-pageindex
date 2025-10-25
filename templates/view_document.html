@@ -1,0 +1,29 @@
+
+{% extends "base.html" %}
+
+{% block title %}View Document: {{ document.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>{{ document.name }}</h1>
+    <hr>
+    {% if document.chunks %}
+        {% for chunk in document.chunks %}
+            <div class="chunk mb-4">
+                {% if chunk.page and chunk.page != 'N/A' %}
+                    <h5>Page {{ chunk.page }}</h5>
+                {% endif %}
+                <pre class="content">{{ chunk.content }}</pre>
+                {% if chunk.metadata %}
+                    <details class="mt-2">
+                        <summary>Metadata</summary>
+                        <pre>{{ chunk.metadata|tojson(indent=2) }}</pre>
+                    </details>
+                {% endif %}
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>No content available for this document.</p>
+    {% endif %}
+</div>
+{% endblock %}

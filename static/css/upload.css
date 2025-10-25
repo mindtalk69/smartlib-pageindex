@@ -1,0 +1,172 @@
+tha/* Styles specific to the upload/download page */
+
+#url-list-display {
+  max-height: 80px; /* Approx 5 lines, adjust as needed */
+  overflow-y: auto;
+  border: 1px solid var(--bs-border-color); /* Match input border */
+  border-radius: var(--bs-border-radius); /* Match input radius */
+  padding: 0.5rem;
+  margin-top: 0.5rem;
+  background-color: var(--bs-body-bg); /* Match input background */
+}
+
+/* Style for list items within the URL display */
+#url-list-display ul {
+  margin-bottom: 0; /* Remove default margin */
+}
+
+#url-list-display li {
+  padding: 0.25rem 0; /* Add some vertical spacing */
+  word-break: break-all; /* Break long URLs */
+}
+
+/* Ensure remove button aligns nicely */
+#url-list-display .remove-url-item {
+  margin-left: 0.5rem;
+}
+
+/* Consistent style for remove buttons in URL and Batch lists */
+.remove-list-item-btn {
+  border-radius: 50% !important; /* Make it circular */
+  width: 22px; /* Slightly smaller */
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none; /* Remove border */
+  background-color: rgba(128, 128, 128, 0.15); /* Subtle background */
+  color: var(--bs-secondary-color); /* Use secondary text color */
+  transition: background-color 0.2s ease, color 0.2s ease;
+  line-height: 1; /* Ensure icon centers vertically */
+  vertical-align: middle; /* Align button nicely with text */
+  margin-left: 0.5rem; /* Keep margin */
+}
+
+.remove-list-item-btn:hover {
+  background-color: rgba(128, 128, 128, 0.3);
+  color: var(--bs-danger); /* Red icon on hover */
+}
+
+.remove-list-item-btn i {
+  font-size: 0.8rem; /* Smaller icon */
+  vertical-align: baseline; /* Adjust icon alignment */
+}
+
+[data-bs-theme="dark"] .remove-list-item-btn {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--bs-secondary-color);
+}
+
+[data-bs-theme="dark"] .remove-list-item-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: var(--bs-danger);
+}
+
+
+/* Style for the batch file list and URL status area */
+#batch-file-list,
+#url-status {
+  max-height: 150px; /* Match the URL list height */
+  overflow-y: auto;  /* Enable vertical scrolling */
+  padding: 0.5rem; /* Add padding for better text spacing */
+  white-space: pre-wrap; /* Preserve line breaks and wrap text */
+  word-break: break-word; /* Break long words to avoid overflow */
+  background-color: var(--bs-body-bg); /* Match background for clarity */
+  border-radius: var(--bs-border-radius);
+  border: 1px solid var(--bs-border-color);
+  margin-top: 0.5rem;
+}
+
+/* Limit height of batch file list to prevent button push */
+#batch-file-list {
+  max-height: 120px; /* Limit height to about 5-6 files */
+  overflow-y: auto;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  padding: 0.5rem;
+  background-color: var(--bs-body-bg);
+  margin-top: 0.5rem;
+}
+
+/* Ensure form container uses flex layout to keep button below file list */
+#batch-content form#batchUploadForm {
+  display: flex;
+  flex-direction: column;
+}
+
+#uploadBatchBtn {
+  margin-top: auto; /* Push button to bottom */
+}
+
+/* --- Tab Content Height --- */
+#uploadTabsContent {
+  height: 400px; /* Fixed height for the tab content area */
+  /* overflow-y: auto; */ /* Optional: Add scroll if content ever exceeds fixed height */
+}
+/* Remove min-height from individual panes */
+/* #uploadTabsContent .tab-pane { */
+/*   min-height: 380px; */
+/* } */
+
+/* --- Upload Page Specific Layout --- */
+
+.upload-section-row {
+  margin-top: 3rem !important; /* Increase top margin */
+}
+
+/* REMOVED specific background/border/shadow/padding rules for .login-form-container */
+/* Relying on the styles from darkmode.css for the container */
+
+/* Apply custom curve to library select dropdowns on upload page */
+.upload-page-container #librarySelectUrl,
+.upload-page-container #librarySelectBatch {
+  border-radius: var(--custom-button-radius) !important; /* Force the curve */
+}
+
+/* --- Translucent Toast Styles (Upload Page Specific) --- */
+/* Base style for custom toasts */
+.toast.custom-toast {
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  background-color: rgba(var(--bs-secondary-rgb), 0.85); /* Default fallback */
+  color: var(--bs-light); /* Default text color */
+  border: none; /* Remove default border */
+}
+.toast.custom-toast .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%); /* Ensure close button is visible */
+}
+
+/* Type-specific translucent backgrounds */
+.toast.custom-toast.toast-info-translucent {
+  background-color: rgba(var(--bs-info-rgb), 0.85);
+  color: var(--bs-dark); /* Dark text on light info */
+}
+.toast.custom-toast.toast-success-translucent {
+  background-color: rgba(var(--bs-success-rgb), 0.85);
+  color: var(--bs-light);
+}
+.toast.custom-toast.toast-warning-translucent {
+  background-color: rgba(var(--bs-warning-rgb), 0.85);
+  color: var(--bs-dark); /* Dark text on light warning */
+}
+.toast.custom-toast.toast-danger-translucent {
+  background-color: rgba(var(--bs-danger-rgb), 0.85);
+  color: var(--bs-light);
+}
+
+/* Adjust close button color for light backgrounds */
+.toast.custom-toast.toast-info-translucent .btn-close,
+.toast.custom-toast.toast-warning-translucent .btn-close {
+  filter: none; /* Use default close button color */
+}
+
+/* Dark theme overrides for text color if needed (Bootstrap 5.3+ might handle this) */
+[data-bs-theme="dark"] .toast.custom-toast.toast-info-translucent,
+[data-bs-theme="dark"] .toast.custom-toast.toast-warning-translucent {
+   color: var(--bs-light); /* Ensure light text in dark mode */
+}
+[data-bs-theme="dark"] .toast.custom-toast.toast-info-translucent .btn-close,
+[data-bs-theme="dark"] .toast.custom-toast.toast-warning-translucent .btn-close {
+   filter: invert(1) grayscale(100%) brightness(200%); /* Ensure white close button */
+}

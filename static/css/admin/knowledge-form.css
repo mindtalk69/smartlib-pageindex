@@ -1,0 +1,135 @@
+/* Knowledge Form Styles */
+
+/* Tabs styling */
+#knowledgeFormTabs .nav-link {
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+}
+
+#knowledgeFormTabs .nav-link.active {
+    font-weight: 600;
+}
+
+/* Badge styles for selected items */
+#selectedCategoriesDisplay .badge,
+#selectedCatalogsDisplay .badge {
+    border-radius: 4px;
+    padding: 0.4rem 0.6rem;
+    margin-right: 0.4rem;
+    margin-bottom: 0.3rem;
+    display: inline-block;
+    font-weight: 500;
+}
+
+#selectedCategoriesDisplay .badge {
+    background-color: var(--bs-primary);
+}
+
+#selectedCatalogsDisplay .badge {
+    background-color: var(--bs-primary);
+}
+
+/* Checkbox list styling */
+.category-item,
+.catalog-item {
+    transition: background-color 0.15s;
+    border-radius: 4px;
+    margin-bottom: 1px;
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+}
+
+/* Fix for checkboxes being cut off */
+.category-item .form-check-input,
+.catalog-item .form-check-input {
+    position: static;
+    margin-top: 0;
+    margin-right: 0.5rem;
+    margin-left: 0;
+    min-width: 1.2em;
+    min-height: 1.2em;
+    border: 1px solid #aaa;
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Improve checkbox appearance */
+.form-check-input:checked {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+.category-item .form-check-label,
+.catalog-item .form-check-label {
+    padding-left: 0.2rem;
+    display: inline-block;
+}
+
+/* Override default Bootstrap form-check padding */
+.form-check {
+    padding-left: 0;
+    margin-bottom: 0;
+}
+
+.category-item:hover,
+.catalog-item:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.category-item:last-child,
+.catalog-item:last-child {
+    border-bottom: none !important;
+}
+
+/* Checked item highlight */
+.category-item:has(.category-checkbox:checked),
+.catalog-item:has(.catalog-checkbox:checked) {
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+    font-weight: 500;
+}
+
+/* Filter input styling */
+.input-group-text {
+    background-color: var(--bs-body-bg);
+    border-right: none;
+}
+
+#categoryFilterInput,
+#catalogFilterInput {
+    border-left: none;
+}
+
+/* Make scrollbar thinner and more modern */
+#knowledgeCategories,
+#knowledgeCatalogs {
+    scrollbar-width: thin;
+}
+
+#knowledgeCategories::-webkit-scrollbar,
+#knowledgeCatalogs::-webkit-scrollbar {
+    width: 6px;
+}
+
+#knowledgeCategories::-webkit-scrollbar-thumb,
+#knowledgeCatalogs::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+/* Dark mode adjustments */
+[data-bs-theme="dark"] .input-group-text {
+    background-color: var(--bs-body-bg);
+}
+
+[data-bs-theme="dark"] .category-item:hover,
+[data-bs-theme="dark"] .catalog-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-bs-theme="dark"] .category-item:has(.category-checkbox:checked),
+[data-bs-theme="dark"] .catalog-item:has(.catalog-checkbox:checked) {
+    background-color: rgba(var(--bs-primary-rgb), 0.2);
+}

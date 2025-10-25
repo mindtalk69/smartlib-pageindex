@@ -1,0 +1,83 @@
+{# /home/mlk/flaskrag3/templates/admin/_formhelpers.html #}
+{% macro render_field(field, label_visible=true) -%}
+  <div class="form-group mb-3 row
+    {% if field.errors %} has-error{% endif %}
+    {% if field.flags.required %} required{% endif %}">
+    {% if label_visible %}
+        {{ field.label(class="col-sm-2 col-form-label") }} {# Adjust grid classes if needed #}
+    {% endif %}
+    <div class="col-sm-10"> {# Adjust grid classes if needed #}
+        {{ field(class="form-control", **kwargs) }}
+        {% if field.errors %}
+            <ul class="invalid-feedback d-block"> {# Use d-block for visibility #}
+            {% for error in field.errors %}
+                <li>{{ error }}</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+        {% if field.description %}
+            <small class="form-text text-muted">{{ field.description }}</small>
+        {% endif %}
+    </div>
+  </div>
+{%- endmacro %}
+
+{% macro render_checkbox(field) -%}
+  <div class="form-check mb-3">
+    {{ field(class="form-check-input", **kwargs) }}
+    {{ field.label(class="form-check-label") }}
+    {% if field.errors %}
+        <ul class="invalid-feedback d-block">
+        {% for error in field.errors %}
+            <li>{{ error }}</li>
+        {% endfor %}
+        </ul>
+    {% endif %}
+    {% if field.description %}
+        <small class="form-text text-muted">{{ field.description }}</small>
+    {% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro render_radio(field) -%}
+    <div class="mb-3">
+        <label class="form-label">{{ field.label }}</label>
+        {% for subfield in field %}
+        <div class="form-check">
+            {{ subfield(class="form-check-input") }}
+            {{ subfield.label(class="form-check-label") }}
+        </div>
+        {% endfor %}
+        {% if field.errors %}
+            <div class="invalid-feedback d-block">
+                {{ field.errors|join(' ') }}
+            </div>
+        {% endif %}
+        {% if field.description %}
+            <small class="form-text text-muted">{{ field.description }}</small>
+        {% endif %}
+    </div>
+{%- endmacro %}
+
+{% macro render_field_stacked(field, label_visible=true) -%}
+  <div class="form-group mb-3 {# Removed row class #}
+    {% if field.errors %} has-error{% endif %}
+    {% if field.flags.required %} required{% endif %}">
+    {% if label_visible %}
+        {# Render label simply, without grid classes #}
+        {{ field.label(class="form-label") }}
+    {% endif %}
+    {# Render field simply, without grid classes #}
+    {{ field(class="form-control", **kwargs) }}
+    {% if field.errors %}
+        <ul class="invalid-feedback d-block"> {# Use d-block for visibility #}
+        {% for error in field.errors %}
+            <li>{{ error }}</li>
+        {% endfor %}
+        </ul>
+    {% endif %}
+    {% if field.description %}
+        <small class="form-text text-muted">{{ field.description }}</small>
+    {% endif %}
+  </div>
+{%- endmacro %}

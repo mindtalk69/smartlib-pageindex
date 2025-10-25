@@ -1,0 +1,57 @@
+{% extends "admin/base.html" %}
+
+{% block admin_title %}Reset Activity Log{% endblock %}
+
+{% block admin_content %}
+<div class="container mt-4">
+    <h5>Reset/Clear Transaction Tables Activity Log</h5>
+    <div class="alert alert-info">
+        This table shows all reset/clear actions performed by admins, including who performed the action, when, and how many records were deleted from each table.
+    </div>
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>Timestamp (UTC)</th>
+                <th>User</th>
+                <th>User ID</th>
+                <th>Tables Cleared</th>
+                <th>Counts</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in log_entries %}
+            <tr>
+                <td>{{ entry.timestamp }}</td>
+                <td>{{ entry.user }}</td>
+                <td>{{ entry.user_id }}</td>
+                <td>
+                    <ul>
+                        {% for t in entry.tables_cleared %}
+                        <li>{{ t }}</li>
+                        {% endfor %}
+                    </ul>
+                </td>
+                <td>
+                    <ul>
+                        {% for k, v in entry.counts.items() %}
+                        <li>{{ k }}: {{ v }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% if entry.verification %}
+                    <br><strong>Verification:</strong>
+                    <ul>
+                        {% for k, v in entry.verification.items() %}
+                        <li>{{ k }}: {{ v }} remaining</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if not log_entries %}
+    <div class="alert alert-warning">No reset activity has been logged yet.</div>
+    {% endif %}
+</div>
+{% endblock %}

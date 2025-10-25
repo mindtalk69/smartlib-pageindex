@@ -1,0 +1,20 @@
+# SmartLib Agent Guide
+- Follow migration roadmap in `agents_for_new_home.md`; keep directories and names consistent.
+- Python 3.11 preferred (3.10+ works); bootstrap with `python -m venv .venv` and `pip install -r requirements.txt`.
+- Web or worker-only installs: use `requirements-web.txt` or `requirements-worker.txt` respectively.
+- Local dev server: export `FLASK_APP=app.py`, load .env, then run `flask run --debug`.
+- Docker workflow: `docker compose up --build` rebuilds containers; stop with `docker compose down`.
+- Primary tests: `pytest`; target one test via `pytest tests/<path>.py::TestClass::test_method` or `pytest -k keyword`.
+- Database migrations: run `flask db migrate`, `flask db upgrade`; use `./verify_migrations.sh` after syncing data.
+- Lint/format before commits: `black .`, `isort .`, and `flake8`.
+- Align imports as isort's black profile: stdlib, third-party, local, with explicit relative imports avoided.
+- Keep line length ≤88 characters; break chains with parentheses rather than backslashes.
+- Prefer type hints across modules; use `typing` helpers and `pydantic` models where appropriate.
+- Name modules, functions, variables in snake_case; classes and exceptions in PascalCase; constants UPPER_SNAKE_CASE.
+- Write docstrings for public functions/classes summarizing purpose, params, and error scenarios.
+- Handle errors via structured exceptions; log context and return meaningful Flask responses instead of bare prints.
+- Guard external calls (LLMs, Azure) with retries/timeout configs defined in config modules.
+- Avoid storing secrets in repo; rely on `.env` or Azure KeyVault references outlined in docs.
+- Ensure templates/static assets stay organized under their dedicated directories with descriptive names.
+- No Cursor or Copilot rule files exist; follow this guide and project docs.
+- Before finishing, rerun tests and docker compose builds if you altered dependencies or migrations.
