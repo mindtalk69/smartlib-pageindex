@@ -233,8 +233,17 @@
                   tabindex="1">
               <i class="bi bi-collection fs-5"></i>
           </button>
-          <ul class="dropdown-menu dropdown-menu-sm dropdown-menu-center" id="librarySelectDropdown" aria-labelledby="libraryBtn">
-          </ul>
+           <ul class="dropdown-menu dropdown-menu-sm dropdown-menu-center" id="librarySelectDropdown" aria-labelledby="libraryBtn">
+             <li><a class="dropdown-item active" href="#" data-library-id="">All Libraries</a></li>
+             {% if libraries %}
+               {% for library in libraries %}
+                 <li><a class="dropdown-item" href="#" data-library-id="{{ library.library_id }}">{{ library.name }}</a></li>
+               {% endfor %}
+             {% else %}
+               <li><span class="dropdown-item disabled text-muted">No libraries available</span></li>
+             {% endif %}
+           </ul>
+
         </div>
         <!-- Hidden input for selected library id -->
         <input type="hidden" id="selected-library-id" value="">
@@ -335,6 +344,7 @@
 <script>
     // Pass data from Flask to JS
     window.__FLASK_INITIAL_CONVERSATION_JSON = {{ conversation|tojson }};
+    window.availableLibraries = {{ library_options|default([])|tojson }};
     window.knowledges = {{ knowledges|tojson }};
     window.__FLASK_KNOWLEDGE_LIBRARIES_MAP = {{ knowledge_libraries_map|default({})|tojson }};
     window.APP_CONFIG = {

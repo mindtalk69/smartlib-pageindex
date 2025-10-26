@@ -352,6 +352,9 @@ def retrieve_context_tool(query: str, config: dict = None) -> Dict[str, Any]:
         Dict[str, Any]: A dictionary containing 'documents' (List[Document]) and 'structured_query' (str).
     """
     logging.info("--- ENTERING retrieve_context_tool ---") # Add entry log
+    start_time = time.perf_counter()
+    retrieval_mode = "unknown"
+
     # Use query and config directly now
     tool_call_config = config or {} # Rename to avoid confusion with app.config
     vector_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb')
@@ -462,6 +465,7 @@ def retrieve_context_tool(query: str, config: dict = None) -> Dict[str, Any]:
         # --- PATH 1: Direct Search with Explicit Filters ---
         if has_explicit_filters:
             logging.info(f"[RAG] Using DIRECT similarity search with guaranteed filters: {explicit_filters}")
+            retrieval_mode = "direct_filters"
             
             # Apply filters appropriate to your vector store provider
             if vector_provider == 'pgvector':
@@ -491,6 +495,7 @@ def retrieve_context_tool(query: str, config: dict = None) -> Dict[str, Any]:
         # --- PATH 2: SelfQueryRetriever for Exploratory Search ---
         else:
             logging.info(f"[RAG] Using SelfQueryRetriever (no explicit filters in config)")
+            retrieval_mode = "self_query"
             
             # Initialize SelfQueryRetriever
             if llm_instance is None:
@@ -532,6 +537,15 @@ def retrieve_context_tool(query: str, config: dict = None) -> Dict[str, Any]:
             if mismatched:
                 logging.error(f"[RAG] {len(mismatched)}/{len(retrieved_docs)} documents failed filter validation!")
         
+        duration = time.perf_counter() - start_time
+        logging.info(
+            "[RAG] Retrieval path=%s finished in %.2fs with %d docs. Structured query: %s",
+            retrieval_mode,
+            duration,
+            len(retrieved_docs) if 'retrieved_docs' in locals() else 0,
+            structured_query_string,
+        )
+
         # Return results
         return {
             "documents": retrieved_docs,
@@ -539,7 +553,8 @@ def retrieve_context_tool(query: str, config: dict = None) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        logging.error(f"[RAG] Error during retrieval: {e}", exc_info=True)
+        duration = time.perf_counter() - start_time
+        logging.error(f"[RAG] Error during retrieval after {duration:.2f}s: {e}", exc_info=True)
         return {
             "documents": [],
             "structured_query": f"Error: {str(e)}",
@@ -813,7 +828,17 @@ Think step-by-step."""
             llm_config_for_rag = {"configurable": {"vector_store_config": state['vector_store_config']}}
            
             try:
+                llm_start = time.perf_counter()
+                logging.info("[RAG] call_rag_model invoking LLM with %d messages", len(messages_for_llm))
                 llm_response = llm_with_current_tools.invoke(messages_for_llm, config=llm_config_for_rag)
+                llm_elapsed = time.perf_counter() - llm_start
+                tool_call_count = len(getattr(llm_response, "tool_calls", []) or [])
+                logging.info(
+                    "[RAG] LLM invocation finished in %.2fs (tool_calls=%d, ctx_docs=%d)",
+                    llm_elapsed,
+                    tool_call_count,
+                    len(current_retrieved_context) if current_retrieved_context else 0,
+                )
             except Exception as e:                 
                 logging.error(f"[RAG] Error during llm_with_current_tools.invoke: {e}", exc_info=True)
                 raise

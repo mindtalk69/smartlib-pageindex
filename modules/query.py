@@ -368,6 +368,8 @@ def init_query(app):
             extra_kwargs["db_message_id_for_stream"] = db_message_id_for_stream
             extra_kwargs["user_id_for_stream"] = current_user.get_id()
 
+        task_timeout = current_app.config.get('AGENT_TASK_TIMEOUT', 120)
+
         agent_result = invoke_agent_via_worker(
             query=query_text,
             chat_history=chat_history_messages,
@@ -379,6 +381,7 @@ def init_query(app):
             uploaded_file_type=uploaded_file_type,
             uploaded_file_name=uploaded_file_name,
             conversation_id=conversation_id,
+            timeout=task_timeout,
             extra_kwargs=extra_kwargs,
         )
 

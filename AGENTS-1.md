@@ -1,24 +1,3 @@
-# SmartLib Agent Guide
-- Follow migration roadmap in `agents_for_new_home.md`; keep directories and names consistent.
-- Python 3.11 preferred (3.10+ works); bootstrap with `python -m venv .venv` and `pip install -r requirements.txt`.
-- Web or worker-only installs: use `requirements-web.txt` or `requirements-worker.txt` respectively.
-- Local dev server: export `FLASK_APP=app.py`, load .env, then run `flask run --debug`.
-- Docker workflow: `docker compose up --build` rebuilds containers; stop with `docker compose down`.
-- Primary tests: `pytest`; target one test via `pytest tests/<path>.py::TestClass::test_method` or `pytest -k keyword`.
-- Database migrations: run `flask db migrate`, `flask db upgrade`; use `./verify_migrations.sh` after syncing data.
-- Lint/format before commits: `black .`, `isort .`, and `flake8`.
-- Align imports as isort's black profile: stdlib, third-party, local, with explicit relative imports avoided.
-- Keep line length ≤88 characters; break chains with parentheses rather than backslashes.
-- Prefer type hints across modules; use `typing` helpers and `pydantic` models where appropriate.
-- Name modules, functions, variables in snake_case; classes and exceptions in PascalCase; constants UPPER_SNAKE_CASE.
-- Write docstrings for public functions/classes summarizing purpose, params, and error scenarios.
-- Handle errors via structured exceptions; log context and return meaningful Flask responses instead of bare prints.
-- Guard external calls (LLMs, Azure) with retries/timeout configs defined in config modules.
-- Avoid storing secrets in repo; rely on `.env` or Azure KeyVault references outlined in docs.
-- Ensure templates/static assets stay organized under their dedicated directories with descriptive names.
-- No Cursor or Copilot rule files exist; follow this guide and project docs.
-- Before finishing, rerun tests and docker compose builds if you altered dependencies or migrations.
-
 # SmartLib Project Reorganization Agent Plan
 
 ## Overview
@@ -852,16 +831,3 @@ After setting up the new project structure, follow this testing plan to verify e
 This document provides a comprehensive plan for migrating the `flaskrag3` project to a new `smartlib` folder with a clean, production-ready structure. By following these instructions, you will create a well-organized project that is easier to maintain and deploy.
 
 To begin the migration, run the `create_smartlib.sh` script in the `flaskrag3` directory, then follow the detailed steps in this document to complete the migration.
-
-## USER INTERFACE (index.html)
-
-The `index.html` file serves as the main user chat interface for the SmartThing application. It's a Flask template that extends from `base.html` and provides two primary views:
-1. A welcome page for unauthenticated users
-2. A chat interface with document search functionality for authenticated users.
-
-## Overview of Vector Store Modes
-
-The SmartThing application has three different vector store modes that significantly affect how the user interface in `index.html` functions:
-
-Please read on docs/ui/index-html.md and docs/ui/index-html-vectore_store.md for more details.
-

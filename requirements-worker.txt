@@ -38,7 +38,7 @@ langgraph-sdk>=0.1.66
 chromadb>=0.5.23
 lark
 pgvector
-duckduckgo-search
+
 
 # Essential ML (CPU-only) - for HuggingFace embeddings
 torch>=2.2.2,<3.0.0

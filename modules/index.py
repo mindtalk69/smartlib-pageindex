@@ -21,6 +21,13 @@ def init_index(app):
         message_count = count_user_messages(user_id) if user_id else 0
         uploaded_docs_count = count_user_documents(user_id) if user_id else 0
         libraries = get_libraries() # Fetch libraries
+        library_options = [
+            {
+                "library_id": library.library_id,
+                "name": getattr(library, "name", ""),
+            }
+            for library in libraries
+        ]
 
         # --- Fetch and process history ---
         history_by_date = defaultdict(list)
@@ -105,17 +112,20 @@ def init_index(app):
         
         active_language = get_active_language_name()
 
-        return render_template('index.html',
-                             conversation=conversation,
-                             message_count=message_count,
-                             uploaded_docs_count=uploaded_docs_count,
-                             libraries=libraries,
-                             history_by_date=history_by_date,
-                             vector_store_mode=vector_store_mode,
-                             knowledges=knowledges_list,
-                             knowledge_libraries_map=knowledge_libraries_map,
-                             active_language=active_language) # Pass knowledges and mapping for knowledge mode
-                            
+        return render_template(
+            'index.html',
+            conversation=conversation,
+            message_count=message_count,
+            uploaded_docs_count=uploaded_docs_count,
+            libraries=libraries,
+            library_options=library_options,
+            history_by_date=history_by_date,
+            vector_store_mode=vector_store_mode,
+            knowledges=knowledges_list,
+            knowledge_libraries_map=knowledge_libraries_map,
+            active_language=active_language,
+        )
+
     @app.route('/api/history')
     @login_required
     def api_history():

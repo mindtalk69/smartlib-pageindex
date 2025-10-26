@@ -15,11 +15,11 @@ services:
   web:
     build:
       context: .
-      dockerfile: Dockerfile.cpu.micro
+      dockerfile: Dockerfile.web
     ports:
       - "8000:8000"
     volumes:
-      - my_data:/app/data
+      - ./data:/app/data
     env_file:
       - .env.dev
     environment:
@@ -28,6 +28,9 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - VECTOR_STORE_PROVIDER=chromadb
       - DEFAULT_EMBEDDING_MODEL=text-embedding-3-small
+      - AGENT_TASK_TIMEOUT=240
+      - GUNICORN_TIMEOUT=240
+      - PYTHONPATH=/app
     command: ["web"]
     depends_on:
       redis:
@@ -37,9 +40,9 @@ services:
   worker:
     build:
       context: .
-      dockerfile: Dockerfile.worker-optimized
+      dockerfile: Dockerfile.worker
     volumes:
-      - my_data:/app/data
+      - ./data:/app/data
     env_file:
       - .env.dev
     environment:
@@ -48,6 +51,8 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - VECTOR_STORE_PROVIDER=chromadb
       - DEFAULT_EMBEDDING_MODEL=all-MiniLM-L6-v2
+      - AGENT_TASK_TIMEOUT=240
+      - PYTHONPATH=/app
     command: ["worker"]
     depends_on:
       redis:
@@ -55,5 +60,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  my_data:
   redis_data:

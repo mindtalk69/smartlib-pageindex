@@ -33,8 +33,9 @@ if [ "$1" = "web" ]; then
     export HOST=${HOST:-0.0.0.0}
     export PORT=${PORT:-8000}
     export WORKERS=${WORKERS:-1}
+    export GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-120}
 
-    echo "Starting Flask app on $HOST:$PORT with $WORKERS workers..."
+    echo "Starting Flask app on $HOST:$PORT with $WORKERS workers (timeout ${GUNICORN_TIMEOUT}s)..."
 
     # Initialize database if not exists and run migrations
     echo "Checking and initializing database..."
@@ -63,7 +64,7 @@ if [ "$1" = "web" ]; then
         exec gunicorn \
             --bind "$HOST:$PORT" \
             --workers "$WORKERS" \
-            --timeout 120 \
+            --timeout "$GUNICORN_TIMEOUT" \
             --access-logfile - \
             --error-logfile - \
             --log-level info \

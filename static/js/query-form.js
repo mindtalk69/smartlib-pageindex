@@ -105,11 +105,97 @@ function initializeTooltips() {
 // Placeholder for setupLibrarySelect
 function setupLibrarySelect() {
     console.log('Initializing Library Select...');
-    const librarySelect = document.getElementById('librarySelectDropdown');
-    if (!librarySelect) {
-        console.warn('Library select element (#library-select) not found. Skipping setup.');
+    const libraryDropdown = document.getElementById('librarySelectDropdown');
+    const libraryBtn = document.getElementById('libraryBtn');
+    const hiddenInput = document.getElementById('selected-library-id');
+
+    if (!libraryDropdown || !hiddenInput) {
+        console.warn('Library select dropdown or hidden input not found. Skipping setup.');
         return;
     }
+
+    const alreadyInitialized = libraryDropdown.dataset.initialized === 'true';
+
+    const STORAGE_KEY = 'selectedLibraryId';
+
+    const getOptions = () => Array.from(libraryDropdown.querySelectorAll('a[data-library-id]'));
+    if (getOptions().length === 0) {
+        console.warn('Library dropdown has no selectable options.');
+        return;
+    }
+
+    function applySelection(libraryId, libraryName) {
+        const normalizedId = libraryId || '';
+        hiddenInput.value = normalizedId;
+        window.selectedLibraryId = normalizedId || null;
+        window.selectedLibraryName = libraryName || 'All Libraries';
+        try {
+            localStorage.setItem(STORAGE_KEY, normalizedId);
+        } catch (error) {
+            console.warn('Unable to persist library selection:', error);
+        }
+
+        const options = getOptions();
+        options.forEach(option => {
+            const optionId = option.dataset.libraryId || '';
+            option.classList.toggle('active', optionId === normalizedId);
+        });
+
+        if (libraryBtn) {
+
+            const titleText = libraryName
+                ? `Current library: ${libraryName}`
+                : 'All Libraries';
+            libraryBtn.setAttribute('title', titleText);
+            libraryBtn.setAttribute('aria-label', titleText);
+            if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip && libraryBtn.getAttribute('data-bs-toggle') === 'tooltip') {
+                const tooltipInstance = bootstrap.Tooltip.getOrCreateInstance(libraryBtn);
+                tooltipInstance.setContent({ '.tooltip-inner': titleText });
+                libraryBtn._tooltipInstance = tooltipInstance;
+            }
+        }
+    }
+
+    const storedLibraryId = (() => {
+        try {
+            return localStorage.getItem(STORAGE_KEY);
+        } catch (error) {
+            console.warn('Unable to read stored library selection:', error);
+            return null;
+        }
+    })();
+
+    const initialOptions = getOptions();
+    if (storedLibraryId && initialOptions.some(option => option.dataset.libraryId === storedLibraryId)) {
+        const storedOption = initialOptions.find(option => option.dataset.libraryId === storedLibraryId);
+        applySelection(storedLibraryId, storedOption ? storedOption.textContent.trim() : '');
+    } else {
+        const defaultOption = initialOptions[0];
+        applySelection(defaultOption.dataset.libraryId || '', defaultOption.textContent.trim());
+    }
+
+    if (!alreadyInitialized) {
+        libraryDropdown.addEventListener('click', (event) => {
+            const link = event.target.closest('a[data-library-id]');
+            if (!link) {
+                return;
+            }
+            event.preventDefault();
+            const libraryId = link.dataset.libraryId || '';
+            const libraryName = link.textContent.trim();
+            applySelection(libraryId, libraryName);
+
+            if (typeof window.updateSelfRetrieverContextVisibility === 'function') {
+                try {
+                    window.updateSelfRetrieverContextVisibility();
+                } catch (error) {
+                    console.warn('updateSelfRetrieverContextVisibility failed after library change:', error);
+                }
+            }
+        });
+    }
+
+    libraryDropdown.dataset.initialized = 'true';
 }
 
 // Placeholder for setupKnowledgeSelect
@@ -170,8 +256,8 @@ async function updateSelfRetrieverContextVisibility() {
         // Fetch and display self-retriever context.
         // fetchSelfRetrieverContext handles showing/hiding the selfRetrieverPanel based on content.
         // Optionally, fetch context for current library/knowledge selection
-        const librarySelect = document.getElementById('librarySelectDropdown');
-        const libraryId = librarySelect ? librarySelect.value : null; 
+        const libraryHiddenInput = document.getElementById('selected-library-id');
+        const libraryId = libraryHiddenInput ? (libraryHiddenInput.value || null) : null; 
         const knowledgeId = window.selectedKnowledgeId || null;
         console.log('[UpdateSelfRetriever] Calling fetchSelfRetrieverContext...');
         try {
@@ -338,6 +424,9 @@ function updateKnowledgeDropdown(knowledges) {
 }
 
 function updateLibraryDropdown(knowledgeId) {
+    if (!window.APP_CONFIG || window.APP_CONFIG.VECTOR_STORE_MODE !== 'knowledge') {
+        return; // In user mode the dropdown is static and handled by setupLibrarySelect
+    }
     const libraryDropdown = document.getElementById('librarySelectDropdown');
     if (!libraryDropdown) return;
 
@@ -538,7 +627,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const submitButton = document.getElementById('send-btn');
     const streamToggle = document.getElementById('stream-toggle');
     const chatMessagesContainer = document.getElementById('chat-container');
-    const librarySelect = document.getElementById('librarySelectDropdown');
+    const libraryInputHidden = document.getElementById('selected-library-id');
     const knowledgeSelectBtn = document.getElementById('knowledgeSelectBtn');
     const knowledgeDropdown = document.getElementById('knowledgeSelectDropdown');
     // Use a global variable for selectedKnowledgeId so submitQuery can access it
@@ -557,23 +646,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     // Initial population of knowledge dropdown (might select "ALL Knowledge" if available and first)
     updateKnowledgeDropdown(window.knowledges);
-    updateLibraryDropdown(null); // Initially load all libraries
-
+    updateLibraryDropdown(null); // Initially load all libraries (no-op in user mode)
+    setupLibrarySelect(); // Re-apply selection in case dropdown content changed
+ 
     // --- Self-Retriever: Initial fetch ---
-    fetchSelfRetrieverContext(librarySelect ? librarySelect.value : null, window.selectedKnowledgeId);
-
-    // --- Library Dropdown Change ---
-    if (librarySelect) {
-        librarySelect.addEventListener('change', function() {
-            const libraryId = librarySelect.value;
-            // This event is for when a library is selected, not for updating the knowledge dropdown
-            // updateKnowledgeDropdown(libraryId);
-            window.selectedKnowledgeId = null; // Reset knowledge selection
-            fetchSelfRetrieverContext(libraryId, null);
-        });
-    }
-
+    fetchSelfRetrieverContext(libraryInputHidden ? (libraryInputHidden.value || null) : null, window.selectedKnowledgeId);
+ 
     // --- Knowledge Dropdown Selection ---
+
     if (knowledgeDropdown && knowledgeSelectBtn) {
         knowledgeDropdown.addEventListener('click', function(e) {
             if (e.target && e.target.matches('.dropdown-item')) {
@@ -599,40 +679,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 }
-                fetchSelfRetrieverContext(librarySelect ? librarySelect.value : null, window.selectedKnowledgeId);
+                const currentLibraryId = libraryInputHidden ? (libraryInputHidden.value || null) : null;
+                fetchSelfRetrieverContext(currentLibraryId, window.selectedKnowledgeId);
                 updateLibraryDropdown(window.selectedKnowledgeId);
-            }
-        });
-    }
-
-    // --- Library Dropdown Selection (icon-only, update tooltip) ---
-    const libraryBtn = document.getElementById('libraryBtn');
-    const libraryDropdown = document.getElementById('librarySelectDropdown');
-    if (libraryDropdown && libraryBtn) {
-        libraryDropdown.addEventListener('click', function(e) {
-            if (e.target && e.target.matches('.dropdown-item')) {
-                e.preventDefault();
-                // Keep icon-only, update tooltip to selected library
-                libraryBtn.innerHTML = `<i class="bi bi-collection fs-5"></i>`;
-                libraryBtn.title = e.target.textContent;
-                // Update Bootstrap tooltip if present
-                if (libraryBtn._tooltip) {
-                    libraryBtn._tooltip.setContent({ '.tooltip-inner': e.target.textContent });
-                } else if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
-                    if (libraryBtn.getAttribute('data-bs-toggle') === 'tooltip') {
-                        if (libraryBtn._tooltipInstance) {
-                            libraryBtn._tooltipInstance.setContent({ '.tooltip-inner': e.target.textContent });
-                        } else {
-                            libraryBtn._tooltipInstance = bootstrap.Tooltip.getOrCreateInstance(libraryBtn);
-                            libraryBtn._tooltipInstance.setContent({ '.tooltip-inner': e.target.textContent });
-                        }
-                    }
-                }
+                setupLibrarySelect();
             }
         });
     }
 
     // --- Event Listeners for Query Submission ---
+
     if (submitButton) {
         submitButton.addEventListener('click', submitQuery);
     }
@@ -767,7 +823,7 @@ document.addEventListener('DOMContentLoaded', function() {
 async function submitQuery() {
     const queryInput = document.getElementById('query-input');
     const submitButton = document.getElementById('send-btn');
-    const librarySelect = document.getElementById('librarySelectDropdown');
+    const libraryInput = document.getElementById('selected-library-id');
     // Correctly get the stream toggle using its actual ID from base.html
     // Ensure getConversationId() is called to initialize if null
     const streamToggle = document.getElementById('enable-stream-answers');
@@ -776,7 +832,7 @@ async function submitQuery() {
     const knowledgeId = window.selectedKnowledgeId || null;
 
     let query = queryInput.value.trim();
-    const libraryId = librarySelect ? librarySelect.value : null; // Ensure librarySelect exists before accessing value
+    const libraryId = libraryInput ? (libraryInput.value || null) : null;
     const streamEnabled = streamToggle ? streamToggle.checked : false;
 
     // If query is empty BUT a data file or pasted data is present, set a default "analyze" query
