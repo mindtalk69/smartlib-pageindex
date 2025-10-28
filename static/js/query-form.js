@@ -925,9 +925,9 @@ async function submitQuery() {
         knowledge_id: knowledgeId,
         conversation_id: getConversationId() // Add conversation_id to the request
     };
-    // Add MMR mode from localStorage
+    // Add search strategy from localStorage
     const mmrPref = localStorage.getItem('mmrModeEnabled');
-    requestBody.mmr = mmrPref === null ? true : (mmrPref === 'true');
+    requestBody.search_strategy = mmrPref === null ? 'mmr' : (mmrPref === 'true' ? 'mmr' : 'similarity');
     if (window.currentImageBase64 && window.currentImageMimeType) {
         requestBody.image_base64 = window.currentImageBase64;
         requestBody.image_mime_type = window.currentImageMimeType;

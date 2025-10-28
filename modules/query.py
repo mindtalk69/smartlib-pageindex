@@ -292,7 +292,16 @@ def init_query(app):
         uploaded_file_type = data.get('uploaded_file_type') # e.g., "csv", "excel_base64"
         uploaded_file_name = data.get('uploaded_file_name')
         clipboard_data_tsv = data.get('clipboard_data_tsv')
-        search_strategy = data.get('search_strategy', 'mmr').lower() # Get strategy from JSON, default mmr
+        # Get search strategy - support both new 'search_strategy' field and legacy 'mmr' boolean
+        search_strategy = data.get('search_strategy')
+        if search_strategy is None:
+            # Check for legacy 'mmr' boolean field
+            mmr_legacy = data.get('mmr')
+            if mmr_legacy is not None:
+                search_strategy = 'mmr' if mmr_legacy else 'similarity'
+            else:
+                search_strategy = current_app.config.get('DEFAULT_SEARCH_STRATEGY', 'mmr')  # Configurable default
+        search_strategy = search_strategy.lower()
         if not query_text:
             logging.error("No 'query' field found in parsed JSON data.") # Updated log message
             from werkzeug.exceptions import BadRequest

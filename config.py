@@ -69,6 +69,7 @@ class Config:
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
     USER_AGENT = os.environ.get('USER_AGENT', 'FlaskRAG/1.0')
     API_KEY = os.environ.get('API_KEY') # For securing internal APIs if needed
+    DEFAULT_SEARCH_STRATEGY = os.environ.get('DEFAULT_SEARCH_STRATEGY', 'mmr').lower()
     TOKENIZERS_PARALLELISM = os.environ.get('TOKENIZERS_PARALLELISM', 'false').lower() in ('true', '1', 't')
     try:
         AGENT_TASK_TIMEOUT = int(os.environ.get('AGENT_TASK_TIMEOUT', '120'))

@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+UPLOAD_TEMP_DIR="${UPLOAD_TEMP_DIR:-/app/data/tmp_uploads}"
+mkdir -p "$UPLOAD_TEMP_DIR"
+
 # Check the first argument to decide which process to start
 if [ "$1" = "web" ]; then
     echo "Starting Flask web application..."

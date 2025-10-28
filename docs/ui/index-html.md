@@ -42,31 +42,42 @@ The `index.html` file serves as the main user chat interface for the SmartThing 
 ## Key Features Related to Libraries
 
 1. **Visual Grounding Integration**
-   - `index.html` includes a modal for displaying visual evidence from documents
-   - Citations can include visual evidence links that open the modal
-   - The modal displays document pages with bounding boxes highlighting relevant text
-   - This feature leverages docling's visual grounding capabilities
+    - `index.html` includes a modal for displaying visual evidence from documents
+    - Citations can include visual evidence links that open the modal
+    - The modal displays document pages with bounding boxes highlighting relevant text
+    - This feature leverages docling's visual grounding capabilities
 
 2. **Citation System**
-   - The UI displays citations for information retrieved from the vector store
-   - Citations include source document information and page numbers
-   - Clicking citations shows the original text context
-   - For documents with visual grounding enabled, citations include image icons that open the visual evidence modal
+    - The UI displays citations for information retrieved from the vector store
+    - Citations include source document information and page numbers
+    - Clicking citations shows the original text context
+    - For documents with visual grounding enabled, citations include image icons that open the visual evidence modal
 
-3. **Streaming Response Handling**
-   - The UI supports incremental responses from Azure OpenAI
-   - The `ChatUI` JavaScript class manages updating the DOM during streaming
-   - Users can toggle streaming mode in the options panel
+3. **Options Panel**
+    - The options panel (accessible via the gear icon in the navbar) allows users to customize their chat experience
+    - **MMR Mode Toggle**: Controls the document retrieval strategy
+      - When enabled (default): Uses Maximum Marginal Relevance (MMR) to retrieve diverse, relevant documents
+      - When disabled: Uses similarity search to retrieve the most similar documents
+      - This setting affects how the vector store (Chroma) retrieves context for generating responses
+    - **Background Animation**: Controls visual background effects
+    - **Streaming Answers**: Enables/disables real-time streaming of AI responses
+    - **Restore Last Chat**: Automatically restores the previous conversation on page reload
+    - **Clear Chat History**: Removes all stored chat data from local storage
 
-4. **Library/Knowledge Selection**
-   - The dropdown interfaces allow selecting specific knowledge libraries
-   - This selection filters which documents from the Chroma vector store are searched
-   - The interface adjusts based on vector store mode (global or knowledge)
+4. **Streaming Response Handling**
+    - The UI supports incremental responses from Azure OpenAI
+    - The `ChatUI` JavaScript class manages updating the DOM during streaming
+    - Users can toggle streaming mode in the options panel
 
-5. **File Upload and Preview**
-   - The interface supports uploading multiple file types for processing
-   - Images and data files have preview capabilities
-   - Uploaded files are processed by docling and added to the vector store
+5. **Library/Knowledge Selection**
+    - The dropdown interfaces allow selecting specific knowledge libraries
+    - This selection filters which documents from the Chroma vector store are searched
+    - The interface adjusts based on vector store mode (global or knowledge)
+
+6. **File Upload and Preview**
+    - The interface supports uploading multiple file types for processing
+    - Images and data files have preview capabilities
+    - Uploaded files are processed by docling and added to the vector store
 
 ## Integration Code Patterns
 
