@@ -25,6 +25,11 @@ from langchain.retrievers.self_query.base import SelfQueryRetriever
 from langchain_openai import AzureChatOpenAI
 from langchain_chroma import Chroma
 
+try:
+    from chromadb.errors import InternalError as ChromaInternalError
+except ImportError:  # pragma: no cover - optional dependency guard
+    ChromaInternalError = None
+
 agent_db_session = db.session
 
 from dotenv import load_dotenv
@@ -376,6 +381,214 @@ def _build_explicit_metadata_filters(config: dict) -> dict:
     logging.info(f"[RAG Filter] Built explicit filters: {filters}")
     return filters
 
+def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str, Any]:
+    """Execute vector store retrieval using the provided configuration."""
+    start_time = time.perf_counter()
+    retrieval_mode = "unknown"
+
+    vector_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb')
+    app_default_vector_store_mode = current_app.config.get('VECTOR_STORE_MODE', 'user')
+
+    logging.info(
+        f"--- Retrieving context for query: '{query}' with tool_call_config: {tool_call_config}, "
+        f"configured VECTOR_STORE_PROVIDER: {vector_provider}, "
+        f"app_default_vector_store_mode: {app_default_vector_store_mode} ---"
+    )
+
+    user_id = tool_call_config.get('user_id')
+    knowledge_id = tool_call_config.get('knowledge_id')
+    library_id = tool_call_config.get('library_id')
+    mode_for_operation = tool_call_config.get('mode', app_default_vector_store_mode)
+    search_strategy = tool_call_config.get('search_strategy', 'similarity')
+    k_docs = tool_call_config.get('k', 4)
+
+    embed_func = get_embedding_function()
+    llm_instance = get_llm()
+
+    store = None
+    if vector_provider == 'pgvector':
+        from langchain_postgres import PGVector
+        connection_string = current_app.config.get('PGVECTOR_CONNECTION_STRING')
+        collection_name = current_app.config.get('PGVECTOR_COLLECTION_NAME', 'langchain_vectors')
+        if not connection_string:
+            logging.error("PGVECTOR_CONNECTION_STRING not configured.")
+            return {"documents": [], "structured_query": "PGVector not configured.", "error": "PGVector not configured."}
+
+        logging.info(f"[PGVector DEBUG] Using connection: {connection_string[:30]}..., collection: {collection_name}")
+        try:
+            store = PGVector(
+                connection_string=connection_string,
+                embeddings=embed_func,
+                collection_name=collection_name,
+                use_jsonb=True,
+                distance_strategy=DistanceStrategy.COSINE
+            )
+        except Exception as e:
+            logging.error(f"[PGVector DEBUG] Error initializing PGVector: {e}")
+            return {"documents": [], "structured_query": "Error initializing PGVector.", "error": str(e)}
+    elif vector_provider == 'chromadb':
+        mode_to_pass = None
+        if knowledge_id:
+            mode_to_pass = 'knowledge'
+        elif mode_for_operation == 'global':
+            mode_to_pass = 'global'
+        elif library_id and not user_id:
+            mode_to_pass = None
+        elif user_id:
+            mode_to_pass = 'user'
+        else:
+            mode_to_pass = mode_for_operation
+
+        persist_dir = get_lc_store_path(user_id, knowledge_id, mode_to_pass)
+        if not persist_dir or not os.path.exists(persist_dir):
+            logging.warning(f"Chroma directory not found or path is None: {persist_dir}. Retrieval will likely fail.")
+            return {
+                "documents": [],
+                "structured_query": "Vector store not found.",
+                "error": f"Vector store not found at {persist_dir}."
+            }
+        chroma_collection_name = current_app.config.get('CHROMA_COLLECTION_NAME', 'documents-vectors')
+        import re
+
+        def sanitize_collection_name(name: str) -> str:
+            cleaned = name.strip()
+            cleaned = re.sub(r'\s+', '_', cleaned)
+            if not re.match(r'^[a-zA-Z0-9](?:[a-zA-Z0-9._-]{1,510}[a-zA-Z0-9])$', cleaned):
+                raise ValueError(f"Invalid Chroma collection name: {cleaned}")
+            return cleaned
+
+        if chroma_collection_name:
+            chroma_collection_name = sanitize_collection_name(chroma_collection_name)
+
+        chroma_kwargs = {
+            "embedding_function": embed_func,
+            "persist_directory": str(persist_dir),
+            "collection_name": chroma_collection_name,
+        }
+        store = Chroma(**chroma_kwargs)
+    else:
+        logging.error(f"Unsupported VECTOR_STORE_PROVIDER: {vector_provider}")
+        return {"documents": [], "structured_query": "Unsupported vector store provider.", "error": f"Unsupported vector store provider: {vector_provider}"}
+
+    explicit_filters = _build_explicit_metadata_filters(tool_call_config)
+    has_explicit_filters = bool(explicit_filters)
+
+    structured_query_string = "Direct similarity search with explicit filters" if has_explicit_filters else "SelfQueryRetriever with LLM-generated filters"
+
+    try:
+        if has_explicit_filters:
+            logging.info(f"[RAG] Using DIRECT similarity search with guaranteed filters: {explicit_filters}")
+            retrieval_mode = "direct_filters"
+
+            if vector_provider == 'pgvector':
+                search_kwargs = {'k': k_docs, 'filter': explicit_filters}
+            elif vector_provider == 'chromadb':
+                if len(explicit_filters) > 1:
+                    chroma_filter = {'$and': [{k: v} for k, v in explicit_filters.items()]}
+                else:
+                    chroma_filter = explicit_filters
+                search_kwargs = {'k': k_docs, 'filter': chroma_filter}
+
+            if vector_provider == 'chromadb' and ChromaInternalError is not None:
+                max_attempts = 2
+                for attempt in range(1, max_attempts + 1):
+                    try:
+                        retrieved_docs = store.similarity_search(query, **search_kwargs)
+                        break
+                    except ChromaInternalError as chroma_exc:
+                        logging.warning(
+                            "[RAG] Chroma InternalError during similarity_search (attempt %s/%s): %s",
+                            attempt,
+                            max_attempts,
+                            chroma_exc,
+                        )
+                        if attempt == max_attempts:
+                            raise
+                        time.sleep(0.4)
+                        store = Chroma(**chroma_kwargs)
+                else:
+                    retrieved_docs = []
+            else:
+                retrieved_docs = store.similarity_search(query, **search_kwargs)
+
+            structured_query_string = f"Direct search with filters: {explicit_filters}"
+
+            logging.info(f"[RAG] Direct search retrieved {len(retrieved_docs)} documents")
+
+            if retrieved_docs:
+                for i, doc in enumerate(retrieved_docs[:2]):
+                    logging.info(
+                        f"[RAG] Doc {i+1}: source={doc.metadata.get('source')}, "
+                        f"knowledge_id={doc.metadata.get('knowledge_id')}, "
+                        f"library_id={doc.metadata.get('library_id')}"
+                    )
+
+        else:
+            logging.info(f"[RAG] Using SelfQueryRetriever (no explicit filters in config)")
+            retrieval_mode = "self_query"
+
+            if llm_instance is None:
+                raise ValueError("LLM instance is None, cannot initialize SelfQueryRetriever.")
+
+            retriever = SelfQueryRetriever.from_llm(
+                llm=llm_instance,
+                vectorstore=store,
+                document_contents=document_content_description,
+                metadata_field_info=metadata_field_info,
+                verbose=True,
+                use_original_query=True,
+                search_kwargs={'k': k_docs}
+            )
+
+            try:
+                structured_query_dict = retriever.query_constructor.invoke({"query": query})
+                structured_query_string = str(structured_query_dict)
+                logging.info(f"[RAG] SelfQueryRetriever generated: {structured_query_string}")
+            except Exception as sq_err:
+                logging.warning(f"[RAG] Failed to generate structured query: {sq_err}")
+                structured_query_string = "SelfQueryRetriever (no structured query generated)"
+
+            retrieved_docs = retriever.invoke(query)
+            logging.info(f"[RAG] SelfQueryRetriever retrieved {len(retrieved_docs)} documents")
+
+        if has_explicit_filters and retrieved_docs:
+            mismatched = []
+            for doc in retrieved_docs:
+                for filter_key, filter_value in explicit_filters.items():
+                    if doc.metadata.get(filter_key) != filter_value:
+                        mismatched.append(doc)
+                        logging.warning(
+                            f"[RAG] Filter mismatch! Expected {filter_key}={filter_value}, "
+                            f"got {doc.metadata.get(filter_key)} in doc from {doc.metadata.get('source')}"
+                        )
+
+            if mismatched:
+                logging.error(f"[RAG] {len(mismatched)}/{len(retrieved_docs)} documents failed filter validation!")
+
+        duration = time.perf_counter() - start_time
+        logging.info(
+            "[RAG] Retrieval path=%s finished in %.2fs with %d docs. Structured query: %s",
+            retrieval_mode,
+            duration,
+            len(retrieved_docs) if 'retrieved_docs' in locals() else 0,
+            structured_query_string,
+        )
+
+        return {
+            "documents": retrieved_docs,
+            "structured_query": structured_query_string
+        }
+
+    except Exception as e:
+        duration = time.perf_counter() - start_time
+        logging.error(f"[RAG] Error during retrieval after {duration:.2f}s: {e}", exc_info=True)
+        return {
+            "documents": [],
+            "structured_query": f"Error: {str(e)}",
+            "error": str(e)
+        }
+
+
 @tool("retrieve_context", args_schema=RetrieveContextInput)
 # Modify signature to accept keyword arguments matching the schema fields
 def retrieve_context_tool(query: str, config: dict = None) -> Dict[str, Any]:
@@ -390,215 +603,9 @@ def retrieve_context_tool(query: str, config: dict = None) -> Dict[str, Any]:
     Returns:        
         Dict[str, Any]: A dictionary containing 'documents' (List[Document]) and 'structured_query' (str).
     """
-    logging.info("--- ENTERING retrieve_context_tool ---") # Add entry log
-    start_time = time.perf_counter()
-    retrieval_mode = "unknown"
-
-    # Use query and config directly now
-    tool_call_config = config or {} # Rename to avoid confusion with app.config
-    vector_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb')
-    app_default_vector_store_mode = current_app.config.get('VECTOR_STORE_MODE', 'user')
-
-    logging.info(
-        f"--- Retrieving context for query: '{query}' with tool_call_config: {tool_call_config}, "
-        f"configured VECTOR_STORE_PROVIDER: {vector_provider}, "
-        f"app_default_vector_store_mode: {app_default_vector_store_mode} ---"
-    )
-
-    # Extract parameters from tool_call_config, falling back to None or app defaults
-    user_id = tool_call_config.get('user_id')
-    knowledge_id = tool_call_config.get('knowledge_id')
-    library_id = tool_call_config.get('library_id')
-    # 'mode_for_operation' is the effective mode: LLM can specify it, else use app's default.
-    mode_for_operation = tool_call_config.get('mode', app_default_vector_store_mode)
-    search_strategy = tool_call_config.get('search_strategy', 'similarity')
-    k_docs = tool_call_config.get('k', 4)
-
-    embed_func = get_embedding_function()
-    llm_instance = get_llm()
-
-    # --- Initialize Vector Store based on provider ---
-    store = None
-    if vector_provider == 'pgvector':
-        from langchain_postgres import PGVector
-        connection_string = current_app.config.get('PGVECTOR_CONNECTION_STRING')
-        collection_name = current_app.config.get('PGVECTOR_COLLECTION_NAME', 'langchain_vectors')
-        if not connection_string:
-            logging.error("PGVECTOR_CONNECTION_STRING not configured.")
-            return {"documents": [], "structured_query": "PGVector not configured.", "error": "PGVector not configured."}
-
-        logging.info(f"[PGVector DEBUG] Using connection: {connection_string[:30]}..., collection: {collection_name}")
-        try:            
-            store = PGVector(
-                connection_string=connection_string, # Corrected parameter name
-                embeddings=embed_func,
-                collection_name=collection_name,
-                use_jsonb=True,
-                distance_strategy=DistanceStrategy.COSINE # define the distance strategy
-            )
-        except Exception as e:
-            logging.error(f"[PGVector DEBUG] Error initializing PGVector: {e}")
-            return {"documents": [], "structured_query": "Error initializing PGVector.", "error": str(e)}
-    elif vector_provider == 'chromadb':
-        # Determine mode for Chroma path construction
-        mode_to_pass=None
-        # Determine the mode to pass to get_lc_store_path
-        # If knowledge_id is explicitly provided by the LLM, we must use 'knowledge' mode.
-        if knowledge_id:
-            mode_to_pass = 'knowledge'
-        elif mode_for_operation == 'global':
-            # Respect explicit global mode setting from admin, even if user_id is present
-            mode_to_pass = 'global'
-        elif library_id and not user_id:
-            # If library_id is given but no user_id, it's likely a global library context.
-            # This is a bit ambiguous. If 'library' mode implies a specific path structure, use it.
-            # Otherwise, it might fall to 'global' or 'user' (if user_id was implicitly available via config).
-            # For now, let's assume if library_id is present, it's not 'knowledge' mode unless knowledge_id is also present.
-            # We'll let get_lc_store_path decide based on its internal logic if mode_to_pass is None.
-            mode_to_pass = None # Or 'global' if that's the intent for library-only context
-        elif user_id:
-            mode_to_pass = 'user' # If user_id is present and no knowledge_id, default to user mode for the tool call
-        else: # No specific IDs provided by LLM for the tool call
-            # If no specific IDs, use the determined mode_for_operation (which already includes app default)
-            mode_to_pass = mode_for_operation
-        
-        persist_dir = get_lc_store_path(user_id, knowledge_id, mode_to_pass)
-        if not persist_dir or not os.path.exists(persist_dir):
-            logging.warning(f"Chroma directory not found or path is None: {persist_dir}. Retrieval will likely fail.")
-            return {
-                "documents": [],
-                "structured_query": "Vector store not found.",
-                "error": f"Vector store not found at {persist_dir}."
-            }
-        chroma_collection_name = current_app.config.get('CHROMA_COLLECTION_NAME', 'documents-vectors')    
-        import re
-        def sanitize_collection_name(name: str) -> str:
-            cleaned = name.strip()
-            cleaned = re.sub(r'\s+', '_', cleaned)
-            if not re.match(r'^[a-zA-Z0-9](?:[a-zA-Z0-9._-]{1,510}[a-zA-Z0-9])$', cleaned):
-                raise ValueError(f"Invalid Chroma collection name: {cleaned}")
-            return cleaned
-
-        # Ensure collection name is valid before passing to Chroma
-        if chroma_collection_name:
-            chroma_collection_name = sanitize_collection_name(chroma_collection_name)
-
-        store = Chroma(
-            embedding_function=embed_func,
-            persist_directory=str(persist_dir),
-            collection_name=chroma_collection_name,
-            # persist_directory should be a string for Chroma
-        )
-    else:
-        logging.error(f"Unsupported VECTOR_STORE_PROVIDER: {vector_provider}")
-        return {"documents": [], "structured_query": "Unsupported vector store provider.", "error": f"Unsupported vector store provider: {vector_provider}"}
-    # --- End Vector Store Initialization ---
-    
-    # Extract explicit filters from config
-    explicit_filters = _build_explicit_metadata_filters(tool_call_config)
-    has_explicit_filters = bool(explicit_filters)
-    
-    structured_query_string = "Direct similarity search with explicit filters" if has_explicit_filters else "SelfQueryRetriever with LLM-generated filters"
-    
-    try:
-        # --- PATH 1: Direct Search with Explicit Filters ---
-        if has_explicit_filters:
-            logging.info(f"[RAG] Using DIRECT similarity search with guaranteed filters: {explicit_filters}")
-            retrieval_mode = "direct_filters"
-            
-            # Apply filters appropriate to your vector store provider
-            if vector_provider == 'pgvector':
-                # PGVector uses filter dict directly
-                search_kwargs = {'k': k_docs, 'filter': explicit_filters}
-            elif vector_provider == 'chromadb':
-                # Chroma needs $and structure for multiple conditions
-                if len(explicit_filters) > 1:
-                    chroma_filter = {'$and': [{k: v} for k, v in explicit_filters.items()]}
-                else:
-                    chroma_filter = explicit_filters
-                search_kwargs = {'k': k_docs, 'filter': chroma_filter}
-            
-            # Execute direct search
-            retrieved_docs = store.similarity_search(query, **search_kwargs)
-            structured_query_string = f"Direct search with filters: {explicit_filters}"
-            
-            logging.info(f"[RAG] Direct search retrieved {len(retrieved_docs)} documents")
-            
-            # Log sample results for debugging
-            if retrieved_docs:
-                for i, doc in enumerate(retrieved_docs[:2]):
-                    logging.info(f"[RAG] Doc {i+1}: source={doc.metadata.get('source')}, "
-                               f"knowledge_id={doc.metadata.get('knowledge_id')}, "
-                               f"library_id={doc.metadata.get('library_id')}")
-        
-        # --- PATH 2: SelfQueryRetriever for Exploratory Search ---
-        else:
-            logging.info(f"[RAG] Using SelfQueryRetriever (no explicit filters in config)")
-            retrieval_mode = "self_query"
-            
-            # Initialize SelfQueryRetriever
-            if llm_instance is None:
-                raise ValueError("LLM instance is None, cannot initialize SelfQueryRetriever.")
-            
-            retriever = SelfQueryRetriever.from_llm(
-                llm=llm_instance,
-                vectorstore=store,
-                document_contents=document_content_description,
-                metadata_field_info=metadata_field_info,
-                verbose=True,
-                use_original_query=True,
-                search_kwargs={'k': k_docs}
-            )
-            
-            # Capture structured query
-            try:
-                structured_query_dict = retriever.query_constructor.invoke({"query": query})
-                structured_query_string = str(structured_query_dict)
-                logging.info(f"[RAG] SelfQueryRetriever generated: {structured_query_string}")
-            except Exception as sq_err:
-                logging.warning(f"[RAG] Failed to generate structured query: {sq_err}")
-                structured_query_string = "SelfQueryRetriever (no structured query generated)"
-            
-            # Execute retrieval
-            retrieved_docs = retriever.invoke(query)
-            logging.info(f"[RAG] SelfQueryRetriever retrieved {len(retrieved_docs)} documents")
-        
-        # --- VALIDATION: Verify filters were applied ---
-        if has_explicit_filters and retrieved_docs:
-            mismatched = []
-            for doc in retrieved_docs:
-                for filter_key, filter_value in explicit_filters.items():
-                    if doc.metadata.get(filter_key) != filter_value:
-                        mismatched.append(doc)
-                        logging.warning(f"[RAG] Filter mismatch! Expected {filter_key}={filter_value}, "
-                                      f"got {doc.metadata.get(filter_key)} in doc from {doc.metadata.get('source')}")
-            
-            if mismatched:
-                logging.error(f"[RAG] {len(mismatched)}/{len(retrieved_docs)} documents failed filter validation!")
-        
-        duration = time.perf_counter() - start_time
-        logging.info(
-            "[RAG] Retrieval path=%s finished in %.2fs with %d docs. Structured query: %s",
-            retrieval_mode,
-            duration,
-            len(retrieved_docs) if 'retrieved_docs' in locals() else 0,
-            structured_query_string,
-        )
-
-        # Return results
-        return {
-            "documents": retrieved_docs,
-            "structured_query": structured_query_string
-        }
-        
-    except Exception as e:
-        duration = time.perf_counter() - start_time
-        logging.error(f"[RAG] Error during retrieval after {duration:.2f}s: {e}", exc_info=True)
-        return {
-            "documents": [],
-            "structured_query": f"Error: {str(e)}",
-            "error": str(e)
-        }
+    logging.info("--- ENTERING retrieve_context_tool ---")
+    tool_call_config = config or {}
+    return perform_retrieval(query, tool_call_config)
 
 # --- RAG Agent and Supervisor Graphs ---
 
@@ -1977,13 +1984,10 @@ def resume_agent_graph(
     if stream:
         print(f"--- Resuming SUPERVISOR graph in STREAMING mode for thread {thread_id} ---")
         try:
-            # Use astream for resuming in streaming mode
-            # Pass None as input to signal resume
-            # --- DEBUG LOG: Before astream ---
-            logging.info(f"[resume_agent_graph] Calling astream(None) for thread {config_thread_id}")
-            result = asyncio.run(_collect_stream_chunks(compiled_supervisor_graph, None, config))
-            logging.info(f"[resume_agent_graph] astream completed for thread {config_thread_id}. Result type: {type(result)}") # DEBUG LOG
-            return result
+            logging.info(f"[resume_agent_graph] Preparing streaming generator for thread {config_thread_id}")
+            streaming_generator = _collect_stream_chunks(compiled_supervisor_graph, None, config)
+            logging.info(f"[resume_agent_graph] Streaming generator prepared for thread {config_thread_id}")
+            return streaming_generator
         except Exception as e:
             logging.error(f"Error during agent streaming resume: {e}", exc_info=True)
             return {"type": "error", "message": f"Streaming resume failed: {e}"}
@@ -2028,9 +2032,11 @@ async def _collect_stream_chunks(graph, inputs, config):
         "map_image_base64": None,
         "map_image_mime_type": None,
         "html_map_url": None,
+        "structured_query": None,
         "confirmation_required": False,  # For HIL
         "confirmation_type": None,  # For HIL
         "thread_id": None,  # For HIL
+        "hil_options": [],
         "message_id": None,  # Will be populated with db_message_id
     }
     full_streamed_content = ""
@@ -2057,39 +2063,94 @@ async def _collect_stream_chunks(graph, inputs, config):
         }
         yield f"data: {json.dumps(metadata_packet)}\n\n"
 
-    async for chunk_event in graph.astream_events(inputs, config=config, version="v1"):
-        kind = chunk_event["event"]
+    hil_interrupt = False
+    try:
+        async for chunk_event in graph.astream_events(inputs, config=config, version="v1"):
+            kind = chunk_event["event"]
 
-        if kind == "on_chat_model_stream":
-            content = chunk_event["data"]["chunk"].content
-            if content:
-                full_streamed_content += content
-                yield f"data: {json.dumps({'type': 'text_chunk', 'content': content})}\n\n"
-        
-        elif kind == "on_tool_end":
-            tool_name = chunk_event.get("name")
-            tool_output = chunk_event["data"].get("output")
-            logging.info(f"[astream_events] Tool '{tool_name}' ended. Output type: {type(tool_output)}")
-            if tool_name in ["generate_map_link", "generate_map_link_by_string_coordinates"] and isinstance(tool_output, dict):
-                final_response_obj["map_image_base64"] = tool_output.get("map_image_base64")
-                final_response_obj["map_image_mime_type"] = tool_output.get("map_image_mime_type")
-                final_response_obj["html_map_url"] = tool_output.get("html_map_url")
-                yield f"data: {json.dumps({'type': 'metadata_update', 'metadata': {'map_image_base64': final_response_obj['map_image_base64'], 'map_image_mime_type': final_response_obj['map_image_mime_type'], 'html_map_url': final_response_obj['html_map_url']}})}\n\n"
+            if kind == "on_chat_model_stream":
+                content = chunk_event["data"]["chunk"].content
+                if content:
+                    full_streamed_content += content
+                    yield f"data: {json.dumps({'type': 'text_chunk', 'content': content})}\n\n"
+            
+            elif kind == "on_tool_end":
+                tool_name = chunk_event.get("name")
+                tool_output = chunk_event["data"].get("output")
+                logging.info(f"[astream_events] Tool '{tool_name}' ended. Output type: {type(tool_output)}")
+                if tool_name in ["generate_map_link", "generate_map_link_by_string_coordinates"] and isinstance(tool_output, dict):
+                    final_response_obj["map_image_base64"] = tool_output.get("map_image_base64")
+                    final_response_obj["map_image_mime_type"] = tool_output.get("map_image_mime_type")
+                    final_response_obj["html_map_url"] = tool_output.get("html_map_url")
+                    yield f"data: {json.dumps({'type': 'metadata_update', 'metadata': {'map_image_base64': final_response_obj['map_image_base64'], 'map_image_mime_type': final_response_obj['map_image_mime_type'], 'html_map_url': final_response_obj['html_map_url']}})}\n\n"
 
-        elif kind == "on_chain_end":
-            node_output = chunk_event["data"].get("output", {})
-            if isinstance(node_output, dict) and "agent_output" in node_output:
-                agent_output_data = node_output["agent_output"]
-                if isinstance(agent_output_data, dict):
-                    for key in ["citations", "suggested_questions", "usage_metadata", "is_evidence", "source_type", 
-                                "chart_image_base64", "chart_image_mime_type", 
-                                "map_image_base64", "map_image_mime_type", "html_map_url",
-                                "confirmation_required", "confirmation_type", "thread_id", "structured_query"]:
-                        if key in agent_output_data:
-                            final_response_obj[key] = agent_output_data[key]
-                    if "answer" in agent_output_data and not full_streamed_content: # Prioritize streamed text
-                        final_response_obj["answer"] = agent_output_data["answer"]
-                    yield f"data: {json.dumps({'type': 'metadata_update', 'metadata': agent_output_data})}\n\n"
+            elif kind == "on_chain_end":
+                node_output = chunk_event["data"].get("output", {})
+                if isinstance(node_output, dict) and "agent_output" in node_output:
+                    agent_output_data = node_output["agent_output"]
+                    if isinstance(agent_output_data, dict):
+                        for key in ["citations", "suggested_questions", "usage_metadata", "is_evidence", "source_type", 
+                                    "chart_image_base64", "chart_image_mime_type", 
+                                    "map_image_base64", "map_image_mime_type", "html_map_url",
+                                    "confirmation_required", "confirmation_type", "thread_id", "structured_query", "hil_options"]:
+                            if key in agent_output_data:
+                                final_response_obj[key] = agent_output_data[key]
+                        if "answer" in agent_output_data and not full_streamed_content: # Prioritize streamed text
+                            final_response_obj["answer"] = agent_output_data["answer"]
+                        yield f"data: {json.dumps({'type': 'metadata_update', 'metadata': agent_output_data})}\n\n"
+    except GraphInterrupt:
+        hil_interrupt = True
+        logging.info("[_collect_stream_chunks] GraphInterrupt caught during streaming; preparing HIL confirmation payload.")
+        hil_answer = "I couldn't find relevant information in the internal documents. Would you like me to search the web instead?"
+        final_response_obj.update({
+            "answer": hil_answer,
+            "confirmation_required": True,
+            "confirmation_type": "web_search",
+            "hil_options": [
+                {"display_text": "Yes", "payload": "yes"},
+                {"display_text": "No", "payload": "no"},
+            ],
+        })
+        # Ensure the conversation/thread IDs are preserved for the client
+        if thread_id_from_config:
+            final_response_obj["thread_id"] = str(thread_id_from_config)
+            final_response_obj["conversation_id"] = str(thread_id_from_config)
+        # Emit a text chunk so the typing bubble immediately shows the prompt
+        full_streamed_content = hil_answer
+        logging.info("[_collect_stream_chunks] Emitting HIL text chunk for thread %s.", thread_id_from_config)
+        yield f"data: {json.dumps({'type': 'text_chunk', 'content': hil_answer})}\n\n"
+        hil_metadata = {
+            "answer": hil_answer,
+            "confirmation_required": True,
+            "confirmation_type": "web_search",
+            "hil_options": final_response_obj["hil_options"],
+            "thread_id": final_response_obj.get("thread_id"),
+        }
+        yield f"data: {json.dumps({'type': 'metadata_update', 'metadata': hil_metadata})}\n\n"
+    except Exception as stream_exc:
+        logging.error("[_collect_stream_chunks] Unhandled exception during streaming: %s", stream_exc, exc_info=True)
+        raise
+
+    if not full_streamed_content and not final_response_obj.get("answer"):
+        logging.info("[_collect_stream_chunks] Streaming fallback invoked for thread %s.", thread_id_from_config)
+        hil_answer = "I couldn't find relevant information in the internal documents. Would you like me to search the web instead?"
+
+        final_response_obj.update({
+            "answer": hil_answer,
+            "confirmation_required": True,
+            "confirmation_type": "web_search",
+            "hil_options": [
+                {"display_text": "Yes", "payload": "yes"},
+                {"display_text": "No", "payload": "no"},
+            ],
+        })
+
+        if thread_id_from_config:
+            final_response_obj["thread_id"] = str(thread_id_from_config)
+            final_response_obj["conversation_id"] = str(thread_id_from_config)
+        yield f"data: {json.dumps({'type': 'text_chunk', 'content': hil_answer})}\n\n"
+        yield f"data: {json.dumps({'type': 'metadata_update', 'metadata': final_response_obj})}\n\n"
+        full_streamed_content = hil_answer
 
     if full_streamed_content:
         final_response_obj["answer"] = full_streamed_content

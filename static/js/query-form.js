@@ -1263,6 +1263,55 @@ function mergeTypewriterMetadata(messageId, metadata) {
     initializeTypewriterState(messageId);
     const state = TYPEWRITER_STATES.get(messageId);
     state.metadata = { ...state.metadata, ...metadata };
+    const backendMessageId = extractBackendMessageId(state.metadata);
+    if (backendMessageId) {
+        syncBubbleMessageId(messageId, backendMessageId);
+    }
+}
+
+function extractBackendMessageId(metadata) {
+    if (!metadata || typeof metadata !== 'object') {
+        return null;
+    }
+
+    const directId = metadata.message_id || metadata.messageId;
+    if (directId) {
+        return directId;
+    }
+
+    if (metadata.agent_output && typeof metadata.agent_output === 'object') {
+        const agentId = metadata.agent_output.message_id || metadata.agent_output.messageId;
+        if (agentId) {
+            return agentId;
+        }
+    }
+
+    if (metadata.response && typeof metadata.response === 'object') {
+        const responseId = metadata.response.message_id || metadata.response.messageId;
+        if (responseId) {
+            return responseId;
+        }
+    }
+
+    return null;
+}
+
+function syncBubbleMessageId(placeholderId, backendMessageId) {
+    if (!placeholderId || !backendMessageId) {
+        return;
+    }
+
+    window.requestAnimationFrame(() => {
+        let bubble = document.getElementById(placeholderId);
+        if (!bubble) {
+            bubble = document.querySelector(`[data-message-id="${placeholderId}"]`);
+        }
+        if (!bubble) {
+            return;
+        }
+        bubble.dataset.messageId = backendMessageId;
+        bubble.dataset.backendMessageId = backendMessageId;
+    });
 }
 
 function applyTypewriterEffect(messageId, targetText) {
@@ -1306,6 +1355,11 @@ function completeTypewriterStream(messageId, finalContent, finalMetadata) {
         if (possibleTotal !== null) {
             state.chunkTotal = possibleTotal;
         }
+    }
+    const backendMessageId = extractBackendMessageId(state.metadata);
+    if (backendMessageId) {
+        state.metadata.backend_message_id = backendMessageId;
+        syncBubbleMessageId(messageId, backendMessageId);
     }
     state.finalContent = typeof finalContent === 'string' ? finalContent : '';
     if (state.chunkCount > 0 || state.chunkTotal) {
@@ -1389,6 +1443,10 @@ function finalizeTypewriter(messageId) {
     }
     const finalContent = state.finalContent !== null ? state.finalContent : state.targetText;
     const finalMetadata = state.metadata || {};
+    const backendMessageId = extractBackendMessageId(finalMetadata);
+    if (backendMessageId) {
+        finalMetadata.backend_message_id = backendMessageId;
+    }
     const chunkCount = state.chunkCount ?? 0;
     const chunkTotal = state.chunkTotal ?? null;
     if (chunkCount > 0 || chunkTotal) {
@@ -1401,6 +1459,9 @@ function finalizeTypewriter(messageId) {
         content: finalContent,
         metadata: finalMetadata
     });
+    if (backendMessageId) {
+        syncBubbleMessageId(messageId, backendMessageId);
+    }
     window.requestAnimationFrame(() => {
         let bubble = document.getElementById(messageId);
         if (!bubble) {
@@ -1408,6 +1469,10 @@ function finalizeTypewriter(messageId) {
         }
         if (!bubble) {
             return;
+        }
+        if (backendMessageId) {
+            bubble.dataset.messageId = backendMessageId;
+            bubble.dataset.backendMessageId = backendMessageId;
         }
         bubble.classList.remove('typewriter-active');
         const caret = bubble.querySelector('.typewriter-caret');
@@ -1558,7 +1623,9 @@ function resumeQuery(threadId, confirmation) {
         },
         body: JSON.stringify({
             thread_id: threadId,
-            confirmation: confirmation // Send 'yes'
+            confirmation: confirmation,
+            stream: currentStreamPreference,
+            conversation_id: typeof getConversationId === 'function' ? getConversationId() : null
         }),
         signal: signal
     })

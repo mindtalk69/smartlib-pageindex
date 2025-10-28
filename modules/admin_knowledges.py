@@ -11,6 +11,35 @@ from extensions import csrf
 
 knowledges_bp = Blueprint('admin_knowledges', __name__, url_prefix='/admin/knowledges')
 
+def serialize_knowledge_instance(knowledge):
+    """Serialize a Knowledge instance with related names for JSON responses."""
+    if not knowledge:
+        return None
+
+    knowledge_dict = {column.name: getattr(knowledge, column.name) for column in Knowledge.__table__.columns}
+    knowledge_dict['id'] = knowledge.id
+
+    creator = getattr(knowledge, 'creator', None)
+    knowledge_dict['created_by_username'] = getattr(creator, 'username', 'N/A') if creator else 'N/A'
+
+    knowledge_dict['category_names'] = sorted(
+        (category.name for category in getattr(knowledge, 'categories', []))
+    )
+    knowledge_dict['catalog_names'] = sorted(
+        (catalog.name for catalog in getattr(knowledge, 'catalogs', []))
+    )
+    knowledge_dict['library_names'] = sorted(
+        (library.name for library in getattr(knowledge, 'libraries', []))
+    )
+    knowledge_dict['group_names'] = sorted(
+        (group.name for group in getattr(knowledge, 'groups', []))
+    )
+
+    created_at = knowledge_dict.get('created_at')
+    if hasattr(created_at, 'isoformat'):
+        knowledge_dict['created_at'] = created_at.isoformat()
+    return knowledge_dict
+
 @knowledges_bp.route('/')
 @login_required
 def knowledge_management():
@@ -119,18 +148,19 @@ def add_knowledge():
         ).get(knowledge_id)
 
         if created_knowledge:
-            knowledge_dict = {c.name: getattr(created_knowledge, c.name) for c in created_knowledge.__table__.columns}
-            knowledge_dict['id'] = created_knowledge.id
-            knowledge_dict['created_by_username'] = created_knowledge.creator.username if created_knowledge.creator else 'N/A'
-            knowledge_dict['category_names'] = sorted([cat.name for cat in created_knowledge.categories])
-            knowledge_dict['catalog_names'] = sorted([cat.name for cat in created_knowledge.catalogs])
-            knowledge_dict['library_names'] = sorted([lib.name for lib in created_knowledge.libraries])
-            knowledge_dict['group_names'] = sorted([grp.name for grp in created_knowledge.groups])
-            if knowledge_dict.get('created_at'):
-                knowledge_dict['created_at'] = knowledge_dict['created_at'].isoformat()
-            return jsonify({"status": "success", "message": "Knowledge added successfully.", "sent_library_ids": library_ids, "sent_group_ids": group_ids, "knowledge": knowledge_dict}), 201
-        else:
-            return jsonify({"status": "success", "message": "Knowledge added, but failed to fetch details.", "knowledge_id": knowledge_id}), 201
+            knowledge_dict = serialize_knowledge_instance(created_knowledge)
+            return jsonify({
+                "status": "success",
+                "message": "Knowledge added successfully.",
+                "sent_library_ids": library_ids,
+                "sent_group_ids": group_ids,
+                "knowledge": knowledge_dict,
+            }), 201
+        return jsonify({
+            "status": "success",
+            "message": "Knowledge added, but failed to fetch details.",
+            "knowledge_id": knowledge_id,
+        }), 201
 
     except IntegrityError:
         db.session.rollback()
@@ -163,16 +193,13 @@ def get_knowledge_data(knowledge_id):
             selected_category_ids = [cat.id for cat in knowledge.categories]
             selected_library_ids = [lib.library_id for lib in knowledge.libraries]
             selected_group_ids = [grp.group_id for grp in knowledge.groups]
-            knowledge_dict = {c.name: getattr(knowledge, c.name) for c in knowledge.__table__.columns}
-            knowledge_dict['id'] = knowledge.id
-            if knowledge_dict.get('created_at'):
-                knowledge_dict['created_at'] = knowledge_dict['created_at'].isoformat()
+            knowledge_dict = serialize_knowledge_instance(knowledge)
             return jsonify({
                 "knowledge": knowledge_dict,
                 "selected_catalogs": selected_catalog_ids,
                 "selected_categories": selected_category_ids,
                 "selected_libraries": selected_library_ids,
-                "selected_groups": selected_group_ids
+                "selected_groups": selected_group_ids,
             })
         else:
             return jsonify({"status": "error", "message": "Knowledge not found."}), 404
@@ -253,18 +280,13 @@ def edit_knowledge(knowledge_id):
         ).get(knowledge_id)
 
         if updated_knowledge:
-            knowledge_dict = {c.name: getattr(updated_knowledge, c.name) for c in updated_knowledge.__table__.columns}
-            knowledge_dict['id'] = updated_knowledge.id
-            knowledge_dict['created_by_username'] = updated_knowledge.creator.username if updated_knowledge.creator else 'N/A'
-            knowledge_dict['category_names'] = sorted([cat.name for cat in updated_knowledge.categories])
-            knowledge_dict['catalog_names'] = sorted([cat.name for cat in updated_knowledge.catalogs])
-            knowledge_dict['library_names'] = sorted([lib.name for lib in updated_knowledge.libraries])
-            knowledge_dict['group_names'] = sorted([grp.name for grp in updated_knowledge.groups])
-            if knowledge_dict.get('created_at'):
-                knowledge_dict['created_at'] = knowledge_dict['created_at'].isoformat()
-            return jsonify({"status": "success", "message": "Knowledge updated successfully.", "knowledge": knowledge_dict})
-        else:
-            return jsonify({"status": "success", "message": "Knowledge updated, but failed to fetch details."})
+            knowledge_dict = serialize_knowledge_instance(updated_knowledge)
+            return jsonify({
+                "status": "success",
+                "message": "Knowledge updated successfully.",
+                "knowledge": knowledge_dict,
+            })
+        return jsonify({"status": "success", "message": "Knowledge updated, but failed to fetch details."})
 
     except IntegrityError:
         db.session.rollback()

@@ -34,12 +34,11 @@
         <tbody>
             {% if libraries %}
                 {% for library in libraries %}
-                <tr id="libraryRow-{{ library.library_id }}">
-                    <td>{{ loop.index }}</td>
-                    <td>{{ library.name }}</td>
-                    <!-- <td>{{ library.description | default('N/A', true) }}</td> -->
-                    <td>{{ library.description[:80] ~ ('...' if library.description and library.description|length > 80 else '') }}</td>
-                    <td>
+                <tr id="libraryRow-{{ library.library_id }}" data-id="{{ library.library_id }}">
+                    <td class="row-number">{{ loop.index }}</td>
+                    <td class="library-name">{{ library.name }}</td>
+                    <td class="library-description" title="{{ library.description | default('', true) }}">{{ library.description[:80] ~ ('...' if library.description and library.description|length > 80 else '') }}</td>
+                    <td class="library-knowledges">
                       {% if library.knowledges %}
                         {% for knowledge in library.knowledges %}
                           <span class="badge rounded-pill bg-info text-dark me-1">{{ knowledge.name }}</span>
@@ -48,8 +47,8 @@
                         <span class="text-muted">None</span>
                       {% endif %}
                     </td>
-                    <td>{{ library.creator.username | default('Unknown', true) }}</td>
-                    <td>{{ library.created_at.strftime('%Y-%m-%d %H:%M') if library.created_at else 'N/A' }}</td>
+                    <td class="library-created-by">{{ library.creator.username | default('Unknown', true) }}</td>
+                    <td class="library-created-at">{{ library.created_at.strftime('%Y-%m-%d %H:%M') if library.created_at else 'N/A' }}</td>
                     <td>
                         <div class="action-buttons">
                             <button class="btn btn-sm btn-warning edit-btn"
@@ -71,7 +70,7 @@
                 {% endfor %}
             {% else %}
                 <tr>
-                    <td colspan="6" class="text-center">No libraries found.</td>
+                    <td colspan="7" class="text-center">No libraries found.</td>
                 </tr>
             {% endif %}
         </tbody>

@@ -1,464 +1,486 @@
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     const knowledgeModalElement = document.getElementById('knowledgeModal');
     if (!knowledgeModalElement) {
-        console.error('Knowledge modal element not found!');
+        console.error('Knowledge modal element not found.');
         return;
     }
+
     const knowledgeModal = new bootstrap.Modal(knowledgeModalElement);
     const knowledgeForm = document.getElementById('knowledgeForm');
     const knowledgeModalLabel = document.getElementById('knowledgeModalLabel');
     const knowledgeIdInput = document.getElementById('knowledgeId');
     const knowledgeNameInput = document.getElementById('knowledgeName');
     const knowledgeDescriptionInput = document.getElementById('knowledgeDescription');
-    // Category elements (similar to catalog)
-    const knowledgeCategoriesDiv = document.getElementById('knowledgeCategories'); // Container for category checkboxes
-    const categoryFilterInput = document.getElementById('categoryFilterInput'); // Category filter input
-    const selectedCategoriesDisplay = document.getElementById('selectedCategoriesDisplay'); // Category display area
-    // Catalog elements
-    const knowledgeCatalogsDiv = document.getElementById('knowledgeCatalogs'); // Container for catalog checkboxes
-    const catalogFilterInput = document.getElementById('catalogFilterInput'); // Catalog filter input - KEEP THIS ONE
-    const selectedCatalogsDisplay = document.getElementById('selectedCatalogsDisplay'); // Catalog display area - KEEP THIS ONE
-    // Library elements
-    const knowledgeLibrariesDiv = document.getElementById('knowledgeLibraries'); // Container for library checkboxes
-    const libraryFilterInput = document.getElementById('libraryFilterInput'); // Library filter input
-    const selectedLibrariesDisplay = document.getElementById('selectedLibrariesDisplay'); // Library display area
-    // Groups elements
-    const knowledgeGroupsDiv = document.getElementById('knowledgeGroups'); // Container for group checkboxes
-    const groupFilterInput = document.getElementById('groupFilterInput'); // Group filter input
-    const selectedGroupsDisplay = document.getElementById('selectedGroupsDisplay'); // Group display area
-    // Buttons and other elements
+    const knowledgeCategoriesDiv = document.getElementById('knowledgeCategories');
+    const knowledgeCatalogsDiv = document.getElementById('knowledgeCatalogs');
+    const knowledgeLibrariesDiv = document.getElementById('knowledgeLibraries');
+    const knowledgeGroupsDiv = document.getElementById('knowledgeGroups');
+    const categoryFilterInput = document.getElementById('categoryFilterInput');
+    const catalogFilterInput = document.getElementById('catalogFilterInput');
+    const libraryFilterInput = document.getElementById('libraryFilterInput');
+    const groupFilterInput = document.getElementById('groupFilterInput');
+    const selectedCategoriesDisplay = document.getElementById('selectedCategoriesDisplay');
+    const selectedCatalogsDisplay = document.getElementById('selectedCatalogsDisplay');
+    const selectedLibrariesDisplay = document.getElementById('selectedLibrariesDisplay');
+    const selectedGroupsDisplay = document.getElementById('selectedGroupsDisplay');
     const saveKnowledgeBtn = document.getElementById('saveKnowledgeBtn');
     const addKnowledgeBtn = document.getElementById('addKnowledgeBtn');
-    const knowledgesTableBody = document.querySelector('#knowledgesTable tbody');
+    const knowledgesTable = document.getElementById('knowledgesTable');
+    const knowledgesTableBody = knowledgesTable ? knowledgesTable.querySelector('tbody') : null;
     const formErrorElement = document.getElementById('formError');
-    // const catalogFilterInput = document.getElementById('catalogFilterInput'); // REMOVE DUPLICATE
-    // const selectedCatalogsDisplay = document.getElementById('selectedCatalogsDisplay'); // REMOVE DUPLICATE
-    // Select the button within the specific modal context
-    const generateDescBtn = knowledgeModalElement ? knowledgeModalElement.querySelector('#generateDescBtn') : null; // Find button inside modal
-    // Get CSRF token from meta tag - Ensure this meta tag exists in your base template
-    let csrfToken = null;
-    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-    if (csrfMeta) {
-        csrfToken = csrfMeta.getAttribute('content');
-    } else {
-        console.warn('CSRF token meta tag not found. AJAX requests might fail.');
-        // Optionally, try to get it from a cookie if your setup uses that
-        // csrfToken = getCookie('csrftoken'); // Example function needed
+    const generateDescBtn = knowledgeModalElement.querySelector('#generateDescBtn');
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? null;
+
+    if (!knowledgeForm || !knowledgesTableBody) {
+        console.error('Knowledge form or table elements missing.');
+        return;
     }
 
+    let currentEditId = null;
 
-    let currentEditId = null; // To store the ID of the knowledge being edited
+    function formatDate(value) {
+        if (!value) {
+            return 'N/A';
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return typeof value === 'string' ? value : 'N/A';
+        }
+        return date.toLocaleString();
+    }
 
-    // --- DataTables initialization is handled globally in admin-datatables.js ---
+    function truncate(value, maxLength = 80) {
+        if (!value) {
+            return '';
+        }
+        return `${value.slice(0, maxLength)}${value.length > maxLength ? '...' : ''}`;
+    }
 
-    // --- Helper Functions ---
+    function joinNames(list) {
+        if (!Array.isArray(list) || list.length === 0) {
+            return 'N/A';
+        }
+        return list.join(', ');
+    }
+
+    function resolveLabel(checkbox) {
+        if (!checkbox) {
+            return null;
+        }
+        if (checkbox.nextElementSibling && checkbox.nextElementSibling.tagName === 'LABEL') {
+            return checkbox.nextElementSibling;
+        }
+        if (checkbox.closest('label')) {
+            return checkbox.closest('label');
+        }
+        return document.querySelector(`label[for="${checkbox.id}"]`);
+    }
+
+    function collectSelectedNames(container, checkboxSelector) {
+        if (!container) {
+            return [];
+        }
+        return Array.from(container.querySelectorAll(`${checkboxSelector}:checked`))
+            .map((checkbox) => resolveLabel(checkbox)?.textContent.trim())
+            .filter((name) => !!name);
+    }
+
+    function updateSelectionDisplay(container, displayElement, checkboxSelector) {
+        if (!displayElement) {
+            return;
+        }
+        const names = collectSelectedNames(container, checkboxSelector);
+        if (names.length > 0) {
+            displayElement.innerHTML = '<strong>Selected:</strong> ' + names
+                .map((name) => `<span class="badge bg-primary me-1">${name}</span>`)
+                .join('');
+        } else {
+            displayElement.innerHTML = '<span class="text-muted">Selected: None</span>';
+        }
+    }
+
+    function getCheckedValues(container, selector) {
+        if (!container) {
+            return [];
+        }
+        return Array.from(container.querySelectorAll(`${selector}:checked`))
+            .map((checkbox) => parseInt(checkbox.value, 10))
+            .filter((value) => !Number.isNaN(value));
+    }
+
+    function resetListVisibility(container, itemSelector) {
+        if (!container) {
+            return;
+        }
+        container.querySelectorAll(itemSelector).forEach((item) => {
+            item.style.display = '';
+        });
+    }
+
+    function filterList(container, itemSelector, filterValue) {
+        if (!container) {
+            return;
+        }
+        const normalized = filterValue.toLowerCase();
+        container.querySelectorAll(itemSelector).forEach((item) => {
+            const label = item.querySelector('label');
+            const text = label ? label.textContent.toLowerCase() : '';
+            item.style.display = text.includes(normalized) ? '' : 'none';
+        });
+    }
+
+    function normalizeKnowledge(raw) {
+        if (!raw || typeof raw !== 'object') {
+            return null;
+        }
+        const id = raw.id ?? raw.knowledge_id ?? null;
+        if (!id) {
+            return null;
+        }
+        const categoryNames = Array.isArray(raw.category_names)
+            ? raw.category_names
+            : Array.isArray(raw.categories)
+                ? raw.categories
+                    .map((category) => (category && typeof category === 'object' ? category.name : null))
+                    .filter((name) => !!name)
+                : [];
+        const catalogNames = Array.isArray(raw.catalog_names)
+            ? raw.catalog_names
+            : Array.isArray(raw.catalogs)
+                ? raw.catalogs
+                    .map((catalog) => (catalog && typeof catalog === 'object' ? catalog.name : null))
+                    .filter((name) => !!name)
+                : [];
+        const libraryNames = Array.isArray(raw.library_names)
+            ? raw.library_names
+            : Array.isArray(raw.libraries)
+                ? raw.libraries
+                    .map((library) => (library && typeof library === 'object' ? library.name : null))
+                    .filter((name) => !!name)
+                : [];
+        const groupNames = Array.isArray(raw.group_names)
+            ? raw.group_names
+            : Array.isArray(raw.groups)
+                ? raw.groups
+                    .map((group) => (group && typeof group === 'object' ? group.name : null))
+                    .filter((name) => !!name)
+                : [];
+        return {
+            id,
+            name: raw.name ?? '',
+            description: raw.description ?? '',
+            categoryNames,
+            catalogNames,
+            libraryNames,
+            groupNames,
+            createdBy: raw.created_by_username
+                ?? raw.created_by
+                ?? (raw.creator && typeof raw.creator === 'object' ? raw.creator.username : null)
+                ?? 'N/A',
+            createdAt: raw.created_at ?? raw.createdAt ?? null,
+        };
+    }
+
+    function createTableRow(raw) {
+        const knowledge = normalizeKnowledge(raw);
+        if (!knowledge) {
+            return document.createElement('tr');
+        }
+
+        const tr = document.createElement('tr');
+        tr.dataset.id = knowledge.id;
+
+        const numberCell = document.createElement('td');
+        numberCell.classList.add('row-number');
+        tr.appendChild(numberCell);
+
+        const nameCell = document.createElement('td');
+        nameCell.classList.add('knowledge-name');
+        nameCell.textContent = knowledge.name;
+        tr.appendChild(nameCell);
+
+        const descriptionCell = document.createElement('td');
+        descriptionCell.classList.add('knowledge-description');
+        descriptionCell.title = knowledge.description;
+        descriptionCell.textContent = truncate(knowledge.description);
+        tr.appendChild(descriptionCell);
+
+        const categoriesCell = document.createElement('td');
+        categoriesCell.classList.add('knowledge-categories');
+        categoriesCell.textContent = joinNames(knowledge.categoryNames);
+        tr.appendChild(categoriesCell);
+
+        const librariesCell = document.createElement('td');
+        librariesCell.classList.add('knowledge-libraries');
+        librariesCell.textContent = joinNames(knowledge.libraryNames);
+        tr.appendChild(librariesCell);
+
+        const groupsCell = document.createElement('td');
+        groupsCell.classList.add('knowledge-groups');
+        groupsCell.textContent = joinNames(knowledge.groupNames);
+        tr.appendChild(groupsCell);
+
+        const createdByCell = document.createElement('td');
+        createdByCell.classList.add('knowledge-created-by');
+        createdByCell.textContent = knowledge.createdBy || 'N/A';
+        tr.appendChild(createdByCell);
+
+        const createdAtCell = document.createElement('td');
+        createdAtCell.classList.add('knowledge-created-at');
+        createdAtCell.textContent = formatDate(knowledge.createdAt);
+        tr.appendChild(createdAtCell);
+
+        const actionsCell = document.createElement('td');
+        const actionWrapper = document.createElement('div');
+        actionWrapper.classList.add('action-buttons');
+
+        const editButton = document.createElement('button');
+        editButton.className = 'btn btn-sm btn-warning edit-btn';
+        editButton.dataset.id = knowledge.id;
+        editButton.title = 'Edit Knowledge';
+        editButton.innerHTML = '<i class="bi bi-pencil-fill"></i>';
+
+        const deleteButton = document.createElement('button');
+        deleteButton.className = 'btn btn-sm btn-danger delete-btn';
+        deleteButton.dataset.id = knowledge.id;
+        deleteButton.dataset.name = knowledge.name;
+        deleteButton.title = 'Delete Knowledge';
+        deleteButton.innerHTML = '<i class="bi bi-trash-fill"></i>';
+
+        actionWrapper.appendChild(editButton);
+        actionWrapper.appendChild(deleteButton);
+        actionsCell.appendChild(actionWrapper);
+        tr.appendChild(actionsCell);
+
+        return tr;
+    }
+
+    function updateTableRow(raw) {
+        const knowledge = normalizeKnowledge(raw);
+        if (!knowledge) {
+            return;
+        }
+        const row = knowledgesTableBody.querySelector(`tr[data-id="${knowledge.id}"]`);
+        if (!row) {
+            return;
+        }
+        const nameCell = row.querySelector('.knowledge-name');
+        if (nameCell) {
+            nameCell.textContent = knowledge.name;
+        }
+        const descriptionCell = row.querySelector('.knowledge-description');
+        if (descriptionCell) {
+            descriptionCell.title = knowledge.description;
+            descriptionCell.textContent = truncate(knowledge.description);
+        }
+        const categoriesCell = row.querySelector('.knowledge-categories');
+        if (categoriesCell) {
+            categoriesCell.textContent = joinNames(knowledge.categoryNames);
+        }
+        const librariesCell = row.querySelector('.knowledge-libraries');
+        if (librariesCell) {
+            librariesCell.textContent = joinNames(knowledge.libraryNames);
+        }
+        const groupsCell = row.querySelector('.knowledge-groups');
+        if (groupsCell) {
+            groupsCell.textContent = joinNames(knowledge.groupNames);
+        }
+        const createdByCell = row.querySelector('.knowledge-created-by');
+        if (createdByCell) {
+            createdByCell.textContent = knowledge.createdBy || 'N/A';
+        }
+        const createdAtCell = row.querySelector('.knowledge-created-at');
+        if (createdAtCell) {
+            createdAtCell.textContent = formatDate(knowledge.createdAt);
+        }
+    }
+
+    function refreshRowNumbers() {
+        const rows = knowledgesTableBody.querySelectorAll('tr[data-id]');
+        rows.forEach((row, index) => {
+            const numberCell = row.querySelector('.row-number') || row.firstElementChild;
+            if (numberCell) {
+                numberCell.textContent = index + 1;
+            }
+        });
+    }
+
+    function removePlaceholderRow() {
+        const placeholderCell = knowledgesTableBody.querySelector('td[colspan="9"]');
+        if (placeholderCell) {
+            placeholderCell.parentElement.remove();
+        }
+    }
+
+    function ensurePlaceholderRow() {
+        if (knowledgesTableBody.querySelector('tr[data-id]')) {
+            return;
+        }
+        knowledgesTableBody.innerHTML = '<tr><td colspan="9" class="text-center">No knowledge entries found.</td></tr>';
+    }
+
+    function hideFormError() {
+        if (!formErrorElement) {
+            return;
+        }
+        formErrorElement.textContent = '';
+        formErrorElement.style.display = 'none';
+    }
+
+    function showFormError(message) {
+        if (formErrorElement) {
+            formErrorElement.textContent = message;
+            formErrorElement.style.display = 'block';
+        } else {
+            alert(message);
+        }
+    }
+
+    function showFeedback(message) {
+        alert(message);
+    }
+
     function clearForm() {
         knowledgeForm.reset();
         knowledgeIdInput.value = '';
         currentEditId = null;
-        // Uncheck all category checkboxes
-        if (knowledgeCategoriesDiv) {
-            knowledgeCategoriesDiv.querySelectorAll('.category-checkbox').forEach(checkbox => {
-                checkbox.checked = false;
-            });
-        }
-        // Uncheck all catalog checkboxes
-        if (knowledgeCatalogsDiv) {
-            knowledgeCatalogsDiv.querySelectorAll('.catalog-checkbox').forEach(checkbox => {
-                checkbox.checked = false;
-            });
-        }
-        // Uncheck all library checkboxes
-        if (knowledgeLibrariesDiv) {
-            knowledgeLibrariesDiv.querySelectorAll('.library-checkbox').forEach(checkbox => {
-                checkbox.checked = false;
-            });
-        }
-        // Clear selected libraries display explicitly on form clear
-        if (selectedLibrariesDisplay) {
-            selectedLibrariesDisplay.innerHTML = '<span class="text-muted">Selected: None</span>';
-        }
-        // Explicitly update displays based on cleared state
-        updateSelectedCategoriesDisplay([]); 
-        updateSelectedCatalogsDisplay([]); 
-        updateSelectedLibrariesDisplay([]); 
-        // Uncheck all group checkboxes
-        if (knowledgeGroupsDiv) {
-            knowledgeGroupsDiv.querySelectorAll('.group-checkbox').forEach(checkbox => {
-                checkbox.checked = false;
-            });
-        }
-        // Clear selected groups display explicitly on form clear
-        if (selectedGroupsDisplay) {
-            selectedGroupsDisplay.innerHTML = '<span class="text-muted">Selected: None</span>';
-        }
-        formErrorElement.textContent = '';
-        formErrorElement.style.display = 'none';
         knowledgeModalLabel.textContent = 'Add Knowledge';
         saveKnowledgeBtn.textContent = 'Save Knowledge';
-        saveKnowledgeBtn.disabled = false; // Re-enable button
-    }
+        hideFormError();
 
-    function showFormError(message) {
-        formErrorElement.textContent = message;
-        formErrorElement.style.display = 'block';
-    }
+        updateSelectionDisplay(knowledgeCategoriesDiv, selectedCategoriesDisplay, '.category-checkbox');
+        updateSelectionDisplay(knowledgeCatalogsDiv, selectedCatalogsDisplay, '.catalog-checkbox');
+        updateSelectionDisplay(knowledgeLibrariesDiv, selectedLibrariesDisplay, '.library-checkbox');
+        updateSelectionDisplay(knowledgeGroupsDiv, selectedGroupsDisplay, '.group-checkbox');
 
-    function hideFormError() {
-        formErrorElement.textContent = '';
-        formErrorElement.style.display = 'none';
-    }
-
-    function showFeedback(message, type = 'success') {
-        // Simple alert for now
-        alert(message);
-        // Consider implementing a more user-friendly toast notification system
-    }
-
-    function getSelectedCatalogIds() {
-        const selectedIds = [];
-        knowledgeCatalogsDiv.querySelectorAll('.catalog-checkbox:checked').forEach(checkbox => {
-            selectedIds.push(checkbox.value);
-        });
-        return selectedIds;
-    }
-
-    function getSelectedCategoryIds() {
-        const selectedIds = [];
-        if (knowledgeCategoriesDiv) {
-            knowledgeCategoriesDiv.querySelectorAll('.category-checkbox:checked').forEach(checkbox => {
-                selectedIds.push(checkbox.value);
-            });
-        }
-        return selectedIds;
-    }
-
-    function getSelectedGroupIds() {
-        const selectedIds = [];
-        if (knowledgeGroupsDiv) {
-            knowledgeGroupsDiv.querySelectorAll('.group-checkbox:checked').forEach(checkbox => {
-                selectedIds.push(checkbox.value);
-            });
-        }
-        return selectedIds;
-    }
-
-    function updateSelectedGroupsDisplay() {
-        if (!selectedGroupsDisplay || !knowledgeGroupsDiv) return;
-        const selectedNames = [];
-        knowledgeGroupsDiv.querySelectorAll('.group-checkbox:checked').forEach(checkbox => {
-            // Try to find the label using for attribute if .form-check is missing
-            let label = null;
-            if (checkbox.closest('.form-check')) {
-                label = checkbox.closest('.form-check').querySelector('label');
-            }
-            if (!label) {
-                // Fallback: find label by for attribute
-                label = document.querySelector('label[for="' + checkbox.id + '"]');
-            }
-            if (label) {
-                selectedNames.push(label.textContent.trim());
-            }
-        });
-        if (selectedNames.length > 0) {
-            selectedGroupsDisplay.innerHTML = '<strong>Selected:</strong> ' + selectedNames.map(name =>
-                `<span class="badge bg-primary me-1">${name}</span>`
-            ).join('');
-        } else {
-            selectedGroupsDisplay.innerHTML = `<span class="text-muted">Selected: None</span>`;
-        }
-    }
-
-    function createTableRow(knowledge) {
-        const tr = document.createElement('tr');
-        tr.setAttribute('data-id', knowledge.id);
-        // Format date safely
-        let createdAt = 'N/A';
-        if (knowledge.created_at) {
-            try {
-                // Assuming backend returns ISO string or similar parseable format
-                createdAt = new Date(knowledge.created_at).toLocaleString();
-            } catch (e) {
-                console.warn("Could not parse created_at date:", knowledge.created_at);
-            }
-        }
-
-        tr.innerHTML = `
-            <td class="knowledge-name">${knowledge.name}</td>
-            <td class="knowledge-description">${knowledge.description || ''}</td>
-            <td class="knowledge-categories">${knowledge.category_names ? knowledge.category_names.join(', ') : 'N/A'}</td>
-            <td class="knowledge-libraries">${knowledge.library_names ? knowledge.library_names.join(', ') : 'N/A'}</td>
-            <td class="knowledge-groups">${knowledge.group_names ? knowledge.group_names.join(', ') : 'N/A'}</td>
-            <td>${knowledge.created_by_username || 'N/A'}</td>
-            <td>${createdAt}</td>
-            <td>
-                <button class="btn btn-sm btn-outline-primary edit-btn" data-id="${knowledge.id}">
-                    <i class="fas fa-edit"></i> Edit
-                </button>
-                <button class="btn btn-sm btn-outline-danger delete-btn" data-id="${knowledge.id}">
-                    <i class="fas fa-trash"></i> Delete
-                </button>
-            </td>
-        `;
-        // Re-attach event listeners for buttons in the new row
-        tr.querySelector('.edit-btn').addEventListener('click', handleEditClick);
-        tr.querySelector('.delete-btn').addEventListener('click', handleDeleteClick);
-        return tr;
-    }
-
-    function updateTableRow(knowledge) {
-        const row = knowledgesTableBody.querySelector(`tr[data-id="${knowledge.id}"]`);
-        if (row) {
-            row.querySelector('.knowledge-name').textContent = knowledge.name;
-            row.querySelector('.knowledge-description').textContent = knowledge.description || '';
-            // Update category display (assuming a class 'knowledge-categories')
-            const categoryCell = row.querySelector('.knowledge-categories');
-            if (categoryCell) {
-                categoryCell.textContent = knowledge.category_names ? knowledge.category_names.join(', ') : 'N/A';
-            }
-            // Update library display (assuming a class 'knowledge-libraries')
-            const libraryCell = row.querySelector('.knowledge-libraries');
-            if (libraryCell) {
-                libraryCell.textContent = knowledge.library_names ? knowledge.library_names.join(', ') : 'N/A';
-            }
-            // Update group display (assuming a class 'knowledge-groups')
-            const groupCell = row.querySelector('.knowledge-groups');
-            if (groupCell) {
-                groupCell.textContent = knowledge.group_names ? knowledge.group_names.join(', ') : 'N/A';
-            }
-            // Update catalog display (assuming a class 'knowledge-catalogs' if you add it)
-            // const catalogCell = row.querySelector('.knowledge-catalogs');
-            // if (catalogCell) {
-            //     catalogCell.textContent = knowledge.catalog_names ? knowledge.catalog_names.join(', ') : 'N/A';
-            // }
-            // created_by and created_at typically don't change on edit
-        }
-    }
-
-    // --- Function to update the selected libraries display ---
-    // Moved here from admin-form-utils.js for better scope management
-    function updateSelectedLibrariesDisplay() { // Removed libraryIds parameter
-        if (!selectedLibrariesDisplay || !knowledgeLibrariesDiv) return; // Exit if elements don't exist
-
-        const libraryNames = [];
-        const checkedBoxes = knowledgeLibrariesDiv.querySelectorAll('.library-checkbox:checked');
-        console.log('[DEBUG] updateSelectedLibrariesDisplay called. Checked boxes:', checkedBoxes.length);
-
-        checkedBoxes.forEach(checkbox => {
-            // Try to find the label using for attribute if .form-check is missing
-            let label = null;
-            if (checkbox.closest('.form-check')) {
-                label = checkbox.closest('.form-check').querySelector('label');
-            }
-            if (!label) {
-                // Fallback: find label by for attribute
-                label = document.querySelector('label[for="' + checkbox.id + '"]');
-            }
-            if (label) {
-                console.log('[DEBUG] Found label for library:', label.textContent.trim());
-                libraryNames.push(label.textContent.trim());
-            } else {
-                console.warn('[DEBUG] No label found for library checkbox with id:', checkbox.id);
-            }
-        });
-            
-        if (libraryNames.length > 0) {
-                selectedLibrariesDisplay.style.display = 'block';
-                selectedLibrariesDisplay.innerHTML = '<strong>Selected:</strong> ' + libraryNames.map(name => 
-                    `<span class="badge bg-primary me-1">${name}</span>`
-                ).join('');
-            } else {
-                // This single else handles the case where libraryNames is empty (meaning no checked boxes were found or labels couldn't be retrieved)
-                selectedLibrariesDisplay.style.display = 'block';
-                selectedLibrariesDisplay.innerHTML = '<span class="text-muted">Selected: None</span>';
-            }
-        // Removed the extra 'else' block here
-    } // Correct placement for function closing brace
-
-    // --- Function to update the selected catalogs display ---
-    function updateSelectedCatalogsDisplay() {
-        if (!selectedCatalogsDisplay || !knowledgeCatalogsDiv) return;
-        const selectedNames = [];
-        knowledgeCatalogsDiv.querySelectorAll('.catalog-checkbox:checked').forEach(checkbox => {
-            let label = null;
-            if (checkbox.closest('.form-check')) {
-                label = checkbox.closest('.form-check').querySelector('label');
-            }
-            if (!label) {
-                label = document.querySelector('label[for="' + checkbox.id + '"]');
-            }
-            if (label) {
-                selectedNames.push(label.textContent.trim());
-            }
-        });
-        if (selectedNames.length > 0) {
-            selectedCatalogsDisplay.innerHTML = '<strong>Selected:</strong> ' + selectedNames.map(name =>
-                `<span class="badge bg-primary me-1">${name}</span>`
-            ).join('');
-        } else {
-            selectedCatalogsDisplay.innerHTML = `<span class="text-muted">Selected: None</span>`;
-        }
-    }
-
-
-    // --- Event Handlers ---
-    function handleAddClick() {
-        clearForm();
-        // Reset filter when adding new
         if (categoryFilterInput) {
             categoryFilterInput.value = '';
-            handleCategoryFilter(); // Also reset category filter
         }
         if (catalogFilterInput) {
             catalogFilterInput.value = '';
-            handleCatalogFilter(); // Reset catalog filter
         }
         if (libraryFilterInput) {
             libraryFilterInput.value = '';
-            handleLibraryFilter(); // Reset library filter
         }
+        if (groupFilterInput) {
+            groupFilterInput.value = '';
+        }
+
+        resetListVisibility(knowledgeCategoriesDiv, '.category-item');
+        resetListVisibility(knowledgeCatalogsDiv, '.catalog-item');
+        resetListVisibility(knowledgeLibrariesDiv, '.library-item');
+        resetListVisibility(knowledgeGroupsDiv, '.group-item');
+
+        saveKnowledgeBtn.disabled = false;
+    }
+
+    function handleAddClick() {
+        clearForm();
         knowledgeModal.show();
     }
 
-    // Modified to accept the button element directly
     async function handleEditClick(button) {
         clearForm();
-        // Reset filter when opening for edit
-        if (catalogFilterInput) {
-            catalogFilterInput.value = '';
-            handleCatalogFilter();
-        }
-        if (libraryFilterInput) {
-            libraryFilterInput.value = '';
-            handleLibraryFilter();
-        }
-        // const button = event.currentTarget; // Removed: button is now passed directly
-        currentEditId = button.getAttribute('data-id');
-        if (!currentEditId) {
-            console.error("Edit button clicked but data-id attribute is missing or empty.");
-            showFeedback("Could not get ID for editing.", "danger");
+        const knowledgeId = button.dataset.id;
+        if (!knowledgeId) {
+            showFeedback('Unable to determine knowledge ID for editing.');
             return;
         }
+        currentEditId = knowledgeId;
         knowledgeModalLabel.textContent = 'Edit Knowledge';
         saveKnowledgeBtn.textContent = 'Update Knowledge';
-
+        saveKnowledgeBtn.disabled = true;
         try {
-            saveKnowledgeBtn.disabled = true; // Disable while loading
-            const response = await fetch(`/admin/knowledges/data/${currentEditId}`);
+            const response = await fetch(`/admin/knowledges/data/${knowledgeId}`);
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({})); // Try to get error message
-                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-            const data = await response.json();
-            const knowledge = data.knowledge;
-            const selectedCatalogs = data.selected_catalogs || [];
-            const selectedCategories = data.selected_categories || []; // Get selected categories
-            const selectedLibraries = data.selected_libraries || []; // Get selected libraries
-            const selectedGroups = data.selected_groups || []; // Get selected groups
-
+            const payload = await response.json();
+            const knowledge = payload.knowledge;
+            if (!knowledge) {
+                throw new Error('Invalid knowledge data received.');
+            }
             knowledgeIdInput.value = knowledge.id;
-            knowledgeNameInput.value = knowledge.name;
-            knowledgeDescriptionInput.value = knowledge.description || '';
+            knowledgeNameInput.value = knowledge.name ?? '';
+            knowledgeDescriptionInput.value = knowledge.description ?? '';
 
-            // Check the corresponding category checkboxes
+            const selectedCategories = Array.isArray(payload.selected_categories) ? payload.selected_categories : [];
+            const selectedCatalogs = Array.isArray(payload.selected_catalogs) ? payload.selected_catalogs : [];
+            const selectedLibraries = Array.isArray(payload.selected_libraries)
+                ? payload.selected_libraries.map((value) => value.toString())
+                : [];
+            const selectedGroups = Array.isArray(payload.selected_groups)
+                ? payload.selected_groups.map((value) => value.toString())
+                : [];
+
             if (knowledgeCategoriesDiv) {
-                knowledgeCategoriesDiv.querySelectorAll('.category-checkbox').forEach(checkbox => {
-                    checkbox.checked = selectedCategories.includes(parseInt(checkbox.value));
+                knowledgeCategoriesDiv.querySelectorAll('.category-checkbox').forEach((checkbox) => {
+                    const value = parseInt(checkbox.value, 10);
+                    checkbox.checked = selectedCategories.includes(value);
                 });
+                updateSelectionDisplay(knowledgeCategoriesDiv, selectedCategoriesDisplay, '.category-checkbox');
             }
-            updateSelectedCategoriesDisplay(); // Update category display
-
-            // Check the corresponding catalog checkboxes
             if (knowledgeCatalogsDiv) {
-                knowledgeCatalogsDiv.querySelectorAll('.catalog-checkbox').forEach(checkbox => {
-                    checkbox.checked = selectedCatalogs.includes(parseInt(checkbox.value));
+                knowledgeCatalogsDiv.querySelectorAll('.catalog-checkbox').forEach((checkbox) => {
+                    const value = parseInt(checkbox.value, 10);
+                    checkbox.checked = selectedCatalogs.includes(value);
                 });
+                updateSelectionDisplay(knowledgeCatalogsDiv, selectedCatalogsDisplay, '.catalog-checkbox');
             }
-            updateSelectedCatalogsDisplay(); // Update catalog display
-
-            // Check the corresponding library checkboxes
             if (knowledgeLibrariesDiv) {
-                knowledgeLibrariesDiv.querySelectorAll('.library-checkbox').forEach(checkbox => {
-                    // Use string comparison for robustness (checkbox.value is string)
-                    checkbox.checked = selectedLibraries.map(String).includes(checkbox.value);
+                knowledgeLibrariesDiv.querySelectorAll('.library-checkbox').forEach((checkbox) => {
+                    checkbox.checked = selectedLibraries.includes(checkbox.value);
                 });
+                updateSelectionDisplay(knowledgeLibrariesDiv, selectedLibrariesDisplay, '.library-checkbox');
             }
-            updateSelectedLibrariesDisplay(); // Update library display
-
-            // Check the corresponding group checkboxes
             if (knowledgeGroupsDiv) {
-                knowledgeGroupsDiv.querySelectorAll('.group-checkbox').forEach(checkbox => {
-                    // Use string comparison for robustness (checkbox.value is string)
-                    checkbox.checked = selectedGroups.map(String).includes(checkbox.value);
+                knowledgeGroupsDiv.querySelectorAll('.group-checkbox').forEach((checkbox) => {
+                    checkbox.checked = selectedGroups.includes(checkbox.value);
                 });
-            }
-            updateSelectedGroupsDisplay(); // Update group display
-
-            // Set active tab to Libraries if any libraries are selected, else default to Categories
-            if (selectedLibraries.length > 0) {
-                sessionStorage.setItem('activeKnowledgeTab', 'libraries-tab');
-            } else if (selectedGroups.length > 0) {
-                sessionStorage.setItem('activeKnowledgeTab', 'groups-tab');
-            } else {
-                sessionStorage.setItem('activeKnowledgeTab', 'categories-tab');
+                updateSelectionDisplay(knowledgeGroupsDiv, selectedGroupsDisplay, '.group-checkbox');
             }
 
-            knowledgeModal.show(); // Show modal after populating
+            knowledgeModal.show();
         } catch (error) {
             console.error('Error fetching knowledge data:', error);
-            showFeedback(`Failed to load knowledge data for editing: ${error.message}`, 'danger');
-            currentEditId = null; // Reset edit state on error
+            showFeedback(`Failed to load knowledge: ${error.message}`);
+            currentEditId = null;
         } finally {
-             saveKnowledgeBtn.disabled = false; // Re-enable button
+            saveKnowledgeBtn.disabled = false;
         }
     }
 
-    // Modified to accept the button element directly
     async function handleDeleteClick(button) {
-        // const button = event.currentTarget; // Removed: button is now passed directly
-        const knowledgeId = button.getAttribute('data-id');
+        const knowledgeId = button.dataset.id;
+        const knowledgeName = button.dataset.name || 'selected knowledge';
         if (!knowledgeId) {
-             console.error("Delete button clicked but data-id attribute is missing or empty.");
-             showFeedback("Could not get ID for deletion.", "danger");
-             return;
+            return;
         }
-        const row = button.closest('tr');
-        const knowledgeName = row ? row.querySelector('.knowledge-name').textContent : `ID ${knowledgeId}`; // Fallback name
-
-        if (confirm(`Are you sure you want to delete the knowledge "${knowledgeName}" (ID: ${knowledgeId})?`)) {
-            // Disable button to prevent double clicks
-            button.disabled = true;
-            try {
-                const headers = {
-                    'Content-Type': 'application/json' // Optional for delete, but good practice
-                };
-                if (csrfToken) {
-                    headers['X-CSRFToken'] = csrfToken;
-                }
-
-                const response = await fetch(`/admin/knowledges/delete/${knowledgeId}`, {
-                    method: 'POST', // Or 'DELETE', ensure backend handles it
-                    headers: headers,
-                    credentials: 'same-origin'
-                });
-                const result = await response.json();
-
-                if (response.ok && result.status === 'success') {
+        if (!confirm(`Are you sure you want to delete "${knowledgeName}"?`)) {
+            return;
+        }
+        try {
+            const response = await fetch(`/admin/knowledges/delete/${knowledgeId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
+                },
+            });
+            const result = await response.json();
+            if (response.ok && result.status === 'success') {
+                const row = knowledgesTableBody.querySelector(`tr[data-id="${knowledgeId}"]`);
+                if (row) {
                     row.remove();
-                    showFeedback(result.message || 'Knowledge deleted successfully.');
-                     // Check if table is empty after deletion
-                    if (knowledgesTableBody && knowledgesTableBody.rows.length === 0) {
-                        knowledgesTableBody.innerHTML = '<tr><td colspan="7" class="text-center">No knowledge entries found.</td></tr>';
-                    }
-                } else {
-                    throw new Error(result.message || 'Failed to delete knowledge.');
                 }
-            } catch (error) {
-                console.error('Error deleting knowledge:', error);
-                showFeedback(`Error: ${error.message}`, 'danger');
-                 button.disabled = false; // Re-enable button on error
+                ensurePlaceholderRow();
+                refreshRowNumbers();
+            } else {
+                throw new Error(result.message || 'Failed to delete knowledge.');
             }
-            // No finally block needed here as button is removed on success
+        } catch (error) {
+            console.error('Error deleting knowledge:', error);
+            showFeedback(`Error: ${error.message}`);
         }
     }
 
@@ -469,388 +491,189 @@ document.addEventListener('DOMContentLoaded', function () {
         const knowledgeData = {
             name: knowledgeNameInput.value.trim(),
             description: knowledgeDescriptionInput.value.trim(),
-            category_ids: getSelectedCategoryIds(), // Get list of category IDs
-            catalog_ids: getSelectedCatalogIds(),
-            library_ids: Array.from(document.querySelectorAll('.library-checkbox:checked')).map(cb => cb.value),
-            group_ids: Array.from(document.querySelectorAll('.group-checkbox:checked')).map(cb => cb.value)
+            category_ids: getCheckedValues(knowledgeCategoriesDiv, '.category-checkbox'),
+            catalog_ids: getCheckedValues(knowledgeCatalogsDiv, '.catalog-checkbox'),
+            library_ids: getCheckedValues(knowledgeLibrariesDiv, '.library-checkbox'),
+            group_ids: getCheckedValues(knowledgeGroupsDiv, '.group-checkbox'),
         };
-        console.log('DEBUG: Form submit, selected library_ids:', knowledgeData.library_ids);
-        console.log('DEBUG: Form submit, selected group_ids:', knowledgeData.group_ids);
 
         if (!knowledgeData.name) {
             showFormError('Knowledge name is required.');
             return;
         }
 
-        const url = currentEditId ? `/admin/knowledges/edit/${currentEditId}` : '/admin/knowledges/add';
-        const method = 'POST';
+        const url = currentEditId
+            ? `/admin/knowledges/edit/${currentEditId}`
+            : '/admin/knowledges/add';
 
+        saveKnowledgeBtn.disabled = true;
         try {
-            saveKnowledgeBtn.disabled = true; // Prevent double submission
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            if (csrfToken) {
-                headers['X-CSRFToken'] = csrfToken;
-                headers['X-CSRF-Token'] = csrfToken;
-            }
-
             const response = await fetch(url, {
-                method: method,
-                headers: headers,
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
+                },
                 body: JSON.stringify(knowledgeData),
-                credentials: 'same-origin',
             });
 
-            const result = await response.json();
+            let result;
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                result = await response.json();
+            } else {
+                const text = await response.text();
+                try {
+                    result = JSON.parse(text);
+                } catch (parseError) {
+                    showFormError('Unexpected server response. Please refresh and retry.');
+                    return;
+                }
+            }
 
             if (response.ok && result.status === 'success') {
-                console.log('DEBUG: server returned library_ids:', result.sent_library_ids);
-                console.log('DEBUG: server returned group_ids:', result.sent_group_ids);
-                knowledgeModal.hide(); // Hide modal first
-                // showFeedback(result.message || `Knowledge ${currentEditId ? 'updated' : 'added'} successfully.`);
-
-                // Update table
-                const returnedKnowledge = result.knowledge; // Backend should return the added/updated item
+                knowledgeModal.hide();
+                showFeedback(result.message || `Knowledge ${currentEditId ? 'updated' : 'added'} successfully.`);
+                const returnedKnowledge = result.knowledge;
                 if (returnedKnowledge) {
                     if (currentEditId) {
                         updateTableRow(returnedKnowledge);
                     } else {
-                         // Remove "No knowledge entries found" row if it exists
-                        const noDataRow = knowledgesTableBody ? knowledgesTableBody.querySelector('td[colspan="7"]') : null;
-                        if (noDataRow) noDataRow.parentElement.remove();
-                        // Add new row
+                        removePlaceholderRow();
                         const newRow = createTableRow(returnedKnowledge);
-                        if (knowledgesTableBody) {
-                            knowledgesTableBody.appendChild(newRow);
-                        } else {
-                             console.error("Table body not found for adding new row.");
-                        }
+                        knowledgesTableBody.appendChild(newRow);
                     }
+                    refreshRowNumbers();
+                    clearForm();
                 } else {
-                    // Fallback: Reload if backend doesn't return data (less ideal)
-                    console.warn("Backend did not return knowledge data, reloading page.");
                     window.location.reload();
                 }
-
             } else {
-                 // Use error message from backend if available
-                throw new Error(result.message || `Failed to ${currentEditId ? 'update' : 'add'} knowledge. Status: ${response.status}`);
+                throw new Error(result.message || `Failed to ${currentEditId ? 'update' : 'add'} knowledge.`);
             }
         } catch (error) {
             console.error('Error saving knowledge:', error);
             showFormError(`Error: ${error.message}`);
         } finally {
-             saveKnowledgeBtn.disabled = false; // Re-enable button after request finishes
+            saveKnowledgeBtn.disabled = false;
         }
     }
 
-    // --- Attach Initial Event Listeners ---
     if (addKnowledgeBtn) {
         addKnowledgeBtn.addEventListener('click', handleAddClick);
-    } else {
-        console.warn("Add Knowledge button not found.");
     }
 
-    if (knowledgeForm) {
-        knowledgeForm.addEventListener('submit', handleFormSubmit);
-    } else {
-         console.error("Knowledge form not found.");
-    }
+    knowledgeForm.addEventListener('submit', handleFormSubmit);
 
-    // Debug: Check if jQuery and table/buttons are present
-    console.log('[DEBUG] DOMContentLoaded: jQuery present?', !!window.jQuery);
-    const $table = $('#knowledgesTable');
-
-    // Use jQuery event delegation for edit/delete buttons (DataTables compatible)
-    if (window.jQuery) {
-        $('#knowledgesTable').on('click', '.edit-btn', function (event) {
-            handleEditClick(this);
-        });
-        $('#knowledgesTable').on('click', '.delete-btn', function (event) {
-            handleDeleteClick(this);
-        });
-    } else {
-        // Fallback: native event delegation (should not be needed with DataTables)
-        const knowledgesTable = document.getElementById('knowledgesTable');
-        if (knowledgesTable) {
-            knowledgesTable.addEventListener('click', function(event) {
-                const editButton = event.target.closest('.edit-btn');
-                const deleteButton = event.target.closest('.delete-btn');
-
-                if (editButton) {
-                    handleEditClick(editButton); // Pass the specific button element
-                } else if (deleteButton) {
-                    handleDeleteClick(deleteButton); // Pass the specific button element
-                }
-            });
-        } else {
-            console.error("Knowledges table not found for event delegation.");
+    knowledgesTable.addEventListener('click', (event) => {
+        const editButton = event.target.closest('.edit-btn');
+        if (editButton) {
+            handleEditClick(editButton);
+            return;
         }
-    }
-
-
-    // Clear form when modal is hidden
-    knowledgeModalElement.addEventListener('hidden.bs.modal', clearForm);
-
-    // --- Catalog Filter Logic ---
-    function handleCatalogFilter() {
-        const filterValue = catalogFilterInput.value.toLowerCase().trim();
-        const catalogCheckboxes = knowledgeCatalogsDiv.querySelectorAll('.form-check');
-
-        catalogCheckboxes.forEach(div => {
-            const label = div.querySelector('label');
-            const labelText = label ? label.textContent.toLowerCase() : '';
-            if (labelText.includes(filterValue)) {
-                div.style.display = ''; // Show if matches
-            } else {
-                div.style.display = 'none'; // Hide if doesn't match
-            }
-        });
-    }
-
-    // Attach filter listener
-    if (catalogFilterInput) {
-        catalogFilterInput.addEventListener('input', handleCatalogFilter);
-    } else {
-        console.warn("Catalog filter input not found.");
-    }
-
-    // Also clear filter and update display when modal is hidden
-    knowledgeModalElement.addEventListener('hidden.bs.modal', () => {
-        clearForm(); // This now also calls updateSelectedCatalogsDisplay
-        if (categoryFilterInput) {
-            categoryFilterInput.value = ''; // Clear category filter
-            handleCategoryFilter(); // Reset category filter display
-        }
-        if (catalogFilterInput) {
-            catalogFilterInput.value = ''; // Clear catalog filter
-            handleCatalogFilter(); // Reset catalog filter display
-        }
-        if (libraryFilterInput) {
-            libraryFilterInput.value = ''; // Clear library filter
-            handleLibraryFilter(); // Reset library filter display
+        const deleteButton = event.target.closest('.delete-btn');
+        if (deleteButton) {
+            handleDeleteClick(deleteButton);
         }
     });
 
-    // Add event listener to the container holding the checkboxes
-    if (knowledgeCatalogsDiv) {
-        knowledgeCatalogsDiv.addEventListener('change', function(event) {
-            // Check if the changed element is one of our catalog checkboxes
-            if (event.target.classList.contains('catalog-checkbox')) {
-                updateSelectedCatalogsDisplay();
-            }
-        });
-    } else {
-        console.warn("Catalog checkboxes container not found.");
-    }
+    knowledgeModalElement.addEventListener('hidden.bs.modal', clearForm);
 
-    // Add event listener to the container holding the library checkboxes
-    // Moved back here from admin-form-utils.js
-    if (knowledgeLibrariesDiv) {
-        // Fallback: Attach event listener to the document for event delegation
-        document.addEventListener('change', function(event) {
-            if (
-                event.target.classList &&
-                event.target.classList.contains('library-checkbox')
-            ) {
-                setTimeout(() => {
-                    updateSelectedLibrariesDisplay();
-                }, 0);
-            }
-        });
-    } else {
-    }
-
-    // --- Library Filter Logic ---
-    function handleLibraryFilter() {
-        if (!libraryFilterInput || !knowledgeLibrariesDiv) return;
-        const filterValue = libraryFilterInput.value.toLowerCase().trim();
-        const libraryItems = knowledgeLibrariesDiv.querySelectorAll('.library-item');
-        libraryItems.forEach(item => {
-            const label = item.querySelector('label');
-            if (!label) return;
-            const text = label.textContent.toLowerCase();
-            if (text.includes(filterValue)) {
-                item.style.display = '';
-            } else {
-                item.style.display = 'none';
-            }
+    if (catalogFilterInput) {
+        catalogFilterInput.addEventListener('input', () => {
+            filterList(knowledgeCatalogsDiv, '.catalog-item', catalogFilterInput.value.trim());
         });
     }
-
-    // --- Category Filter Logic ---
-    function handleCategoryFilter() {
-        if (!categoryFilterInput || !knowledgeCategoriesDiv) return; // Exit if elements don't exist
-        const filterValue = categoryFilterInput.value.toLowerCase().trim();
-        const categoryCheckboxes = knowledgeCategoriesDiv.querySelectorAll('.form-check');
-
-        categoryCheckboxes.forEach(div => {
-            const label = div.querySelector('label');
-            const labelText = label ? label.textContent.toLowerCase() : '';
-            if (labelText.includes(filterValue)) {
-                div.style.display = ''; // Show if matches
-            } else {
-                div.style.display = 'none'; // Hide if doesn't match
-            }
+    if (libraryFilterInput) {
+        libraryFilterInput.addEventListener('input', () => {
+            filterList(knowledgeLibrariesDiv, '.library-item', libraryFilterInput.value.trim());
         });
     }
-
-    // Attach category filter listener
     if (categoryFilterInput) {
-        categoryFilterInput.addEventListener('input', handleCategoryFilter);
-    } else {
-        console.warn("Category filter input not found.");
-    }
-
-    // --- Function to update the selected categories display ---
-    function updateSelectedCategoriesDisplay() {
-        if (!selectedCategoriesDisplay || !knowledgeCategoriesDiv) return;
-        const selectedNames = [];
-        knowledgeCategoriesDiv.querySelectorAll('.category-checkbox:checked').forEach(checkbox => {
-            let label = null;
-            if (checkbox.closest('.form-check')) {
-                label = checkbox.closest('.form-check').querySelector('label');
-            }
-            if (!label) {
-                label = document.querySelector('label[for="' + checkbox.id + '"]');
-            }
-            if (label) {
-                selectedNames.push(label.textContent.trim());
-            }
-        });
-        if (selectedNames.length > 0) {
-            selectedCategoriesDisplay.innerHTML = '<strong>Selected:</strong> ' + selectedNames.map(name =>
-                `<span class="badge bg-primary me-1">${name}</span>`
-            ).join('');
-        } else {
-            selectedCategoriesDisplay.innerHTML = `<span class="text-muted">Selected: None</span>`;
-        }
-    }
-
-    // Add event listener to the container holding the category checkboxes
-    if (knowledgeCategoriesDiv) {
-        knowledgeCategoriesDiv.addEventListener('change', function(event) {
-            // Check if the changed element is one of our category checkboxes
-            if (event.target.classList.contains('category-checkbox')) {
-                updateSelectedCategoriesDisplay();
-            }
-        });
-    } else {
-        console.warn("Catalog checkboxes container not found.");
-    }
-
-    // --- Group Filter Logic ---
-    function handleGroupFilter() {
-        if (!groupFilterInput || !knowledgeGroupsDiv) return;
-        const filterValue = groupFilterInput.value.toLowerCase().trim();
-        const groupItems = knowledgeGroupsDiv.querySelectorAll('.group-item');
-        groupItems.forEach(div => {
-            const label = div.querySelector('label');
-            const labelText = label ? label.textContent.toLowerCase() : '';
-            if (labelText.includes(filterValue)) {
-                div.style.display = '';
-            } else {
-                div.style.display = 'none';
-            }
+        categoryFilterInput.addEventListener('input', () => {
+            filterList(knowledgeCategoriesDiv, '.category-item', categoryFilterInput.value.trim());
         });
     }
-
-    // Attach group filter listener
     if (groupFilterInput) {
-        groupFilterInput.addEventListener('input', handleGroupFilter);
+        groupFilterInput.addEventListener('input', () => {
+            filterList(knowledgeGroupsDiv, '.group-item', groupFilterInput.value.trim());
+        });
     }
 
-    // Add event listener to the container holding the group checkboxes
+    if (knowledgeCatalogsDiv) {
+        knowledgeCatalogsDiv.addEventListener('change', (event) => {
+            if (event.target.classList.contains('catalog-checkbox')) {
+                updateSelectionDisplay(knowledgeCatalogsDiv, selectedCatalogsDisplay, '.catalog-checkbox');
+            }
+        });
+    }
+    if (knowledgeLibrariesDiv) {
+        knowledgeLibrariesDiv.addEventListener('change', (event) => {
+            if (event.target.classList.contains('library-checkbox')) {
+                updateSelectionDisplay(knowledgeLibrariesDiv, selectedLibrariesDisplay, '.library-checkbox');
+            }
+        });
+    }
+    if (knowledgeCategoriesDiv) {
+        knowledgeCategoriesDiv.addEventListener('change', (event) => {
+            if (event.target.classList.contains('category-checkbox')) {
+                updateSelectionDisplay(knowledgeCategoriesDiv, selectedCategoriesDisplay, '.category-checkbox');
+            }
+        });
+    }
     if (knowledgeGroupsDiv) {
-        knowledgeGroupsDiv.addEventListener('change', function(event) {
+        knowledgeGroupsDiv.addEventListener('change', (event) => {
             if (event.target.classList.contains('group-checkbox')) {
-                updateSelectedGroupsDisplay();
+                updateSelectionDisplay(knowledgeGroupsDiv, selectedGroupsDisplay, '.group-checkbox');
             }
         });
     }
 
-    // --- AI Description Generation ---
-    async function handleGenerateDescription() {
-        const nameValue = knowledgeNameInput.value.trim();
-        if (!nameValue) {
-            showFormError('Please enter a name first to generate a description.');
-            return;
-        }
-        hideFormError(); // Clear previous errors
-
-        const button = generateDescBtn; // Already scoped
-        if (!button) {
-            console.error("Generate Description button not found in Knowledge modal.");
-            return;
-        }
-        const spinner = button.querySelector('.spinner-border');
-
-        // Show loading state
-        button.disabled = true;
-        spinner.classList.remove('d-none');
-
-        try {
-            // Get selected catalog names
-            const selectedCatalogNames = [];
-            knowledgeCatalogsDiv.querySelectorAll('.catalog-checkbox:checked').forEach(checkbox => {
-                let label = null;
-                if (checkbox.closest('.form-check')) {
-                    label = checkbox.closest('.form-check').querySelector('label');
-                }
-                if (!label) {
-                    label = document.querySelector('label[for="' + checkbox.id + '"]');
-                }
-                if (label) {
-                    selectedCatalogNames.push(label.textContent.trim());
-                }
-            });
-
-            const payload = {
-                context_text: nameValue,
-                item_type: "knowledge base item", // Specific to this page
-                deployment_name: "gpt-4o-mini", // Updated deployment name
-                catalog_names: selectedCatalogNames // Add selected catalog names
-                // No language needed in payload, backend handles it
-            };
-
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            if (csrfToken) {
-                headers['X-CSRFToken'] = csrfToken;
-            }
-
-            const response = await fetch('/admin/generate-description', {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(payload)
-            });
-
-            const result = await response.json();
-            if (response.ok && result.status === 'success') {
-                knowledgeDescriptionInput.value = result.description; // Update the textarea
-                // showFeedback('Description generated successfully!', 'success'); // Removed confirmation alert
-            } else {
-                throw new Error(result.message || `Failed to generate description. Status: ${response.status}`);
-            }
-
-        } catch (error) {
-            console.error('Error in Knowledge handleGenerateDescription:', error);
-            showFormError(`Error generating description: ${error.message}`);
-        } finally {
-            // Hide loading state
-            button.disabled = false;
-            spinner.classList.add('d-none');
-        }
-    }
-
-    // Attach listener directly to the button (scoped)
     if (generateDescBtn) {
-        generateDescBtn.addEventListener('click', handleGenerateDescription);
-    } else {
-        console.warn("Generate Description button not found.");
+        generateDescBtn.addEventListener('click', async () => {
+            const name = knowledgeNameInput.value.trim();
+            if (!name) {
+                showFormError('Please enter a knowledge name before generating a description.');
+                return;
+            }
+            hideFormError();
+            const spinner = generateDescBtn.querySelector('.spinner-border');
+            generateDescBtn.disabled = true;
+            if (spinner) {
+                spinner.classList.remove('d-none');
+            }
+            try {
+                const catalogNames = collectSelectedNames(knowledgeCatalogsDiv, '.catalog-checkbox');
+                const response = await fetch('/admin/generate-description', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
+                    },
+                    body: JSON.stringify({
+                        context_text: name,
+                        item_type: 'knowledge base item',
+                        deployment_name: 'gpt-4o-mini',
+                        catalog_names: catalogNames,
+                    }),
+                });
+                const result = await response.json();
+                if (response.ok && result.status === 'success' && result.description) {
+                    knowledgeDescriptionInput.value = result.description;
+                } else {
+                    throw new Error(result.message || 'Failed to generate description.');
+                }
+            } catch (error) {
+                console.error('Error generating knowledge description:', error);
+                showFormError(`Error generating description: ${error.message}`);
+            } finally {
+                generateDescBtn.disabled = false;
+                if (spinner) {
+                    spinner.classList.add('d-none');
+                }
+            }
+        });
     }
 
-
+    refreshRowNumbers();
 });

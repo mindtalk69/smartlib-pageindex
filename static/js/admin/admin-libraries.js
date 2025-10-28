@@ -1,223 +1,424 @@
-document.addEventListener('DOMContentLoaded', function () {
-    // Get CSRF token from meta tag
-    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    const libraryModalElement = document.getElementById('libraryModal'); // Get modal element
+document.addEventListener('DOMContentLoaded', () => {
+    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : null;
+    const libraryModalElement = document.getElementById('libraryModal');
+
     if (!libraryModalElement) {
-        console.error("Library modal element not found!");
+        console.error('Library modal element not found!');
         return;
     }
+
     const libraryModal = new bootstrap.Modal(libraryModalElement);
     const libraryForm = document.getElementById('libraryForm');
     const modalTitle = document.getElementById('libraryModalLabel');
     const libraryIdInput = document.getElementById('library_id');
     const libraryNameInput = document.getElementById('libraryName');
-    const libraryDescriptionInput = document.getElementById('libraryDescription'); // Already exists
-    // Select the button globally (to match working pattern in catalogs)
+    const libraryDescriptionInput = document.getElementById('libraryDescription');
     const generateDescBtn = document.getElementById('generateDescBtn');
-    // const knowledgeIdInput = document.getElementById('libraryKnowledge'); // Not used since knowledge input removed
-
-    // Removed all references to knowledgeIdInput since knowledge input element is not used
     const saveLibraryBtn = document.getElementById('saveLibraryBtn');
+    const addLibraryBtn = document.getElementById('addLibraryBtn');
     const modalAlertPlaceholder = document.getElementById('modalAlertPlaceholder');
-    const librariesTableBody = document.querySelector('#librariesTable tbody');
+    const librariesTable = document.getElementById('librariesTable');
+    const librariesTableBody = librariesTable ? librariesTable.querySelector('tbody') : null;
 
-    // --- DataTables Initialization Removed ---
-    // Using basic HTML table instead to prevent initialization errors
-    // All CRUD operations remain functional
+    if (!libraryForm || !librariesTable || !librariesTableBody) {
+        console.error('Library form or table elements missing.');
+        return;
+    }
 
-    // --- Helper Functions ---
-    function showAlert(message, type = 'danger', container = modalAlertPlaceholder) {
-        const wrapper = document.createElement('div');
-        wrapper.innerHTML = [
-            `<div class="alert alert-${type} alert-dismissible" role="alert">`,
-            `   <div>${message}</div>`,
-            '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
-            '</div>'
-        ].join('');
-        container.innerHTML = ''; // Clear previous alerts
-        container.append(wrapper);
+    let currentEditId = null;
+
+    function truncateText(text, maxLength = 80) {
+        if (!text) {
+            return '';
+        }
+        if (text.length <= maxLength) {
+            return text;
+        }
+        return `${text.slice(0, maxLength)}...`;
+    }
+
+    function formatDate(value) {
+        if (!value) {
+            return 'N/A';
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return typeof value === 'string' ? value : 'N/A';
+        }
+        return date.toLocaleString();
+    }
+
+    function normalizeLibrary(raw) {
+        if (!raw || typeof raw !== 'object') {
+            return null;
+        }
+        const id = raw.library_id ?? raw.libraryId ?? raw.id ?? null;
+        const knowledgeNamesSource = raw.knowledge_names ?? raw.knowledgeNames ?? raw.knowledges ?? [];
+        const knowledgeNames = Array.isArray(knowledgeNamesSource)
+            ? knowledgeNamesSource
+                  .map((entry) => {
+                      if (typeof entry === 'string') {
+                          return entry;
+                      }
+                      if (entry && typeof entry === 'object' && 'name' in entry) {
+                          return entry.name;
+                      }
+                      return null;
+                  })
+                  .filter(Boolean)
+            : [];
+
+        return {
+            id,
+            name: raw.name ?? '',
+            description: raw.description ?? '',
+            knowledgeNames,
+            createdBy: raw.created_by_username ?? raw.created_by ?? raw.createdBy ?? 'N/A',
+            createdAt: raw.created_at ?? raw.createdAt ?? null,
+        };
+    }
+
+    function renderKnowledgeBadges(names) {
+        if (!names || names.length === 0) {
+            return '<span class="text-muted">None</span>';
+        }
+        return names
+            .map(
+                (name) =>
+                    `<span class="badge rounded-pill bg-info text-dark me-1">${name}</span>`,
+            )
+            .join('');
+    }
+
+    function createTableRow(library) {
+        const normalized = normalizeLibrary(library);
+        if (!normalized || !normalized.id) {
+            return document.createElement('tr');
+        }
+
+        const tr = document.createElement('tr');
+        tr.dataset.id = normalized.id;
+        tr.id = `libraryRow-${normalized.id}`;
+
+        const numberCell = document.createElement('td');
+        numberCell.classList.add('row-number');
+        tr.appendChild(numberCell);
+
+        const nameCell = document.createElement('td');
+        nameCell.classList.add('library-name');
+        nameCell.textContent = normalized.name;
+        tr.appendChild(nameCell);
+
+        const descriptionCell = document.createElement('td');
+        descriptionCell.classList.add('library-description');
+        descriptionCell.title = normalized.description;
+        descriptionCell.textContent = truncateText(normalized.description);
+        tr.appendChild(descriptionCell);
+
+        const knowledgeCell = document.createElement('td');
+        knowledgeCell.classList.add('library-knowledges');
+        knowledgeCell.innerHTML = renderKnowledgeBadges(normalized.knowledgeNames);
+        tr.appendChild(knowledgeCell);
+
+        const createdByCell = document.createElement('td');
+        createdByCell.classList.add('library-created-by');
+        createdByCell.textContent = normalized.createdBy || 'N/A';
+        tr.appendChild(createdByCell);
+
+        const createdAtCell = document.createElement('td');
+        createdAtCell.classList.add('library-created-at');
+        createdAtCell.textContent = formatDate(normalized.createdAt);
+        tr.appendChild(createdAtCell);
+
+        const actionsCell = document.createElement('td');
+        const actionWrapper = document.createElement('div');
+        actionWrapper.classList.add('action-buttons');
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn btn-sm btn-warning edit-btn';
+        editBtn.dataset.id = normalized.id;
+        editBtn.title = 'Edit Library';
+        editBtn.innerHTML = '<i class="bi bi-pencil-fill"></i>';
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn btn-sm btn-danger delete-btn';
+        deleteBtn.dataset.id = normalized.id;
+        deleteBtn.dataset.name = normalized.name;
+        deleteBtn.title = 'Delete Library';
+        deleteBtn.innerHTML = '<i class="bi bi-trash-fill"></i>';
+
+        actionWrapper.appendChild(editBtn);
+        actionWrapper.appendChild(deleteBtn);
+        actionsCell.appendChild(actionWrapper);
+        tr.appendChild(actionsCell);
+
+        return tr;
+    }
+
+    function updateTableRow(library) {
+        const normalized = normalizeLibrary(library);
+        if (!normalized || !normalized.id) {
+            return;
+        }
+        const row = librariesTableBody.querySelector(`tr[data-id="${normalized.id}"]`);
+        if (!row) {
+            return;
+        }
+        const nameCell = row.querySelector('.library-name');
+        if (nameCell) {
+            nameCell.textContent = normalized.name;
+        }
+        const descriptionCell = row.querySelector('.library-description');
+        if (descriptionCell) {
+            descriptionCell.title = normalized.description;
+            descriptionCell.textContent = truncateText(normalized.description);
+        }
+        const knowledgeCell = row.querySelector('.library-knowledges');
+        if (knowledgeCell) {
+            knowledgeCell.innerHTML = renderKnowledgeBadges(normalized.knowledgeNames);
+        }
+        const createdByCell = row.querySelector('.library-created-by');
+        if (createdByCell) {
+            createdByCell.textContent = normalized.createdBy || 'N/A';
+        }
+        const createdAtCell = row.querySelector('.library-created-at');
+        if (createdAtCell) {
+            createdAtCell.textContent = formatDate(normalized.createdAt);
+        }
+    }
+
+    function refreshRowNumbers() {
+        const rows = librariesTableBody.querySelectorAll('tr[data-id]');
+        rows.forEach((row, index) => {
+            const numberCell = row.querySelector('.row-number') || row.firstElementChild;
+            if (numberCell) {
+                numberCell.textContent = index + 1;
+            }
+        });
     }
 
     function clearModalForm() {
         libraryForm.reset();
+        libraryForm.classList.remove('was-validated');
+        modalAlertPlaceholder.innerHTML = '';
+        currentEditId = null;
         libraryIdInput.value = '';
         modalTitle.textContent = 'Add Library';
-        modalAlertPlaceholder.innerHTML = ''; // Clear alerts
-        // Reset validation states if Bootstrap validation was used
-        libraryForm.classList.remove('was-validated');
+        saveLibraryBtn.textContent = 'Save';
     }
 
-    // --- Event Listeners ---
-
-    // 1. Open Modal for Adding
-    document.getElementById('addLibraryBtn').addEventListener('click', () => {
-        clearModalForm();
-    });
-
-    // 2. Open Modal for Editing
-    $(document).on('click', '#librariesTable .edit-btn', async function () {
-        clearModalForm();
-        const libraryId = $(this).data('id');
-        modalTitle.textContent = 'Edit Library';
-        if (libraryIdInput) {
-            libraryIdInput.value = libraryId;
-            console.log('Edit modal opened, libraryIdInput.value set to:', libraryIdInput.value);
-        } else {
-            console.error('libraryIdInput not found in edit modal!');
+    function showAlert(message, type = 'danger') {
+        if (!modalAlertPlaceholder) {
+            alert(message);
+            return;
         }
-        saveLibraryBtn.disabled = true;
+        modalAlertPlaceholder.innerHTML = [
+            `<div class="alert alert-${type} alert-dismissible" role="alert">`,
+            `  <div>${message}</div>`,
+            '  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
+            '</div>',
+        ].join('');
+    }
+
+    function handleAddClick() {
+        clearModalForm();
+        libraryModal.show();
+    }
+
+    async function handleEditClick(button) {
+        clearModalForm();
+        const libraryId = button.dataset.id;
+        if (!libraryId) {
+            console.error('Library ID missing on edit button.');
+            showAlert('Unable to load library for editing.');
+            return;
+        }
+        currentEditId = libraryId;
+        modalTitle.textContent = 'Edit Library';
+        saveLibraryBtn.textContent = 'Update';
         try {
             const response = await fetch(`/admin/libraries/data/${libraryId}`);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             const data = await response.json();
-            if (libraryNameInput) {
-                libraryNameInput.value = data.name || '';
-            } else {
-                console.error('libraryNameInput not found!');
+            const normalized = normalizeLibrary(data);
+            if (!normalized) {
+                throw new Error('Invalid library payload received.');
             }
-            if (libraryDescriptionInput) {
-                libraryDescriptionInput.value = data.description || '';
-            } else {
-                console.error('libraryDescriptionInput not found!');
-            }
-            // All references to knowledgeIdInput removed
+            libraryIdInput.value = normalized.id;
+            libraryNameInput.value = normalized.name;
+            libraryDescriptionInput.value = normalized.description;
+            libraryModal.show();
         } catch (error) {
             console.error('Error fetching library data:', error);
-            showAlert(`Error loading library data: ${error.message}`, 'danger');
-        } finally {
-            saveLibraryBtn.disabled = false;
-            libraryModal.show();
+            showAlert(`Error loading library: ${error.message}`);
+            currentEditId = null;
         }
-    });
+    }
 
+    function ensurePlaceholderRow() {
+        if (librariesTableBody.querySelector('tr[data-id]')) {
+            return;
+        }
+        librariesTableBody.innerHTML =
+            '<tr><td colspan="7" class="text-center">No libraries found.</td></tr>';
+    }
 
-    // 3. Handle Form Submission (Add/Edit)
-    libraryForm.addEventListener('submit', async (event) => {
+    async function handleDeleteClick(button) {
+        const libraryId = button.dataset.id;
+        const libraryName = button.dataset.name || 'selected library';
+        if (!libraryId) {
+            return;
+        }
+        if (!confirm(`Are you sure you want to delete "${libraryName}"?`)) {
+            return;
+        }
+        try {
+            const response = await fetch(`/admin/libraries/delete/${libraryId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
+                },
+            });
+            const result = await response.json();
+            if (response.ok && result.status === 'success') {
+                const row = librariesTableBody.querySelector(`tr[data-id="${libraryId}"]`);
+                if (row) {
+                    row.remove();
+                }
+                ensurePlaceholderRow();
+                refreshRowNumbers();
+            } else {
+                throw new Error(result.message || 'Failed to delete library.');
+            }
+        } catch (error) {
+            console.error('Error deleting library:', error);
+            alert(`Error deleting library: ${error.message}`);
+        }
+    }
+
+    async function handleFormSubmit(event) {
         event.preventDefault();
         event.stopPropagation();
 
-        // Basic validation (Bootstrap validation can enhance this)
         if (!libraryForm.checkValidity()) {
             libraryForm.classList.add('was-validated');
             return;
         }
 
-        const libraryId = libraryIdInput.value;
-        // Debug: log the libraryId value
-        console.log('Form submit handler triggered with libraryId:', libraryId);
-
-        // Only treat as edit mode if libraryId is a non-empty string and a valid integer > 0
-        const isEditMode = libraryId && !isNaN(libraryId) && Number(libraryId) > 0;
-        const url = isEditMode ? `/admin/libraries/edit/${libraryId}` : '/admin/libraries/add';
-        const method = 'POST'; // Using POST for both add and edit
-
-        if (!libraryNameInput) {
-            console.error('libraryNameInput is null in form submit handler!');
-            showAlert('Library name input not found. Please check the form markup.', 'danger');
-            saveLibraryBtn.disabled = false;
-            return;
-        }
-        if (!libraryDescriptionInput) {
-            console.error('libraryDescriptionInput is null in form submit handler!');
-            showAlert('Library description input not found. Please check the form markup.', 'danger');
-            saveLibraryBtn.disabled = false;
-            return;
-        }
-        const formData = {
+        const payload = {
             name: libraryNameInput.value.trim(),
-            description: libraryDescriptionInput.value.trim()
-            // knowledge_id removed since knowledge input element is not used
-            // knowledge_id: knowledgeIdInput ? knowledgeIdInput.value.trim() || null : null
+            description: libraryDescriptionInput.value.trim(),
         };
 
+        if (!payload.name) {
+            showAlert('Library name is required.');
+            return;
+        }
+
+        const url = currentEditId
+            ? `/admin/libraries/edit/${currentEditId}`
+            : '/admin/libraries/add';
+
         saveLibraryBtn.disabled = true;
-        modalAlertPlaceholder.innerHTML = ''; // Clear previous alerts
+        modalAlertPlaceholder.innerHTML = '';
 
         try {
             const response = await fetch(url, {
-                method: method,
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken // Add CSRF token header
+                    ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload),
             });
 
-            const result = await response.json();
+            let result;
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                result = await response.json();
+            } else {
+                const text = await response.text();
+                try {
+                    result = JSON.parse(text);
+                } catch (parseError) {
+                    showAlert('Unexpected server response. Please refresh and try again.');
+                    return;
+                }
+            }
 
             if (response.ok && result.status === 'success') {
                 libraryModal.hide();
-                // Simple page reload to show changes. Dynamic update is more complex.
-                location.reload();
-                // Optionally show flash message (requires backend setup for flash messages via JS)
-                // showGlobalAlert(result.message, 'success');
+                alert(
+                    result.message ||
+                        `Library ${currentEditId ? 'updated' : 'added'} successfully.`,
+                );
+                const returnedLibrary = result.library;
+                if (returnedLibrary) {
+                    if (currentEditId) {
+                        updateTableRow(returnedLibrary);
+                    } else {
+                        const placeholderRow = librariesTableBody.querySelector('td[colspan="7"]');
+                        if (placeholderRow) {
+                            placeholderRow.parentElement.remove();
+                        }
+                        const newRow = createTableRow(returnedLibrary);
+                        librariesTableBody.appendChild(newRow);
+                    }
+                    refreshRowNumbers();
+                    clearModalForm();
+                } else {
+                    window.location.reload();
+                }
             } else {
-                showAlert(result.message || 'An unknown error occurred.', 'danger');
+                throw new Error(
+                    result.message ||
+                        `Failed to ${currentEditId ? 'update' : 'add'} library.`,
+                );
             }
         } catch (error) {
             console.error('Error saving library:', error);
-            showAlert(`An error occurred: ${error.message}`, 'danger');
+            showAlert(`Error: ${error.message}`);
         } finally {
             saveLibraryBtn.disabled = false;
         }
-    });
+    }
 
-    // 4. Handle Delete Button Click (using event delegation)
-    librariesTableBody.addEventListener('click', async (event) => {
+    if (addLibraryBtn) {
+        addLibraryBtn.addEventListener('click', handleAddClick);
+    }
+
+    libraryForm.addEventListener('submit', handleFormSubmit);
+
+    librariesTable.addEventListener('click', (event) => {
+        const editButton = event.target.closest('.edit-btn');
+        if (editButton) {
+            handleEditClick(editButton);
+            return;
+        }
         const deleteButton = event.target.closest('.delete-btn');
         if (deleteButton) {
-            const libraryId = deleteButton.dataset.id;
-            const libraryName = deleteButton.dataset.name;
-
-            if (confirm(`Are you sure you want to delete the library "${libraryName}"?`)) {
-                try {
-                    const response = await fetch(`/admin/libraries/delete/${libraryId}`, {
-                        method: 'POST', // Or 'DELETE', ensure backend route accepts it
-                         headers: {
-                            'Content-Type': 'application/json', // Good practice
-                            'X-CSRFToken': csrfToken // Add CSRF token header
-                        }
-                    });
-
-                    const result = await response.json();
-
-                    if (response.ok && result.status === 'success') {
-                        // Remove row from table
-                        const row = document.getElementById(`libraryRow-${libraryId}`);
-                        if (row) {
-                            row.remove();
-                        }
-                        // Optionally show a global success message
-                        // showGlobalAlert(result.message, 'success');
-                         // Simple reload if dynamic removal fails or is complex
-                         // location.reload();
-                    } else {
-                        alert(`Error deleting library: ${result.message || 'Unknown error'}`);
-                    }
-                } catch (error) {
-                    console.error('Error deleting library:', error);
-                    alert(`An error occurred: ${error.message}`);
-                }
-            }
+            handleDeleteClick(deleteButton);
         }
     });
 
-    // --- AI Description Generation (now uses shared utility) ---
     if (generateDescBtn) {
-        generateDescBtn.addEventListener('click', function () {
+        generateDescBtn.addEventListener('click', () => {
             const spinner = generateDescBtn.querySelector('.spinner-border');
             generateDescriptionForEntity({
                 nameInput: libraryNameInput,
                 descriptionInput: libraryDescriptionInput,
-                itemType: "library",
+                itemType: 'library',
                 alertPlaceholder: modalAlertPlaceholder,
                 button: generateDescBtn,
-                spinner: spinner,
-                csrfToken: csrfToken
+                spinner,
+                csrfToken,
             });
         });
-    } else {
-        console.warn("Generate Description button not found.");
     }
 
-}); // End DOMContentLoaded
+    refreshRowNumbers();
+});

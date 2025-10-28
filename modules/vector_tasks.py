@@ -1,11 +1,20 @@
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from celery_app import celery
 from flask import current_app
 
 logger = logging.getLogger(__name__)
+
+
+@celery.task(name="modules.vector_tasks.retrieve_context")
+def retrieve_context_task(query: str, tool_call_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Execute document retrieval on the worker to keep web images slim."""
+    from modules.agent import perform_retrieval
+
+    config = tool_call_config or {}
+    return perform_retrieval(query, config)
 
 
 @celery.task(name="modules.vector_tasks.fetch_document_chunks")

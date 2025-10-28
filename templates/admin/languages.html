@@ -45,18 +45,18 @@
             {% if languages %}
                 {% for lang in languages %}
                 <tr data-id="{{ lang.id }}">
-                    <td>{{ loop.index }}</td>
+                    <td class="row-number">{{ loop.index }}</td>
                     <td class="language-code">{{ lang.language_code }}</td>
                     <td class="language-name">{{ lang.language_name }}</td>
-                    <td class="language-active" data-active="{{ lang.is_active }}">
+                    <td class="language-active" data-active="{{ 'true' if lang.is_active else 'false' }}">
                         {% if lang.is_active %}
                             <span class="badge bg-success">Yes</span>
                         {% else %}
                             <span class="badge bg-secondary">No</span>
                         {% endif %}
                     </td>
-                    <td>{{ lang.created_by | default('N/A', true) }}</td>
-                    <td>{{ lang.created_at.strftime('%Y-%m-%d %H:%M:%S') if lang.created_at else 'N/A' }}</td>
+                    <td class="language-created-by">{{ lang.created_by | default('N/A', true) }}</td>
+                    <td class="language-created-at">{{ lang.created_at.strftime('%Y-%m-%d %H:%M:%S') if lang.created_at else 'N/A' }}</td>
                     <td>
                         <div class="action-buttons">
                             <button class="btn btn-sm btn-warning edit-btn"

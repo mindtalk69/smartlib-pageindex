@@ -62,8 +62,16 @@ class FeedbackHandler {
   }
 
   _sendFeedback(type, button) {
-    const messageId = button.closest('[data-message-id]')?.dataset.messageId;
-    if (!messageId) return;
+    const bubble = button.closest('[data-message-id]');
+    if (!bubble) return;
+
+    const backendMessageId = bubble.dataset.backendMessageId;
+    let messageId = backendMessageId || bubble.dataset.messageId;
+
+    if (!messageId || messageId.startsWith('streaming-')) {
+      showToast('Feedback will be available once the response finishes streaming.', 'info');
+      return;
+    }
 
     window.fetchWithCsrfRetry('/api/message_feedback', { // Use fetchWithCsrfRetry
       method: 'POST',

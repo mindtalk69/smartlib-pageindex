@@ -2,11 +2,51 @@ from flask import Blueprint, render_template, request, jsonify, redirect, url_fo
 from flask_login import login_required, current_user
 from sqlalchemy.exc import IntegrityError
 from modules.database import (
-    db, Library, Knowledge, get_libraries, get_libraries_with_details, get_knowledges,
-    create_library, get_library_by_id, update_library, delete_library
+    db,
+    Library,
+    get_libraries,
+    get_libraries_with_details,
+    get_knowledges,
+    create_library,
+    get_library_by_id,
+    get_library_with_details,
+    update_library,
+    delete_library,
 )
 
+
 libraries_bp = Blueprint('admin_libraries', __name__, url_prefix='/admin/libraries')
+
+
+def serialize_library(library):
+    if not library:
+        return None
+    knowledge_names = sorted(
+        [
+            knowledge.name
+            for knowledge in getattr(library, 'knowledges', [])
+            if getattr(knowledge, 'name', None)
+        ]
+    )
+    knowledge_ids = [
+        knowledge.id
+        for knowledge in getattr(library, 'knowledges', [])
+        if hasattr(knowledge, 'id')
+    ]
+    creator_username = (
+        library.creator.username if getattr(library, 'creator', None) else 'N/A'
+    )
+    return {
+        'library_id': library.library_id,
+        'id': library.library_id,
+        'name': library.name,
+        'description': library.description or '',
+        'knowledge_names': knowledge_names,
+        'knowledge_ids': knowledge_ids,
+        'created_by_username': creator_username,
+        'created_at': library.created_at.isoformat() if library.created_at else None,
+    }
+
 
 @libraries_bp.route('/')
 @login_required
@@ -46,7 +86,29 @@ def add_library():
     try:
         library_id = create_library(name, description, user_id, knowledge_id)
         print(f"DEBUG: create_library invoked, new library_id = {library_id}")
-        return jsonify({"status": "success", "message": "Library added successfully.", "library_id": library_id}), 201
+        detailed_library = get_library_with_details(library_id)
+        library_payload = serialize_library(detailed_library)
+        if library_payload is None:
+            library_payload = {
+                'library_id': library_id,
+                'id': library_id,
+                'name': name,
+                'description': description or '',
+                'knowledge_names': [],
+                'knowledge_ids': [],
+                'created_by_username': getattr(current_user, 'username', 'N/A'),
+                'created_at': None,
+            }
+        return (
+            jsonify(
+                {
+                    'status': 'success',
+                    'message': 'Library added successfully.',
+                    'library': library_payload,
+                }
+            ),
+            201,
+        )
     except IntegrityError:
         db.session.rollback()
         print(f"DEBUG: IntegrityError on create_library with name={name}")
@@ -60,14 +122,14 @@ def add_library():
 @login_required
 def get_library_data(library_id):
     try:
-        library = get_library_by_id(library_id)
+        library = get_library_with_details(library_id)
         if library:
-            library_dict = {c.name: getattr(library, c.name) for c in library.__table__.columns}
-            if library_dict.get('created_at'):
-                library_dict['created_at'] = library_dict['created_at'].isoformat()
-            return jsonify(library_dict)
+            library_payload = serialize_library(library)
+            if library_payload is None:
+                return jsonify({'status': 'error', 'message': 'Library serialization failed.'}), 500
+            return jsonify(library_payload)
         else:
-            return jsonify({"status": "error", "message": "Library not found."}), 404
+            return jsonify({'status': 'error', 'message': 'Library not found.'}), 404
     except Exception as e:
         print(f"Error in /admin/libraries/data route: {e}")
         return jsonify({"status": "error", "message": f"An unexpected error occurred: {str(e)}"}), 500
@@ -93,9 +155,19 @@ def edit_library(library_id):
         success = update_library(library_id, name, description, knowledge_id)
         print(f"DEBUG: update_library invoked for id={library_id}, success={success}")
         if success:
-            return jsonify({"status": "success", "message": "Library updated successfully."})
+            detailed_library = get_library_with_details(library_id)
+            library_payload = serialize_library(detailed_library)
+            if library_payload is None:
+                return jsonify({'status': 'success', 'message': 'Library updated successfully.'})
+            return jsonify(
+                {
+                    'status': 'success',
+                    'message': 'Library updated successfully.',
+                    'library': library_payload,
+                }
+            )
         else:
-            return jsonify({"status": "error", "message": "Library update failed."}), 500
+            return jsonify({'status': 'error', 'message': 'Library update failed.'}), 500
     except IntegrityError:
         db.session.rollback()
         return jsonify({"status": "error", "message": f"Library name '{name}' already exists."}), 409

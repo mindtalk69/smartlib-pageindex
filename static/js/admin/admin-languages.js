@@ -19,6 +19,60 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let currentEditId = null;
 
+    function toBoolean(value, fallback = false) {
+        if (typeof value === 'boolean') {
+            return value;
+        }
+        if (typeof value === 'number') {
+            return value === 1;
+        }
+        if (typeof value === 'string') {
+            const normalized = value.toLowerCase();
+            if (normalized === 'true' || normalized === '1') {
+                return true;
+            }
+            if (normalized === 'false' || normalized === '0') {
+                return false;
+            }
+        }
+        if (value === null || value === undefined) {
+            return fallback;
+        }
+        return Boolean(value);
+    }
+
+    function formatDate(dateValue) {
+        if (!dateValue) {
+            return 'N/A';
+        }
+        const date = new Date(dateValue);
+        if (Number.isNaN(date.getTime())) {
+            return typeof dateValue === 'string' ? dateValue : 'N/A';
+        }
+        return date.toLocaleString();
+    }
+
+    function normalizeLanguage(raw) {
+        if (!raw || typeof raw !== 'object') {
+            return null;
+        }
+        const resolvedActive = raw.is_active !== undefined ? raw.is_active : raw.active;
+        return {
+            id: raw.id,
+            language_code: raw.language_code || raw.code || '',
+            language_name: raw.language_name || raw.name || '',
+            is_active: toBoolean(resolvedActive, false),
+            created_by: raw.created_by || raw.created_by_username || raw.createdBy || 'N/A',
+            created_at: raw.created_at || raw.createdAt || null,
+        };
+    }
+
+    function renderActiveBadge(isActive) {
+        return isActive
+            ? '<span class="badge bg-success">Yes</span>'
+            : '<span class="badge bg-secondary">No</span>';
+    }
+
     function clearForm() {
         languageForm.reset();
         languageIdInput.value = '';
@@ -44,33 +98,109 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function createTableRow(language) {
+        const normalized = normalizeLanguage(language);
+        if (!normalized) {
+            return document.createElement('tr');
+        }
+
         const tr = document.createElement('tr');
-        tr.setAttribute('data-id', language.id);
-        tr.innerHTML = `
-            <td class="language-code">${language.code}</td>
-            <td class="language-name">${language.name}</td>
-            <td>${language.active ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>'}</td>
-            <td>${language.created_by_username || 'N/A'}</td>
-            <td>${language.created_at ? new Date(language.created_at).toLocaleString() : 'N/A'}</td>
-            <td>
-                <button class="btn btn-sm btn-warning edit-btn" data-id="${language.id}" title="Edit Language">
-                    <i class="bi bi-pencil-fill"></i>
-                </button>
-                <button class="btn btn-sm btn-danger delete-btn" data-id="${language.id}" data-name="${language.name}" title="Delete Language">
-                    <i class="bi bi-trash-fill"></i>
-                </button>
-            </td>
-        `;
+        tr.setAttribute('data-id', normalized.id);
+
+        const numberCell = document.createElement('td');
+        numberCell.classList.add('row-number');
+        tr.appendChild(numberCell);
+
+        const codeCell = document.createElement('td');
+        codeCell.classList.add('language-code');
+        codeCell.textContent = normalized.language_code;
+        tr.appendChild(codeCell);
+
+        const nameCell = document.createElement('td');
+        nameCell.classList.add('language-name');
+        nameCell.textContent = normalized.language_name;
+        tr.appendChild(nameCell);
+
+        const activeCell = document.createElement('td');
+        activeCell.classList.add('language-active');
+        activeCell.dataset.active = normalized.is_active ? 'true' : 'false';
+        activeCell.innerHTML = renderActiveBadge(normalized.is_active);
+        tr.appendChild(activeCell);
+
+        const createdByCell = document.createElement('td');
+        createdByCell.classList.add('language-created-by');
+        createdByCell.textContent = normalized.created_by || 'N/A';
+        tr.appendChild(createdByCell);
+
+        const createdAtCell = document.createElement('td');
+        createdAtCell.classList.add('language-created-at');
+        createdAtCell.textContent = formatDate(normalized.created_at);
+        tr.appendChild(createdAtCell);
+
+        const actionsCell = document.createElement('td');
+        const actionWrapper = document.createElement('div');
+        actionWrapper.classList.add('action-buttons');
+
+        const editButton = document.createElement('button');
+        editButton.className = 'btn btn-sm btn-warning edit-btn';
+        editButton.setAttribute('data-id', normalized.id);
+        editButton.title = 'Edit Language';
+        editButton.innerHTML = '<i class="bi bi-pencil-fill"></i>';
+
+        const deleteButton = document.createElement('button');
+        deleteButton.className = 'btn btn-sm btn-danger delete-btn';
+        deleteButton.setAttribute('data-id', normalized.id);
+        deleteButton.setAttribute('data-name', normalized.language_name);
+        deleteButton.title = 'Delete Language';
+        deleteButton.innerHTML = '<i class="bi bi-trash-fill"></i>';
+
+        actionWrapper.appendChild(editButton);
+        actionWrapper.appendChild(deleteButton);
+        actionsCell.appendChild(actionWrapper);
+        tr.appendChild(actionsCell);
+
         return tr;
     }
 
     function updateTableRow(language) {
-        const row = languagesTableBody.querySelector(`tr[data-id="${language.id}"]`);
-        if (row) {
-            row.querySelector('.language-code').textContent = language.code;
-            row.querySelector('.language-name').textContent = language.name;
-            row.querySelector('td:nth-child(3)').innerHTML = language.active ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>';
+        const normalized = normalizeLanguage(language);
+        if (!normalized) {
+            return;
         }
+        const row = languagesTableBody.querySelector(`tr[data-id="${normalized.id}"]`);
+        if (!row) {
+            return;
+        }
+        const codeCell = row.querySelector('.language-code');
+        if (codeCell) {
+            codeCell.textContent = normalized.language_code;
+        }
+        const nameCell = row.querySelector('.language-name');
+        if (nameCell) {
+            nameCell.textContent = normalized.language_name;
+        }
+        const activeCell = row.querySelector('.language-active');
+        if (activeCell) {
+            activeCell.dataset.active = normalized.is_active ? 'true' : 'false';
+            activeCell.innerHTML = renderActiveBadge(normalized.is_active);
+        }
+        const createdByCell = row.querySelector('.language-created-by');
+        if (createdByCell) {
+            createdByCell.textContent = normalized.created_by || 'N/A';
+        }
+        const createdAtCell = row.querySelector('.language-created-at');
+        if (createdAtCell) {
+            createdAtCell.textContent = formatDate(normalized.created_at);
+        }
+    }
+
+    function refreshRowNumbers() {
+        const dataRows = Array.from(languagesTableBody.querySelectorAll('tr[data-id]'));
+        dataRows.forEach((row, index) => {
+            const numberCell = row.querySelector('.row-number') || row.querySelector('td');
+            if (numberCell) {
+                numberCell.textContent = index + 1;
+            }
+        });
     }
 
     function handleAddClick() {
@@ -156,8 +286,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (response.ok && result.status === 'success') {
                     row.remove();
                     showFeedback(result.message || 'Language deleted successfully.');
-                    if (languagesTableBody.rows.length === 0) {
-                        languagesTableBody.innerHTML = '<tr><td colspan="6" class="text-center">No languages found.</td></tr>';
+                    const remainingRows = languagesTableBody.querySelectorAll('tr[data-id]').length;
+                    if (remainingRows === 0) {
+                        languagesTableBody.innerHTML = '<tr><td colspan="7" class="text-center">No languages found.</td></tr>';
+                    } else {
+                        refreshRowNumbers();
                     }
                 } else {
                     throw new Error(result.message || 'Failed to delete language.');
@@ -229,17 +362,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 const returnedLanguage = result.language;
                 if (returnedLanguage) {
-                    if (!returnedLanguage.created_at) returnedLanguage.created_at = new Date().toISOString();
-                    if (!returnedLanguage.created_by_username) returnedLanguage.created_by_username = 'Current User';
-
                     if (currentEditId) {
                         updateTableRow(returnedLanguage);
                     } else {
-                        const noDataRow = languagesTableBody.querySelector('td[colspan="6"]');
-                        if (noDataRow) noDataRow.parentElement.remove();
+                        const placeholderRow = languagesTableBody.querySelector('td[colspan="7"]');
+                        if (placeholderRow) {
+                            placeholderRow.parentElement.remove();
+                        }
                         const newRow = createTableRow(returnedLanguage);
                         languagesTableBody.appendChild(newRow);
                     }
+                    refreshRowNumbers();
+                    clearForm();
                 } else {
                     window.location.reload();
                 }
@@ -272,4 +406,6 @@ document.addEventListener('DOMContentLoaded', function () {
             handleDeleteClick(deleteButton);
         }
     });
+
+    refreshRowNumbers();
 });

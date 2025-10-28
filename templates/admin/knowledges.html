@@ -52,16 +52,16 @@
             {% if knowledges %}
                 {% for knowledge in knowledges %}
                 <tr data-id="{{ knowledge.id }}">
-                    <td>{{ loop.index }}</td>
+                    <td class="row-number">{{ loop.index }}</td>
                     <td class="knowledge-name">{{ knowledge.name }}</td>
-                    <td class="knowledge-description" title="{{ knowledge.description }}">
+                    <td class="knowledge-description" title="{{ knowledge.description | default('', true) }}">
                         {{ knowledge.description[:80] ~ ('...' if knowledge.description and knowledge.description|length > 80 else '') }}
                     </td>
                     <td class="knowledge-categories">{{ knowledge.categories|map(attribute='name')|join(', ') if knowledge.categories else 'N/A' }}</td>
                     <td class="knowledge-libraries">{{ knowledge.libraries|map(attribute='name')|join(', ') if knowledge.libraries else 'N/A' }}</td>
                     <td class="knowledge-groups">{{ knowledge.groups|map(attribute='name')|join(', ') if knowledge.groups else 'N/A' }}</td>
-                    <td>{{ knowledge.creator.username | default('N/A', true) }}</td>
-                    <td>{{ knowledge.created_at.strftime('%Y-%m-%d %H:%M:%S') if knowledge.created_at else 'N/A' }}</td>
+                    <td class="knowledge-created-by">{{ knowledge.creator.username | default('N/A', true) }}</td>
+                    <td class="knowledge-created-at">{{ knowledge.created_at.strftime('%Y-%m-%d %H:%M:%S') if knowledge.created_at else 'N/A' }}</td>
                     <td>
                         <div class="action-buttons">
                             <button class="btn btn-sm btn-warning edit-btn"

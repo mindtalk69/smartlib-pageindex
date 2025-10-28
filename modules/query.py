@@ -691,7 +691,13 @@ def init_query(app):
             logging.error(message)
             if stream_flag:
                 def _stream_resume_error():
-                    yield f"data: {json.dumps({'type': 'error', 'message': message, 'status_code': status_code, 'db_message_id': db_message_id_for_resume})}\n\n"
+                    error_event = {
+                        "type": "error",
+                        "message": message,
+                        "status_code": status_code,
+                        "db_message_id": db_message_id_for_resume,
+                    }
+                    yield f"data: {json.dumps(error_event)}\n\n"
                 return Response(
                     stream_with_context(_stream_resume_error()),
                     status=status_code,
@@ -700,11 +706,167 @@ def init_query(app):
                 )
             return jsonify({"error": message, "status_code": status_code}), status_code
 
+        user_id_for_stream = current_user.get_id()
+
+        if stream_flag:
+            def _update_resume_placeholder_with_error(message_text: str) -> None:
+                if not db_message_id_for_resume:
+                    return
+                _update_message_history_entry(
+                    db_message_id_for_resume,
+                    {
+                        "answer": message_text,
+                        "citations": [],
+                        "usage_metadata": {},
+                        "suggested_questions": [],
+                    },
+                )
+
+            def _serialize_resume_error_event(message_text: str, status_code: int | str = 500) -> str:
+                try:
+                    status_int = int(status_code)
+                except (TypeError, ValueError):
+                    status_int = 500
+                payload = {
+                    "type": "error",
+                    "message": message_text,
+                    "status_code": status_int,
+                }
+                if db_message_id_for_resume:
+                    payload["db_message_id"] = db_message_id_for_resume
+                return f"data: {json.dumps(payload)}\n\n"
+
+            def _stream_resume_response():
+                try:
+                    from modules.agent import resume_agent_graph
+                except Exception as import_err:
+                    logging.error(
+                        "Streaming resume requested but agent graph unavailable: %s",
+                        import_err,
+                        exc_info=True,
+                    )
+                    error_text = "Streaming resume is temporarily unavailable."
+                    _update_resume_placeholder_with_error(error_text)
+                    yield _serialize_resume_error_event(error_text)
+                    return
+
+                resume_kwargs = {
+                    "thread_id": thread_id,
+                    "confirmation": confirmation,
+                    "stream": True,
+                    "image_base64": image_base64,
+                    "image_mime_type": image_mime_type,
+                    "conversation_id": conversation_id,
+                    "user_id_for_stream": user_id_for_stream,
+                }
+                if db_message_id_for_resume:
+                    resume_kwargs["db_message_id_for_stream"] = db_message_id_for_resume
+
+                try:
+                    streaming_result = resume_agent_graph(**resume_kwargs)
+                except Exception as resume_err:
+                    logging.error(
+                        "Error starting streaming resume: %s",
+                        resume_err,
+                        exc_info=True,
+                    )
+                    error_text = "Error starting streaming resume."
+                    _update_resume_placeholder_with_error(error_text)
+                    yield _serialize_resume_error_event(error_text)
+                    return
+
+                if inspect.isasyncgen(streaming_result):
+                    loop = asyncio.new_event_loop()
+                    try:
+                        asyncio.set_event_loop(loop)
+                        async_iterator = streaming_result.__aiter__()
+                        while True:
+                            try:
+                                chunk = loop.run_until_complete(async_iterator.__anext__())
+                            except StopAsyncIteration:
+                                break
+                            if chunk is not None:
+                                yield chunk if isinstance(chunk, str) else str(chunk)
+                    except Exception as stream_err:
+                        logging.error(
+                            "Error while streaming resume output: %s",
+                            stream_err,
+                            exc_info=True,
+                        )
+                        error_text = "Streaming resume interrupted due to an internal error."
+                        _update_resume_placeholder_with_error(error_text)
+                        yield _serialize_resume_error_event(error_text)
+                    finally:
+                        try:
+                            if hasattr(streaming_result, "aclose"):
+                                loop.run_until_complete(streaming_result.aclose())
+                        except Exception as close_err:
+                            logging.debug(
+                                "Error closing streaming resume generator: %s",
+                                close_err,
+                                exc_info=True,
+                            )
+                        asyncio.set_event_loop(None)
+                        loop.close()
+                    return
+
+                if isinstance(streaming_result, dict):
+                    if streaming_result.get("type") == "error":
+                        error_text = streaming_result.get(
+                            "message", "Agent worker returned an error"
+                        )
+                        status_code = streaming_result.get("status_code", 500)
+                        _update_resume_placeholder_with_error(error_text)
+                        yield _serialize_resume_error_event(error_text, status_code=status_code)
+                        return
+
+                    if db_message_id_for_resume:
+                        _update_message_history_entry(
+                            db_message_id_for_resume,
+                            streaming_result,
+                        )
+
+                    metadata = {}
+                    if db_message_id_for_resume:
+                        metadata["message_id"] = str(db_message_id_for_resume)
+                    if conversation_id:
+                        metadata["conversation_id"] = conversation_id
+                    if metadata:
+                        metadata_event = {
+                            "type": "metadata_update",
+                            "metadata": metadata,
+                        }
+                        yield f"data: {json.dumps(metadata_event)}\n\n"
+
+                    final_payload = dict(streaming_result)
+                    if conversation_id:
+                        final_payload["conversation_id"] = conversation_id
+                    if db_message_id_for_resume:
+                        final_payload["message_id"] = db_message_id_for_resume
+                    end_event = {"type": "end_of_stream", "data": final_payload}
+                    yield f"data: {json.dumps(end_event)}\n\n"
+                    return
+
+                logging.error(
+                    "Streaming resume invocation returned unexpected type: %s",
+                    type(streaming_result),
+                )
+                error_text = "Streaming resume failed due to unexpected response type."
+                _update_resume_placeholder_with_error(error_text)
+                yield _serialize_resume_error_event(error_text)
+
+            return Response(
+                stream_with_context(_stream_resume_response()),
+                status=200,
+                headers={"Content-Type": "text/event-stream"},
+                mimetype="text/event-stream",
+            )
+
         try:
             extra_kwargs = {}
-            if stream_flag and db_message_id_for_resume:
+            if db_message_id_for_resume:
                 extra_kwargs["db_message_id_for_stream"] = db_message_id_for_resume
-                extra_kwargs["user_id_for_stream"] = current_user.get_id()
+                extra_kwargs["user_id_for_stream"] = user_id_for_stream
 
             resume_result = resume_agent_via_worker(
                 thread_id=thread_id,
@@ -723,43 +885,7 @@ def init_query(app):
                 error_message = resume_result.get("message", "Resuming failed.")
                 status_code = resume_result.get("status_code", 500)
                 logging.error("Agent resume error: %s", error_message)
-                if stream_flag:
-                    def _stream_resume_error_message():
-                        yield f"data: {json.dumps({'type': 'error', 'message': error_message, 'status_code': status_code, 'db_message_id': db_message_id_for_resume})}\n\n"
-                    return Response(
-                        stream_with_context(_stream_resume_error_message()),
-                        status=status_code,
-                        headers={"Content-Type": "text/event-stream"},
-                        mimetype="text/event-stream",
-                    )
                 return jsonify({"error": error_message, "status_code": status_code}), status_code
-
-            if stream_flag:
-                if db_message_id_for_resume:
-                    _update_message_history_entry(db_message_id_for_resume, resume_result)
-
-                def _stream_resume_success():
-                    metadata = {}
-                    if db_message_id_for_resume:
-                        metadata["message_id"] = str(db_message_id_for_resume)
-                    if conversation_id:
-                        metadata["conversation_id"] = conversation_id
-                    if metadata:
-                        yield f"data: {json.dumps({'type': 'metadata_update', 'metadata': metadata})}\n\n"
-
-                    final_payload = dict(resume_result)
-                    if conversation_id:
-                        final_payload["conversation_id"] = conversation_id
-                    if db_message_id_for_resume:
-                        final_payload["message_id"] = db_message_id_for_resume
-                    yield f"data: {json.dumps({'type': 'end_of_stream', 'data': final_payload})}\n\n"
-
-                return Response(
-                    stream_with_context(_stream_resume_success()),
-                    status=200,
-                    headers={"Content-Type": "text/event-stream"},
-                    mimetype="text/event-stream",
-                )
 
             if isinstance(resume_result, dict) and "answer" in resume_result:
                 final_answer = resume_result.get("answer", "Resumed operation completed.")
@@ -784,7 +910,12 @@ def init_query(app):
             logging.error("Error resuming agent workflow for thread %s: %s", thread_id, e, exc_info=True)
             if stream_flag:
                 def _stream_exception_error_on_resume():
-                    yield f"data: {json.dumps({'type': 'error', 'message': f'Error resuming query processing: {str(e)}', 'status_code': 500})}\n\n"
+                    error_event = {
+                        "type": "error",
+                        "message": f"Error resuming query processing: {str(e)}",
+                        "status_code": 500,
+                    }
+                    yield f"data: {json.dumps(error_event)}\n\n"
                 return Response(
                     stream_with_context(_stream_exception_error_on_resume()),
                     status=500,
@@ -1134,6 +1265,125 @@ def init_query(app):
                 return jsonify({"status": "cancelled", "message": "User declined web search."})
 
         # confirmation == 'yes'
+        user_id_for_stream = current_user.get_id()
+
+        if stream_flag:
+            def _serialize_resume_error_event(message_text: str, status_code: int | str = 500) -> str:
+                try:
+                    status_int = int(status_code)
+                except (TypeError, ValueError):
+                    status_int = 500
+                payload = {
+                    "type": "error",
+                    "message": message_text,
+                    "status_code": status_int,
+                }
+                return f"data: {json.dumps(payload)}\n\n"
+
+            def _stream_resume_response():
+                try:
+                    from modules.agent import resume_agent_graph
+                except Exception as import_err:
+                    logging.error(
+                        "Streaming resume requested but agent graph unavailable: %s",
+                        import_err,
+                        exc_info=True,
+                    )
+                    yield _serialize_resume_error_event("Streaming resume is temporarily unavailable.")
+                    return
+
+                resume_kwargs = {
+                    "thread_id": thread_id,
+                    "confirmation": confirmation,
+                    "stream": True,
+                    "image_base64": image_base64,
+                    "image_mime_type": image_mime_type,
+                    "conversation_id": conversation_id,
+                    "user_id_for_stream": user_id_for_stream,
+                }
+
+                try:
+                    streaming_result = resume_agent_graph(**resume_kwargs)
+                except Exception as resume_err:
+                    logging.error(
+                        "Error starting streaming resume: %s",
+                        resume_err,
+                        exc_info=True,
+                    )
+                    yield _serialize_resume_error_event("Error starting streaming resume.")
+                    return
+
+                if conversation_id:
+                    metadata_event = {
+                        "type": "metadata_update",
+                        "metadata": {"conversation_id": conversation_id},
+                    }
+                    yield f"data: {json.dumps(metadata_event)}\n\n"
+
+                if inspect.isasyncgen(streaming_result):
+                    loop = asyncio.new_event_loop()
+                    try:
+                        asyncio.set_event_loop(loop)
+                        async_iterator = streaming_result.__aiter__()
+                        while True:
+                            try:
+                                chunk = loop.run_until_complete(async_iterator.__anext__())
+                            except StopAsyncIteration:
+                                break
+                            if chunk is not None:
+                                yield chunk if isinstance(chunk, str) else str(chunk)
+                    except Exception as stream_err:
+                        logging.error(
+                            "Error while streaming resume output: %s",
+                            stream_err,
+                            exc_info=True,
+                        )
+                        yield _serialize_resume_error_event(
+                            "Streaming resume interrupted due to an internal error."
+                        )
+                    finally:
+                        try:
+                            if hasattr(streaming_result, "aclose"):
+                                loop.run_until_complete(streaming_result.aclose())
+                        except Exception as close_err:
+                            logging.debug(
+                                "Error closing streaming resume generator: %s",
+                                close_err,
+                                exc_info=True,
+                            )
+                        asyncio.set_event_loop(None)
+                        loop.close()
+                    return
+
+                if isinstance(streaming_result, dict):
+                    if streaming_result.get("type") == "error":
+                        error_message = streaming_result.get("message", "Resuming failed.")
+                        status_code = streaming_result.get("status_code", 500)
+                        yield _serialize_resume_error_event(error_message, status_code=status_code)
+                        return
+
+                    final_payload = dict(streaming_result)
+                    if conversation_id:
+                        final_payload["conversation_id"] = conversation_id
+                    end_event = {"type": "end_of_stream", "data": final_payload}
+                    yield f"data: {json.dumps(end_event)}\n\n"
+                    return
+
+                logging.error(
+                    "Streaming resume invocation returned unexpected type: %s",
+                    type(streaming_result),
+                )
+                yield _serialize_resume_error_event(
+                    "Streaming resume failed due to unexpected response type."
+                )
+
+            return Response(
+                stream_with_context(_stream_resume_response()),
+                status=200,
+                headers={"Content-Type": "text/event-stream"},
+                mimetype="text/event-stream",
+            )
+
         try:
             resume_result = resume_agent_via_worker(
                 thread_id=thread_id,
@@ -1147,44 +1397,13 @@ def init_query(app):
             if resume_result is None:
                 message = "Agent worker is unavailable. Please ensure the worker container is running."
                 logging.error(message)
-                if stream_flag:
-                    def _stream_resume_error():
-                        yield f"data: {json.dumps({'type': 'error', 'message': message, 'status_code': 503})}\n\n"
-                    return Response(
-                        stream_with_context(_stream_resume_error()),
-                        status=503,
-                        headers={"Content-Type": "text/event-stream"},
-                        mimetype="text/event-stream",
-                    )
                 return jsonify({"error": message, "status_code": 503}), 503
 
             if isinstance(resume_result, dict) and resume_result.get("type") == "error":
                 error_message = resume_result.get("message", "Resuming failed.")
                 status_code = resume_result.get("status_code", 500)
                 logging.error("confirm_web_search worker error: %s", error_message)
-                if stream_flag:
-                    def _stream_resume_error_message():
-                        yield f"data: {json.dumps({'type': 'error', 'message': error_message, 'status_code': status_code})}\n\n"
-                    return Response(
-                        stream_with_context(_stream_resume_error_message()),
-                        status=status_code,
-                        headers={"Content-Type": "text/event-stream"},
-                        mimetype="text/event-stream",
-                    )
                 return jsonify({"error": error_message, "status_code": status_code}), status_code
-
-            if stream_flag:
-                def _stream_resume_success():
-                    final_payload = dict(resume_result)
-                    if conversation_id:
-                        final_payload["conversation_id"] = conversation_id
-                    yield f"data: {json.dumps({'type': 'end_of_stream', 'data': final_payload})}\n\n"
-                return Response(
-                    stream_with_context(_stream_resume_success()),
-                    status=200,
-                    headers={"Content-Type": "text/event-stream"},
-                    mimetype="text/event-stream",
-                )
 
             if isinstance(resume_result, dict):
                 response_payload = dict(resume_result)
@@ -1198,7 +1417,12 @@ def init_query(app):
             logging.error(f"Error while confirming/resuming web search for thread {thread_id}: {e}", exc_info=True)
             if stream_flag:
                 def _stream_unhandled_error():
-                    yield f"data: {json.dumps({'type': 'error', 'message': f'Error resuming web search: {str(e)}', 'status_code': 500})}\n\n"
+                    error_event = {
+                        "type": "error",
+                        "message": f"Error resuming web search: {str(e)}",
+                        "status_code": 500,
+                    }
+                    yield f"data: {json.dumps(error_event)}\n\n"
                 return Response(
                     stream_with_context(_stream_unhandled_error()),
                     status=500,

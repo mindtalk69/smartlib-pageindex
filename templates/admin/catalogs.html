@@ -44,11 +44,11 @@
             {% if catalogs %}
                 {% for catalog in catalogs %}
                 <tr data-id="{{ catalog.id }}">
-                    <td>{{ loop.index }}</td>
+                    <td class="row-number">{{ loop.index }}</td>
                     <td class="catalog-name">{{ catalog.name }}</td>
-                    <td class="catalog-description">{{ catalog.description[:80] ~ ('...' if catalog.description and catalog.description|length > 80 else '') }}</td>                    
-                    <td>{{ catalog.creator_name | default('N/A', true) }}</td>                    
-                    <td>{{ catalog.created_at.strftime('%Y-%m-%d %H:%M:%S') if catalog.created_at else 'N/A' }}</td>
+                    <td class="catalog-description" title="{{ catalog.description | default('', true) }}">{{ catalog.description[:80] ~ ('...' if catalog.description and catalog.description|length > 80 else '') }}</td>
+                    <td class="catalog-created-by">{{ catalog.creator_name | default('N/A', true) }}</td>
+                    <td class="catalog-created-at">{{ catalog.created_at.strftime('%Y-%m-%d %H:%M:%S') if catalog.created_at else 'N/A' }}</td>
                     <td>
                         <div class="action-buttons">
                             <button class="btn btn-sm btn-warning edit-btn"

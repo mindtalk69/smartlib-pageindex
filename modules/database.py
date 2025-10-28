@@ -1070,6 +1070,18 @@ def get_library_by_id(library_id):
     """Get a single library by its ID using SQLAlchemy."""
     return db.session.get(Library, library_id)
 
+
+def get_library_with_details(library_id: int) -> Library | None:
+    """Fetch a library with creator and knowledge relationships eager loaded."""
+    return (
+        Library.query.options(
+            joinedload(Library.creator),
+            joinedload(Library.knowledges)
+        )
+        .filter_by(library_id=library_id)
+        .first()
+    )
+
 def update_library(library_id, name, description, knowledge_id):
     """Update an existing library using SQLAlchemy."""
     library = db.session.get(Library, library_id)

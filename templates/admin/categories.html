@@ -44,11 +44,11 @@
             {% if categories %}
                 {% for category in categories %}
                 <tr data-id="{{ category.id }}">
-                    <td>{{ loop.index }}</td>
-                    <td class="category-name">{{ category.name }}</td>                    
-                    <td class="category-description">{{ category.description[:80] ~ ('...' if category.description and category.description|length > 80 else '') }}</td>                               
-                    <td>{{ category.creator_name | default('N/A', true) }}</td>
-                    <td>{{ category.created_at.strftime('%Y-%m-%d %H:%M:%S') if category.created_at else 'N/A' }}</td>
+                    <td class="row-number">{{ loop.index }}</td>
+                    <td class="category-name">{{ category.name }}</td>
+                    <td class="category-description" title="{{ category.description | default('', true) }}">{{ category.description[:80] ~ ('...' if category.description and category.description|length > 80 else '') }}</td>
+                    <td class="category-created-by">{{ category.creator_name | default('N/A', true) }}</td>
+                    <td class="category-created-at">{{ category.created_at.strftime('%Y-%m-%d %H:%M:%S') if category.created_at else 'N/A' }}</td>
                     <td>
                         <div class="action-buttons">
                             <button class="btn btn-sm btn-warning edit-btn"

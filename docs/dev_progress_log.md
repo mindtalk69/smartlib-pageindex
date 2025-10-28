@@ -11,9 +11,16 @@
 - **Planned**: Enable server-side chart rendering for the DataFrame agent (execute matplotlib/seaborn, store chart assets alongside maps, and surface URLs back to the client).
 
 ## 2025-10-27 – Streaming UX Enhancements & Dependencies
-- Enabled streaming on the web container by installing the full LangGraph + Hugging Face stack (`langchain-huggingface`, `sentence-transformers`, etc.) so SSE queries reuse the same BGE-M3 embeddings path as Celery worker jobs.
+- Enabled streaming on the web container by reusing the LangGraph stack while delegating Hugging Face embeddings to the worker via `langchain-community` wrappers, keeping the web image slim yet letting SSE queries reuse the same BGE-M3 path.
 - Updated `modules/agent.py` to grab a proper SQLAlchemy session (`db.session`) during streaming and avoid write failures when persisting partial responses.
 - Added chunk-by-chunk UI polish: streaming agent bubbles now pulse as text arrives, display a live progress bar with chunk counters, and fall back cleanly when a stream aborts.
+- Hardened Chroma querying in streaming mode with a quick retry/reload path to absorb transient "Error finding id" failures while new uploads finish indexing.
 - Hardened the front-end typewriter pipeline to accumulate partial text, merge metadata, and finalize messages only after the stream completes, preventing stale caret states.
 - Added console diagnostics and cache-busting tweaks (`Config.APP_VERSION`) to ensure rebuilt assets invalidate the browser cache during rapid UI iteration.
 - **Next**: Tune the progress bar styling for dark mode and explore a lightweight “look-ahead” chunk summary before final render.
+
+## 2025-10-28 – Admin UX Parity & Streaming Feedback Fixes
+- Brought the knowledges admin page in line with other admin tables: new client script handles inline add/edit/delete, row renumbering, placeholder swaps, and modal resets without full reloads.
+- Normalized knowledge responses by reusing shared serialization helpers so the frontend receives consistent name lists and timestamps.
+- Synced streaming metadata with the real backend message ID and updated the bubble dataset, ensuring like/dislike feedback persists once the stream completes.
+- Hardened the feedback buttons to defer submission while a message is streaming and use the synchronized ID, resolving the previous failure when streaming was enabled.

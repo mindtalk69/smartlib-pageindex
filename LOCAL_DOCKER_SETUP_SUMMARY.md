@@ -49,7 +49,7 @@
      --build-arg INSTALL_WEB_EXTRAS=true \
      -t smartlib-web:extras .
    ```
-   This flag installs `requirements-web-extras.txt` (langchain-huggingface, sentence-transformers, torch, torchvision). Expect the image to grow by 6–8 GB. Only enable when the web container must host local embeddings or Torch-based streaming.
+   This flag installs `requirements-web-extras.txt` (sentence-transformers, torch, torchvision) so the LangChain community embeddings wrapper can run locally. Expect the image to grow by 6–8 GB. Only enable when the web container must host local embeddings or Torch-based streaming.
 
 3. **Start all services:**
    ```bash

@@ -7,7 +7,6 @@ import mimetypes # Added for determining image type
 from flask import current_app # Import current_app
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from langchain_core.exceptions import OutputParserException
-#from langchain_huggingface import HuggingFaceEmbeddings
 import logging
 import json
 import re
@@ -89,7 +88,8 @@ def generate_simple_text(prompt: str, deployment_name: str) -> str:
 # Change with
 # BAAI Model
 # https://python.langchain.com/docs/integrations/text_embedding/bge_huggingface/
-#
+AZURE_EMBEDDING_MODELS: set[str] = {"text-embedding-3-small", "text-embedding-3-large"}
+
 embedding_function = None
 #embedding_model_name= "Qwen/Qwen3-Embedding-0.6B" # New default model, change as needed
 embedding_model_name = "BAAI/bge-m3" # Keep this if using bge-m3
@@ -134,7 +134,21 @@ def get_embedding_model_name():
     # Fallback to hardcoded value
     return embedding_model_name
 
+
+def is_azure_embedding_model(model_name: str | None) -> bool:
+    """Return True if the provided model name refers to an Azure-hosted embedding deployment."""
+    if not model_name:
+        return False
+    return model_name in AZURE_EMBEDDING_MODELS
+
+
+def requires_local_embedding(model_name: str | None) -> bool:
+    """Determine whether the embedding model must run locally (Hugging Face) instead of via Azure."""
+    return not is_azure_embedding_model(model_name)
+
+
 def get_current_embedding_model():
+
     """Get the current embedding model, updating the global embedding_model_name variable."""
     global embedding_model_name
     current_model = get_embedding_model_name()
@@ -156,10 +170,7 @@ def get_embedding_function():
             current_model = get_current_embedding_model()
             logging.info(f"Using embedding model: {current_model}")
 
-            # List of known Azure OpenAI embedding model names
-            azure_embedding_models = ["text-embedding-3-small", "text-embedding-3-large"]
-
-            if current_model in azure_embedding_models:
+            if is_azure_embedding_model(current_model):
                 logging.info(f"Initializing Azure OpenAI Embeddings model: {current_model}")
                 # For Azure embeddings, we need the endpoint, key, and version
                 azure_key = current_app.config.get("AZURE_OPENAI_API_KEY")
@@ -178,23 +189,42 @@ def get_embedding_function():
                 )
             else:
                 try:
-                    from langchain_huggingface import HuggingFaceEmbeddings
+                    if current_model.lower().startswith("baai/bge"):
+                        from langchain_community.embeddings import HuggingFaceBgeEmbeddings
+
+                        bge_kwargs = {
+                            "model_name": current_model,
+                            "model_kwargs": model_kwargs,
+                            "encode_kwargs": encode_kwargs,
+                        }
+                        if current_model == "BAAI/bge-m3":
+                            # Per https://huggingface.co/BAAI/bge-m3#faq the query instruction must be empty.
+                            bge_kwargs["query_instruction"] = ""
+                        logging.info(
+                            "Initializing HuggingFace BGE embeddings model: %s", current_model
+                        )
+                        embedding_function = HuggingFaceBgeEmbeddings(**bge_kwargs)
+                    else:
+                        from langchain_community.embeddings import HuggingFaceEmbeddings
+
+                        logging.info(
+                            "Initializing HuggingFace sentence-transformer embeddings model: %s",
+                            current_model,
+                        )
+                        embedding_function = HuggingFaceEmbeddings(
+                            model_name=current_model,
+                            model_kwargs=model_kwargs,
+                            encode_kwargs=encode_kwargs,
+                        )
                 except ImportError as import_err:
                     logging.error(
-                        "HuggingFace embeddings requested but optional dependency 'langchain-huggingface' is not installed."
+                        "Local embeddings requested but required HuggingFace dependencies are not installed."
                     )
                     raise RuntimeError(
-                        "Local embedding model requires 'langchain-huggingface'. Install it in the worker image "
-                        "or switch the default embedding model to an Azure deployment."
+                        "Local embedding models require 'langchain-community' with HuggingFace support "
+                        "and 'sentence-transformers'. Install them in the worker image or use an Azure "
+                        "OpenAI embedding deployment instead."
                     ) from import_err
-                # Fallback to HuggingFace for local models
-                logging.info(f"Initializing HuggingFace Embeddings model: {current_model}")
-                embedding_function = HuggingFaceEmbeddings(
-                    model_name=current_model,
-                    model_kwargs=model_kwargs,
-                    encode_kwargs=encode_kwargs,
-                    # query_instruction=query_instruction # Uncomment if using BGE and instruction is desired
-                )
             logging.info("Embeddings model initialized successfully.")
         except Exception as e:
             logging.error(f"Fatal Error: Could not initialize embeddings: {e}", exc_info=True)
