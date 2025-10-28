@@ -189,43 +189,38 @@ def get_embedding_function():
                 )
             else:
                 try:
-                    if current_model.lower().startswith("baai/bge"):
-                        from langchain_community.embeddings import HuggingFaceBgeEmbeddings
-
-                        bge_kwargs = {
-                            "model_name": current_model,
-                            "model_kwargs": model_kwargs,
-                            "encode_kwargs": encode_kwargs,
-                        }
-                        if current_model == "BAAI/bge-m3":
-                            # Per https://huggingface.co/BAAI/bge-m3#faq the query instruction must be empty.
-                            bge_kwargs["query_instruction"] = ""
-                        logging.info(
-                            "Initializing HuggingFace BGE embeddings model: %s", current_model
-                        )
-                        embedding_function = HuggingFaceBgeEmbeddings(**bge_kwargs)
-                    else:
-                        from langchain_community.embeddings import HuggingFaceEmbeddings
-
-                        logging.info(
-                            "Initializing HuggingFace sentence-transformer embeddings model: %s",
-                            current_model,
-                        )
-                        embedding_function = HuggingFaceEmbeddings(
-                            model_name=current_model,
-                            model_kwargs=model_kwargs,
-                            encode_kwargs=encode_kwargs,
-                        )
+                    from langchain_huggingface.embeddings import HuggingFaceEmbeddings  
                 except ImportError as import_err:
                     logging.error(
-                        "Local embeddings requested but required HuggingFace dependencies are not installed."
+                        "Local embeddings requested but 'langchain-huggingface' is not installed in this environment."
                     )
                     raise RuntimeError(
-                        "Local embedding models require 'langchain-community' with HuggingFace support "
-                        "and 'sentence-transformers'. Install them in the worker image or use an Azure "
-                        "OpenAI embedding deployment instead."
+                        "Install 'langchain-huggingface' in the worker image or switch to an Azure embedding deployment."
                     ) from import_err
-            logging.info("Embeddings model initialized successfully.")
+
+                # hf_kwargs = {
+                #     "model_name": current_model,
+                #     "model_kwargs": model_kwargs,
+                #     "encode_kwargs": encode_kwargs,
+                # }
+                
+                logging.info(
+                    "Initializing HuggingFace embeddings model via langchain-huggingface: %s",
+                    current_model,
+                )
+                try:
+                    from langchain_huggingface.embeddings import HuggingFaceEmbeddings  
+                     # Fallback to HuggingFace for local models
+                    logging.info(f"Initializing HuggingFace Embeddings model: {current_model}")
+                    embedding_function = HuggingFaceEmbeddings(
+                        model_name=current_model,
+                        model_kwargs=model_kwargs,
+                        encode_kwargs=encode_kwargs,                        
+                    )
+                    logging.info("Embeddings model initialized successfully.")
+                except Exception as e:
+                    logging.error(f"Error initializing embeddings model: {e}", exc_info=True)
+                    raise RuntimeError("Failed to initialize embedding model.") from e
         except Exception as e:
             logging.error(f"Fatal Error: Could not initialize embeddings: {e}", exc_info=True)
             raise RuntimeError("Failed to initialize embedding model.") from e

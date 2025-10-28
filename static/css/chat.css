@@ -127,7 +127,7 @@
 #knowledgeSelectBtn i,
 #knowledgeGlobalSelectBtn i,
 #libraryBtn i {
-  color: var(--bs-secondary-color, #6c757d);
+  color: rgba(255, 255, 255, 0.95) !important;
 }
 
 /* Hover/focus: background matches page with 0.9 opacity, no outline */

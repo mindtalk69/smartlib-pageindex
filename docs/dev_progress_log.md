@@ -18,9 +18,15 @@
 - Hardened the front-end typewriter pipeline to accumulate partial text, merge metadata, and finalize messages only after the stream completes, preventing stale caret states.
 - Added console diagnostics and cache-busting tweaks (`Config.APP_VERSION`) to ensure rebuilt assets invalidate the browser cache during rapid UI iteration.
 - **Next**: Tune the progress bar styling for dark mode and explore a lightweight “look-ahead” chunk summary before final render.
+- Offloaded Hugging Face embedding retrieval to the worker via a new `modules.vector_tasks.retrieve_context` task so the web container can stay slim; the tool automatically calls Celery when a local model (e.g., `BAAI/bge-m3`) is active.
+- Pulled the updated `langchain-huggingface` shim into the worker image so BGE models load cleanly while the web image remains lean.
+ 
+ ## 2025-10-28 – Admin UX Parity & Streaming Feedback Fixes
+ - Brought the knowledges admin page in line with other admin tables: new client script handles inline add/edit/delete, row renumbering, placeholder swaps, and modal resets without full reloads.
 
-## 2025-10-28 – Admin UX Parity & Streaming Feedback Fixes
-- Brought the knowledges admin page in line with other admin tables: new client script handles inline add/edit/delete, row renumbering, placeholder swaps, and modal resets without full reloads.
 - Normalized knowledge responses by reusing shared serialization helpers so the frontend receives consistent name lists and timestamps.
 - Synced streaming metadata with the real backend message ID and updated the bubble dataset, ensuring like/dislike feedback persists once the stream completes.
 - Hardened the feedback buttons to defer submission while a message is streaming and use the synchronized ID, resolving the previous failure when streaming was enabled.
+- Restored implicit knowledge assignment during uploads so `/admin/files` immediately shows the correct knowledge after a data reset.
+- Normalized the streaming formatter to strip inline follow-up blocks while keeping the suggested questions in the footer metadata.
+- Wired the streaming collector to reuse the formatted answer payload so numbered follow-ups stay out of the UI transcript while suggested pills remain intact.

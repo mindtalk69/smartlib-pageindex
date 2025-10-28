@@ -20,9 +20,15 @@ except ImportError:
 
 # Import database functions
 from modules.database import (
-    add_uploaded_file, get_libraries_with_details, 
-    Library, Knowledge, db,
-    create_url_download, update_url_download,
+    add_uploaded_file,
+    get_libraries_with_details,
+    get_library_with_details,
+    knowledge_libraries_association,
+    Library,
+    Knowledge,
+    db,
+    create_url_download,
+    update_url_download,
 )
 
 # Import CSRF instance
@@ -64,7 +70,7 @@ def init_upload(app):
         )
         raw_library_name = request.form.get('library_name', 'Unknown Library')
         library_name = raw_library_name.split(' — ')[0].strip() if raw_library_name else 'Unknown Library'
-        knowledge_id = 0
+        knowledge_id = None
 
         if not library_id:
             return jsonify({'success': False, 'message': 'Please select a library.'}), 400
@@ -73,6 +79,10 @@ def init_upload(app):
             library_id = int(library_id)
         except ValueError:
             return jsonify({'success': False, 'message': 'Invalid library selected.'}), 400
+
+        library = get_library_with_details(library_id)
+        if library is None:
+            return jsonify({'success': False, 'message': 'Selected library does not exist.'}), 400
 
         # Get files from request (handle both 'file' and 'files' for compatibility)
         files = request.files.getlist('files') or request.files.getlist('file')
@@ -94,6 +104,15 @@ def init_upload(app):
             except Exception as e:
                 print(f"DEBUG: Knowledge ID conversion failed: {e}")
                 return jsonify({'success': False, 'message': 'Invalid knowledge base selected.'}), 400
+        else:
+            first_library_knowledge = (
+                Knowledge.query.join(knowledge_libraries_association)
+                .filter(knowledge_libraries_association.c.library_id == library_id)
+                .first()
+            )
+            if first_library_knowledge is not None:
+                knowledge_id = first_library_knowledge.id
+                print(f"DEBUG: Defaulting knowledge_id to library association: {knowledge_id}")
 
         # Process each file
         uploaded_files = []
@@ -122,7 +141,8 @@ def init_upload(app):
                     original_name=filename,
                     stored_name=stored_filename,
                     size=file_size,
-                    library_id=library_id
+                    library_id=library_id,
+                    knowledge_id=knowledge_id
                 )
                 
                 # Submit processing task to Celery worker
@@ -224,6 +244,10 @@ def init_upload(app):
         except (TypeError, ValueError):
             return jsonify({'success': False, 'message': 'Invalid library selected.'}), 400
 
+        library = get_library_with_details(library_id)
+        if library is None:
+            return jsonify({'success': False, 'message': 'Selected library does not exist.'}), 400
+
         vector_store_setting = current_app.config.get('VECTOR_STORE_MODE', 'user')
         if vector_store_setting == 'knowledge':
             if not knowledge_id:
@@ -233,7 +257,12 @@ def init_upload(app):
             except (TypeError, ValueError):
                 return jsonify({'success': False, 'message': 'Invalid knowledge base selected.'}), 400
         else:
-            knowledge_id_int = None
+            knowledge_obj = (
+                Knowledge.query.join(knowledge_libraries_association)
+                .filter(knowledge_libraries_association.c.library_id == library_id)
+                .first()
+            )
+            knowledge_id_int = knowledge_obj.id if knowledge_obj is not None else None
 
         filename = os.path.basename(parsed.path) or 'downloaded_document'
         if '.' not in filename:
@@ -284,6 +313,7 @@ def init_upload(app):
         )
 
         task_id = None
+        result = None
         try:
             task_scheduled = False
             if submit_file_processing_task:
@@ -348,9 +378,13 @@ def init_upload(app):
                 'download_id': download_id,
             }
         else:
+            if isinstance(result, dict) and 'message' in result:
+                success_message = result['message']
+            else:
+                success_message = 'URL processed successfully.'
             response_payload = {
                 'success': True,
-                'message': result.get('message') if 'result' in locals() else 'URL processed successfully.',
+                'message': success_message,
                 'download_id': download_id,
             }
 

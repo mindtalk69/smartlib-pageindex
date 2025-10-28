@@ -3,7 +3,14 @@ import folium
 import base64 # For encoding map image
 import io # For image bytes
 from geopy.geocoders import Nominatim
-from modules.llm_utils import get_llm, get_embedding_function, get_lc_store_path, get_active_language_name
+from modules.llm_utils import (
+    get_llm,
+    get_embedding_function,
+    get_lc_store_path,
+    get_active_language_name,
+    get_current_embedding_model,
+    requires_local_embedding,
+)
 from langchain_community.tools import GoogleSerperResults
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, BaseMessage
 import json
@@ -381,6 +388,28 @@ def _build_explicit_metadata_filters(config: dict) -> dict:
     logging.info(f"[RAG Filter] Built explicit filters: {filters}")
     return filters
 
+def _rehydrate_documents(payload: Dict[str, Any]) -> Dict[str, Any]:
+    documents = payload.get("documents")
+    if not documents:
+        return payload
+    hydrated: List[Document] = []
+    for item in documents:
+        if isinstance(item, Document):
+            hydrated.append(item)
+            continue
+        if isinstance(item, dict):
+            hydrated.append(
+                Document(
+                    page_content=item.get("page_content", ""),
+                    metadata=item.get("metadata") or {},
+                )
+            )
+        else:
+            logging.warning("Unexpected document payload type: %s", type(item))
+    payload["documents"] = hydrated
+    return payload
+
+
 def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str, Any]:
     """Execute vector store retrieval using the provided configuration."""
     start_time = time.perf_counter()
@@ -574,19 +603,23 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
             structured_query_string,
         )
 
-        return {
-            "documents": retrieved_docs,
-            "structured_query": structured_query_string
-        }
+        return _rehydrate_documents(
+            {
+                "documents": retrieved_docs,
+                "structured_query": structured_query_string,
+            }
+        )
 
     except Exception as e:
         duration = time.perf_counter() - start_time
         logging.error(f"[RAG] Error during retrieval after {duration:.2f}s: {e}", exc_info=True)
-        return {
-            "documents": [],
-            "structured_query": f"Error: {str(e)}",
-            "error": str(e)
-        }
+        return _rehydrate_documents(
+            {
+                "documents": [],
+                "structured_query": f"Error: {str(e)}",
+                "error": str(e),
+            }
+        )
 
 
 @tool("retrieve_context", args_schema=RetrieveContextInput)
@@ -604,7 +637,34 @@ def retrieve_context_tool(query: str, config: dict = None) -> Dict[str, Any]:
         Dict[str, Any]: A dictionary containing 'documents' (List[Document]) and 'structured_query' (str).
     """
     logging.info("--- ENTERING retrieve_context_tool ---")
-    tool_call_config = config or {}
+    tool_call_config = dict(config or {})
+
+    current_model = get_current_embedding_model()
+    logging.info("Current embedding model resolved to %s", current_model)
+
+    if requires_local_embedding(current_model) and not tool_call_config.get("_offloaded_to_worker"):
+        logging.info("Offloading retrieval to worker because %s requires local embeddings", current_model)
+        from celery_app import celery
+
+        offloaded_config = dict(tool_call_config)
+        offloaded_config["_offloaded_to_worker"] = True
+        timeout_seconds = current_app.config.get("RETRIEVAL_OFFLOAD_TIMEOUT", 180)
+        try:
+            async_result = celery.send_task(
+                "modules.vector_tasks.retrieve_context",
+                args=[query, offloaded_config],
+            )
+            result = async_result.get(timeout=timeout_seconds)
+            logging.info("Worker retrieval completed successfully via Celery")
+            return _rehydrate_documents(result)
+        except Exception as exc:  # pragma: no cover - network/worker issues
+            logging.error("Worker retrieval failed: %s", exc, exc_info=True)
+            return {
+                "documents": [],
+                "structured_query": "Error: worker retrieval failed",
+                "error": str(exc),
+            }
+
     return perform_retrieval(query, tool_call_config)
 
 # --- RAG Agent and Supervisor Graphs ---
@@ -959,8 +1019,13 @@ Think step-by-step."""
                 # If retrieve_context produced results, update retrieved_context and structured_query consistently
                 if tool_name == "retrieve_context":
                     res = exec_res.get("result", {}) or {}
-                    documents = res.get("documents", []) if isinstance(res, dict) else []
-                    structured_query_res = res.get("structured_query") if isinstance(res, dict) else None
+                    if isinstance(res, dict):
+                        res = _rehydrate_documents(dict(res))
+                        documents = res.get("documents", [])
+                        structured_query_res = res.get("structured_query")
+                    else:
+                        documents = []
+                        structured_query_res = None
                     updated_state_dict["retrieved_context"] = documents
                     updated_state_dict["structured_query"] = structured_query_res
     
@@ -975,6 +1040,8 @@ Think step-by-step."""
             logging.info("--- Generating Final Answer (Simplified) ---")
             question = state["input"]
             documents = state.get("retrieved_context", [])
+            if documents and not isinstance(documents[0], Document):
+                documents = _rehydrate_documents({"documents": documents}).get("documents", [])
             image_base64 = state.get("image_base64")
             image_mime_type = state.get("image_mime_type")
             messages = state.get("messages", [])
@@ -1070,6 +1137,50 @@ Answer:"""
             
             import re
 
+            def _normalize_question(text: str) -> str:
+                cleaned = re.sub(r'^[\s\-\d\.\)\(•\u2022\*]+', '', (text or '').strip())
+                return cleaned.rstrip('?.!').strip().lower()
+
+            def _extract_trailing_question_block(text: str) -> Tuple[str, List[str]]:
+                if not text:
+                    return text, []
+                patterns = [
+                    re.compile(
+                        r"""
+                        (?<!\w)
+                        (?P<block>(?:\s*(?:\d+[\.\)\:])\s*.{1,280}?\?\s*){2,})
+                        \s*$
+                        """,
+                        re.VERBOSE | re.DOTALL,
+                    ),
+                    re.compile(
+                        r"""
+                        (?<!\w)
+                        (?P<block>(?:\s*(?:[-*•])\s*.{1,280}?\?\s*){2,})
+                        \s*$
+                        """,
+                        re.VERBOSE | re.DOTALL,
+                    ),
+                ]
+                question_pattern = re.compile(r'(?:\d+[\.\)\:]|[-*•])\s*(.+?\?)', re.DOTALL)
+                for pattern in patterns:
+                    match = pattern.search(text)
+                    if not match:
+                        continue
+                    block = match.group("block")
+                    questions: List[str] = []
+                    for q_match in question_pattern.finditer(block):
+                        candidate = q_match.group(1).strip()
+                        if not candidate:
+                            continue
+                        if not candidate.endswith('?'):
+                            candidate = f"{candidate}?"
+                        questions.append(candidate)
+                    if questions:
+                        cleaned_text = text[:match.start()].rstrip()
+                        return cleaned_text, questions
+                return text, []
+
             # Find all unique, 1-based citation numbers used by the LLM (e.g., [1], [2], [5])
             cited_numbers = sorted(list(set(int(m) for m in re.findall(r'\[(\d+)\]', final_answer_from_llm))))
 
@@ -1086,6 +1197,19 @@ Answer:"""
                 return match.group(0) # Should not happen if regex is correct
 
             final_answer_raw = re.sub(r'\[(\d+)\]', replace_cite_marker, final_answer_from_llm)
+
+            cleanup_block_pattern = re.compile(
+                r"(?is)\b(?:possible\s+)?follow[\s\-]?up questions?(?:\s+include)?[:：]?\s*.*$"
+            )
+            final_answer_raw = cleanup_block_pattern.sub("", final_answer_raw).rstrip()
+
+            trailing_questions_from_answer: List[str] = []
+            while True:
+                updated_answer, extracted_questions = _extract_trailing_question_block(final_answer_raw)
+                if not extracted_questions:
+                    break
+                trailing_questions_from_answer.extend(extracted_questions)
+                final_answer_raw = updated_answer
 
             # Build the citations list for the metadata, using only the documents that were actually cited.
             citations = []
@@ -1195,18 +1319,46 @@ Answer:"""
                         # Fallback to simple line-splitting parsing
                         for line in raw_q_content.splitlines():
                             line = line.strip()
-                            if line:
-                                clean = re.sub(r'^[\d\-\.\)\s]+', '', line).strip().strip('"\'').strip()
-                                if clean and not clean.endswith('?'):
-                                    clean += '?'
-                                if clean and clean not in suggested_questions:
-                                    suggested_questions.append(clean)
-                                if len(suggested_questions) >= 3:
-                                    break
+                            if not line:
+                                continue
+                            clean = re.sub(r'^[\d\-\.\)\s]+', '', line).strip().strip('"\'').strip()
+                            if clean and not clean.endswith('?'):
+                                clean += '?'
+                            if clean and clean not in suggested_questions:
+                                suggested_questions.append(clean)
+                            if len(suggested_questions) >= 3:
+                                break
+
                 except Exception as e:
                     logging.warning(f"Error generating questions: {e}")
 
+            combined_questions: List[str] = []
+            seen_questions = set()
+            for candidate in trailing_questions_from_answer + suggested_questions:
+                normalized = _normalize_question(candidate)
+                if not normalized or normalized in seen_questions:
+                    continue
+                combined_questions.append(candidate.strip())
+                seen_questions.add(normalized)
+            suggested_questions = combined_questions[:3]
+
+            if suggested_questions:
+                normalized_questions_for_trim = {_normalize_question(q) for q in suggested_questions if q}
+                answer_lines = final_answer_raw.splitlines()
+                while answer_lines:
+                    tail = answer_lines[-1].strip()
+                    if not tail:
+                        answer_lines.pop()
+                        continue
+                    if _normalize_question(tail) in normalized_questions_for_trim:
+                        answer_lines.pop()
+                        continue
+                    break
+                final_answer_raw = "\n".join(answer_lines).rstrip()
+
+
             formatted_response = {
+
                 "answer": final_answer_raw,
                 "citations": citations,
                 "suggested_questions": suggested_questions,
@@ -2095,8 +2247,12 @@ async def _collect_stream_chunks(graph, inputs, config):
                                     "confirmation_required", "confirmation_type", "thread_id", "structured_query", "hil_options"]:
                             if key in agent_output_data:
                                 final_response_obj[key] = agent_output_data[key]
-                        if "answer" in agent_output_data and not full_streamed_content: # Prioritize streamed text
-                            final_response_obj["answer"] = agent_output_data["answer"]
+                        if "answer" in agent_output_data:
+                            formatted_answer = agent_output_data.get("answer") or ""
+                            if not isinstance(formatted_answer, str):
+                                formatted_answer = str(formatted_answer)
+                            final_response_obj["answer"] = formatted_answer
+                            full_streamed_content = formatted_answer
                         yield f"data: {json.dumps({'type': 'metadata_update', 'metadata': agent_output_data})}\n\n"
     except GraphInterrupt:
         hil_interrupt = True

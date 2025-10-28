@@ -327,7 +327,7 @@
   font-size: 0.8rem;
   padding: 0.35rem 0.75rem;
   margin: 0 2px;
-  color: var(--bs-body-color); /* Use body color */
+  color: rgba(255, 255, 255, 0.92) !important;
 }
 
 #historyBtn:hover,

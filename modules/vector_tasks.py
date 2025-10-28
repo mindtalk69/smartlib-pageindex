@@ -14,7 +14,19 @@ def retrieve_context_task(query: str, tool_call_config: Optional[Dict[str, Any]]
     from modules.agent import perform_retrieval
 
     config = tool_call_config or {}
-    return perform_retrieval(query, config)
+    result = perform_retrieval(query, config)
+
+    documents = result.get("documents") or []
+    serialized_docs: List[Dict[str, Any]] = []
+    for doc in documents:
+        serialized_docs.append(
+            {
+                "page_content": getattr(doc, "page_content", ""),
+                "metadata": getattr(doc, "metadata", {}) or {},
+            }
+        )
+    result["documents"] = serialized_docs
+    return result
 
 
 @celery.task(name="modules.vector_tasks.fetch_document_chunks")

@@ -74,6 +74,10 @@ class Config:
         AGENT_TASK_TIMEOUT = int(os.environ.get('AGENT_TASK_TIMEOUT', '120'))
     except ValueError:
         AGENT_TASK_TIMEOUT = 120
+    try:
+        RETRIEVAL_OFFLOAD_TIMEOUT = int(os.environ.get('RETRIEVAL_OFFLOAD_TIMEOUT', '180'))
+    except ValueError:
+        RETRIEVAL_OFFLOAD_TIMEOUT = 180
 
     # --- Azure OpenAI Config (Load from env) ---
     AZURE_OPENAI_API_KEY = os.environ.get('AZURE_OPENAI_API_KEY')
