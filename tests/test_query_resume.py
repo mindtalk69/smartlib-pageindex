@@ -123,7 +123,13 @@ def test_api_query_streaming_updates_placeholder(client, app_instance, monkeypat
     def fake_invoke_agent(*args, **kwargs):
         return dict(agent_payload)
 
-    monkeypatch.setattr(query_module, "invoke_agent_via_worker", fake_invoke_agent)
+    def fail_invoke_agent_via_worker(*args, **kwargs):  # pragma: no cover - safety
+        raise AssertionError("invoke_agent_via_worker should not be called for streaming")
+
+    dummy_agent_module = types.ModuleType("modules.agent")
+    dummy_agent_module.invoke_agent_graph = fake_invoke_agent
+    monkeypatch.setitem(sys.modules, "modules.agent", dummy_agent_module)
+    monkeypatch.setattr(query_module, "invoke_agent_via_worker", fail_invoke_agent_via_worker)
 
     response = client.post(
         "/api/query",
@@ -135,6 +141,7 @@ def test_api_query_streaming_updates_placeholder(client, app_instance, monkeypat
     assert "metadata_update" in body
     assert "end_of_stream" in body
     assert agent_payload["answer"] in body
+    assert '"conversation_id": "conv-stream"' in body
 
     with app_instance.app_context():
         stored = (

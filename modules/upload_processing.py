@@ -24,7 +24,7 @@ from modules.database import (
     add_vector_reference, add_uploaded_file, add_library_reference, add_document, get_knowledge_by_id, add_visual_grounding_activities, 
     Library, Knowledge, Document as DBDocument,  db # Renamed DB Document to avoid confusion, import DB
 )
-from modules.database import UploadedFile, LibraryReference, VisualGroundingActivity, AppSettings
+from modules.database import UploadedFile, LibraryReference, VisualGroundingActivity, AppSettings, update_url_download
 # Import the vector store processing function from the new utility module
 from modules.vector_store_utils import process_and_store_chunks
 
@@ -39,6 +39,8 @@ def process_uploaded_file(
     logger=None,
     app_config=None,
     current_user=None,
+    url_download_id=None,
+    source_url=None,
 ):
     """
     Process a single uploaded file for ingestion, chunking, vector store, and metadata.
@@ -48,6 +50,7 @@ def process_uploaded_file(
     results = {}
     actual_file_size = os.path.getsize(file_path)
     logger.info(f"Processing file: {filename} for library_id: {library_id}, library_name: {library_name}")
+    reference_type = 'url_download' if url_download_id else 'file'
 
     # --- Visual Grounding Setup ---
     converter = None
@@ -439,7 +442,8 @@ def process_uploaded_file(
                 db.session.add(uploaded_file)
                 db.session.flush()
                 file_id = uploaded_file.file_id
-                library_ref = LibraryReference(library_id=library_id, user_id=user_id, reference_type='file', source_id=file_id)
+                reference_type = 'url_download' if url_download_id else 'file'
+                library_ref = LibraryReference(library_id=library_id, user_id=user_id, reference_type=reference_type, source_id=file_id)
                 db.session.add(library_ref)
                 db.session.commit()
                 logger.info(f"Recorded file upload (file_id: {file_id}) despite zero chunks generated.")
@@ -465,6 +469,9 @@ def process_uploaded_file(
         "library_name": library_name,
         "knowledge_id": knowledge_id_int
     }
+    if source_url:
+        upload_context_metadata["source_url"] = source_url
+
     # Use metadata from the first loaded doc if available, otherwise empty dict
     base_metadata_from_load = {}
     if loaded_docs and hasattr(loaded_docs[0], 'metadata'):
@@ -530,6 +537,8 @@ def process_uploaded_file(
         # Ensure metadata from the split itself takes precedence over merged base
         current_metadata = {**merged_base_metadata, **split_doc.metadata}
         current_metadata['source'] = filename # Ensure source is always the filename
+        if source_url:
+            current_metadata['source_url'] = source_url
               
         #--------------------------------
         # Get Page No
@@ -597,10 +606,11 @@ def process_uploaded_file(
             db.session.rollback()
             return {'success': False, 'message': 'Failed to store file information.'}
 
+        reference_type = 'url_download' if url_download_id else 'file'
         library_ref = LibraryReference(
             library_id=library_id,
             user_id=user_id,
-            reference_type='file',
+            reference_type=reference_type,
             source_id=file_id
         )
         db.session.add(library_ref)
@@ -678,6 +688,7 @@ def process_uploaded_file(
                 embedding_function,
                 logger,
                 file_id=file_id, # Pass file_id for association
+                url_download_id=url_download_id,
                 knowledge_id=knowledge_id_int, # Pass knowledge_id for pathing
                 new_uuid_indexes=new_uuid_strings, # Pass the generated UUIDs
             )
@@ -711,7 +722,7 @@ print(f"[{os.getpid()}] modules.upload_processing.py: Imported celery instance. 
 # @celery.task
 # It becomes (combine name and base into one decorator):
 @celery.task(name="modules.upload_processing.async_process_single_file", bind=True)
-def async_process_single_file(self, temp_file_path_from_route, original_filename, user_id, library_id, library_name, knowledge_id_str, enable_visual_grounding_flag):
+def async_process_single_file(self, temp_file_path_from_route, original_filename, user_id, library_id, library_name, knowledge_id_str, enable_visual_grounding_flag, url_download_id=None, source_url=None, content_type=None):
     """
     Celery task to process a single file upload asynchronously.
     This task runs in the background and calls the main process_uploaded_file function.
@@ -719,6 +730,9 @@ def async_process_single_file(self, temp_file_path_from_route, original_filename
     # Use a more specific logger for Celery tasks if desired, or use the default task logger
     task_logger = logging.getLogger(f"celery.task.{self.name}")
     task_logger.info(f"Celery task started for: {original_filename}, temp path: {temp_file_path_from_route}")
+
+    if url_download_id:
+        update_url_download(url_download_id, status='processing')
 
     # Construct app_config for process_uploaded_file
     # This requires running within a Flask app context, which should be configured for the Celery app.
@@ -743,23 +757,44 @@ def async_process_single_file(self, temp_file_path_from_route, original_filename
             enable_visual_grounding=enable_visual_grounding_flag,
             logger=task_logger, # Pass the task's logger
             app_config=task_app_config,
-            current_user=None # current_user is not available/needed here
+            current_user=None, # current_user is not available/needed here
+            url_download_id=url_download_id,
+            source_url=source_url,
         )
         if result.get('success'):
             task_logger.info(f"Async processing successful for {original_filename}: {result.get('message')}")
+            if url_download_id:
+                update_url_download(url_download_id, status='success', content_type=content_type)
         else:
             task_logger.error(f"Async processing failed for {original_filename}: {result.get('message')}")
+            if url_download_id:
+                update_url_download(url_download_id, status='failed', error_message=result.get('message'))
     except Exception as e:
         task_logger.error(f"Exception in async_process_single_file for {original_filename}: {e}", exc_info=True)
         result = {'success': False, 'message': f"Celery task exception: {str(e)}", 'filename': original_filename}
+        if url_download_id:
+            update_url_download(url_download_id, status='failed', error_message=str(e))
     finally:
         # Clean up the temporary file passed from the route
-        if temp_file_path_from_route and os.path.exists(temp_file_path_from_route):
+        if temp_file_path_from_route:
+            temp_path = Path(temp_file_path_from_route)
+            if temp_path.exists():
+                try:
+                    temp_path.unlink()
+                    task_logger.info(f"Celery task removed temp file: {temp_file_path_from_route}")
+                except OSError as e_remove:
+                    task_logger.error(
+                        f"Celery task error removing temp file {temp_file_path_from_route}: {e_remove.strerror}"
+                    )
+            parent_dir = temp_path.parent
             try:
-                os.remove(temp_file_path_from_route)
-                task_logger.info(f"Celery task removed temp file: {temp_file_path_from_route}")
-            except OSError as e_remove:
-                task_logger.error(f"Celery task error removing temp file {temp_file_path_from_route}: {e_remove.strerror}")
+                if parent_dir.is_dir() and not any(parent_dir.iterdir()):
+                    parent_dir.rmdir()
+                    task_logger.debug(f"Celery task removed empty temp dir: {parent_dir}")
+            except OSError as e_remove_dir:
+                task_logger.debug(
+                    f"Celery task skipped removing temp dir {parent_dir}: {e_remove_dir.strerror}"
+                )
 
     # TODO: Implement a way to notify the user or update status in DB based on 'result'
     return result

@@ -36,17 +36,27 @@
 
 ### Quick Start Testing
 
-1. **Build the micro image:**
+1. **Build the micro image (default ultralight web stack):**
    ```bash
    ./rebuild-micro.sh
    ```
 
-2. **Start all services:**
+   > The default `Dockerfile.web` keeps HuggingFace/Torch dependencies out of the image for a ~1 GB footprint.
+
+2. **(Optional) Build with local embedding extras:**
+   ```bash
+   docker build -f Dockerfile.web \
+     --build-arg INSTALL_WEB_EXTRAS=true \
+     -t smartlib-web:extras .
+   ```
+   This flag installs `requirements-web-extras.txt` (langchain-huggingface, sentence-transformers, torch, torchvision). Expect the image to grow by 6–8 GB. Only enable when the web container must host local embeddings or Torch-based streaming.
+
+3. **Start all services:**
    ```bash
    docker compose up -d
    ```
 
-3. **Run automated tests:**
+4. **Run automated tests:**
    ```bash
    ./test-local-compose.sh
    ```

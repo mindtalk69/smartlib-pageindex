@@ -26,6 +26,14 @@ tiktoken==0.9.0
 langchain-openai==0.2.10
 langchain>=0.3.18
 langchain-community>=0.3.17
+langchain-chroma>=0.1.4
+langchain-postgres>=0.0.6
+langgraph-checkpoint>=2.0.25
+langgraph-prebuilt>=0.1.8
+langgraph-supervisor>=0.0.19
+langgraph-sdk>=0.1.66
+chromadb>=0.5.23
+pgvector>=0.2.5
 
 # Document loading handled by worker container (remote API only)
 
@@ -46,6 +54,10 @@ Pillow==11.0.0
 folium==0.18.0
 geopy==2.4.1
 langgraph>=0.2.60
+langchain-experimental>=0.0.65
+selenium>=4.25.0
+webdriver-manager>=4.0.1
+matplotlib>=3.9.0
 pandas==2.2.3
 
 # Experimental dependencies for agent tools are loaded in worker image
@@ -54,6 +66,7 @@ pandas==2.2.3
 # REMOVED FOR SIZE OPTIMIZATION:
 # ============================================================================
 # - sentence-transformers (~200MB with dependencies)
+# - langchain-huggingface (requires torch; only installed in worker)
 # - scikit-learn (~50MB)
 # - PyMuPDF (~50MB)
 # - pdfminer.six (~20MB)

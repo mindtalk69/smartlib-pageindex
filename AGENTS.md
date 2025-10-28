@@ -859,9 +859,16 @@ The `index.html` file serves as the main user chat interface for the SmartThing 
 1. A welcome page for unauthenticated users
 2. A chat interface with document search functionality for authenticated users.
 
+## Overview of Upload & Ingest
+
+docs/upload_ingest.md
+
 ## Overview of Vector Store Modes
 
 The SmartThing application has three different vector store modes that significantly affect how the user interface in `index.html` functions:
 
 Please read on docs/ui/index-html.md and docs/ui/index-html-vectore_store.md for more details.
 
+## Progress Dayli
+Always check this document
+[text](docs/dev_progress_log.md)

@@ -1,4 +1,7 @@
-from flask import render_template, session, jsonify
+import os
+from pathlib import Path
+
+from flask import render_template, session, jsonify, send_from_directory, abort, current_app
 from extensions import db
 # Import rewritten functions and MessageHistory model
 from .database import count_user_messages, count_user_documents, get_libraries, get_user_messages, MessageHistory
@@ -125,6 +128,20 @@ def init_index(app):
             knowledge_libraries_map=knowledge_libraries_map,
             active_language=active_language,
         )
+
+    @app.route('/generated-maps/<path:filename>')
+    def serve_generated_map(filename: str):
+        """Serve generated map files stored outside the static directory."""
+        map_dir = Path(current_app.config.get('MAP_PUBLIC_DIR', os.path.join(current_app.root_path, 'static', 'maps')))
+        requested_path = (map_dir / filename).resolve()
+        try:
+            map_dir_resolved = map_dir.resolve()
+        except FileNotFoundError:
+            map_dir_resolved = map_dir
+        if not str(requested_path).startswith(str(map_dir_resolved)) or not requested_path.is_file():
+            abort(404)
+        relative_path = requested_path.relative_to(map_dir_resolved)
+        return send_from_directory(str(map_dir_resolved), relative_path.as_posix())
 
     @app.route('/api/history')
     @login_required

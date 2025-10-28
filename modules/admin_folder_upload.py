@@ -295,7 +295,9 @@ def process_folder_upload_task(job_id):
                 enable_visual_grounding=enable_visual_grounding,
                 logger=None,
                 app_config=app_config,
-                current_user=None
+                current_user=None,
+                url_download_id=None,
+                source_url=None,
             )
             results.append(result)
             if result.get("success", False):

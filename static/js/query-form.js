@@ -3,6 +3,12 @@
 
 let currentConversationId = null;
 
+const TYPEWRITER_STATES = new Map();
+const TYPEWRITER_CHAR_INTERVAL = 18;
+if (typeof window !== 'undefined') {
+    window.TYPEWRITER_STATES = TYPEWRITER_STATES;
+}
+
 function getConversationId() {
     let convId = localStorage.getItem('chatConversationId');
     // console.log('[QueryFormJS] getConversationId: Tried loading from localStorage, found:', convId);
@@ -899,6 +905,7 @@ async function submitQuery() {
                 content: '<div class="typing-indicator"><span></span><span></span><span></span></div>', // Typing animation placeholder
                 id: streamingMessageId // Assign ID for targeting by readStream
             });
+            initializeTypewriterState(streamingMessageId);
         }
     } else {
         // STREAMING OFF: Show the main loading animation
@@ -983,6 +990,9 @@ async function submitQuery() {
             // Loading indicator is hidden in the finally block
             errorOccurred = true;
         }
+        if (streamEnabled && streamingMessageId) {
+            resetTypewriterEffect(streamingMessageId);
+        }
     })
     .finally(async () => { // Make finally async to await
         queryInput.disabled = false;
@@ -999,6 +1009,12 @@ async function submitQuery() {
         // Also handles placeholder.
         await updateSelfRetrieverContextVisibility();
         
+        if (streamEnabled && streamingMessageId) {
+            const lingeringState = TYPEWRITER_STATES.get(streamingMessageId);
+            if (lingeringState && !lingeringState.streamComplete) {
+                resetTypewriterEffect(streamingMessageId);
+            }
+        }
         // Automatically clear image attachment after sending
         const removeImageButton = document.getElementById('remove-image-badge');
         if (removeImageButton && (window.currentImageBase64 || window.currentImageMimeType)) {
@@ -1050,12 +1066,12 @@ async function readStream(response, messageId) {
 
                             if (eventData.type === 'text_chunk' && typeof eventData.content === 'string') {
                                 accumulatedTextContent += eventData.content;
-                                window.chatCore.updateMessage(messageId, { content: accumulatedTextContent });
+                                initializeTypewriterState(messageId);
+                                registerChunkProgress(messageId, eventData);
+                                applyTypewriterEffect(messageId, accumulatedTextContent);
                             } else if (eventData.type === 'metadata_update' && eventData.metadata) {
                                 console.log("[QueryForm readStream] Processing metadata_update:", eventData.metadata);
-                                // ChatCore's updateMessage should handle merging this metadata
-                                // with any existing metadata for the message.
-                                window.chatCore.updateMessage(messageId, { metadata: eventData.metadata });
+                                mergeTypewriterMetadata(messageId, eventData.metadata);
                             } else if (eventData.type === 'end_of_stream' && eventData.data) {
                                 console.log("[QueryForm readStream] Processing end_of_stream:", eventData.data);
                                 
@@ -1072,10 +1088,8 @@ async function readStream(response, messageId) {
                                     console.log("[QueryForm readStream] Using answer from end_of_stream.data.answer:", finalContent);
                                 }
 
-                                window.chatCore.updateMessage(messageId, {
-                                    content: finalContent,
-                                    metadata: finalPayload // Pass the whole data object as metadata
-                                });
+                                accumulatedTextContent = finalContent;
+                                completeTypewriterStream(messageId, finalContent, finalPayload);
                                 console.log("[QueryForm readStream] End of stream event fully processed.");
                             }
                         } catch (e) {
@@ -1088,17 +1102,341 @@ async function readStream(response, messageId) {
         }
     } catch (error) {
         console.error("Error reading stream:", error);
+        resetTypewriterEffect(messageId);
         if (window.chatCore) {
             // Update the bubble with an error message
             window.chatCore.updateMessage(messageId, { content: "Error receiving response." });
         }
     } finally {
+        const lingeringState = TYPEWRITER_STATES.get(messageId);
+        if (lingeringState && !lingeringState.streamComplete) {
+            resetTypewriterEffect(messageId);
+        }
         // Optional: Finalize message state in chatCore if needed
         if (window.chatCore && typeof window.chatCore.finalizeMessage === 'function') {
             window.chatCore.finalizeMessage(messageId);
         }
         console.log("Stream finished for message:", messageId);
     }
+}
+
+function initializeTypewriterState(messageId) {
+    if (!messageId) {
+        return;
+    }
+    if (!TYPEWRITER_STATES.has(messageId)) {
+        TYPEWRITER_STATES.set(messageId, {
+            displayedText: '',
+            targetText: '',
+            queue: '',
+            timer: null,
+            metadata: {},
+            streamComplete: false,
+            finalContent: null,
+            chunkCount: 0,
+            chunkTotal: null
+        });
+    }
+}
+
+function registerChunkProgress(messageId, chunkMeta = {}) {
+    initializeTypewriterState(messageId);
+    const state = TYPEWRITER_STATES.get(messageId);
+    if (!state) {
+        return;
+    }
+    if (typeof chunkMeta.chunk_index === 'number') {
+        state.chunkCount = chunkMeta.chunk_index + 1;
+    } else {
+        state.chunkCount = (state.chunkCount || 0) + 1;
+    }
+    if (typeof chunkMeta.total_chunks === 'number') {
+        state.chunkTotal = chunkMeta.total_chunks;
+    }
+    updateChunkProgressUI(messageId);
+    triggerChunkPulse(messageId);
+}
+
+function triggerChunkPulse(messageId) {
+    window.requestAnimationFrame(() => {
+        let bubble = document.getElementById(messageId);
+        if (!bubble) {
+            bubble = document.querySelector(`[data-message-id="${messageId}"]`);
+        }
+        if (!bubble) {
+            return;
+        }
+        bubble.classList.remove('chunk-pulse');
+        // Force reflow to restart animation
+        void bubble.offsetWidth;
+        bubble.classList.add('chunk-pulse');
+        setTimeout(() => bubble.classList.remove('chunk-pulse'), 260);
+    });
+}
+
+function updateChunkProgressUI(messageId, options = {}) {
+    const state = TYPEWRITER_STATES.get(messageId);
+    const chunkCount = options.chunkCount ?? state?.chunkCount ?? 0;
+    const chunkTotal = options.chunkTotal ?? state?.chunkTotal ?? null;
+
+    window.requestAnimationFrame(() => {
+        let bubble = document.getElementById(messageId);
+        if (!bubble) {
+            bubble = document.querySelector(`[data-message-id="${messageId}"]`);
+        }
+        if (!bubble) {
+            return;
+        }
+        const progressEl = bubble.querySelector('.stream-progress');
+        if (!progressEl) {
+            return;
+        }
+        progressEl.removeAttribute('hidden');
+        const labelEl = progressEl.querySelector('.stream-progress-label');
+        const barEl = progressEl.querySelector('.stream-progress-bar');
+
+        if (labelEl) {
+            if (options.complete) {
+                const summary = chunkTotal ? `${chunkCount}/${chunkTotal}` : chunkCount;
+                labelEl.textContent = `Completed (${summary})`;
+            } else {
+                labelEl.textContent = chunkTotal ? `Streaming… ${chunkCount}/${chunkTotal}` : `Streaming… ${chunkCount}`;
+            }
+        }
+
+        if (barEl) {
+            let percent;
+            if (options.complete) {
+                percent = 100;
+            } else if (chunkTotal && chunkTotal > 0) {
+                percent = Math.min(100, Math.max(5, Math.round((chunkCount / chunkTotal) * 100)));
+            } else {
+                // Cycle through values to give a sense of motion when total unknown
+                const step = (chunkCount % 6) + 1;
+                percent = Math.min(95, step * 14);
+            }
+            barEl.style.setProperty('--progress-width', `${percent}%`);
+            barEl.style.width = `${percent}%`;
+        }
+
+        if (options.complete) {
+            progressEl.classList.add('stream-progress-complete');
+            setTimeout(() => {
+                progressEl.setAttribute('hidden', 'true');
+                progressEl.classList.remove('stream-progress-complete');
+            }, 1200);
+        } else {
+            progressEl.classList.remove('stream-progress-complete');
+        }
+    });
+}
+
+function markChunkProgressComplete(messageId, chunkCount, chunkTotal) {
+    updateChunkProgressUI(messageId, {
+        complete: true,
+        chunkCount,
+        chunkTotal
+    });
+}
+
+function hideChunkProgress(messageId) {
+    window.requestAnimationFrame(() => {
+        let bubble = document.getElementById(messageId);
+        if (!bubble) {
+            bubble = document.querySelector(`[data-message-id="${messageId}"]`);
+        }
+        if (!bubble) {
+            return;
+        }
+        const progressEl = bubble.querySelector('.stream-progress');
+        if (progressEl) {
+            progressEl.setAttribute('hidden', 'true');
+            progressEl.classList.remove('stream-progress-complete');
+        }
+    });
+}
+
+function mergeTypewriterMetadata(messageId, metadata) {
+    if (!metadata || typeof metadata !== 'object') {
+        return;
+    }
+    initializeTypewriterState(messageId);
+    const state = TYPEWRITER_STATES.get(messageId);
+    state.metadata = { ...state.metadata, ...metadata };
+}
+
+function applyTypewriterEffect(messageId, targetText) {
+    if (!messageId) {
+        return;
+    }
+    initializeTypewriterState(messageId);
+    const state = TYPEWRITER_STATES.get(messageId);
+    const safeTarget = targetText || '';
+    if (safeTarget === state.targetText && !state.streamComplete) {
+        return;
+    }
+    const addition = safeTarget.slice(state.targetText.length);
+    state.targetText = safeTarget;
+    if (state.displayedText.length > safeTarget.length) {
+        state.displayedText = safeTarget.slice(0, state.displayedText.length);
+        renderTypewriterFrame(messageId, state.displayedText, true);
+    }
+    if (addition.length > 0) {
+        state.queue += addition;
+    }
+    if (!state.timer) {
+        typewriterStep(messageId);
+    }
+    if (state.streamComplete && state.queue.length === 0 && !state.timer) {
+        finalizeTypewriter(messageId);
+    }
+}
+
+function completeTypewriterStream(messageId, finalContent, finalMetadata) {
+    initializeTypewriterState(messageId);
+    const state = TYPEWRITER_STATES.get(messageId);
+    state.streamComplete = true;
+    if (finalMetadata && typeof finalMetadata === 'object') {
+        state.metadata = { ...state.metadata, ...finalMetadata };
+        const possibleTotal = typeof finalMetadata.total_chunks === 'number'
+            ? finalMetadata.total_chunks
+            : (finalMetadata.agent_output && typeof finalMetadata.agent_output.total_chunks === 'number'
+                ? finalMetadata.agent_output.total_chunks
+                : null);
+        if (possibleTotal !== null) {
+            state.chunkTotal = possibleTotal;
+        }
+    }
+    state.finalContent = typeof finalContent === 'string' ? finalContent : '';
+    if (state.chunkCount > 0 || state.chunkTotal) {
+        updateChunkProgressUI(messageId);
+    }
+    applyTypewriterEffect(messageId, state.finalContent);
+    if (state.queue.length === 0) {
+        finalizeTypewriter(messageId);
+    }
+}
+
+function typewriterStep(messageId) {
+    const state = TYPEWRITER_STATES.get(messageId);
+    if (!state) {
+        return;
+    }
+    if (state.streamComplete) {
+        if (state.queue.length > 0) {
+            state.displayedText += state.queue;
+            state.queue = '';
+            renderTypewriterFrame(messageId, state.displayedText, false);
+        }
+        state.timer = null;
+        finalizeTypewriter(messageId);
+        return;
+    }
+
+    if (state.queue.length === 0) {
+        state.timer = null;
+        renderTypewriterFrame(messageId, state.displayedText, true);
+        return;
+    }
+
+    const nextChar = state.queue.charAt(0);
+    state.queue = state.queue.slice(1);
+    state.displayedText += nextChar;
+    if (state.displayedText.length % 25 === 1) {
+        console.debug(`[Typewriter] ${messageId} progress: ${state.displayedText.length} chars, remaining: ${state.queue.length}`);
+    }
+    renderTypewriterFrame(messageId, state.displayedText, true);
+
+    state.timer = setTimeout(() => typewriterStep(messageId), TYPEWRITER_CHAR_INTERVAL);
+}
+
+function renderTypewriterFrame(messageId, text, showCaret) {
+    if (!TYPEWRITER_STATES.has(messageId)) {
+        return;
+    }
+    const escape = window.escapeHtml || ((value) => value);
+    window.requestAnimationFrame(() => {
+        if (!TYPEWRITER_STATES.has(messageId)) {
+            return;
+        }
+        let bubble = document.getElementById(messageId);
+        if (!bubble) {
+            bubble = document.querySelector(`[data-message-id="${messageId}"]`);
+        }
+        if (!bubble) {
+            setTimeout(() => renderTypewriterFrame(messageId, text, showCaret), 16);
+            return;
+        }
+        bubble.classList.add('typewriter-active');
+        let contentElement = bubble.querySelector('.bubble-content');
+        if (!contentElement && bubble.classList.contains('bubble-content')) {
+            contentElement = bubble;
+        }
+        if (!contentElement) {
+            setTimeout(() => renderTypewriterFrame(messageId, text, showCaret), 16);
+            return;
+        }
+        const safeText = escape(text || '');
+        const caretHtml = showCaret ? '<span class="typewriter-caret"></span>' : '';
+        contentElement.innerHTML = `<span class="typewriter-text">${safeText}</span>${caretHtml}`;
+    });
+}
+
+function finalizeTypewriter(messageId) {
+    const state = TYPEWRITER_STATES.get(messageId);
+    if (!state) {
+        return;
+    }
+    const finalContent = state.finalContent !== null ? state.finalContent : state.targetText;
+    const finalMetadata = state.metadata || {};
+    const chunkCount = state.chunkCount ?? 0;
+    const chunkTotal = state.chunkTotal ?? null;
+    if (chunkCount > 0 || chunkTotal) {
+        markChunkProgressComplete(messageId, chunkCount, chunkTotal);
+    } else {
+        hideChunkProgress(messageId);
+    }
+    TYPEWRITER_STATES.delete(messageId);
+    window.chatCore.updateMessage(messageId, {
+        content: finalContent,
+        metadata: finalMetadata
+    });
+    window.requestAnimationFrame(() => {
+        let bubble = document.getElementById(messageId);
+        if (!bubble) {
+            bubble = document.querySelector(`[data-message-id="${messageId}"]`);
+        }
+        if (!bubble) {
+            return;
+        }
+        bubble.classList.remove('typewriter-active');
+        const caret = bubble.querySelector('.typewriter-caret');
+        if (caret && caret.parentNode) {
+            caret.parentNode.removeChild(caret);
+        }
+    });
+}
+
+function resetTypewriterEffect(messageId) {
+    const state = TYPEWRITER_STATES.get(messageId);
+    if (state && state.timer) {
+        clearTimeout(state.timer);
+    }
+    TYPEWRITER_STATES.delete(messageId);
+    hideChunkProgress(messageId);
+    window.requestAnimationFrame(() => {
+        let bubble = document.getElementById(messageId);
+        if (!bubble) {
+            bubble = document.querySelector(`[data-message-id="${messageId}"]`);
+        }
+        if (bubble) {
+            bubble.classList.remove('typewriter-active');
+            const caret = bubble.querySelector('.typewriter-caret');
+            if (caret && caret.parentNode) {
+                caret.parentNode.removeChild(caret);
+            }
+        }
+    });
 }
 
 /**
@@ -1198,6 +1536,7 @@ function resumeQuery(threadId, confirmation) {
                 content: '<div class="typing-indicator"><span></span><span></span><span></span></div>', // Typing animation
                 id: streamingMessageId
             });
+            initializeTypewriterState(streamingMessageId);
         }
     } else {
         window.showLoading();
@@ -1249,8 +1588,17 @@ function resumeQuery(threadId, confirmation) {
                 window.chatCore.addMessage({ role: 'error', content: `Error resuming: ${error.message}` });
             }
         }
+        if (currentStreamPreference && streamingMessageId) {
+            resetTypewriterEffect(streamingMessageId);
+        }
     })
     .finally(() => {
+        if (currentStreamPreference && streamingMessageId) {
+            const lingeringState = TYPEWRITER_STATES.get(streamingMessageId);
+            if (lingeringState && !lingeringState.streamComplete) {
+                resetTypewriterEffect(streamingMessageId);
+            }
+        }
         removeSpinner(submitButton);
         submitButton.disabled = false; // Re-enable button
         if (!currentStreamPreference) window.hideLoading();

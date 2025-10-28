@@ -675,6 +675,66 @@ def create_url_download(user_id, url, status, content_type='unknown', error_mess
         logging.error(f"Error recording URL download for user {user_id}, url: {url}: {e}")
         raise
 
+def update_url_download(download_id, status=None, content_type=None, error_message=None):
+    """Update an existing URL download entry."""
+    download = UrlDownload.query.get(download_id)
+    if not download:
+        logging.warning(
+            f"update_url_download called for missing download_id {download_id}"
+        )
+        return False
+
+    updated = False
+    if status is not None and download.status != status:
+        download.status = status
+        updated = True
+    if content_type is not None and download.content_type != content_type:
+        download.content_type = content_type
+        updated = True
+    if error_message is not None:
+        download.error_message = error_message
+        updated = True
+
+    if updated:
+        download.processed_at = datetime.now(timezone.utc)
+
+    try:
+        db.session.commit()
+        logging.info(
+            "Updated URL download %s: status=%s, content_type=%s",
+            download_id,
+            status,
+            content_type,
+        )
+        return True
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Failed to update URL download {download_id}: {e}")
+        return False
+
+
+def delete_url_download(download_id):
+    """Delete a URL download entry and detach related references."""
+    download = UrlDownload.query.get(download_id)
+    if not download:
+        logging.warning(
+            f"delete_url_download called for missing download_id {download_id}"
+        )
+        return False
+    try:
+        VectorReference.query.filter_by(url_download_id=download_id).update(
+            {"url_download_id": None}, synchronize_session=False
+        )
+        db.session.delete(download)
+        db.session.commit()
+        logging.info(f"Deleted URL download {download_id}")
+        return True
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Failed to delete URL download {download_id}: {e}")
+        raise
+
+
 def get_url_downloads(limit=100):
     """Get all URL downloads for admin view using SQLAlchemy, including library and knowledge names."""
     from modules.database import Library, Knowledge, User

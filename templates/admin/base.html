@@ -164,7 +164,7 @@
                     <span class="fas fa-chevron-down small"></span>
                   </button>
                   <div class="collapse show" id="collapseAI">
-                    <a href="{{ url_for('admin.vector_references') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin.vector_references' %}active{% endif %}">
+                    <a href="{{ url_for('admin.list_vector_reference_logs') }}" class="list-group-item list-group-item-action {% if request.endpoint in ['admin.list_vector_reference_logs', 'admin.view_vector_reference_log'] %}active{% endif %}">
                       <i class="fas fa-project-diagram me-2"></i>Vector References
                     </a>
                     <a href="{{ url_for('admin.vector_store_settings') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin.vector_store_settings' %}active{% endif %}">

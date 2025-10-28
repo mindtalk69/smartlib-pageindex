@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+import time
 
 SMARTHING_CONFIG_FILE = os.environ.get('SMARTHING_CONFIG_FILE', '.env.dev')
 
@@ -30,16 +31,33 @@ class Config:
     os.makedirs(data_dir, exist_ok=True)
     print(f"DEBUG: Ensured data directory exists: {data_dir}") # Add debug print
 
+    upload_tmp_dir = os.environ.get('UPLOAD_TEMP_DIR', os.path.join(data_dir, 'tmp_uploads'))
+    os.makedirs(upload_tmp_dir, exist_ok=True)
+    UPLOAD_TEMP_DIR = upload_tmp_dir
+    print(f"DEBUG: Ensured upload temp directory exists: {UPLOAD_TEMP_DIR}")
+
+    map_public_dir = os.environ.get('MAP_PUBLIC_DIR', os.path.join(data_dir, 'maps'))
+    os.makedirs(map_public_dir, exist_ok=True)
+    MAP_PUBLIC_DIR = map_public_dir
+    print(f"DEBUG: Ensured map public directory exists: {MAP_PUBLIC_DIR}")
+
     VECTOR_STORE_PROVIDER = os.environ.get('VECTOR_STORE_PROVIDER', 'pgvector')
+
     print(f"DEBUG [config.py]: Config.VECTOR_STORE_PROVIDER set to: {VECTOR_STORE_PROVIDER}") # Check value assigned in class
-    
+
     if VECTOR_STORE_PROVIDER == 'pgvector':
-        SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI') 
+        SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI')
     else:
-        # Use data_dir variable 
-        SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(data_dir, 'app.db') or \
-            'sqlite:///' +os.environ.get('SQLALCHEMY_DATABASE_URI') 
-        
+        sqlite_path = os.path.join(data_dir, 'app.db')
+        uri_env = os.environ.get('SQLALCHEMY_DATABASE_URI')
+        if uri_env and uri_env.startswith('sqlite:///'):
+            sqlite_target = uri_env.replace('sqlite:///', '', 1)
+            if not os.path.isabs(sqlite_target):
+                sqlite_target = os.path.join(basedir, sqlite_target)
+            SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.normpath(sqlite_target)}"
+        else:
+            SQLALCHEMY_DATABASE_URI = uri_env or f'sqlite:///{sqlite_path}'
+
     # --- Feature Flags (Load from env or default) ---
     # Example: Set FEATURE_AZURE_LOGIN_ENABLED=False in .env.dev or system env to disable
     FEATURE_AZURE_LOGIN_ENABLED = os.environ.get('FEATURE_AZURE_LOGIN_ENABLED', 'True').lower() in ('true', '1', 't')
@@ -83,7 +101,7 @@ class Config:
     
     # --- Vector Store Configuration ---
     # Base path for local vector stores (ChromaDB)    
-    LOCAL_VECTOR_STORE_BASE_PATH = os.environ.get('VECTOR_STORE_BASE_PATH', 'data/vector_stores')
+    LOCAL_VECTOR_STORE_BASE_PATH = os.environ.get('VECTOR_STORE_BASE_PATH', os.path.join(data_dir, 'chroma'))
 
     # ChromaDB specific settings
     CHROMA_COLLECTION_NAME = os.environ.get('CHROMA_COLLECTION_NAME', 'documents-vectors') # Default collection name
@@ -94,10 +112,36 @@ class Config:
 
     # Keep VECTOR_STORE_MODE for structuring local paths (ChromaDB)
     VECTOR_STORE_MODE = os.environ.get('VECTOR_STORE_MODE', 'knowledge').lower() # e.g., knowledge, user, global
+    print(f"DEBUG [config.py]: Config.VECTOR_STORE_MODE set to: {VECTOR_STORE_MODE}")
+    APP_VERSION = os.environ.get('APP_VERSION') or str(int(time.time()))
 
-    
+    MAP_GENERATE_PNG = os.environ.get('MAP_GENERATE_PNG', 'false').lower() in ('true', '1', 'yes')
+    try:
+        MAP_RETENTION_HOURS = int(os.environ.get('MAP_RETENTION_HOURS', '24'))
+    except ValueError:
+        MAP_RETENTION_HOURS = 24
+    try:
+        MAP_CLEANUP_INTERVAL_HOURS = int(os.environ.get('MAP_CLEANUP_INTERVAL_HOURS', '6'))
+    except ValueError:
+        MAP_CLEANUP_INTERVAL_HOURS = 6
+    MAP_RETENTION_ENABLED = os.environ.get('MAP_RETENTION_ENABLED', 'true').lower() in ('true', '1', 'yes')
+
+    MESSAGE_RETENTION_ENABLED = os.environ.get('MESSAGE_RETENTION_ENABLED', 'true').lower() in ('true', '1', 'yes')
+    try:
+        MESSAGE_RETENTION_DAYS = int(os.environ.get('MESSAGE_RETENTION_DAYS', '30'))
+    except ValueError:
+        MESSAGE_RETENTION_DAYS = 30
+    try:
+        MESSAGE_CLEANUP_INTERVAL_HOURS = int(os.environ.get('MESSAGE_CLEANUP_INTERVAL_HOURS', '24'))
+    except ValueError:
+        MESSAGE_CLEANUP_INTERVAL_HOURS = 24
+
+    EMBEDDING_WARMUP_ENABLED = os.environ.get('EMBEDDING_WARMUP_ENABLED', 'true').lower() in ('true', '1', 'yes')
+    EMBEDDING_WARMUP_TEXT = os.environ.get('EMBEDDING_WARMUP_TEXT', 'SmartLib warmup prompt for embeddings')
+
 
 class DevelopmentConfig(Config):
+
     """Development configuration."""
     DEBUG = True
     # Override base settings if needed for development

@@ -94,6 +94,8 @@ embedding_function = None
 #embedding_model_name= "Qwen/Qwen3-Embedding-0.6B" # New default model, change as needed
 embedding_model_name = "BAAI/bge-m3" # Keep this if using bge-m3
 #embedding_model_name = "all-MiniLM-L6-v2" # Reverted for compatibility if bge-m3 isn't set up
+# Track whether we've already warmed the embedding pipeline during this process lifetime
+_embedding_warmup_complete = False
 # Check CUDA availability for model_kwargs
 try:
     import torch
@@ -175,7 +177,16 @@ def get_embedding_function():
                     api_version=api_version,
                 )
             else:
-                from langchain_huggingface import HuggingFaceEmbeddings
+                try:
+                    from langchain_huggingface import HuggingFaceEmbeddings
+                except ImportError as import_err:
+                    logging.error(
+                        "HuggingFace embeddings requested but optional dependency 'langchain-huggingface' is not installed."
+                    )
+                    raise RuntimeError(
+                        "Local embedding model requires 'langchain-huggingface'. Install it in the worker image "
+                        "or switch the default embedding model to an Azure deployment."
+                    ) from import_err
                 # Fallback to HuggingFace for local models
                 logging.info(f"Initializing HuggingFace Embeddings model: {current_model}")
                 embedding_function = HuggingFaceEmbeddings(
@@ -189,6 +200,38 @@ def get_embedding_function():
             logging.error(f"Fatal Error: Could not initialize embeddings: {e}", exc_info=True)
             raise RuntimeError("Failed to initialize embedding model.") from e
     return embedding_function
+
+
+def warmup_embedding_model(sample_text: str | None = None, *, force: bool = False) -> bool:
+    """Prime the embedding pipeline so the first user query is responsive."""
+    global _embedding_warmup_complete
+
+    if _embedding_warmup_complete and not force:
+        logging.info("Embedding warmup already completed for this process; skipping.")
+        return False
+
+    try:
+        embedder = get_embedding_function()
+        if embedder is None:
+            logging.warning("Embedding warmup skipped: no embedding function available.")
+            return False
+
+        text_to_embed = (sample_text or "SmartLib warmup prompt")
+
+        if hasattr(embedder, "embed_query"):
+            embedder.embed_query(text_to_embed)
+        elif hasattr(embedder, "embed_documents"):
+            embedder.embed_documents([text_to_embed])
+        else:
+            logging.warning("Embedding warmup skipped: embedder lacks embed_query/embed_documents.")
+            return False
+
+        _embedding_warmup_complete = True
+        logging.info("Embedding warmup executed successfully.")
+        return True
+    except Exception as exc:
+        logging.warning("Embedding warmup failed: %s", exc, exc_info=True)
+        return False
 
 
 def get_llm(model_name=None, streaming=False, temperature=None):
@@ -915,20 +958,33 @@ def get_lc_store_path(user_id=None, knowledge_id=None, mode_param=None): # Renam
         
     logger.info(f"VECTOR_STORE_MODE: {mode}")
     
+    base_path = None
+    try:
+        from flask import current_app
+        if current_app:
+            configured = current_app.config.get('LOCAL_VECTOR_STORE_BASE_PATH')
+            if configured:
+                base_path = Path(configured)
+    except Exception as cfg_exc:
+        logger.debug(f"Falling back to default Chroma base path: {cfg_exc}")
+
+    if base_path is None:
+        base_path = Path('data') / 'chroma'
+
     if mode == 'user':
         if user_id is None:
             raise ValueError("user_id is required for user mode")
-        return Path('data') / 'chroma' / str(user_id) 
+        return base_path / str(user_id)
     elif mode == 'global':
-        return Path('data') / 'chroma' / 'global' 
+        return base_path / 'global'
     elif mode == 'knowledge':
         if knowledge_id is None:
             raise ValueError("knowledge_id is required for knowledge mode")
-        return Path('data') / 'chroma' / f'knowledge_{knowledge_id}' 
+        return base_path / f'knowledge_{knowledge_id}'
     else:
         raise ValueError(f"Unknown vector store mode: {mode}")
-    
-    
+
+
 def normalize_outgoing_messages(messages):
     """
     Normalize outgoing messages into a conservative, model-safe representation.

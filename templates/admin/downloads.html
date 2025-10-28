@@ -34,13 +34,18 @@
                     <td>{{ download.library_name or 'N/A' }}</td>
                     <td>{{ download.knowledge_name or 'N/A' }}</td>
                     <td>
-                        <span class="badge 
-                            {% if download.status == 'success' %}
-                                {% if not light_theme %}bg-success{% else %}bg-primary{% endif %}
-                            {% else %}
-                                {% if not light_theme %}bg-danger{% else %}bg-warning text-dark{% endif %}
-                            {% endif %}">
-                            {{ download.status|title }}
+                        {% set status_lower = (download.status or 'unknown')|lower %}
+                        {% if status_lower == 'success' %}
+                            {% set badge_class = 'bg-success' if not light_theme else 'bg-primary' %}
+                        {% elif status_lower in ['processing', 'in_progress'] %}
+                            {% set badge_class = 'bg-info text-dark' %}
+                        {% elif status_lower in ['queued', 'pending'] %}
+                            {% set badge_class = 'bg-warning text-dark' %}
+                        {% else %}
+                            {% set badge_class = 'bg-danger' %}
+                        {% endif %}
+                        <span class="badge {{ badge_class }}">
+                            {{ status_lower.replace('_', ' ')|title }}
                         </span>
                         {% if download.error_message %}
                         <div class="small text-muted mt-1">{{ download.error_message }}</div>
@@ -67,6 +72,12 @@
                         </div>
                     </td>
                 </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" class="text-center text-muted py-4">
+                        No URL downloads recorded yet.
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -74,46 +85,63 @@
 </div>
 {% endblock %}
 
-{% block scripts %}
+{% block admin_scripts %}
 {{ super() }}
 <script>
-    // Add basic delete confirmation (requires backend endpoint)
-    $(document).ready(function() {
-        $('#downloadsTable').on('click', '.delete-download-btn', function() {
+    document.addEventListener('DOMContentLoaded', function() {
+        const tableSelector = '#downloadsTable';
+        const tableApi = (window.jQuery && $.fn.DataTable && $.fn.DataTable.isDataTable(tableSelector))
+            ? $(tableSelector).DataTable()
+            : null;
+
+        $(tableSelector).on('click', '.delete-download-btn', function() {
             const button = $(this);
             const downloadId = button.data('id');
             const downloadUrl = button.data('url');
-            
-            if (confirm(`Are you sure you want to delete the download record for:\n${downloadUrl} (ID: ${downloadId})?\n\nNote: This only deletes the record, not the downloaded content if it was saved elsewhere.`)) {
-                // --- Backend Call Required ---
-                // Example using fetch API (replace with your actual endpoint and logic)
-                /* 
-                const csrfToken = $('meta[name="csrf-token"]').attr('content'); 
-                fetch(`/admin/downloads/delete/${downloadId}`, {
-                    method: 'POST', // Or DELETE
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken
+            const confirmMessage = `Are you sure you want to delete the download record for:\n${downloadUrl} (ID: ${downloadId})?\n\nThis only removes the tracking record.`;
+
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            button.prop('disabled', true);
+
+            fetchWithCsrfRetry(`/admin/downloads/delete/${downloadId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().catch(() => ({})).then(data => {
+                            const errorMessage = data.message || 'Unexpected error deleting download.';
+                            throw new Error(errorMessage);
+                        });
                     }
+                    return response.json();
                 })
-                .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        // Use the DataTable API to remove the row
-                        const table = $('#downloadsTable').DataTable();
-                        table.row(button.closest('tr')).remove().draw();
-                        alert('Download record deleted successfully.'); 
+                        if (tableApi) {
+                            tableApi.row(button.closest('tr')).remove().draw();
+                        } else {
+                            button.closest('tr').remove();
+                        }
+                        alert(data.message || 'Download record deleted.');
                     } else {
-                        alert('Error deleting download record: ' + (data.message || 'Unknown error'));
+                        throw new Error(data.message || 'Unable to delete download record.');
                     }
                 })
                 .catch(error => {
-                    console.error('Error:', error);
-                    alert('An error occurred while trying to delete the record.');
+                    console.error('Delete download error:', error);
+                    alert(error.message || 'Failed to delete download record.');
+                })
+                .finally(() => {
+                    if (button.closest('tr').length) {
+                        button.prop('disabled', false);
+                    }
                 });
-                */
-               alert('Delete functionality requires backend implementation.'); // Placeholder alert
-            }
         });
     });
 </script>

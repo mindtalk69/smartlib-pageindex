@@ -52,7 +52,6 @@ $(document).ready(function() {
             '#knowledgesTable',
             '#filesTable',
             '#downloadsTable',
-            '#vectorReferencesTable',
             '#messagesTable',
             '#aggFeedbackTable',
             '#userFeedbackTable',
@@ -96,9 +95,7 @@ $(document).ready(function() {
                     } else if (tableSelector === '#filesTable') {
                         config.order = [[3, 'desc']];
                     } else if (tableSelector === '#downloadsTable') {
-                        config.order = [[4, 'desc']];
-                    } else if (tableSelector === '#vectorReferencesTable') {
-                        config.order = [[0, 'desc']];
+                        config.order = [[7, 'desc']];
                     } else if (tableSelector === '#messagesTable') {
                         config.order = [[2, 'desc']];
                     }

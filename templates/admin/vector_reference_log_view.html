@@ -1,6 +1,8 @@
-{% extends "admin/layout.html" %}
+{% extends "admin/base.html" %}
 
-{% block content %}
+{% block admin_title %}Vector Reference Log{% endblock %}
+
+{% block admin_content %}
 <div class="container">
     <div class="level">
         <div class="level-left">
@@ -25,9 +27,10 @@
                     <div class="control">
                         <input type="text" class="input" id="searchInput" placeholder="Search logs...">
                     </div>
-                    <div class="control">
-                        <button class="button is-info" onclick="exportLogs()">Export CSV</button>
-                    </div>
+                     <div class="control">
+                         <button class="button is-info" onclick="exportLogs()" {% if not references %}disabled{% endif %}>Export CSV</button>
+                     </div>
+
                 </div>
             </div>
         </div>
@@ -53,116 +56,115 @@
         </div>
         {% endif %}
 
-        <div class="table-container">
-            <table class="table is-fullwidth is-striped" id="vectorReferencesTable">
-                <thead>
-                    <tr>
-                        <th>Timestamp</th>
-                        <th>File ID</th>
-                        <th>URL Download ID</th>
-                        <th>Chunk Index</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if references %}
-                        {% for ref in references %}
-                        <tr>
-                            <td><code>{{ ref.timestamp }}</code></td>
-                            <td>
-                                {% if ref.file_id %}
-                                    <span class="tag is-primary">{{ ref.file_id }}</span>
-                                {% else %}
-                                    <span class="tag is-light">N/A</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if ref.url_download_id %}
-                                    <span class="tag is-info">{{ ref.url_download_id }}</span>
-                                {% else %}
-                                    <span class="tag is-light">N/A</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if ref.chunk_index is not none %}
-                                    <span class="tag is-warning">{{ ref.chunk_index }}</span>
-                                {% else %}
-                                    <span class="tag is-light">N/A</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
+         <div class="table-container">
+             <table class="table is-fullwidth is-striped" id="vectorReferencesTable">
+                 <thead>
+                     <tr>
+                         <th>Timestamp</th>
+                         <th>File ID</th>
+                         <th>URL Download ID</th>
+                         <th>Chunk Index</th>
+                     </tr>
+                 </thead>
+                 <tbody>
+                     {% for ref in references %}
+                     <tr>
+                         <td><code>{{ ref.timestamp }}</code></td>
+                         <td>
+                             {% if ref.file_id %}
+                                 <span class="tag is-primary">{{ ref.file_id }}</span>
+                             {% else %}
+                                 <span class="tag is-light">N/A</span>
+                             {% endif %}
+                         </td>
+                         <td>
+                             {% if ref.url_download_id %}
+                                 <span class="tag is-info">{{ ref.url_download_id }}</span>
+                             {% else %}
+                                 <span class="tag is-light">N/A</span>
+                             {% endif %}
+                         </td>
+                         <td>
+                             {% if ref.chunk_index is not none %}
+                                 <span class="tag is-warning">{{ ref.chunk_index }}</span>
+                             {% else %}
+                                 <span class="tag is-light">N/A</span>
+                             {% endif %}
+                         </td>
+                     </tr>
+                     {% endfor %}
+                 </tbody>
+             </table>
+         </div>
+         {% if not references %}
+         <div class="notification is-warning mt-4">
+             <strong>No references found in this log file.</strong><br>
+             This log file appears to be empty or contains no valid vector reference entries.
+         </div>
+         {% endif %}
+     </div>
+ </div>
 {% endblock %}
 
-{% block scripts %}
+
+{% block admin_scripts %}
 {{ super() }}
 <script>
 $(document).ready(function() {
-    // Check if there's data to initialize DataTables
     var hasData = {{ 'true' if references else 'false' }};
-    
-    if (hasData) {
-        // Initialize DataTable only when there's data
-        var table = $('#vectorReferencesTable').DataTable({
-            "order": [[ 0, "desc" ]], // Order by timestamp descending
-            "pageLength": 25,
-            "responsive": true,
-            "language": {
-                "emptyTable": "No references found in this log file."
-            }
-        });
+    var tableElement = $('#vectorReferencesTable');
 
-        // Search functionality
+    if (!tableElement.length) {
+        return;
+    }
+
+    var table = tableElement.DataTable({
+        order: [[0, 'desc']]
+,
+        pageLength: 25,
+        responsive: true,
+        language: {
+            emptyTable: 'No references found in this log file.'
+        }
+    });
+
+    if (hasData) {
         $('#searchInput').on('keyup', function() {
             table.search(this.value).draw();
         });
     } else {
-        // Hide search when no data
-        $('#searchInput').parent().hide();
-        
-        // Show empty state message
-        $('#vectorReferencesTable').hide();
-        $('.table-container').append(
-            '<div class="notification is-warning">' +
-            '<strong>No references found in this log file.</strong><br>' +
-            'This log file appears to be empty or contains no valid vector reference entries.' +
-            '</div>'
-        );
+        $('#searchInput')
+            .prop('disabled', true)
+            .attr('placeholder', 'No entries available')
+            .addClass('is-static');
     }
 });
 
-// Export to CSV function
 function exportLogs() {
+    var table = $('#vectorReferencesTable').DataTable();
+
+    if (!table.data().count()) {
+        return;
+    }
+
     var csv = 'Timestamp,File ID,URL Download ID,Chunk Index\n';
-    
-    $('#vectorReferencesTable tbody tr').each(function() {
-        var row = $(this);
+
+    table.rows({ search: 'applied' }).every(function() {
+        var data = this.data();
+        var row = $(this.node());
+
         var timestamp = row.find('td:eq(0)').text().trim();
         var fileId = row.find('td:eq(1) .tag').text().trim();
         var urlId = row.find('td:eq(2) .tag').text().trim();
         var chunkIndex = row.find('td:eq(3) .tag').text().trim();
-        
-        // Handle N/A values
+
         if (fileId === 'N/A') fileId = '';
         if (urlId === 'N/A') urlId = '';
         if (chunkIndex === 'N/A') chunkIndex = '';
-        
+
         csv += '"' + timestamp + '","' + fileId + '","' + urlId + '","' + chunkIndex + '"\n';
     });
-    
-    // Create download link
+
     var hiddenElement = document.createElement('a');
     hiddenElement.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv));
     hiddenElement.setAttribute('download', '{{ log_filename }}.csv');

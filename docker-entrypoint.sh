@@ -47,6 +47,13 @@ if [ "$1" = "web" ]; then
         python -c "from modules.database import init_db; init_db()"
     fi
 
+    if [ -f add_llm_languages_table.py ]; then
+        echo "Seeding default LLM languages if needed..."
+        python add_llm_languages_table.py
+    else
+        echo "Language seed script not found; skipping."
+    fi
+
     # Create default models if explicitly requested (handled by worker normally)
     if [ "$IS_AZURE" = false ] && [ -f create_default_models.py ] && [ "$RUN_DEFAULT_MODELS" = "true" ]; then
         echo "RUN_DEFAULT_MODELS=true detected. Creating default models..."

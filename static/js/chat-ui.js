@@ -40,6 +40,65 @@ class ChatUI {
           backdrop-filter: blur(2.5px);
         }
 
+        .${this.config.bubbleClass}.chunk-pulse {
+          animation: chunkPulse 0.25s ease;
+        }
+
+        @keyframes chunkPulse {
+          0% {
+            box-shadow: 0 0 0 rgba(13,110,253,0.0);
+          }
+          40% {
+            box-shadow: 0 0 20px rgba(13,110,253,0.3);
+          }
+          100% {
+            box-shadow: 0 0 0 rgba(13,110,253,0.0);
+          }
+        }
+
+        .stream-progress {
+          display: flex;
+          align-items: center;
+          gap: 0.45rem;
+          margin-bottom: 8px;
+          font-size: 0.75rem;
+          color: var(--bs-secondary-color, #6c757d);
+        }
+
+        .stream-progress[hidden] {
+          display: none !important;
+        }
+
+        .stream-progress-bar {
+          position: relative;
+          flex: 1;
+          height: 4px;
+          border-radius: 999px;
+          background: var(--bs-border-color-translucent, rgba(0,0,0,0.08));
+          overflow: hidden;
+        }
+
+        .stream-progress-bar::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          width: var(--progress-width, 18%);
+          max-width: 100%;
+          background: linear-gradient(90deg, var(--bs-primary, #0d6efd), var(--bs-info, #0dcaf0));
+          border-radius: inherit;
+          transition: width 0.25s ease;
+        }
+
+        .stream-progress.stream-progress-complete .stream-progress-bar::after {
+          width: 100%;
+          background: linear-gradient(90deg, var(--bs-success, #198754), var(--bs-primary, #0d6efd));
+        }
+
+        .stream-progress-label {
+          white-space: nowrap;
+          font-variant-numeric: tabular-nums;
+        }
+
         /* Message footer styles */
         .message-footer {
           margin-top: 16px;
@@ -590,6 +649,7 @@ class ChatUI {
       }
 
       bubble.innerHTML = `
+        ${message.role === 'agent' ? `<div class="stream-progress" data-stream-progress="${bubble.id}" hidden><div class="stream-progress-bar"></div><span class="stream-progress-label">Streaming…</span></div>` : ''}
         <div class="bubble-content">${finalHtmlContent}</div>
         ${message.role === 'agent' ? `<div class="message-footer">${this._renderFooter(message)}</div>` : ''}
       `;
@@ -676,7 +736,13 @@ class ChatUI {
         bubble.dataset.messageId = message.id; // Ensure data attribute is present on update too
       }
 
+      const typewriterStates = window.TYPEWRITER_STATES;
+      const typewriterActive = Boolean(typewriterStates && typewriterStates.has(message.id));
+
       if (bubble) {
+        if (typewriterActive) {
+          return;
+        }
         const contentElement = bubble.querySelector('.bubble-content'); // Find the content area
         if (contentElement) {
           const newContent = message.content || '';

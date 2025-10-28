@@ -66,7 +66,7 @@ def _send_task_and_wait(task_name: str, payload: Dict[str, Any], timeout: Option
         return None
 
 
-def submit_file_processing_task(temp_file_path, filename, user_id, library_id, library_name, knowledge_id_str, enable_visual_grounding_flag):
+def submit_file_processing_task(temp_file_path, filename, user_id, library_id, library_name, knowledge_id_str, enable_visual_grounding_flag, url_download_id=None, source_url=None, content_type=None):
     """
     Submit a file processing task to Celery worker.
     Returns task_id if successful, None if Celery is not available.
@@ -86,6 +86,9 @@ def submit_file_processing_task(temp_file_path, filename, user_id, library_id, l
                 "library_name": library_name,
                 "knowledge_id_str": knowledge_id_str,
                 "enable_visual_grounding_flag": enable_visual_grounding_flag,
+                "url_download_id": url_download_id,
+                "source_url": source_url,
+                "content_type": content_type,
             },
         )
         logger.info(f"Submitted Celery task {task.id} for processing {filename}")

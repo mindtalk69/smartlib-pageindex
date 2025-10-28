@@ -29,10 +29,17 @@ RUN apt-get update \
        pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
+ARG INSTALL_WEB_EXTRAS=false
+
 COPY requirements-web.txt /tmp/requirements.txt
+COPY requirements-web-extras.txt /tmp/requirements-extras.txt
 
 RUN pip install --upgrade pip \
-    && pip install --no-cache-dir -r /tmp/requirements.txt
+    && pip install --no-cache-dir -r /tmp/requirements.txt \
+    && if [ "$INSTALL_WEB_EXTRAS" = "true" ]; then \
+        pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu -r /tmp/requirements-extras.txt; \
+    fi \
+    && pip cache purge >/dev/null 2>&1 || true
 
 COPY . /app
 

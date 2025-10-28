@@ -1,6 +1,12 @@
+import logging
 import re
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Optional
+
 
 def add_minutes_symbol(coord_string):
+
     # This regex finds patterns like 05° 55 13" S and inserts a ' after the minutes
     # It works for both latitude and longitude
     pattern = r'(\d{1,3}°)\s*(\d{1,2})\s+(\d{1,2}")'
@@ -32,3 +38,38 @@ def parse_dms_string(coord_string):
     lon = dms_to_decimal(int(lon_deg), int(lon_min), int(lon_sec), lon_dir)
 
     return lat, lon
+
+
+def purge_map_assets(base_dir: Path | str, max_age_hours: int, logger: Optional[logging.Logger] = None) -> int:
+    """Remove generated map files older than max_age_hours from base_dir."""
+    base_path = Path(base_dir)
+    if max_age_hours <= 0:
+        return 0
+    if not base_path.exists() or not base_path.is_dir():
+        return 0
+
+    threshold = datetime.utcnow() - timedelta(hours=max_age_hours)
+    removed = 0
+    for file_path in base_path.glob("**/*"):
+        if file_path.is_file():
+            try:
+                modified = datetime.utcfromtimestamp(file_path.stat().st_mtime)
+                if modified < threshold:
+                    file_path.unlink(missing_ok=False)
+                    removed += 1
+            except FileNotFoundError:
+                continue
+            except Exception as exc:  # pragma: no cover - defensive logging
+                if logger:
+                    logger.warning("Failed to delete map asset %s: %s", file_path, exc)
+
+    # Clean up empty directories
+    for dir_path in sorted(base_path.glob("**/*"), reverse=True):
+        if dir_path.is_dir():
+            try:
+                dir_path.rmdir()
+            except OSError:
+                continue
+
+    return removed
+

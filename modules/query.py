@@ -1,8 +1,10 @@
 # query.py
 
 import os, logging
-import io # For image buffer
-import json # For parsing bbox
+import io  # For image buffer
+import json  # For parsing bbox
+import asyncio
+import inspect
 from lark.exceptions import UnexpectedCharacters, UnexpectedToken
 from extensions import db
 
@@ -370,11 +372,171 @@ def init_query(app):
 
         task_timeout = current_app.config.get('AGENT_TASK_TIMEOUT', 120)
 
+        agent_common_kwargs = {
+            "query": query_text,
+            "chat_history": chat_history_messages,
+            "vector_store_config": vector_store_config,
+            "image_base64": image_base64,
+            "image_mime_type": image_mime_type,
+            "uploaded_file_content": uploaded_file_content,
+            "uploaded_file_type": uploaded_file_type,
+            "uploaded_file_name": uploaded_file_name,
+            "conversation_id": conversation_id,
+        }
+
+        if stream_flag:
+            def _update_placeholder_with_error(error_text: str) -> None:
+                if not db_message_id_for_stream:
+                    return
+                _update_message_history_entry(
+                    db_message_id_for_stream,
+                    {
+                        "answer": error_text,
+                        "citations": [],
+                        "usage_metadata": {},
+                        "suggested_questions": [],
+                    },
+                )
+
+            def _serialize_error_event(
+                message_text: str, status_code: int | str = 500
+            ) -> str:
+                try:
+                    status_int = int(status_code)
+                except (TypeError, ValueError):  # pragma: no cover - defensive
+                    status_int = 500
+                payload = {
+                    "type": "error",
+                    "message": message_text,
+                    "status_code": status_int,
+                }
+                if db_message_id_for_stream:
+                    payload["db_message_id"] = db_message_id_for_stream
+                return f"data: {json.dumps(payload)}\n\n"
+
+            def _stream_agent_response():
+                try:
+                    from modules.agent import invoke_agent_graph
+                except Exception as import_err:  # pragma: no cover - defensive
+                    logging.error(
+                        "Streaming requested but agent graph unavailable: %s",
+                        import_err,
+                        exc_info=True,
+                    )
+                    error_text = "Streaming is temporarily unavailable."
+                    _update_placeholder_with_error(error_text)
+                    yield _serialize_error_event(error_text)
+                    return
+
+                streaming_kwargs = dict(agent_common_kwargs)
+                streaming_kwargs["stream"] = True
+                streaming_kwargs.update(extra_kwargs)
+
+                try:
+                    streaming_result = invoke_agent_graph(**streaming_kwargs)
+                except Exception as invoke_err:  # pragma: no cover - defensive
+                    logging.error(
+                        "Error starting streaming agent invocation: %s",
+                        invoke_err,
+                        exc_info=True,
+                    )
+                    error_text = "Error starting streaming response."
+                    _update_placeholder_with_error(error_text)
+                    yield _serialize_error_event(error_text)
+                    return
+
+                if inspect.isasyncgen(streaming_result):
+                    loop = asyncio.new_event_loop()
+                    try:
+                        asyncio.set_event_loop(loop)
+                        async_iterator = streaming_result.__aiter__()
+                        while True:
+                            try:
+                                chunk = loop.run_until_complete(async_iterator.__anext__())
+                            except StopAsyncIteration:
+                                break
+                            if chunk is not None:
+                                yield chunk if isinstance(chunk, str) else str(chunk)
+                    except Exception as stream_err:  # pragma: no cover - defensive
+                        logging.error(
+                            "Error while streaming agent output: %s",
+                            stream_err,
+                            exc_info=True,
+                        )
+                        error_text = "Streaming interrupted due to an internal error."
+                        _update_placeholder_with_error(error_text)
+                        yield _serialize_error_event(error_text)
+                    finally:
+                        try:
+                            if hasattr(streaming_result, "aclose"):
+                                loop.run_until_complete(streaming_result.aclose())
+                        except Exception as close_err:  # pragma: no cover - defensive
+                            logging.debug(
+                                "Error closing streaming generator: %s",
+                                close_err,
+                                exc_info=True,
+                            )
+                        asyncio.set_event_loop(None)
+                        loop.close()
+                    return
+
+                if isinstance(streaming_result, dict):
+                    if streaming_result.get("type") == "error":
+                        error_text = streaming_result.get(
+                            "message", "Agent worker returned an error"
+                        )
+                        status_code = streaming_result.get("status_code", 500)
+                        _update_placeholder_with_error(error_text)
+                        yield _serialize_error_event(error_text, status_code=status_code)
+                        return
+
+                    if db_message_id_for_stream:
+                        _update_message_history_entry(
+                            db_message_id_for_stream,
+                            streaming_result,
+                        )
+
+                    metadata = {}
+                    if db_message_id_for_stream:
+                        metadata["message_id"] = str(db_message_id_for_stream)
+                    if conversation_id:
+                        metadata["conversation_id"] = conversation_id
+                    if metadata:
+                        metadata_event = {
+                            "type": "metadata_update",
+                            "metadata": metadata,
+                        }
+                        yield f"data: {json.dumps(metadata_event)}\n\n"
+
+                    final_payload = dict(streaming_result)
+                    if conversation_id:
+                        final_payload["conversation_id"] = conversation_id
+                    if db_message_id_for_stream:
+                        final_payload["message_id"] = db_message_id_for_stream
+                    end_event = {"type": "end_of_stream", "data": final_payload}
+                    yield f"data: {json.dumps(end_event)}\n\n"
+                    return
+
+                logging.error(
+                    "Streaming agent invocation returned unexpected type: %s",
+                    type(streaming_result),
+                )
+                error_text = "Streaming failed due to unexpected response type."
+                _update_placeholder_with_error(error_text)
+                yield _serialize_error_event(error_text)
+
+            return Response(
+                stream_with_context(_stream_agent_response()),
+                status=200,
+                headers={"Content-Type": "text/event-stream"},
+                mimetype="text/event-stream",
+            )
+
         agent_result = invoke_agent_via_worker(
             query=query_text,
             chat_history=chat_history_messages,
             vector_store_config=vector_store_config,
-            stream=stream_flag,
+            stream=False,
             image_base64=image_base64,
             image_mime_type=image_mime_type,
             uploaded_file_content=uploaded_file_content,
@@ -390,7 +552,14 @@ def init_query(app):
             logging.error(error_msg_local)
             if stream_flag:
                 def _stream_agent_error():
-                    yield f"data: {json.dumps({'type': 'error', 'message': error_msg_local, 'status_code': status_code, 'db_message_id': db_message_id_for_stream})}\n\n"
+                    payload = {
+                        "type": "error",
+                        "message": error_msg_local,
+                        "status_code": status_code,
+                    }
+                    if db_message_id_for_stream:
+                        payload["db_message_id"] = db_message_id_for_stream
+                    yield f"data: {json.dumps(payload)}\n\n"
                 return Response(
                     stream_with_context(_stream_agent_error()),
                     status=status_code,
@@ -412,7 +581,14 @@ def init_query(app):
             logging.error("Agent worker error: %s", message)
             if stream_flag:
                 def _stream_agent_error_message():
-                    yield f"data: {json.dumps({'type': 'error', 'message': message, 'status_code': status_code, 'db_message_id': db_message_id_for_stream})}\n\n"
+                    payload = {
+                        "type": "error",
+                        "message": message,
+                        "status_code": status_code,
+                    }
+                    if db_message_id_for_stream:
+                        payload["db_message_id"] = db_message_id_for_stream
+                    yield f"data: {json.dumps(payload)}\n\n"
                 return Response(
                     stream_with_context(_stream_agent_error_message()),
                     status=status_code,
@@ -420,33 +596,6 @@ def init_query(app):
                     mimetype="text/event-stream",
                 )
             return jsonify({"error": message, "status_code": status_code}), status_code
-
-        if stream_flag:
-            if db_message_id_for_stream:
-                _update_message_history_entry(db_message_id_for_stream, agent_result)
-
-            def _stream_single_result():
-                metadata = {}
-                if db_message_id_for_stream:
-                    metadata["message_id"] = str(db_message_id_for_stream)
-                if conversation_id:
-                    metadata["conversation_id"] = conversation_id
-                if metadata:
-                    yield f"data: {json.dumps({'type': 'metadata_update', 'metadata': metadata})}\n\n"
-
-                final_payload = dict(agent_result)
-                if conversation_id:
-                    final_payload["conversation_id"] = conversation_id
-                if db_message_id_for_stream:
-                    final_payload["message_id"] = db_message_id_for_stream
-                yield f"data: {json.dumps({'type': 'end_of_stream', 'data': final_payload})}\n\n"
-
-            return Response(
-                stream_with_context(_stream_single_result()),
-                status=200,
-                headers={"Content-Type": "text/event-stream"},
-                mimetype="text/event-stream",
-            )
 
         # Non-streaming path: persist final answer and respond synchronously
         message_id = add_message(

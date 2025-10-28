@@ -68,6 +68,7 @@ def create_dataframe_agent_graph(llm: Any): # llm will be passed from agent.py
         
         df_system_prompt = """You are a data analysis assistant.
 Your primary goal is to help the user analyze data from an uploaded file or pasted content.
+Important environment note: Seaborn is not available. Generate charts with Matplotlib (and pandas) only.
 
 WORKFLOW:
 **RULE 1 (OVERRIDE ALL OTHERS): Processing Newly Uploaded/Pasted Data for the CURRENT TURN**

@@ -295,7 +295,13 @@ def create_app():
     from modules.selfquery import selfquery_bp
     app.register_blueprint(selfquery_bp)
 
-
+    if app.config.get('EMBEDDING_WARMUP_ENABLED', False):
+        try:
+            from modules.llm_utils import warmup_embedding_model
+            with app.app_context():
+                warmup_embedding_model(sample_text=app.config.get('EMBEDDING_WARMUP_TEXT'))
+        except Exception as warmup_exc:
+            app.logger.warning("Embedding warmup encountered an issue: %s", warmup_exc, exc_info=True)
 
     return app
 

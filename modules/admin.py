@@ -60,6 +60,7 @@ from modules.database import (
     Document                 # Added for reset functionality
 )
 from modules.llm_utils import generate_simple_text
+from modules.map_utils import purge_map_assets
 import re # Ensure re is imported
 from sqlalchemy import text # Ensure text is imported
 import traceback
@@ -491,18 +492,8 @@ def download_management():
 
 @admin_bp.route('/vector_references')
 def vector_references():
-    try:
-        # Restore standard ORM query now that the model and schema align
-        references_raw = VectorReference.query.options(
-            joinedload(VectorReference.uploaded_file).joinedload(UploadedFile.uploader),
-            joinedload(VectorReference.url_download).joinedload(UrlDownload.user)
-        ).order_by(VectorReference.id.desc()).all() # Order by the new ID column
-        references = references_raw
-        return render_template('admin/vector_references.html', references=references)
-    except Exception as e:
-        print(f"Error in /admin/vector_references route:\n{traceback.format_exc()}")
-        flash(f'Error loading vector references. Check logs for details.', 'danger')
-        return redirect(url_for('admin.dashboard'))
+    """Legacy route retained for backward compatibility; redirects to log list."""
+    return redirect(url_for('admin.list_vector_reference_logs'))
 
 @admin_bp.route('/vector_reference_logs')
 def list_vector_reference_logs():
@@ -1460,6 +1451,28 @@ def reset_knowledge_vector_store():
         flash(f'Error resetting knowledge vector store: {str(e)}', 'danger')
     return redirect(url_for('admin.vector_store_settings'))
 
+@admin_bp.route('/cleanup_generated_maps', methods=['POST'])
+@login_required
+def admin_cleanup_generated_maps():
+    retention_hours = current_app.config.get('MAP_RETENTION_HOURS', 24)
+    override = request.form.get('retention_hours')
+    if override:
+        try:
+            retention_hours = max(0, int(override))
+        except ValueError:
+            flash('Retention hours must be a valid integer.', 'warning')
+            return redirect(url_for('admin.admin_reset_data'))
+
+    map_dir = Path(current_app.config.get('MAP_PUBLIC_DIR', Path(current_app.root_path) / 'static' / 'maps'))
+    removed = purge_map_assets(map_dir, retention_hours, logger=logging.getLogger(__name__))
+
+    if removed:
+        flash(f'Removed {removed} generated map files older than {retention_hours} hours.', 'success')
+    else:
+        flash('No generated map files met the retention threshold.', 'info')
+
+    return redirect(url_for('admin.admin_reset_data'))
+
 # --- Reset/Clear Transaction Tables Route ---
 @admin_bp.route('/reset_data', methods=['GET', 'POST'])
 @login_required
@@ -1575,7 +1588,7 @@ def admin_reset_data():
             flash(f'Error clearing tables: {str(e)}', 'danger')
         return redirect(url_for('admin.admin_reset_data'))
 
-    return render_template('admin/reset_data.html')
+    return render_template('admin/reset_data.html', map_retention_hours=current_app.config.get('MAP_RETENTION_HOURS', 24))
 
 @admin_bp.route('/reset_data_log')
 @login_required

@@ -26,6 +26,12 @@
   const batchStatus = document.getElementById('batch-status');
   const batchProgressBar = document.getElementById('batch-progress-bar'); // Added progress bar element
 
+  // --- Vector Store Mode ---
+  const vectorModeSource = document.querySelector('.upload-page-container');
+  const vectorStoreMode = vectorModeSource?.dataset?.vectorStoreMode || 'user';
+  const knowledgeRequired = vectorStoreMode === 'knowledge';
+  console.log('[Upload Debug] vectorStoreMode:', vectorStoreMode, 'knowledgeRequired:', knowledgeRequired);
+
   // --- Modal Progress Text Element ---
   const modalProgressText = document.getElementById('modalProgressText');
 
@@ -38,11 +44,18 @@
   let batchFilesArray = []; // Array to hold File objects for batch upload
 
   // --- Tooltip Initialization ---
-  // Initialize all tooltips on the page
+  const bootstrapAvailable = typeof window.bootstrap !== 'undefined';
+  // Initialize all tooltips on the page if Bootstrap JS is present
   const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-  const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-    return new bootstrap.Tooltip(tooltipTriggerEl);
-  });
+  console.log('[Upload Page] bootstrapAvailable =', bootstrapAvailable);
+  const tooltipList = bootstrapAvailable
+      ? tooltipTriggerList.map(function (tooltipTriggerEl) {
+          return new window.bootstrap.Tooltip(tooltipTriggerEl);
+        })
+      : [];
+  if (!bootstrapAvailable && tooltipTriggerList.length > 0) {
+      console.warn('[Upload Page] Bootstrap JS not detected; skipping tooltip initialization.');
+  }
 
   // --- Toast Helper Function ---
   function showToast(message, type = 'info') {
@@ -53,15 +66,13 @@
       }
 
       const toastId = `toast-${Date.now()}`; // Unique ID for each toast
-      // Use new translucent classes
       const toastClass = {
           info: 'toast-info-translucent',
           success: 'toast-success-translucent',
           warning: 'toast-warning-translucent',
           danger: 'toast-danger-translucent'
-      }[type] || ''; // Default to base custom-toast style
+      }[type] || '';
 
-      // Add base class and type-specific class
       const toastHTML = `
           <div id="${toastId}" class="toast align-items-center custom-toast ${toastClass} border-0" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
               <div class="d-flex">
@@ -75,19 +86,22 @@
 
       toastContainer.insertAdjacentHTML('beforeend', toastHTML);
       const toastElement = document.getElementById(toastId);
-      
-      // Attempt to get an existing instance associated *specifically* with this element ID 
-      // (though it should be unique due to Date.now(), this is safer)
-      // and dispose if found, before creating a new one.
-      const existingInstance = bootstrap.Toast.getInstance(toastElement);
+      if (!toastElement) {
+          console.error('Toast element not found after insertion!');
+          return;
+      }
+
+      if (!bootstrapAvailable || !window.bootstrap?.Toast) {
+          console.warn('[Upload Page] Bootstrap Toast not available; toast message:', message);
+          return;
+      }
+
+      const existingInstance = window.bootstrap.Toast.getInstance(toastElement);
       if (existingInstance) {
-          console.warn(`[DEBUG] Found existing toast instance for ID ${toastId}, disposing.`);
           existingInstance.dispose();
       }
 
-      const toast = new bootstrap.Toast(toastElement); // Create new instance
-
-      // Optional: Remove the toast element from DOM after it's hidden
+      const toast = new window.bootstrap.Toast(toastElement);
       toastElement.addEventListener('hidden.bs.toast', function () {
           toastElement.remove();
       });
@@ -236,7 +250,9 @@
                   urlSpan.setAttribute('data-bs-toggle', 'tooltip');
                   urlSpan.setAttribute('data-bs-placement', 'top');
                   urlSpan.setAttribute('title', url);
-                  new bootstrap.Tooltip(urlSpan); // Initialize tooltip for this item
+                  if (bootstrapAvailable && window.bootstrap?.Tooltip) {
+                      new window.bootstrap.Tooltip(urlSpan);
+                  }
                   item.appendChild(urlSpan);
 
                   const removeBtn = document.createElement('button');
@@ -258,22 +274,47 @@
       }
 
       // Function to check button states for the URL tab
-      function checkUrlFormState() {
+      function checkUrlFormState(triggerSource = 'unknown') {
           const librarySelected = !!librarySelectUrl.value;
+          const selectedOption = librarySelectUrl.selectedIndex >= 0
+              ? librarySelectUrl.options[librarySelectUrl.selectedIndex]
+              : null;
+          const knowledgeHiddenField = document.getElementById('knowledgeIdUrl');
+          const knowledgeId = knowledgeHiddenField?.value || selectedOption?.dataset?.knowledgeId || '';
           const urlsInList = urlsToProcess.length > 0;
           const textInArea = urlTextarea.value.trim().length > 0;
+          const libraryReady = librarySelected && (!knowledgeRequired || knowledgeId);
 
-          addUrlsBtn.disabled = !(librarySelected && textInArea);
-          processUrlsBtn.disabled = !(librarySelected && urlsInList);
+          addUrlsBtn.disabled = !(libraryReady && textInArea);
+          processUrlsBtn.disabled = !(libraryReady && urlsInList);
+
+          console.log('[Upload Debug][URL] State update', {
+              triggerSource,
+              librarySelected,
+              knowledgeId,
+              knowledgeRequired,
+              textLength: urlTextarea.value.trim().length,
+              urlsInList,
+              addUrlsDisabled: addUrlsBtn.disabled,
+              processDisabled: processUrlsBtn.disabled,
+          });
       }
 
       // Initial state check
       renderUrlList(); // Show "No URLs added yet" initially
-      checkUrlFormState();
+      checkUrlFormState('initial');
 
       // Event listeners
-      librarySelectUrl.addEventListener('change', checkUrlFormState);
-      urlTextarea.addEventListener('input', checkUrlFormState);
+      librarySelectUrl.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        const knowledgeField = document.getElementById('knowledgeIdUrl');
+        if (knowledgeField) {
+            knowledgeField.value = selectedOption?.dataset?.knowledgeId || '';
+        }
+        updateLibraryDetails(this, 'library-details-url');
+        checkUrlFormState('library-change');
+      });
+      urlTextarea.addEventListener('input', () => checkUrlFormState('url-text-input'));
 
       // Add URLs from textarea to the list after backend validation
       addUrlsBtn.addEventListener('click', async function() { // Make async
@@ -399,6 +440,13 @@
                   processUrlsBtn.disabled = false; // Re-enable
                   return;
               }
+              const knowledgeIdUrlField = document.getElementById('knowledgeIdUrl');
+              const knowledgeIdValue = knowledgeIdUrlField ? knowledgeIdUrlField.value : (selectedLibraryOption?.dataset?.knowledgeId || '');
+              if (knowledgeRequired && !knowledgeIdValue) {
+                  urlStatus.innerHTML = '<div class="alert alert-warning">Please select a knowledge base for this library before processing URLs.</div>';
+                  processUrlsBtn.disabled = false;
+                  return;
+              }
               if (urlsToProcess.length === 0) {
                   urlStatus.innerHTML = '<div class="alert alert-warning">No URLs in the list to process.</div>';
                   processUrlsBtn.disabled = false; // Re-enable
@@ -471,8 +519,8 @@
 
                       if (response.ok && data.success) {
                           successCount++;
-                          // Append success message
-                          const successHTML = `<p class="small text-body-secondary mb-1">Success: ${url} ${data.warning || ''}</p>`;
+                          const messageText = data.message || data.warning || '';
+                          const successHTML = `<p class="small text-body-secondary mb-1">Success: ${url} ${messageText}</p>`;
                           urlStatus.insertAdjacentHTML('beforeend', successHTML);
                       } else {
                           errorCount++;
@@ -527,10 +575,26 @@
       uploadBatchBtn.disabled = true;
 
       // Enable batch submit button only when a library AND files are selected
-      function checkBatchFormState() {
+      function checkBatchFormState(triggerSource = 'unknown') {
           const filesSelected = batchFilesArray.length > 0; // Check our array
           const librarySelected = !!librarySelectBatch.value;
-          uploadBatchBtn.disabled = !(filesSelected && librarySelected);
+          const selectedOption = librarySelectBatch.selectedIndex >= 0
+              ? librarySelectBatch.options[librarySelectBatch.selectedIndex]
+              : null;
+          const knowledgeHiddenField = document.getElementById('knowledgeIdBatch');
+          const knowledgeId = knowledgeHiddenField?.value || selectedOption?.dataset?.knowledgeId || '';
+          const libraryReady = librarySelected && (!knowledgeRequired || knowledgeId);
+          uploadBatchBtn.disabled = !(filesSelected && libraryReady);
+
+          console.log('[Upload Debug][Batch] State update', {
+              triggerSource,
+              librarySelected,
+              filesSelected,
+              knowledgeId,
+              knowledgeRequired,
+              uploadDisabled: uploadBatchBtn.disabled,
+              batchFilesArrayLength: batchFilesArray.length,
+          });
       }
 
       // Function to render the list of selected batch files with remove buttons
@@ -563,7 +627,7 @@
               });
               batchFileList.appendChild(list);
           }
-          checkBatchFormState(); // Update button state after rendering
+          checkBatchFormState('render-list'); // Update button state after rendering
       }
 
       // Update the FileList on the input element based on batchFilesArray
@@ -574,12 +638,13 @@
       }
 
 
-      librarySelectBatch.addEventListener('change', checkBatchFormState);
+      librarySelectBatch.addEventListener('change', () => checkBatchFormState('library-change'));
 
       batchFileInput.addEventListener('change', function() {
           // Populate our array from the input's FileList
           batchFilesArray = Array.from(batchFileInput.files);
           renderBatchFileList(); // Render the list with remove buttons
+          checkBatchFormState('file-input-change');
       });
 
       // Event delegation for remove buttons
@@ -628,6 +693,12 @@
                   uploadBatchBtn.disabled = false; // Re-enable button
                   return;
               }
+              const knowledgeIdValue = knowledgeIdBatch ? knowledgeIdBatch.value : (selectedLibraryOption?.dataset?.knowledgeId || '');
+              if (knowledgeRequired && !knowledgeIdValue) {
+                  batchStatus.innerHTML = '<div class="alert alert-warning">Please select a knowledge base for this library before uploading.</div>';
+                  uploadBatchBtn.disabled = false;
+                  return;
+              }
 
               isBatchUploading = true;
               uploadBatchBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading ${filesToUpload.length} files...`; // Use array length
@@ -672,9 +743,8 @@
                   fileFormData.append('library_name', libraryName);
                   fileFormData.append('file', file, file.name); // Add the current file
                   // Append knowledge_id from hidden input
-                  const knowledgeIdBatch = document.getElementById('knowledgeIdBatch');
-                  if (knowledgeIdBatch && knowledgeIdBatch.value) {
-                      fileFormData.append('knowledge_id', knowledgeIdBatch.value);
+                  if (knowledgeIdValue) {
+                      fileFormData.append('knowledge_id', knowledgeIdValue);
                   }
 
                   // --- Manually add checkbox state if checked ---
@@ -774,6 +844,7 @@
               checkBatchFormState(); // Ensure button is disabled after completion
           });
       } // End listener attachment check
+      checkBatchFormState('initial');
   } // End Batch Upload Logic
 
   // --- Add Event Listeners for Library Details ---
@@ -785,27 +856,24 @@
           const selectedOption = this.options[this.selectedIndex];
           const knowledgeIdUrl = document.getElementById('knowledgeIdUrl');
           if (knowledgeIdUrl) {
-              const knowledgeId = selectedOption && selectedOption.dataset.knowledgeId
-                  ? selectedOption.dataset.knowledgeId
-                  : '';
+              const knowledgeId = selectedOption?.dataset?.knowledgeId || '';
               knowledgeIdUrl.value = knowledgeId;
-              // Disable process button if no knowledge selected
-              processUrlsBtn.disabled = !knowledgeId;
               console.log('[Upload Debug] Selected knowledge_id (URL):', knowledgeId);
           }
+          checkUrlFormState();
       });
       // Initial call in case a library is pre-selected
       updateLibraryDetails(librarySelectUrl, 'library-details-url');
       // Also set knowledge_id on initial load
-      const selectedOption = librarySelectUrl.options[librarySelectUrl.selectedIndex];
+      const selectedOption = librarySelectUrl.selectedIndex >= 0
+          ? librarySelectUrl.options[librarySelectUrl.selectedIndex]
+          : null;
       const knowledgeIdUrl = document.getElementById('knowledgeIdUrl');
       if (knowledgeIdUrl) {
-          const knowledgeId = selectedOption && selectedOption.dataset.knowledgeId
-              ? selectedOption.dataset.knowledgeId
-              : '';
+          const knowledgeId = selectedOption?.dataset?.knowledgeId || '';
           knowledgeIdUrl.value = knowledgeId;
-          processUrlsBtn.disabled = !knowledgeId;
       }
+      checkUrlFormState();
   }
 
   if (librarySelectBatch && document.getElementById('knowledgeIdBatch')) {
@@ -815,26 +883,24 @@
           const selectedOption = this.options[this.selectedIndex];
           const knowledgeIdBatch = document.getElementById('knowledgeIdBatch');
           if (knowledgeIdBatch) {
-              const knowledgeId = selectedOption && selectedOption.dataset.knowledgeId
-                  ? selectedOption.dataset.knowledgeId
-                  : '';
+              const knowledgeId = selectedOption?.dataset?.knowledgeId || '';
               knowledgeIdBatch.value = knowledgeId;
-              // Disable upload button if no knowledge selected
-              uploadBatchBtn.disabled = !knowledgeId || batchFilesArray.length === 0;
               console.log('[Upload Debug] Selected knowledge_id (Batch):', knowledgeId);
           }
+          checkBatchFormState();
       });
       // Initial call
       updateLibraryDetails(librarySelectBatch, 'library-details-batch');
       // Also set knowledge_id on initial load
-      const selectedOption = librarySelectBatch.options[librarySelectBatch.selectedIndex];
+      const selectedOption = librarySelectBatch.selectedIndex >= 0
+          ? librarySelectBatch.options[librarySelectBatch.selectedIndex]
+          : null;
       const knowledgeIdBatch = document.getElementById('knowledgeIdBatch');
       if (knowledgeIdBatch) {
-          const knowledgeId = selectedOption && selectedOption.dataset.knowledgeId
-              ? selectedOption.dataset.knowledgeId
-              : '';
+          const knowledgeId = selectedOption?.dataset?.knowledgeId || '';
           knowledgeIdBatch.value = knowledgeId;
       }
+      checkBatchFormState();
   }
   if (librarySelectFile) {
       librarySelectFile.addEventListener('change', function() {

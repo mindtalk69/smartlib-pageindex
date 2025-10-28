@@ -9,7 +9,7 @@
 {% block content %}
 <div class="row justify-content-center mt-5 upload-section-row"> {# ADDED custom class #}
   {# Use the new shared styled container class and a page-specific class #}
-  <div class="col-md-10 styled-form-container upload-page-container"> 
+  <div class="col-md-10 styled-form-container upload-page-container" data-vector-store-mode="{{ vector_store_setting }}"> 
     {# REMOVED unnecessary inner card and card-body divs #}
 
     <div class="d-flex justify-content-between align-items-center mb-1">
@@ -50,17 +50,28 @@
               <select class="form-select" id="librarySelectFile" name="library_id" required>
                   <option value="" selected disabled>Choose a library...</option>
                   {# Options will be populated by the backend #}
-                  {% for library in libraries %}
-                    {% for knowledge in library.knowledges %}
-                      <option value="{{ library.library_id }}"
-                              data-knowledge-id="{{ knowledge.id }}"
-                              data-knowledge-name="{{ knowledge.name }}"
-                              data-categories="{{ knowledge.categories|map(attribute='name')|join(', ') if knowledge.categories else '' }}"
-                              data-catalogs="{{ knowledge.catalogs|map(attribute='name')|join(', ') if knowledge.catalogs else '' }}">
-                          {{ library.name }} — {{ knowledge.name }}
-                      </option>
+                    {% for library in libraries %}
+                      {% if library.knowledges %}
+                        {% for knowledge in library.knowledges %}
+                          <option value="{{ library.library_id }}"
+                                  data-knowledge-id="{{ knowledge.id }}"
+                                  data-knowledge-name="{{ knowledge.name }}"
+                                  data-categories="{{ knowledge.categories|map(attribute='name')|join(', ') if knowledge.categories else '' }}"
+                                  data-catalogs="{{ knowledge.catalogs|map(attribute='name')|join(', ') if knowledge.catalogs else '' }}">
+                              {{ library.name }} — {{ knowledge.name }}
+                          </option>
+                        {% endfor %}
+                      {% else %}
+                        <option value="{{ library.library_id }}"
+                                data-knowledge-id=""
+                                data-knowledge-name=""
+                                data-categories=""
+                                data-catalogs="">
+                            {{ library.name }}
+                        </option>
+                      {% endif %}
                     {% endfor %}
-                  {% endfor %}
+
               </select>
               <input type="hidden" name="library_name" id="libraryNameFile"> {# Hidden input for library name #}
               {# Placeholder for library details - File Upload Tab (Currently hidden) #}
@@ -105,15 +116,25 @@
                 <select class="form-select" id="librarySelectUrl" name="library_id" required>
                     <option value="" selected disabled>Choose a library...</option>
                     {% for library in libraries %}
-                      {% for knowledge in library.knowledges %}
+                      {% if library.knowledges %}
+                        {% for knowledge in library.knowledges %}
+                          <option value="{{ library.library_id }}"
+                                  data-knowledge-id="{{ knowledge.id }}"
+                                  data-knowledge-name="{{ knowledge.name }}"
+                                  data-categories="{{ knowledge.categories|map(attribute='name')|join(', ') if knowledge.categories else '' }}"
+                                  data-catalogs="{{ knowledge.catalogs|map(attribute='name')|join(', ') if knowledge.catalogs else '' }}">
+                              {{ library.name }} — {{ knowledge.name }}
+                          </option>
+                        {% endfor %}
+                      {% else %}
                         <option value="{{ library.library_id }}"
-                                data-knowledge-id="{{ knowledge.id }}"
-                                data-knowledge-name="{{ knowledge.name }}"
-                                data-categories="{{ knowledge.categories|map(attribute='name')|join(', ') if knowledge.categories else '' }}"
-                                data-catalogs="{{ knowledge.catalogs|map(attribute='name')|join(', ') if knowledge.catalogs else '' }}">
-                            {{ library.name }} — {{ knowledge.name }}
+                                data-knowledge-id=""
+                                data-knowledge-name=""
+                                data-categories=""
+                                data-catalogs="">
+                            {{ library.name }}
                         </option>
-                      {% endfor %}
+                      {% endif %}
                     {% endfor %}
                 </select>
                 <div id="library-details-url" class="mt-2 small text-muted"></div>
@@ -167,15 +188,25 @@
                 <select class="form-select" id="librarySelectBatch" name="library_id" required>
                     <option value="" selected disabled>Choose a library...</option>
                     {% for library in libraries %}
-                      {% for knowledge in library.knowledges %}
+                      {% if library.knowledges %}
+                        {% for knowledge in library.knowledges %}
+                          <option value="{{ library.library_id }}"
+                                  data-knowledge-id="{{ knowledge.id }}"
+                                  data-knowledge-name="{{ knowledge.name }}"
+                                  data-categories="{{ knowledge.categories|map(attribute='name')|join(', ') if knowledge.categories else '' }}"
+                                  data-catalogs="{{ knowledge.catalogs|map(attribute='name')|join(', ') if knowledge.catalogs else '' }}">
+                              {{ library.name }} — {{ knowledge.name }}
+                          </option>
+                        {% endfor %}
+                      {% else %}
                         <option value="{{ library.library_id }}"
-                                data-knowledge-id="{{ knowledge.id }}"
-                                data-knowledge-name="{{ knowledge.name }}"
-                                data-categories="{{ knowledge.categories|map(attribute='name')|join(', ') if knowledge.categories else '' }}"
-                                data-catalogs="{{ knowledge.catalogs|map(attribute='name')|join(', ') if knowledge.catalogs else '' }}">
-                            {{ library.name }} — {{ knowledge.name }}
+                                data-knowledge-id=""
+                                data-knowledge-name=""
+                                data-categories=""
+                                data-catalogs="">
+                            {{ library.name }}
                         </option>
-                      {% endfor %}
+                      {% endif %}
                     {% endfor %}
                 </select>
                 <div id="library-details-batch" class="mt-2 small text-muted"></div>

@@ -190,3 +190,5 @@ static/maps/
 htmlcov/
 .pytest_cache/
 test-results/
+data/admin_folder_uploads
+maps

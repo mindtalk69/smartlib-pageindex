@@ -9,7 +9,7 @@ from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, Base
 import json
 import re
 from langchain_core.tools import tool, Tool # Keep Tool
-from modules.database import MessageHistory as DB_MessageHistory, db as agent_db_session # For DB ops
+from modules.database import MessageHistory as DB_MessageHistory, db # For DB ops
 # Remove create_react_agent_lc as we'll use direct LLM binding
 from langchain import hub
 from langchain_core.agents import AgentAction, AgentFinish # Import Pydantic BaseModel and Field
@@ -25,6 +25,8 @@ from langchain.retrievers.self_query.base import SelfQueryRetriever
 from langchain_openai import AzureChatOpenAI
 from langchain_chroma import Chroma
 
+agent_db_session = db.session
+
 from dotenv import load_dotenv
 from typing import TypedDict, Optional, Tuple, List, Dict, Any, Callable, Annotated, Sequence, Union, TypedDict
 import operator
@@ -33,6 +35,8 @@ from langgraph.errors import GraphInterrupt # Import GraphInterrupt
 import asyncio # Keep asyncio
 import logging
 from uuid import uuid4 # Import uuid4
+from threading import Lock
+
 
 # Import shared RAG field info and filter patching from selfquery.py
 from modules.selfquery import (
@@ -58,6 +62,28 @@ import io # For DataFrame info buffer
 from .dataframe_agent import create_dataframe_agent_graph, DataFrameAgentState # Import new agent
 
 from .evidence_utils import get_visual_info_for_chunk # Import from your new module
+
+# --- HIL Confirmation Tracking ---
+
+_hil_confirmed_threads: set[str] = set()
+_hil_confirmed_lock = Lock()
+
+def _mark_thread_hil_confirmed(thread_id: Optional[str]) -> None:
+    if not thread_id:
+        return
+    thread_key = str(thread_id)
+    with _hil_confirmed_lock:
+        _hil_confirmed_threads.add(thread_key)
+
+def _consume_thread_hil_confirmation(thread_id: Optional[str]) -> bool:
+    if not thread_id:
+        return False
+    thread_key = str(thread_id)
+    with _hil_confirmed_lock:
+        if thread_key in _hil_confirmed_threads:
+            _hil_confirmed_threads.remove(thread_key)
+            return True
+    return False
 
 # --- State Definitions ---
 
@@ -106,6 +132,7 @@ class SupervisorState(TypedDict):
     active_dataframe_id: Optional[str] # ID of the currently active one for DataFrame_Agent tools
     df_agent_is_active_session: Optional[bool] # True if any DF is loaded and active
     current_turn_usage_metadata: Optional[Dict[str, Any]] # To store usage for the current interaction
+    thread_id: Optional[str]
 
 # DataFrameAgentState is now imported from dataframe_agent.py
 # class DataFrameAgentState(TypedDict):
@@ -123,7 +150,7 @@ if os.getenv('SERPER_API_KEY'):
     search = GoogleSerperResults()
 else:
     search = None
-from flask import current_app, url_for
+from flask import current_app, url_for, has_request_context
 
 
 # --- Helper function for map image generation ---
@@ -133,52 +160,64 @@ def _generate_map_image_and_link(folium_map: folium.Map, map_filename_prefix: st
     and returns a dictionary with link, image data, and MIME type.
     """
     map_filename_html = f"{map_filename_prefix}_{uuid4()}.html"
-    static_maps_dir = Path(current_app.static_folder) / "maps"
-    static_maps_dir.mkdir(parents=True, exist_ok=True)
-    save_path_html = static_maps_dir / map_filename_html
-    map_url_html = url_for('static', filename=f'maps/{map_filename_html}', _external=False)
+    map_output_dir = Path(current_app.config.get('MAP_PUBLIC_DIR', os.path.join(current_app.root_path, 'static', 'maps')))
+    map_output_dir.mkdir(parents=True, exist_ok=True)
+    save_path_html = map_output_dir / map_filename_html
 
     folium_map.save(str(save_path_html))
+
+    try:
+        if has_request_context():
+            map_url_html = url_for('serve_generated_map', filename=map_filename_html, _external=False)
+        else:
+            raise RuntimeError("No request context available for url_for")
+    except RuntimeError as url_exc:
+        base_url = current_app.config.get('EXTERNAL_BASE_URL')
+        if base_url:
+            map_url_html = f"{base_url.rstrip('/')}/generated-maps/{map_filename_html}"
+        else:
+            map_url_html = f"/generated-maps/{map_filename_html}"
+        logging.debug(
+            "Falling back to manual generated-map URL for %s due to %s",
+            map_filename_html,
+            url_exc,
+        )
+
     logging.info(f"Saved HTML map to {save_path_html}, URL: {map_url_html}")
 
     map_image_base64 = None
     map_image_mime_type = None
-    try:
-        
-         # --- MODIFIED: Use Selenium with Chrome to generate PNG ---
-        chrome_options = ChromeOptions()
-        chrome_options.add_argument("--headless=new") # Modern headless
-        chrome_options.add_argument("--window-size=800,700") # Adjust as needed for map detail
-        chrome_options.add_argument("--hide-scrollbars")
-        chrome_options.add_argument("--disable-gpu") # Often recommended for headless
-        chrome_options.add_argument("--no-sandbox") # If running as root or in certain CI environments
-        chrome_options.add_argument("--disable-dev-shm-usage") # Overcome limited resource problems
-        # Use webdriver-manager to automatically handle chromedriver
-        try:           
-           
-            driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()),options=chrome_options)            
-        except Exception as e_driver_init:            
-            logging.error(f"Failed to initialize Chrome WebDriver: {e_driver_init}", exc_info=True)
-            logging.warning("Ensure Chrome browser is installed and chromedriver is compatible/downloadable.")
-            raise # Re-raise to be caught by the outer try-except
-        
-        driver.get(f"file:///{save_path_html.resolve()}") # Use absolute path
-        time.sleep(2) # Allow time for map to render (adjust as needed) 
-        
-        img_data_bytes = driver.get_screenshot_as_png()
-        driver.quit()
-        # --- END MODIFICATION ---
-    
-        # Ensure selenium and a webdriver are installed and in PATH
-        #img_data_bytes = folium_map._to_png(delay=1) # delay in seconds
-        map_image_base64 = base64.b64encode(img_data_bytes).decode('utf-8')
-        map_image_mime_type = "image/png"
-        logging.info(f"Successfully generated PNG image for map {map_filename_html}.")
-    except Exception as e:
-        logging.error(f"Failed to generate PNG image for map {map_filename_html}: {e}", exc_info=True)
-        logging.warning("Ensure Selenium and a webdriver (geckodriver/chromedriver) are installed and in your PATH.")
+    if current_app.config.get('MAP_GENERATE_PNG', True):
+        try:
+            chrome_options = ChromeOptions()
+            chrome_options.add_argument("--headless=new")
+            chrome_options.add_argument("--window-size=800,700")
+            chrome_options.add_argument("--hide-scrollbars")
+            chrome_options.add_argument("--disable-gpu")
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
 
-    markdown_link = f"[Open Interactive Map]({map_url_html})"
+            driver = webdriver.Chrome(
+                service=ChromeService(ChromeDriverManager().install()),
+                options=chrome_options,
+            )
+            try:
+                driver.get(f"file:///{save_path_html.resolve()}")
+                time.sleep(2)
+                img_data_bytes = driver.get_screenshot_as_png()
+            finally:
+                driver.quit()
+
+            map_image_base64 = base64.b64encode(img_data_bytes).decode('utf-8')
+            map_image_mime_type = "image/png"
+            logging.info(f"Successfully generated PNG image for map {map_filename_html}.")
+        except Exception as e:
+            logging.error(f"Failed to generate PNG image for map {map_filename_html}: {e}", exc_info=True)
+            logging.warning("Ensure Selenium and a webdriver (geckodriver/chromedriver) are installed and in your PATH.")
+    else:
+        logging.info("MAP_GENERATE_PNG disabled; skipping PNG generation for map %s.", map_filename_html)
+
+    markdown_link = f'<a href="{map_url_html}" target="_blank" rel="noopener">Open Interactive Map</a>'
     return {
         "map_link": markdown_link,
         "map_image_base64": map_image_base64,
@@ -304,8 +343,8 @@ def initialize_llms():
     from flask import current_app
     with current_app.app_context():
         try:
-            print("Initializing LLM...")
-            llm = get_llm()
+            print("Initializing LLM (streaming-enabled)...")
+            llm = get_llm(streaming=True)
             print("LLM Initialized.")
             # Bind map tools immediately after base LLM is ready
             llm_with_map_tools = llm.bind_tools(map_tools)
@@ -1462,10 +1501,13 @@ IMPORTANT:
             # If the last message in the supervisor's history was a ToolMessage (e.g., from get_coords), add it.
             # This allows the LLM to see the result of a previous tool call in this turn.
             if state["messages"] and isinstance(state["messages"][-1], ToolMessage):
-                # Check if the tool message is relevant (e.g., from get_latitude_longitude_by_name_place)
-                # For simplicity, we'll add any last ToolMessage. A more robust check could be added.
-                if state["messages"][-1].name == "get_latitude_longitude_by_name_place":
-                    messages_for_map_llm.append(state["messages"][-1])
+                tool_msg = state["messages"][-1]
+                if tool_msg.name == "get_latitude_longitude_by_name_place":
+                    messages_for_map_llm.append(
+                        HumanMessage(
+                            content=f"Tool result for get_latitude_longitude_by_name_place: {tool_msg.content}"
+                        )
+                    )
             # --- End concise message history construction ---
 
             try:
@@ -1528,9 +1570,32 @@ IMPORTANT:
             confirmation is requested before performing a web search, as per requirements.
             """
             logging.info("--- Checking Web Search Interrupt ---")
-            # If we are resuming after HIL confirmation, don't interrupt again.
-            if config.get("configurable", {}).get("resume_after_hil_confirmation"):
-                logging.info("[web_search_interrupt_check] Resuming after HIL confirmation. Skipping interrupt.")
+            configurable_section = {}
+            if config and hasattr(config, "get"):
+                configurable_section = config.get("configurable", {}) or {}
+
+            thread_id_for_config = state.get("thread_id") or configurable_section.get("thread_id")
+            skip_interrupt = configurable_section.get("resume_after_hil_confirmation", False)
+
+            logging.info(
+                "[web_search_interrupt_check] Thread %s resume flag=%s",
+                thread_id_for_config,
+                skip_interrupt,
+            )
+
+            if not skip_interrupt and thread_id_for_config:
+                skip_interrupt = _consume_thread_hil_confirmation(thread_id_for_config)
+                logging.info(
+                    "[web_search_interrupt_check] Consumed thread flag for %s, result=%s",
+                    thread_id_for_config,
+                    skip_interrupt,
+                )
+
+            if skip_interrupt:
+                logging.info(
+                    "[web_search_interrupt_check] Resuming after HIL confirmation for thread %s. Skipping interrupt.",
+                    thread_id_for_config,
+                )
                 return
 
             logging.info("[web_search_interrupt_check] HIL is required for web search. Raising GraphInterrupt for user confirmation.")
@@ -1907,6 +1972,7 @@ def resume_agent_graph(
 
     if confirmation == "yes":
         config["configurable"]["resume_after_hil_confirmation"] = True
+        _mark_thread_hil_confirmed(config_thread_id)
 
     if stream:
         print(f"--- Resuming SUPERVISOR graph in STREAMING mode for thread {thread_id} ---")
@@ -1962,19 +2028,34 @@ async def _collect_stream_chunks(graph, inputs, config):
         "map_image_base64": None,
         "map_image_mime_type": None,
         "html_map_url": None,
-        "confirmation_required": False, # For HIL
-        "confirmation_type": None, # For HIL
-        "thread_id": None, # For HIL
-        "message_id": None # Will be populated with db_message_id
+        "confirmation_required": False,  # For HIL
+        "confirmation_type": None,  # For HIL
+        "thread_id": None,  # For HIL
+        "message_id": None,  # Will be populated with db_message_id
     }
     full_streamed_content = ""
-    db_message_id_from_config = config.get("configurable", {}).get("db_message_id")
-    user_id_from_config = config.get("configurable", {}).get("user_id") # Get user_id for DB ops
+    configurable_values = config.get("configurable", {}) if config else {}
+    db_message_id_from_config = configurable_values.get("db_message_id")
+    user_id_from_config = configurable_values.get("user_id")  # Get user_id for DB ops
+    thread_id_from_config = configurable_values.get("thread_id")
 
-    if db_message_id_from_config:
+    if db_message_id_from_config is not None:
         final_response_obj["message_id"] = str(db_message_id_from_config)
-        # Yield an initial metadata update if this is the first time we have db_message_id
-        yield f"data: {json.dumps({'type': 'metadata_update', 'metadata': {'message_id': str(db_message_id_from_config)}})}\n\n"
+    if thread_id_from_config is not None:
+        final_response_obj["thread_id"] = str(thread_id_from_config)
+        final_response_obj["conversation_id"] = str(thread_id_from_config)
+
+    initial_metadata = {}
+    if db_message_id_from_config is not None:
+        initial_metadata["message_id"] = str(db_message_id_from_config)
+    if thread_id_from_config is not None:
+        initial_metadata["conversation_id"] = str(thread_id_from_config)
+    if initial_metadata:
+        metadata_packet = {
+            "type": "metadata_update",
+            "metadata": initial_metadata,
+        }
+        yield f"data: {json.dumps(metadata_packet)}\n\n"
 
     async for chunk_event in graph.astream_events(inputs, config=config, version="v1"):
         kind = chunk_event["event"]
@@ -2075,6 +2156,7 @@ def invoke_agent_graph(
 
                 # Add flag to config to bypass the interrupt on resume
                 resume_config["configurable"]["resume_after_hil_confirmation"] = True
+                _mark_thread_hil_confirmed(current_thread_id)
 
                 try:
                     # Call invoke with None to resume from the checkpoint
@@ -2149,7 +2231,7 @@ def invoke_agent_graph(
         df_agent_is_active_session=df_agent_is_active_session_from_checkpoint,
         loaded_dataframes=loaded_dataframes_from_checkpoint, active_dataframe_id=active_dataframe_id_from_checkpoint,
         uploaded_file_content=uploaded_file_content, uploaded_file_type=uploaded_file_type, uploaded_file_name=uploaded_file_name,
-        next=None, agent_output=None, current_turn_usage_metadata={}
+        next=None, agent_output=None, current_turn_usage_metadata={}, thread_id=str(current_thread_id)
     )
 
     config["interrupt_before"] = ["web_search"]

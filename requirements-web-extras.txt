@@ -1,0 +1,9 @@
+# Optional heavy dependencies for web image when local embeddings are required
+# Install with: docker build --build-arg INSTALL_WEB_EXTRAS=true ...
+
+# HuggingFace embedding stack (CPU only)
+langchain-huggingface==0.1.2
+sentence-transformers==2.6.0
+torch==2.1.2+cpu
+# torchvision optional for certain models; include to match worker stack
+torchvision==0.16.2+cpu

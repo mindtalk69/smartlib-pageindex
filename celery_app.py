@@ -1,6 +1,7 @@
 from celery import Celery
 import logging
 import os
+from datetime import timedelta
 from flask import current_app
 
 # Get the broker URL from environment variables
@@ -61,6 +62,28 @@ celery.Task = ContextTask
 celery.conf.update(
     result_expires=3600,
 )
+
+map_cleanup_interval = int(os.environ.get('MAP_CLEANUP_INTERVAL_HOURS', '6') or 0)
+if map_cleanup_interval > 0:
+    beat_schedule = getattr(celery.conf, 'beat_schedule', {})
+    beat_schedule.update({
+        'cleanup-generated-maps': {
+            'task': 'modules.agent.cleanup_generated_maps',
+            'schedule': timedelta(hours=map_cleanup_interval),
+        }
+    })
+    celery.conf.beat_schedule = beat_schedule
+
+message_cleanup_interval = int(os.environ.get('MESSAGE_CLEANUP_INTERVAL_HOURS', '24') or 0)
+if message_cleanup_interval > 0:
+    beat_schedule = getattr(celery.conf, 'beat_schedule', {})
+    beat_schedule.update({
+        'cleanup-message-history': {
+            'task': 'modules.agent.cleanup_message_history',
+            'schedule': timedelta(hours=message_cleanup_interval),
+        }
+    })
+    celery.conf.beat_schedule = beat_schedule
 
 if __name__ == '__main__':
     celery.start()

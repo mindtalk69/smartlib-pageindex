@@ -228,6 +228,35 @@
   }
 }
 
+.typewriter-active .bubble-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.typewriter-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.typewriter-caret {
+  display: inline-block;
+  width: 0.6ch;
+  height: 1.1em;
+  background-color: currentColor;
+  border-radius: 2px;
+  animation: typewriter-caret-blink 0.9s steps(1, start) infinite;
+}
+
+@keyframes typewriter-caret-blink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0;
+  }
+}
+
 /* Add other chat styles below */
 /* ... */
 
