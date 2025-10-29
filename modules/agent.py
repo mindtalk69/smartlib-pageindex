@@ -456,19 +456,30 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
             logging.error(f"[PGVector DEBUG] Error initializing PGVector: {e}")
             return {"documents": [], "structured_query": "Error initializing PGVector.", "error": str(e)}
     elif vector_provider == 'chromadb':
-        mode_to_pass = None
-        if knowledge_id:
-            mode_to_pass = 'knowledge'
-        elif mode_for_operation == 'global':
-            mode_to_pass = 'global'
-        elif library_id and not user_id:
-            mode_to_pass = None
-        elif user_id:
-            mode_to_pass = 'user'
-        else:
-            mode_to_pass = mode_for_operation
+        requested_mode = mode_for_operation or app_default_vector_store_mode
 
-        persist_dir = get_lc_store_path(user_id, knowledge_id, mode_to_pass)
+        if requested_mode not in {'global', 'knowledge', 'user'}:
+            if knowledge_id:
+                requested_mode = 'knowledge'
+            elif user_id:
+                requested_mode = 'user'
+            else:
+                requested_mode = 'global'
+
+        if requested_mode == 'user' and not user_id:
+            logging.warning(
+                "User-scoped vector store requested without user_id; "
+                "falling back to global store."
+            )
+            requested_mode = 'global'
+        if requested_mode == 'knowledge' and not knowledge_id:
+            logging.warning(
+                "Knowledge-scoped vector store requested without knowledge_id; "
+                "falling back to global store."
+            )
+            requested_mode = 'global'
+
+        persist_dir = get_lc_store_path(user_id, knowledge_id, requested_mode)
         if not persist_dir or not os.path.exists(persist_dir):
             logging.warning(f"Chroma directory not found or path is None: {persist_dir}. Retrieval will likely fail.")
             return {

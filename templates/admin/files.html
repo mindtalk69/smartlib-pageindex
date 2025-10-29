@@ -14,6 +14,7 @@
                     <th>Filename</th>
                     <th>Library</th>
                     <th>Knowledge</th>
+                    <th>Metadata</th>
                     <th>Uploaded By</th>
                     <th>Upload Date</th>
                     <th>Is OCR</th>
@@ -28,6 +29,7 @@
                     <td>{{ file['filename'] }}</td>
                     <td>{{ file['library_name'] or 'N/A' }}</td>
                     <td>{{ file['knowledge_name'] or 'N/A' }}</td>
+                    <td class="small text-muted">{{ file['metadata_summary'] }}</td>
                     <td>{{ file['username'] }}</td>
                     <td>{% if file['upload_time'] %}{{ file['upload_time'].strftime('%Y-%m-%d %H:%M') }}{% else %}N/A{% endif %}</td>
                     <td>{% if file['is_ocr'] %}Yes{% else %}No{% endif %}</td>

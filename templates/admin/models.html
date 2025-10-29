@@ -17,6 +17,7 @@
       <th>Temp</th>
       <th>Streaming</th>
       <th>Default</th>
+      <th>Multimodal</th>
       <th>Actions</th>
     </tr>
   </thead>
@@ -30,12 +31,14 @@
       <td>{{ m.temperature if m.temperature is not none else '' }}</td>
       <td>{{ 'Yes' if m.streaming else 'No' }}</td>
       <td>{% if m.is_default %}<span class="badge bg-success">Default</span>{% endif %}</td>
+      <td>{% if current_multimodal_id and m.id == current_multimodal_id %}<span class="badge bg-info text-dark">Multimodal</span>{% endif %}</td>
       <td>
         <button class="btn btn-sm btn-secondary btn-edit">Edit</button>
         <button class="btn btn-sm btn-danger btn-delete">Delete</button>
         {% if not m.is_default %}
         <button class="btn btn-sm btn-outline-primary btn-set-default">Set Default</button>
         {% endif %}
+        <button class="btn btn-sm btn-outline-info btn-set-multimodal" {% if current_multimodal_id and m.id == current_multimodal_id %}disabled{% endif %}>Set Multimodal</button>
       </td>
     </tr>
     {% endfor %}
@@ -174,6 +177,20 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(r=>r.json()).then(res=>{
           if (res.status === 'success') location.reload();
           else alert('Failed to set default: ' + res.message);
+        }).catch(err=>alert('Error: '+err));
+    });
+  });
+
+  // Set multimodal handlers
+  document.querySelectorAll('.btn-set-multimodal').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const tr = e.target.closest('tr');
+      const id = tr.dataset.id;
+      if (!confirm('Set this model as the multimodal default?')) return;
+      fetch(`/admin/models/set-multimodal/${id}`, {method: 'POST', headers: {'Content-Type':'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')}})
+        .then(r=>r.json()).then(res=>{
+          if (res.status === 'success') location.reload();
+          else alert('Failed to set multimodal model: ' + res.message);
         }).catch(err=>alert('Error: '+err));
     });
   });

@@ -23,12 +23,19 @@ from modules.database import (
     add_uploaded_file,
     get_libraries_with_details,
     get_library_with_details,
+    get_catalogs,
+    get_categories,
     knowledge_libraries_association,
     Library,
     Knowledge,
+    Group,
     db,
     create_url_download,
     update_url_download,
+)
+from modules.access_control import (
+    filter_accessible_knowledges,
+    get_user_group_ids,
 )
 
 # Import CSRF instance
@@ -50,9 +57,41 @@ def init_upload(app):
     @login_required
     def upload_page():
         form = UploadForm()
-        libraries = get_libraries_with_details()
         vector_store_setting = current_app.config.get('VECTOR_STORE_MODE', 'user')
-        return render_template('upload.html', form=form, libraries=libraries, vector_store_setting=vector_store_setting)
+        user_group_ids = get_user_group_ids(current_user.user_id)
+        raw_libraries = get_libraries_with_details()
+        libraries = []
+        for library in raw_libraries:
+            accessible_knowledges = filter_accessible_knowledges(
+                getattr(library, 'knowledges', []) or [],
+                user_group_ids,
+            )
+            if vector_store_setting == 'knowledge' and not accessible_knowledges:
+                continue
+            libraries.append(
+                {
+                    'library_id': library.library_id,
+                    'name': library.name,
+                    'description': library.description,
+                    'knowledges': accessible_knowledges,
+                }
+            )
+        categories = []
+        catalogs = []
+        groups = []
+        if vector_store_setting == 'knowledge':
+            categories = get_categories()
+            catalogs = get_catalogs()
+            groups = Group.query.order_by(Group.name).all()
+        return render_template(
+            'upload.html',
+            form=form,
+            libraries=libraries,
+            vector_store_setting=vector_store_setting,
+            categories=categories,
+            catalogs=catalogs,
+            groups=groups,
+        )
 
     @app.route('/upload', methods=['POST'])
     @login_required
@@ -61,7 +100,7 @@ def init_upload(app):
         # Debug logging
         print(f"DEBUG: Upload form data: {dict(request.form)}")
         print(f"DEBUG: Upload files: {request.files}")
-        
+
         # Get library_id and library name from form
         library_id = (
             request.form.get('library_id')
@@ -80,9 +119,29 @@ def init_upload(app):
         except ValueError:
             return jsonify({'success': False, 'message': 'Invalid library selected.'}), 400
 
+        user_group_ids = get_user_group_ids(current_user.user_id)
         library = get_library_with_details(library_id)
         if library is None:
             return jsonify({'success': False, 'message': 'Selected library does not exist.'}), 400
+
+        library_knowledges = list(getattr(library, 'knowledges', []) or [])
+        vector_store_setting = current_app.config.get('VECTOR_STORE_MODE', 'user')
+        enforce_group_permissions = vector_store_setting != 'user'
+
+        if enforce_group_permissions:
+            accessible_library_knowledges = filter_accessible_knowledges(
+                library_knowledges,
+                user_group_ids,
+            )
+        else:
+            accessible_library_knowledges = library_knowledges
+
+        library_knowledge_ids = {item.id for item in library_knowledges}
+        accessible_knowledge_ids = (
+            {item.id for item in accessible_library_knowledges}
+            if enforce_group_permissions
+            else library_knowledge_ids
+        )
 
         # Get files from request (handle both 'file' and 'files' for compatibility)
         files = request.files.getlist('files') or request.files.getlist('file')
@@ -90,29 +149,44 @@ def init_upload(app):
             return jsonify({'success': False, 'message': 'No files selected.'}), 400
 
         # Get knowledge_id if in knowledge mode
-        vector_store_setting = current_app.config.get('VECTOR_STORE_MODE', 'user')
         print(f"DEBUG: Vector store setting: {vector_store_setting}")
         if vector_store_setting == 'knowledge':
-            knowledge_id = request.form.get('knowledge_id') 
+            knowledge_id = request.form.get('knowledge_id')
             print(f"DEBUG: Knowledge ID from form: {knowledge_id}")
             if not knowledge_id:
                 print("DEBUG: Knowledge ID validation failed - empty")
-                return jsonify({'success': False, 'message': 'Knowledge mode is mandatory. Please select a knowledge base before downloading.'}), 400
+                return jsonify(
+                    {
+                        'success': False,
+                        'message': 'Knowledge mode is mandatory. Please select a knowledge base before downloading.',
+                    }
+                ), 400
             try:
                 knowledge_id = int(knowledge_id)
                 print(f"DEBUG: Knowledge ID converted to int: {knowledge_id}")
-            except Exception as e:
-                print(f"DEBUG: Knowledge ID conversion failed: {e}")
+            except Exception as exc:
+                print(f"DEBUG: Knowledge ID conversion failed: {exc}")
                 return jsonify({'success': False, 'message': 'Invalid knowledge base selected.'}), 400
+
+            if knowledge_id not in library_knowledge_ids:
+                return jsonify({'success': False, 'message': 'Selected knowledge is not linked to the chosen library.'}), 400
+            if enforce_group_permissions and knowledge_id not in accessible_knowledge_ids:
+                return jsonify({'success': False, 'message': 'You do not have permission to use the selected knowledge base.'}), 403
+
+            if db.session.get(Knowledge, knowledge_id) is None:
+                return jsonify({'success': False, 'message': 'Selected knowledge does not exist.'}), 400
         else:
-            first_library_knowledge = (
-                Knowledge.query.join(knowledge_libraries_association)
-                .filter(knowledge_libraries_association.c.library_id == library_id)
-                .first()
-            )
-            if first_library_knowledge is not None:
-                knowledge_id = first_library_knowledge.id
-                print(f"DEBUG: Defaulting knowledge_id to library association: {knowledge_id}")
+            if (
+                enforce_group_permissions
+                and library_knowledges
+                and not accessible_library_knowledges
+            ):
+                return jsonify({'success': False, 'message': 'You do not have permission to upload to the selected library.'}), 403
+            if enforce_group_permissions and accessible_library_knowledges:
+                knowledge_id = accessible_library_knowledges[0].id
+                print(f"DEBUG: Defaulting knowledge_id to accessible knowledge: {knowledge_id}")
+            else:
+                knowledge_id = None
 
         # Process each file
         uploaded_files = []
@@ -244,11 +318,30 @@ def init_upload(app):
         except (TypeError, ValueError):
             return jsonify({'success': False, 'message': 'Invalid library selected.'}), 400
 
+        user_group_ids = get_user_group_ids(current_user.user_id)
         library = get_library_with_details(library_id)
         if library is None:
             return jsonify({'success': False, 'message': 'Selected library does not exist.'}), 400
 
+        library_knowledges = list(getattr(library, 'knowledges', []) or [])
         vector_store_setting = current_app.config.get('VECTOR_STORE_MODE', 'user')
+        enforce_group_permissions = vector_store_setting != 'user'
+
+        if enforce_group_permissions:
+            accessible_library_knowledges = filter_accessible_knowledges(
+                library_knowledges,
+                user_group_ids,
+            )
+        else:
+            accessible_library_knowledges = library_knowledges
+
+        library_knowledge_ids = {item.id for item in library_knowledges}
+        accessible_knowledge_ids = (
+            {item.id for item in accessible_library_knowledges}
+            if enforce_group_permissions
+            else library_knowledge_ids
+        )
+
         if vector_store_setting == 'knowledge':
             if not knowledge_id:
                 return jsonify({'success': False, 'message': 'Knowledge mode requires a knowledge selection.'}), 400
@@ -256,13 +349,24 @@ def init_upload(app):
                 knowledge_id_int = int(knowledge_id)
             except (TypeError, ValueError):
                 return jsonify({'success': False, 'message': 'Invalid knowledge base selected.'}), 400
+            if knowledge_id_int not in library_knowledge_ids:
+                return jsonify({'success': False, 'message': 'Selected knowledge is not linked to the chosen library.'}), 400
+            if enforce_group_permissions and knowledge_id_int not in accessible_knowledge_ids:
+                return jsonify({'success': False, 'message': 'You do not have permission to use the selected knowledge base.'}), 403
+            if db.session.get(Knowledge, knowledge_id_int) is None:
+                return jsonify({'success': False, 'message': 'Selected knowledge does not exist.'}), 400
         else:
-            knowledge_obj = (
-                Knowledge.query.join(knowledge_libraries_association)
-                .filter(knowledge_libraries_association.c.library_id == library_id)
-                .first()
+            if (
+                enforce_group_permissions
+                and library_knowledges
+                and not accessible_library_knowledges
+            ):
+                return jsonify({'success': False, 'message': 'You do not have permission to use the selected library.'}), 403
+            knowledge_id_int = (
+                accessible_library_knowledges[0].id
+                if enforce_group_permissions and accessible_library_knowledges
+                else None
             )
-            knowledge_id_int = knowledge_obj.id if knowledge_obj is not None else None
 
         filename = os.path.basename(parsed.path) or 'downloaded_document'
         if '.' not in filename:

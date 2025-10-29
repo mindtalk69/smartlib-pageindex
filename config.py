@@ -13,7 +13,7 @@ dotenv_path = os.path.join(basedir, SMARTHING_CONFIG_FILE)
 # Load .env files and allow system environment variables to override
 if os.path.exists(dotenv_path):
     # Load .env and explicitly override existing environment variables
-    loaded = load_dotenv(dotenv_path, override=True)
+    loaded = load_dotenv(dotenv_path, override=False)
     print(f"DEBUG: load_dotenv executed. Variables loaded: {loaded}") # Removed print
     print(f"DEBUG [config.py]: os.environ['VECTOR_STORE_PROVIDER'] after load_dotenv = {os.environ.get('VECTOR_STORE_PROVIDER')}") # Check os.environ
     # Print the specific variable right after loading to see if it was loaded correctly

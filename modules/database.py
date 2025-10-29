@@ -3,6 +3,7 @@ import contextlib # Keep for old connection functions
 from datetime import datetime, timezone
 from pathlib import Path
 import logging
+from typing import Iterable
 from extensions import db # Import the db instance from extensions.py
 from sqlalchemy.sql import func # For default timestamps
 from sqlalchemy.orm import joinedload, foreign # For eager loading and foreign() annotation
@@ -368,7 +369,16 @@ def get_model_by_id(model_id):
     """Return a single ModelConfig by its ID."""
     return db.session.get(ModelConfig, model_id)
 
+
+def get_model_by_deployment(deployment_name: str):
+    """Return the ModelConfig matching a deployment name, or None."""
+    if not deployment_name:
+        return None
+    return ModelConfig.query.filter_by(deployment_name=deployment_name).first()
+
+
 def create_model(name, deployment_name, provider='azure_openai', temperature=None, streaming=False, description=None, created_by=None, set_as_default=False):
+
     """Create a new ModelConfig. If set_as_default is True, unset other defaults."""
     new_model = ModelConfig(
         name=name,
@@ -435,6 +445,42 @@ def set_default_model(model_id):
     except Exception as e:
         db.session.rollback()
         logging.error(f"Error setting default ModelConfig {model_id}: {e}", exc_info=True)
+        raise
+
+def get_multimodal_model_id():
+    """Return the stored multimodal ModelConfig ID, or None if not configured."""
+    try:
+        setting = db.session.get(AppSettings, 'multimodal_model_id')
+        if not setting or not setting.value:
+            return None
+        try:
+            return int(setting.value)
+        except (TypeError, ValueError):
+            logging.warning("Invalid value for AppSettings.multimodal_model_id; expected integer.")
+            return None
+    except Exception as e:
+        logging.error(f"Error fetching multimodal model setting: {e}", exc_info=True)
+        return None
+
+def set_multimodal_model(model_id):
+    """Persist the ModelConfig ID used for multimodal flows in AppSettings."""
+    model = db.session.get(ModelConfig, model_id)
+    if not model:
+        logging.warning(f"Attempted to set multimodal model for non-existent ModelConfig ID: {model_id}")
+        return False
+    try:
+        setting = db.session.get(AppSettings, 'multimodal_model_id')
+        if not setting:
+            setting = AppSettings(key='multimodal_model_id', value=str(model_id))
+            db.session.add(setting)
+        else:
+            setting.value = str(model_id)
+        db.session.commit()
+        logging.info(f"Set ModelConfig ID {model_id} as multimodal model.")
+        return True
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error setting multimodal model {model_id}: {e}", exc_info=True)
         raise
 
 def get_default_model():
@@ -753,19 +799,31 @@ def get_url_downloads(limit=100):
             User.username,
             Library.name.label('library_name'),
             Knowledge.name.label('knowledge_name'),
+            UrlDownload.knowledge_id,
             UrlDownload.is_ocr
         )
         .order_by(UrlDownload.processed_at.desc())
         .limit(limit)
         .all()
     )
+    knowledge_ids = {row[9] for row in downloads_data if row[9] is not None}
+    metadata_map = build_knowledge_metadata_summary(knowledge_ids)
+
     downloads = [
         {
-            'id': d[0], 'url': d[1], 'status': d[2], 'content_type': d[3],
-            'error_message': d[4], 'processed_at': d[5], 'username': d[6],
-            'library_name': d[7], 'knowledge_name': d[8],
-            'is_ocr': d[9]
-        } for d in downloads_data
+            'id': row[0],
+            'url': row[1],
+            'status': row[2],
+            'content_type': row[3],
+            'error_message': row[4],
+            'processed_at': row[5],
+            'username': row[6],
+            'library_name': row[7],
+            'knowledge_name': row[8],
+            'metadata_summary': metadata_map.get(row[9], 'None') if row[9] is not None else 'N/A',
+            'is_ocr': row[10],
+        }
+        for row in downloads_data
     ]
     return downloads
 
@@ -937,7 +995,123 @@ def get_knowledge_by_id(knowledge_id):
         joinedload(Knowledge.groups)
     ).get(knowledge_id)
 
+
+def update_knowledge_tags(knowledge_id, category_ids=None, catalog_ids=None, group_ids=None):
+    """Update categories, catalogs, and groups associated with a knowledge entry."""
+    knowledge = db.session.get(Knowledge, knowledge_id)
+    if not knowledge:
+        logging.error(f"Knowledge with ID {knowledge_id} not found while updating tags.")
+        return False
+
+    def _coerce_int_list(values):
+        coerced = []
+        if not values:
+            return coerced
+        for value in values:
+            try:
+                coerced.append(int(value))
+            except (TypeError, ValueError):
+                logging.warning(
+                    "Skipping invalid knowledge tag value %s for knowledge %s",
+                    value,
+                    knowledge_id,
+                )
+        return coerced
+
+    updated = False
+
+    if category_ids is not None:
+        category_ids = _coerce_int_list(category_ids)
+        categories = (
+            Category.query.filter(Category.id.in_(category_ids)).all()
+            if category_ids
+            else []
+        )
+        knowledge.categories = categories
+        updated = True
+
+    if catalog_ids is not None:
+        catalog_ids = _coerce_int_list(catalog_ids)
+        catalogs = (
+            Catalog.query.filter(Catalog.id.in_(catalog_ids)).all()
+            if catalog_ids
+            else []
+        )
+        knowledge.catalogs = catalogs
+        updated = True
+
+    if group_ids is not None:
+        group_ids = _coerce_int_list(group_ids)
+        groups = (
+            Group.query.filter(Group.group_id.in_(group_ids)).all()
+            if group_ids
+            else []
+        )
+        knowledge.groups = groups
+        updated = True
+
+    if not updated:
+        logging.info(f"No tag changes supplied for knowledge ID {knowledge_id}.")
+        return True
+
+    try:
+        db.session.commit()
+        logging.info(
+            "Updated knowledge %s tags: categories=%s, catalogs=%s, groups=%s",
+            knowledge_id,
+            [cat.id for cat in knowledge.categories],
+            [cat.id for cat in knowledge.catalogs],
+            [grp.group_id for grp in knowledge.groups],
+        )
+        return True
+    except Exception as exc:
+        db.session.rollback()
+        logging.error(
+            f"Error updating knowledge {knowledge_id} tags: {exc}",
+            exc_info=True,
+        )
+        raise
+
+
+def build_knowledge_metadata_summary(knowledge_ids: Iterable[int]) -> dict[int, str]:
+    """Return a mapping of knowledge_id to a formatted metadata summary string."""
+    if not knowledge_ids:
+        return {}
+
+    normalized_ids = {int(k) for k in knowledge_ids if k is not None}
+    if not normalized_ids:
+        return {}
+
+    knowledge_records = (
+        Knowledge.query
+        .options(
+            joinedload(Knowledge.catalogs),
+            joinedload(Knowledge.categories),
+            joinedload(Knowledge.groups),
+        )
+        .filter(Knowledge.id.in_(normalized_ids))
+        .all()
+    )
+
+    summary_map: dict[int, str] = {}
+    for knowledge in knowledge_records:
+        parts: list[str] = []
+        catalogs = [catalog.name for catalog in knowledge.catalogs]
+        categories = [category.name for category in knowledge.categories]
+        groups = [group.name for group in knowledge.groups]
+        if catalogs:
+            parts.append(f"Catalogs: {', '.join(catalogs)}")
+        if categories:
+            parts.append(f"Categories: {', '.join(categories)}")
+        if groups:
+            parts.append(f"Groups: {', '.join(groups)}")
+        summary_map[knowledge.id] = '; '.join(parts) if parts else 'None'
+
+    return summary_map
+
+
 def get_knowledge_catalogs(knowledge_id):
+
     """Get Catalog objects associated with a knowledge entry using SQLAlchemy."""
     knowledge = db.session.get(Knowledge, knowledge_id)
     if knowledge:
@@ -1061,9 +1235,10 @@ def get_libraries_with_details():
     """Get all libraries with creator, knowledge, categories, and catalogs using SQLAlchemy."""
     # Eager load the necessary relationships to avoid N+1 queries in the template
     return Library.query.options(
-        joinedload(Library.creator), # Keep creator info
-        joinedload(Library.knowledges).joinedload(Knowledge.categories), # Load knowledges -> categories
-        joinedload(Library.knowledges).joinedload(Knowledge.catalogs)  # Load knowledges -> catalogs
+        joinedload(Library.creator),  # Keep creator info
+        joinedload(Library.knowledges).joinedload(Knowledge.categories),  # Load knowledges -> categories
+        joinedload(Library.knowledges).joinedload(Knowledge.catalogs),  # Load knowledges -> catalogs
+        joinedload(Library.knowledges).joinedload(Knowledge.groups),  # Load knowledges -> groups
     ).order_by(Library.name).all()
 
 def get_library_by_id(library_id):

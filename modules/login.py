@@ -1,7 +1,7 @@
 from flask import render_template, request, redirect, url_for, flash, session
 from flask_login import login_user, logout_user # Import logout_user
 # Import the rewritten database functions and User model
-from modules.database import get_user_by_username_local, User
+from modules.database import get_user_by_username_local, get_user_by_id, User
 from werkzeug.security import check_password_hash
 import logging # Import logging
 
@@ -21,8 +21,12 @@ def init_login(app):
                 flash('Username and password are required.')
                 return render_template('login.html')
 
-            # Use the rewritten function
+            # Try username lookup first, then fall back to email (user_id)
             user = get_user_by_username_local(username)
+            if not user and "@" in username:
+                user_by_email = get_user_by_id(username)
+                if user_by_email and getattr(user_by_email, "auth_provider", None) == "local":
+                    user = user_by_email
 
             if not user:
                 app.logger.warning(f"Login attempt failed: User '{username}' not found for auth_provider 'local'.")
@@ -36,7 +40,8 @@ def init_login(app):
                  return render_template('login.html')
 
             # Check password and disabled status using object attributes
-            if check_password_hash(user.password_hash, password):
+            stored_hash = user.password_hash if user.password_hash else ""
+            if check_password_hash(stored_hash, password):
                 if user.is_disabled:
                     app.logger.warning(f"Login attempt failed: User '{username}' (ID: {user.user_id}) is disabled.")
                     flash('Your account is disabled. Please contact an administrator.', 'danger')
@@ -68,7 +73,8 @@ def init_login(app):
             # Use the rewritten function, adding filters for admin and local provider
             user = User.query.filter_by(username=username, is_admin=True, auth_provider='local').first()
 
-            if user and check_password_hash(user.password_hash, password):
+            admin_hash = user.password_hash or "" if user else ""
+            if user and check_password_hash(admin_hash, password):
                 # Logout any existing user and clear session before admin login
                 logout_user()
                 session.clear()

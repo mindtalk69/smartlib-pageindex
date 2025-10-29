@@ -57,6 +57,20 @@ if [ "$1" = "web" ]; then
         echo "Language seed script not found; skipping."
     fi
 
+    if [ -f add_catalogs_table.py ]; then
+        echo "Seeding default catalogs if needed..."
+        python add_catalogs_table.py
+    else
+        echo "Catalog seed script not found; skipping."
+    fi
+
+    if [ -f add_categories_table.py ]; then
+        echo "Seeding default categories if needed..."
+        python add_categories_table.py
+    else
+        echo "Category seed script not found; skipping."
+    fi
+
     # Create default models if explicitly requested (handled by worker normally)
     if [ "$IS_AZURE" = false ] && [ -f create_default_models.py ] && [ "$RUN_DEFAULT_MODELS" = "true" ]; then
         echo "RUN_DEFAULT_MODELS=true detected. Creating default models..."

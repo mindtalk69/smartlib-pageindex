@@ -115,3 +115,4 @@ def init_login_azure(app):
                 redirect_uri=redirect_uri
             )
             return redirect(auth_url)
+

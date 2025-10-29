@@ -119,13 +119,76 @@
   }
 
   // --- Library Details Display Logic ---
-  // Helper function to clear the details display (no longer shows knowledge details)
-  function updateLibraryDetails(selectElement, detailsDivId) {
-      const detailsDiv = document.getElementById(detailsDivId);
-      if (!selectElement || !detailsDiv) return;
-      detailsDiv.innerHTML = '';
-  }
+  function updateLibraryDetails(selectElement, detailsDivId, popoverButtonId) {
+      const detailsDiv = detailsDivId ? document.getElementById(detailsDivId) : null;
+      const popoverButton = popoverButtonId ? document.getElementById(popoverButtonId) : null;
+      const resetPopover = () => {
+          if (popoverButton) {
+              const existingPopover = window.bootstrap?.Popover?.getInstance(popoverButton);
+              if (existingPopover) {
+                  existingPopover.dispose();
+              }
+              popoverButton.classList.add('d-none');
+              popoverButton.removeAttribute('data-bs-content');
+          }
+      };
 
+      if (detailsDiv) {
+          detailsDiv.innerHTML = '';
+      }
+
+      if (!selectElement || selectElement.selectedIndex < 0) {
+          resetPopover();
+          return;
+      }
+
+      const selectedOption = selectElement.options[selectElement.selectedIndex];
+      const knowledgeName = selectedOption?.dataset?.knowledgeName || '';
+      const catalogNames = selectedOption?.dataset?.catalogs || '';
+      const categoryNames = selectedOption?.dataset?.categories || '';
+      const groupNames = selectedOption?.dataset?.groupNames || '';
+
+      const summaryParts = [];
+      if (knowledgeName) {
+          summaryParts.push(`<strong>Knowledge:</strong> ${knowledgeName}`);
+      }
+      if (catalogNames) {
+          summaryParts.push(`<strong>Catalogs:</strong> ${catalogNames}`);
+      }
+      if (categoryNames) {
+          summaryParts.push(`<strong>Categories:</strong> ${categoryNames}`);
+      }
+      if (groupNames) {
+          summaryParts.push(`<strong>Groups:</strong> ${groupNames}`);
+      }
+      if (knowledgeRequired && summaryParts.length > 0) {
+          summaryParts.push('<span class="text-muted small d-block mt-2">Metadata follows the knowledge configuration.</span>');
+      }
+
+      const summaryHtml = summaryParts.length
+          ? summaryParts.join('<br>')
+          : '<em>No metadata assigned.</em>';
+
+      if (detailsDiv) {
+          detailsDiv.innerHTML = summaryHtml;
+      }
+
+      if (popoverButton) {
+          const existingPopover = window.bootstrap?.Popover?.getInstance(popoverButton);
+          if (summaryParts.length > 0) {
+              if (existingPopover) {
+                  existingPopover.dispose();
+              }
+              popoverButton.setAttribute('data-bs-content', summaryHtml);
+              popoverButton.classList.remove('d-none');
+              if (window.bootstrap?.Popover) {
+                  new window.bootstrap.Popover(popoverButton);
+              }
+          } else {
+              resetPopover();
+          }
+      }
+  }
 
   // --- File Upload Logic ---
   if (librarySelectFile && fileSubmitBtn && libraryNameFile) {
@@ -311,7 +374,8 @@
         if (knowledgeField) {
             knowledgeField.value = selectedOption?.dataset?.knowledgeId || '';
         }
-        updateLibraryDetails(this, 'library-details-url');
+          updateLibraryDetails(this, null, 'libraryMetadataInfoUrl');
+
         checkUrlFormState('library-change');
       });
       urlTextarea.addEventListener('input', () => checkUrlFormState('url-text-input'));
@@ -638,7 +702,10 @@
       }
 
 
-      librarySelectBatch.addEventListener('change', () => checkBatchFormState('library-change'));
+      librarySelectBatch.addEventListener('change', () => {
+          updateLibraryDetails(librarySelectBatch, null, 'libraryMetadataInfoBatch');
+          checkBatchFormState('library-change');
+      });
 
       batchFileInput.addEventListener('change', function() {
           // Populate our array from the input's FileList
@@ -743,11 +810,13 @@
                   fileFormData.append('library_name', libraryName);
                   fileFormData.append('file', file, file.name); // Add the current file
                   // Append knowledge_id from hidden input
-                  if (knowledgeIdValue) {
-                      fileFormData.append('knowledge_id', knowledgeIdValue);
-                  }
+                   if (knowledgeIdValue) {
+                       fileFormData.append('knowledge_id', knowledgeIdValue);
+                   }
 
-                  // --- Manually add checkbox state if checked ---
+
+                   // --- Manually add checkbox state if checked ---
+
                   if (groundingCheckbox && groundingCheckbox.checked) {
                       // Backend checks for key presence, value doesn't strictly matter but 'true' is clear
                       fileFormData.append('enable_visual_grounding', 'true');
@@ -851,7 +920,8 @@
   // --- Knowledge Mode Only: Attach listeners if knowledge selection fields exist ---
   if (librarySelectUrl && document.getElementById('knowledgeIdUrl')) {
       librarySelectUrl.addEventListener('change', function() {
-          updateLibraryDetails(this, 'library-details-url');
+        updateLibraryDetails(this, null, 'libraryMetadataInfoUrl');
+
           // Set knowledge_id hidden input based on selected library
           const selectedOption = this.options[this.selectedIndex];
           const knowledgeIdUrl = document.getElementById('knowledgeIdUrl');
@@ -863,7 +933,7 @@
           checkUrlFormState();
       });
       // Initial call in case a library is pre-selected
-      updateLibraryDetails(librarySelectUrl, 'library-details-url');
+      updateLibraryDetails(librarySelectUrl, null, 'libraryMetadataInfoUrl');
       // Also set knowledge_id on initial load
       const selectedOption = librarySelectUrl.selectedIndex >= 0
           ? librarySelectUrl.options[librarySelectUrl.selectedIndex]
@@ -878,7 +948,7 @@
 
   if (librarySelectBatch && document.getElementById('knowledgeIdBatch')) {
       librarySelectBatch.addEventListener('change', function() {
-          updateLibraryDetails(this, 'library-details-batch');
+          updateLibraryDetails(this, null, 'libraryMetadataInfoBatch');
           // Set knowledge_id hidden input based on selected library
           const selectedOption = this.options[this.selectedIndex];
           const knowledgeIdBatch = document.getElementById('knowledgeIdBatch');
@@ -890,8 +960,9 @@
           checkBatchFormState();
       });
       // Initial call
-      updateLibraryDetails(librarySelectBatch, 'library-details-batch');
-      // Also set knowledge_id on initial load
+       updateLibraryDetails(librarySelectBatch, null, 'libraryMetadataInfoBatch');
+       // Also set knowledge_id on initial load
+
       const selectedOption = librarySelectBatch.selectedIndex >= 0
           ? librarySelectBatch.options[librarySelectBatch.selectedIndex]
           : null;
@@ -904,10 +975,11 @@
   }
   if (librarySelectFile) {
       librarySelectFile.addEventListener('change', function() {
-          updateLibraryDetails(this, 'library-details-file');
+          updateLibraryDetails(this, null, 'libraryMetadataInfoFile');
       });
       // Initial call
-      updateLibraryDetails(librarySelectFile, 'library-details-file');
+       updateLibraryDetails(librarySelectFile, null, 'libraryMetadataInfoFile');
+
   }
 
 

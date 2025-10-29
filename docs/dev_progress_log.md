@@ -21,12 +21,35 @@
 - Offloaded Hugging Face embedding retrieval to the worker via a new `modules.vector_tasks.retrieve_context` task so the web container can stay slim; the tool automatically calls Celery when a local model (e.g., `BAAI/bge-m3`) is active.
 - Pulled the updated `langchain-huggingface` shim into the worker image so BGE models load cleanly while the web image remains lean.
  
- ## 2025-10-28 – Admin UX Parity & Streaming Feedback Fixes
- - Brought the knowledges admin page in line with other admin tables: new client script handles inline add/edit/delete, row renumbering, placeholder swaps, and modal resets without full reloads.
-
+## 2025-10-28 – Admin UX Parity & Streaming Feedback Fixes
+- Brought the knowledges admin page in line with other admin tables: new client script handles inline add/edit/delete, row renumbering, placeholder swaps, and modal resets without full reloads.
 - Normalized knowledge responses by reusing shared serialization helpers so the frontend receives consistent name lists and timestamps.
 - Synced streaming metadata with the real backend message ID and updated the bubble dataset, ensuring like/dislike feedback persists once the stream completes.
 - Hardened the feedback buttons to defer submission while a message is streaming and use the synchronized ID, resolving the previous failure when streaming was enabled.
 - Restored implicit knowledge assignment during uploads so `/admin/files` immediately shows the correct knowledge after a data reset.
 - Normalized the streaming formatter to strip inline follow-up blocks while keeping the suggested questions in the footer metadata.
 - Wired the streaming collector to reuse the formatted answer payload so numbered follow-ups stay out of the UI transcript while suggested pills remain intact.
+- Enabled knowledge-mode upload tagging: the upload UI now exposes category, catalog, and group selectors only when the system runs in knowledge vector mode, and the backend applies those choices to the target knowledge before queuing both URL and batch ingests.
+
+## 2025-10-29 – Model Guardrails & Streaming Test Harness
+- Expanded `MODEL_CAPABILITY_REGISTRY` with streaming flags, safe temperature ranges, and lookup helpers so downstream services can enforce deployment-specific limits.
+- Added deployment validation in `/admin/models` (temperature coercion, streaming compatibility, and live `get_llm` probe) to catch typos or unsupported settings before they reach production.
+- Patched the admin routes to surface validation errors back to the UI and ensure multimodal config updates stay in sync with `AppSettings` and cached Flask config.
+- Updated `tests/test_query_resume.py` to fix import paths and simulate a successful streaming resume payload, keeping coverage after the new validation hooks.
+- Test suite now passes (`pytest`), confirming the admin guardrails and streaming harness integrate cleanly with existing flows.
+
+## 2025-10-29 – Group-Gated Upload Access
+- Filtered the upload dropdown to display only knowledges the current user can reach based on group memberships, hiding inaccessible libraries in knowledge mode.
+- Enforced the same access rules in file and URL ingests, blocking submissions that target knowledges or libraries outside the user’s groups and defaulting non-knowledge modes to the first accessible knowledge.
+- Captured the change in the upload progress log for continued tracking of the access-control rollout.
+- Extended the same group filters to RAG queries so `/api/query` rejects inaccessible libraries/knowledges and defaults to an allowed knowledge when none is provided.
+- Updated the chat client to show a clear access-denied message instead of a generic 403 error when RAG queries are blocked.
+
+## 2025-10-29 – Global Vector Store Path Fix
+- Prevented Chroma retrieval from forcing knowledge directories when the system runs in global mode; `modules/agent.py` now respects the configured scope even when queries include knowledge filters.
+- Added defensive logging when user or knowledge identifiers are missing so global mode falls back cleanly instead of emitting missing-path warnings.
+
+## 2025-10-29 – User Mode Private Uploads
+- Relaxed query-time group checks when the vector store runs in user mode so personal searches no longer raise shared-library permission errors.
+- Let uploads and URL ingests bypass group enforcement in user mode, keeping knowledge tags optional while still queuing the user’s own documents.
+

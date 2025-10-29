@@ -1,9 +1,12 @@
+import json
 import os
 import sys
 import types
 
 import pytest
 from flask import Blueprint
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 os.environ.setdefault("SQLALCHEMY_DATABASE_URI", "sqlite:///:memory:")
 os.environ.setdefault("VECTOR_STORE_PROVIDER", "pgvector")
@@ -187,6 +190,14 @@ def test_api_resume_rag_streaming_updates_placeholder(client, app_instance, monk
     def fake_resume_agent(*args, **kwargs):
         return dict(resume_payload)
 
+    def fake_resume_agent_graph(**kwargs):
+        payload = dict(resume_payload)
+        payload.setdefault("type", "result")
+        return payload
+
+    dummy_agent_module = types.ModuleType("modules.agent")
+    dummy_agent_module.resume_agent_graph = fake_resume_agent_graph
+    monkeypatch.setitem(sys.modules, "modules.agent", dummy_agent_module)
     monkeypatch.setattr(query_module, "resume_agent_via_worker", fake_resume_agent)
 
     response = client.post(

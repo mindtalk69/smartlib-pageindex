@@ -46,7 +46,19 @@
             <form id="fileUploadForm" action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data"> {# Added ID to form #}
               {{ form.hidden_tag() }}
               <div class="mb-3">
-              <label for="librarySelectFile" class="form-label">Select Library</label>
+              <label for="librarySelectFile" class="form-label d-flex align-items-center">
+                <span>Select Library</span>
+                <button type="button"
+                        class="btn btn-light btn-sm text-dark shadow-sm fw-semibold ms-2 d-none"
+                        id="libraryMetadataInfoFile"
+                        data-bs-toggle="popover"
+                        data-bs-trigger="focus"
+                        data-bs-placement="right"
+                        data-bs-html="true"
+                        aria-label="Show knowledge metadata">
+                  <i class="bi bi-tags-fill me-1"></i>Metadata
+                </button>
+              </label>
               <select class="form-select" id="librarySelectFile" name="library_id" required>
                   <option value="" selected disabled>Choose a library...</option>
                   {# Options will be populated by the backend #}
@@ -73,9 +85,9 @@
                     {% endfor %}
 
               </select>
-              <input type="hidden" name="library_name" id="libraryNameFile"> {# Hidden input for library name #}
-              {# Placeholder for library details - File Upload Tab (Currently hidden) #}
-              <div id="library-details-file" class="mt-2 small text-muted"></div>
+               <input type="hidden" name="library_name" id="libraryNameFile"> {# Hidden input for library name #}
+
+
           </div>
           <div class="mb-3">
             <label for="fileInput" class="form-label">Upload File</label>
@@ -99,20 +111,30 @@
           <!- REMOVED inner card-body ->
             <div id="url-form">
               <div class="mb-3">
-                <label for="librarySelectUrl" class="form-label">
-                Select Library
-                <span tabindex="0" class="ms-1" data-bs-toggle="tooltip" data-bs-placement="right" title="
-                {% if vector_store_setting == 'user' %}
-                  Per User Mode: Each user has a separate vector store. Only you can access your uploads.
-                {% elif vector_store_setting == 'global' %}
-                  Centralized/Global Mode: All uploads are shared across all users and knowledge bases. Deletions affect the entire system.
-                {% elif vector_store_setting == 'knowledge' %}
-                  Per Knowledge Mode: Select the target Library — Knowledge from the dropdown. Each upload will be stored in the chosen knowledge base.
-                {% endif %}
-                ">
-                  <i class="bi bi-info-circle" aria-label="Info"></i>
-                </span>
-              </label>
+                <label for="librarySelectUrl" class="form-label d-flex align-items-center">
+                  <span>Select Library</span>
+                  <span tabindex="0" class="ms-1" data-bs-toggle="tooltip" data-bs-placement="right" title="
+                  {% if vector_store_setting == 'user' %}
+                    Per User Mode: Each user has a separate vector store. Only you can access your uploads.
+                  {% elif vector_store_setting == 'global' %}
+                    Centralized/Global Mode: All uploads are shared across all users and knowledge bases. Deletions affect the entire system.
+                  {% elif vector_store_setting == 'knowledge' %}
+                    Per Knowledge Mode: Select the target Library — Knowledge from the dropdown. Each upload will be stored in the chosen knowledge base.
+                  {% endif %}
+                  ">
+                    <i class="bi bi-info-circle" aria-label="Info"></i>
+                  </span>
+                  <button type="button"
+                          class="btn btn-light btn-sm text-dark shadow-sm fw-semibold ms-2 d-none"
+                          id="libraryMetadataInfoUrl"
+                          data-bs-toggle="popover"
+                          data-bs-trigger="focus"
+                          data-bs-placement="right"
+                          data-bs-html="true"
+                          aria-label="Show knowledge metadata">
+                    <i class="bi bi-tags-fill me-1"></i>Metadata
+                  </button>
+                </label>
                 <select class="form-select" id="librarySelectUrl" name="library_id" required>
                     <option value="" selected disabled>Choose a library...</option>
                     {% for library in libraries %}
@@ -122,7 +144,11 @@
                                   data-knowledge-id="{{ knowledge.id }}"
                                   data-knowledge-name="{{ knowledge.name }}"
                                   data-categories="{{ knowledge.categories|map(attribute='name')|join(', ') if knowledge.categories else '' }}"
-                                  data-catalogs="{{ knowledge.catalogs|map(attribute='name')|join(', ') if knowledge.catalogs else '' }}">
+                                  data-catalogs="{{ knowledge.catalogs|map(attribute='name')|join(', ') if knowledge.catalogs else '' }}"
+                                  data-category-ids="{{ knowledge.categories|map(attribute='id')|join(',') if knowledge.categories else '' }}"
+                                  data-catalog-ids="{{ knowledge.catalogs|map(attribute='id')|join(',') if knowledge.catalogs else '' }}"
+                                  data-group-ids="{{ knowledge.groups|map(attribute='group_id')|join(',') if knowledge.groups else '' }}"
+                                  data-group-names="{{ knowledge.groups|map(attribute='name')|join(', ') if knowledge.groups else '' }}">
                               {{ library.name }} — {{ knowledge.name }}
                           </option>
                         {% endfor %}
@@ -131,14 +157,18 @@
                                 data-knowledge-id=""
                                 data-knowledge-name=""
                                 data-categories=""
-                                data-catalogs="">
+                                data-catalogs=""
+                                data-category-ids=""
+                                data-catalog-ids=""
+                                data-group-ids=""
+                                data-group-names="">
                             {{ library.name }}
                         </option>
                       {% endif %}
                     {% endfor %}
                 </select>
-                <div id="library-details-url" class="mt-2 small text-muted"></div>
                 <input type="hidden" name="knowledge_id" id="knowledgeIdUrl">
+
               </div>
           <div class="mb-3">
             <label for="url-textarea" class="form-label">Enter URLs</label>
@@ -171,8 +201,8 @@
             <form id="batchUploadForm"> {# No action/method needed as JS handles it #}
               {# CSRF token will be handled by JS fetch headers #}
               <div class="mb-3">
-                <label for="librarySelectBatch" class="form-label">
-                  Select Library
+                <label for="librarySelectBatch" class="form-label d-flex align-items-center">
+                  <span>Select Library</span>
                   <span tabindex="0" class="ms-1" data-bs-toggle="tooltip" data-bs-placement="right" title="
                   {% if vector_store_setting == 'user' %}
                     Per User Mode: Each user has a separate vector store. Only you can access your uploads.
@@ -184,6 +214,16 @@
                   ">
                     <i class="bi bi-info-circle" aria-label="Info"></i>
                   </span>
+                  <button type="button"
+                          class="btn btn-light btn-sm text-dark shadow-sm fw-semibold ms-2 d-none"
+                          id="libraryMetadataInfoBatch"
+                          data-bs-toggle="popover"
+                          data-bs-trigger="focus"
+                          data-bs-placement="right"
+                          data-bs-html="true"
+                          aria-label="Show knowledge metadata">
+                    <i class="bi bi-tags-fill me-1"></i>Metadata
+                  </button>
                 </label>
                 <select class="form-select" id="librarySelectBatch" name="library_id" required>
                     <option value="" selected disabled>Choose a library...</option>
@@ -194,7 +234,11 @@
                                   data-knowledge-id="{{ knowledge.id }}"
                                   data-knowledge-name="{{ knowledge.name }}"
                                   data-categories="{{ knowledge.categories|map(attribute='name')|join(', ') if knowledge.categories else '' }}"
-                                  data-catalogs="{{ knowledge.catalogs|map(attribute='name')|join(', ') if knowledge.catalogs else '' }}">
+                                  data-catalogs="{{ knowledge.catalogs|map(attribute='name')|join(', ') if knowledge.catalogs else '' }}"
+                                  data-category-ids="{{ knowledge.categories|map(attribute='id')|join(',') if knowledge.categories else '' }}"
+                                  data-catalog-ids="{{ knowledge.catalogs|map(attribute='id')|join(',') if knowledge.catalogs else '' }}"
+                                  data-group-ids="{{ knowledge.groups|map(attribute='group_id')|join(',') if knowledge.groups else '' }}"
+                                  data-group-names="{{ knowledge.groups|map(attribute='name')|join(', ') if knowledge.groups else '' }}">
                               {{ library.name }} — {{ knowledge.name }}
                           </option>
                         {% endfor %}
@@ -203,14 +247,18 @@
                                 data-knowledge-id=""
                                 data-knowledge-name=""
                                 data-categories=""
-                                data-catalogs="">
+                                data-catalogs=""
+                                data-category-ids=""
+                                data-catalog-ids=""
+                                data-group-ids=""
+                                data-group-names="">
                             {{ library.name }}
                         </option>
                       {% endif %}
                     {% endfor %}
                 </select>
-                <div id="library-details-batch" class="mt-2 small text-muted"></div>
                 <input type="hidden" name="knowledge_id" id="knowledgeIdBatch">
+
               </div>
           <div class="mb-3">
             <label for="batchFileInput" class="form-label">Select Files for Batch Upload</label>

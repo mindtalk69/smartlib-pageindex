@@ -958,10 +958,27 @@ async function submitQuery() {
     })
     .then(response => {
         if (!response.ok) {
-            return response.json().then(errData => {
-                throw new Error(errData.error || `HTTP error! status: ${response.status}`);
-            }).catch(() => {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            return response.text().then((rawBody) => {
+                let message = `HTTP error! status: ${response.status}`;
+                let parsed = null;
+                if (rawBody) {
+                    try {
+                        parsed = JSON.parse(rawBody);
+                    } catch (parseError) {
+                        parsed = null;
+                    }
+                    if (parsed && typeof parsed === 'object') {
+                        message = parsed.error || parsed.message || message;
+                    } else if (rawBody.trim()) {
+                        message = rawBody.trim();
+                    }
+                }
+                const error = new Error(message);
+                error.status = response.status;
+                if (parsed) {
+                    error.details = parsed;
+                }
+                throw error;
             });
         }
         if (streamEnabled) {
@@ -984,8 +1001,20 @@ async function submitQuery() {
             console.log('Fetch aborted');
         } else {
             console.error('Error submitting query:', error);
+            const statusCode = typeof error.status === 'number' ? error.status : null;
+            let userMessage = (error && typeof error.message === 'string') ? error.message.trim() : '';
+            const genericMatcher = /^HTTP error! status:/i;
+            if (!userMessage) {
+                userMessage = 'An unexpected error occurred while processing your query.';
+            }
+            if (statusCode === 403) {
+                const defaultForbidden = 'Access denied: you do not have permission to query the selected library or knowledge.';
+                userMessage = genericMatcher.test(userMessage) ? defaultForbidden : userMessage;
+            } else if (genericMatcher.test(userMessage)) {
+                userMessage = 'We couldn’t complete that request. Please check your selections and try again.';
+            }
             if (window.chatCore) {
-                window.chatCore.addMessage({ role: 'error', content: `Error: ${error.message}` });
+                window.chatCore.addMessage({ role: 'error', content: escapeHtml(userMessage) });
             }
             // Loading indicator is hidden in the finally block
             errorOccurred = true;

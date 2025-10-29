@@ -14,6 +14,7 @@
                     <th>URL</th>
                     <th>Library</th>
                     <th>Knowledge</th>
+                    <th>Metadata</th>
                     <th>Status</th>
                     <th>Content Type</th>
                     <th>User</th>
@@ -33,6 +34,7 @@
                     </td>
                     <td>{{ download.library_name or 'N/A' }}</td>
                     <td>{{ download.knowledge_name or 'N/A' }}</td>
+                    <td class="small text-muted">{{ download.metadata_summary }}</td>
                     <td>
                         {% set status_lower = (download.status or 'unknown')|lower %}
                         {% if status_lower == 'success' %}

@@ -9,7 +9,7 @@ from flask_migrate import Migrate # Import Migrate
 from config import get_config
 
 # Import database models and functions needed for user loading
-from modules.database import User, get_user_by_id, AppSettings # Added AppSettings
+from modules.database import User, get_user_by_id, AppSettings, ModelConfig # Added AppSettings
 
 # Import extensions (assuming they are defined without app initialization)
 from extensions import db, login_manager, csrf # Assuming csrf is also in extensions
@@ -68,7 +68,8 @@ def create_app():
                 'visual_grounding_enabled',
                 'visual_grounding_doc_store_path',
                 'vector_store_mode',
-                'VECTOR_STORE_MODE'
+                'VECTOR_STORE_MODE',
+                'multimodal_model_id'
             ])).all()
             settings = {s.key: s.value for s in settings_query}
 
@@ -77,10 +78,22 @@ def create_app():
             app.config['VISUAL_GROUNDING_DOC_STORE_PATH'] = settings.get('visual_grounding_doc_store_path', 'data/doc_store')
             app.config['VECTOR_STORE_MODE'] = settings.get('vector_store_mode', 'user') or settings.get('VECTOR_STORE_MODE', 'user')
 
+            multimodal_model_id = settings.get('multimodal_model_id')
+            if multimodal_model_id:
+                try:
+                    model_obj = db.session.get(ModelConfig, int(multimodal_model_id))
+                    if model_obj and model_obj.deployment_name:
+                        app.config['AZURE_OPENAI_MULTIMODAL_DEPLOYMENT'] = model_obj.deployment_name
+                except (ValueError, TypeError):
+                    app.logger.warning("AppSettings.multimodal_model_id is not a valid integer.")
+                except Exception as mm_exc:
+                    app.logger.warning(f"Error loading multimodal model setting: {mm_exc}")
+
             app.logger.info("Loaded AppSettings into app.config.")
             app.logger.info(f"VISUAL_GROUNDING_ENABLED: {app.config['VISUAL_GROUNDING_ENABLED']}")
             app.logger.info(f"VISUAL_GROUNDING_DOC_STORE_PATH: {app.config['VISUAL_GROUNDING_DOC_STORE_PATH']}")
             app.logger.info(f"VECTOR_STORE_MODE: {app.config['VECTOR_STORE_MODE']}")
+            app.logger.info(f"AZURE_OPENAI_MULTIMODAL_DEPLOYMENT: {app.config.get('AZURE_OPENAI_MULTIMODAL_DEPLOYMENT')}")
 
             # Log Docling Export Type
             docling_export_type = app.config.get('DOCLING_EXPORT_TYPE', 'MARKDOWN').upper() # Default to MARKDOWN

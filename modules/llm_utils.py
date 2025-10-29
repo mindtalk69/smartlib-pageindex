@@ -4,6 +4,7 @@ import os
 import logging
 import base64 # Added for image encoding
 import mimetypes # Added for determining image type
+from typing import Any, Tuple
 from flask import current_app # Import current_app
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from langchain_core.exceptions import OutputParserException
@@ -20,7 +21,7 @@ logging.basicConfig(level=logging.INFO)
 
 # TODO: This should get prompt from llm_prompts Table
 # purpose to help user create descrptions while edit in admin pages
-def generate_simple_text(prompt: str, deployment_name: str) -> str:
+def generate_simple_text(prompt: str, deployment_name: str, *, temperature: float | None = None, streaming: bool | None = None) -> str:
     """
     Generates text using a specified Azure OpenAI deployment without RAG.
 
@@ -55,7 +56,8 @@ def generate_simple_text(prompt: str, deployment_name: str) -> str:
     try:
         # Correctly log the deployment name being used
         logging.info(f"Initializing AzureChatOpenAI with deployment='{deployment_name}', endpoint='{azure_endpoint}', api_version='{api_version}'")
-        llm = get_llm(model_name=deployment_name)
+        stream_flag = bool(streaming) if streaming is not None else False
+        llm = get_llm(model_name=deployment_name, streaming=stream_flag, temperature=temperature)
 
         logging.info(f"Invoking LLM with prompt: '{prompt[:100]}...'")
         response = llm.invoke(prompt)
@@ -354,6 +356,8 @@ MODEL_CAPABILITY_REGISTRY = {
         "family": "gpt-4o",
         "supports_multimodal": True,
         "supports_tool_calls": True,
+        "supports_streaming": True,
+        "temperature_range": (0.0, 1.5),
         "recommended_temperature_by_role": {"router": 0.05, "grade": 0.05, "generate": 0.15},
         "max_payload_bytes": 4 * 1024 * 1024,
         "notes": "Good for orchestration and tool-calling."
@@ -362,6 +366,8 @@ MODEL_CAPABILITY_REGISTRY = {
         "family": "gpt-4o",
         "supports_multimodal": True,
         "supports_tool_calls": True,
+        "supports_streaming": True,
+        "temperature_range": (0.0, 1.5),
         "recommended_temperature_by_role": {"router": 0.05, "grade": 0.05, "generate": 0.2},
         "max_payload_bytes": 8 * 1024 * 1024,
         "notes": "Multimodal model for vision tasks."
@@ -370,6 +376,8 @@ MODEL_CAPABILITY_REGISTRY = {
         "family": "gpt-5",
         "supports_multimodal": True,
         "supports_tool_calls": True,
+        "supports_streaming": True,
+        "temperature_range": (0.0, 2.0),
         "recommended_temperature_by_role": {"router": 0.05, "grade": 0.05, "generate": 0.2},
         "max_payload_bytes": 8 * 1024 * 1024,
         "notes": "Powerful model — enforce strict output schemas for decision nodes."
@@ -378,11 +386,15 @@ MODEL_CAPABILITY_REGISTRY = {
         "family": "gpt-5",
         "supports_multimodal": False,
         "supports_tool_calls": False,
+        "supports_streaming": False,
+        "temperature_range": (0.0, 1.5),
         "recommended_temperature_by_role": {"router": 0.2, "grade": 0.2, "generate": 1.0},
         "max_payload_bytes": 2 * 1024 * 1024,
         "notes": "Mini variants may require special temperature settings; avoid for orchestration."
     }
 }
+
+DEFAULT_TEMPERATURE_RANGE: Tuple[float, float] = (0.0, 2.0)
 
 def _detect_family_from_deployment(deployment_name: str) -> str:
     """Try to infer a model family from a deployment name by simple substring matching."""
@@ -395,7 +407,73 @@ def _detect_family_from_deployment(deployment_name: str) -> str:
         return "gpt-4"
     return "unknown"
 
+
+def get_capabilities_for_deployment(deployment_name: str) -> dict[str, Any]:
+    """Return capability metadata for a deployment or inferred family."""
+    if not deployment_name:
+        return {}
+    caps = MODEL_CAPABILITY_REGISTRY.get(deployment_name)
+    if caps:
+        return dict(caps)
+    family = _detect_family_from_deployment(deployment_name)
+    if family != "unknown":
+        for candidate in MODEL_CAPABILITY_REGISTRY.values():
+            if candidate.get("family") == family:
+                return dict(candidate)
+    return {}
+
+
+def validate_temperature_for_deployment(
+    deployment_name: str,
+    temperature: float | None,
+) -> tuple[bool, Tuple[float, float], str | None]:
+    """Validate temperature against configured bounds for a deployment."""
+    caps = get_capabilities_for_deployment(deployment_name)
+    bounds = caps.get("temperature_range", DEFAULT_TEMPERATURE_RANGE)
+    if not isinstance(bounds, tuple) or len(bounds) != 2:
+        bounds = DEFAULT_TEMPERATURE_RANGE
+    min_temp, max_temp = bounds
+    if temperature is None:
+        return True, (min_temp, max_temp), None
+    if temperature < min_temp or temperature > max_temp:
+        message = (
+            "Temperature "
+            f"{temperature} is outside the allowed range "
+            f"{min_temp} - {max_temp} for deployment '{deployment_name}'."
+        )
+        return False, (min_temp, max_temp), message
+    return True, (min_temp, max_temp), None
+
+
+def is_streaming_supported_for_deployment(deployment_name: str) -> bool:
+    """Return True if the deployment explicitly supports streaming."""
+    caps = get_capabilities_for_deployment(deployment_name)
+    supports = caps.get("supports_streaming")
+    if supports is None:
+        return True
+    return bool(supports)
+
+
+def _resolve_temperature_for_role(deployment_name: str, role: str, explicit_temperature: float | None) -> float | None:
+    """Return the effective temperature for a deployment and role."""
+    if explicit_temperature is not None:
+        return explicit_temperature
+
+    caps = get_capabilities_for_deployment(deployment_name)
+    if not caps:
+        return None
+    recommended = caps.get("recommended_temperature_by_role", {}).get(role)
+    if recommended is None:
+        return None
+    bounds = caps.get("temperature_range", DEFAULT_TEMPERATURE_RANGE)
+    if not isinstance(bounds, tuple) or len(bounds) != 2:
+        bounds = DEFAULT_TEMPERATURE_RANGE
+    min_temp, max_temp = bounds
+    return max(min(recommended, max_temp), min_temp)
+
+
 def probe_model_compatibility(deployment_name: str, checks: list = None, timeout: int = 8) -> dict:
+
     """
     Optional runtime probe to sanity-check a deployment for basic orchestration compatibility.
     This function is safe to call but may incur a small LLM API call. It returns a dict:
@@ -435,8 +513,7 @@ def probe_model_compatibility(deployment_name: str, checks: list = None, timeout
         result["reasons"].append(f"Error during probe calls: {e}")
 
     # Attach capability hints from registry if available
-    caps = MODEL_CAPABILITY_REGISTRY.get(deployment_name) or {}
-    result["capabilities"] = caps
+    result["capabilities"] = get_capabilities_for_deployment(deployment_name)
     return result
 
 def get_agent_llm(model_config: dict = None, deployment_name: str = None, role: str = "router", allow_fallback: bool = True):
@@ -469,14 +546,7 @@ def get_agent_llm(model_config: dict = None, deployment_name: str = None, role: 
             raise ValueError("No model deployment provided and no default model configured.")
 
     # Lookup registry capabilities (best-effort)
-    caps = MODEL_CAPABILITY_REGISTRY.get(deployment, {})
-    if not caps:
-        # Try family fallback
-        family = _detect_family_from_deployment(deployment)
-        for k, v in MODEL_CAPABILITY_REGISTRY.items():
-            if v.get("family") == family:
-                caps = v
-                break
+    caps = get_capabilities_for_deployment(deployment)
 
     # Determine temperature: prefer explicit config, then registry
     explicit_temp = (model_config.get("temperature") if isinstance(model_config, dict) else None)
@@ -689,6 +759,26 @@ def classify_document_metadata(document_content_summary: str,
         effective_logger.error(f"Error getting classification deployment config: {e}")
         return {"error": "Configuration error."}
 
+    classification_temperature = None
+    classification_streaming = None
+    try:
+        from modules.database import get_model_by_deployment
+        model_config = get_model_by_deployment(classification_deployment)
+        if model_config:
+            classification_temperature = model_config.temperature
+            classification_streaming = model_config.streaming
+    except Exception as config_exc:
+        effective_logger.warning(
+            "Could not load model config for deployment %s: %s",
+            classification_deployment,
+            config_exc,
+        )
+
+    effective_temperature = _resolve_temperature_for_role(
+        classification_deployment,
+        role="generate",
+        explicit_temperature=classification_temperature,
+    )
 
     # Construct the prompt dynamically
     fields_list_str = "\n".join([f"- {field}" for field in desired_fields])
@@ -719,7 +809,12 @@ Extracted Metadata (JSON only):
 
     try:
         # Use generate_simple_text which handles LLM setup and potential config errors
-        raw_output = generate_simple_text(prompt, deployment_name=classification_deployment)
+        raw_output = generate_simple_text(
+            prompt,
+            deployment_name=classification_deployment,
+            temperature=effective_temperature,
+            streaming=classification_streaming,
+        )
         effective_logger.debug(f"Raw LLM output for metadata: {raw_output}")
 
         # Use the helper function to parse the output
@@ -910,9 +1005,37 @@ Extracted Metadata (JSON only):
     # --- Call LLM ---
     try:
         effective_logger.info(f"Initializing AzureChatOpenAI with multimodal deployment='{multimodal_deployment}'")
-        llm = get_llm(model_name=multimodal_deployment)
+
+        classification_temperature = None
+        classification_streaming = None
+        try:
+            from modules.database import get_model_by_deployment
+            model_config = get_model_by_deployment(multimodal_deployment)
+            if model_config:
+                classification_temperature = model_config.temperature
+                classification_streaming = model_config.streaming
+        except Exception as config_exc:
+            effective_logger.warning(
+                "Could not load model config for multimodal deployment %s: %s",
+                multimodal_deployment,
+                config_exc,
+            )
+
+        stream_flag = bool(classification_streaming) if classification_streaming is not None else False
+        effective_temperature = _resolve_temperature_for_role(
+            multimodal_deployment,
+            role="generate",
+            explicit_temperature=classification_temperature,
+        )
+        llm = get_llm(
+            model_name=multimodal_deployment,
+            streaming=stream_flag,
+            temperature=effective_temperature,
+        )
         effective_logger.info("Invoking multimodal LLM...")
-        response = llm.invoke([message]) # Pass message list
+        response = llm.invoke([message])  # Pass message list
+
+
         effective_logger.info("Multimodal LLM invocation successful.")
 
         if hasattr(response, 'content'):

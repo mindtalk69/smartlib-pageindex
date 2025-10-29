@@ -16,12 +16,17 @@ from extensions import csrf
 # from starlette.responses import StreamingResponse # Remove Starlette's StreamingResponse
 from flask_login import login_required, current_user
 from uuid import uuid4 # For generating conversation_id if not provided
-from modules.database import add_message, MessageHistory
+from modules.database import add_message, get_library_with_details, Knowledge, MessageHistory
 from modules.database import Document as DB_Document
 from langchain_core.messages import HumanMessage, AIMessage # <-- Import the agentic workflow
 from modules.llm_utils import get_active_prompt_content, get_active_language_name, get_llm # Added get_llm
 # from modules.agent import invoke_agent_graph  # <-- MOVED TO WORKER ONLY
 from modules.celery_tasks import invoke_agent_via_worker, resume_agent_via_worker
+from modules.access_control import (
+    filter_accessible_knowledges,
+    get_user_group_ids,
+    knowledge_is_accessible,
+)
 from werkzeug.exceptions import BadRequest, Unauthorized, InternalServerError # Import exceptions
 from typing import Any, Dict, List, Optional
 logging.basicConfig(level=logging.INFO)
@@ -362,15 +367,95 @@ def init_query(app):
             chat_history_messages.insert(0, summary_msg)
         logging.debug(f"Loaded token-limited chat history from DB: {chat_history_messages} (total tokens: {total_tokens})")
 
-        # --- Build vector store config for agentic workflow ---
+        # --- Build vector store config for agentic workflow (with access control) ---
+        vector_store_mode = current_app.config.get('VECTOR_STORE_MODE', 'user')
+        enforce_group_permissions = vector_store_mode != 'user'
+        user_group_ids = get_user_group_ids(current_user.user_id)
+
+        def _is_empty(value) -> bool:
+            return value in (None, "", "null")
+
+        library_obj = None
+        library_id_int = None
+        library_knowledges: List[Knowledge] = []
+        accessible_library_knowledges: List[Knowledge] = []
+
+        if not _is_empty(library_id_filter):
+            try:
+                library_id_int = int(library_id_filter)
+            except (TypeError, ValueError):
+                raise BadRequest("Invalid library selected.")
+            library_id_filter = library_id_int
+            library_obj = get_library_with_details(library_id_int)
+            if library_obj is None:
+                raise BadRequest("Selected library does not exist.")
+            library_knowledges = list(getattr(library_obj, 'knowledges', []) or [])
+            if enforce_group_permissions:
+                accessible_library_knowledges = filter_accessible_knowledges(
+                    library_knowledges,
+                    user_group_ids,
+                )
+            else:
+                accessible_library_knowledges = library_knowledges
+            if (
+                enforce_group_permissions
+                and library_knowledges
+                and not accessible_library_knowledges
+            ):
+                return jsonify({'error': 'You do not have permission to query the selected library.'}), 403
+        else:
+            library_id_filter = None
+
+        knowledge_id_int = None
+        if vector_store_mode == 'user':
+            knowledge_id_filter = None
+        elif not _is_empty(knowledge_id_filter):
+            try:
+                knowledge_id_int = int(knowledge_id_filter)
+            except (TypeError, ValueError):
+                raise BadRequest("Invalid knowledge base selected.")
+            knowledge_obj = db.session.get(Knowledge, knowledge_id_int)
+            if knowledge_obj is None:
+                raise BadRequest("Selected knowledge does not exist.")
+            if enforce_group_permissions and not knowledge_is_accessible(knowledge_obj, user_group_ids):
+                return jsonify({'error': 'You do not have permission to query the selected knowledge base.'}), 403
+            if library_obj:
+                linked_ids = {kn.id for kn in library_knowledges}
+                if knowledge_id_int not in linked_ids:
+                    return jsonify({'error': 'Selected knowledge is not linked to the chosen library.'}), 400
+        else:
+            if vector_store_mode == 'knowledge':
+                candidate_knowledges = accessible_library_knowledges
+                if not candidate_knowledges:
+                    if library_obj and enforce_group_permissions:
+                        return jsonify({'error': 'You do not have permission to query the selected library.'}), 403
+                    candidate_knowledges = filter_accessible_knowledges(
+                        Knowledge.query.all(),
+                        user_group_ids,
+                    ) if enforce_group_permissions else list(Knowledge.query.all())
+                if enforce_group_permissions and not candidate_knowledges:
+                    return jsonify({'error': 'No accessible knowledge bases available for querying.'}), 403
+                if candidate_knowledges:
+                    knowledge_id_int = candidate_knowledges[0].id
+            elif (
+                enforce_group_permissions
+                and library_obj
+                and accessible_library_knowledges
+            ):
+                knowledge_id_int = accessible_library_knowledges[0].id
+        knowledge_id_filter = knowledge_id_int
+
+        if category_id_filter in ("", "null"):
+            category_id_filter = None
+
         vector_store_config = {
-            "mode": current_app.config.get('VECTOR_STORE_MODE', 'user'),
+            "mode": vector_store_mode,
             "backend": current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb'),
             "user_id": current_user.get_id(),
             "knowledge_id": knowledge_id_filter,
             "library_id": library_id_filter,
             "category_id": category_id_filter,
-            "search_strategy": search_strategy
+            "search_strategy": search_strategy,
         }
 
         # --- Call the agentic workflow ---
