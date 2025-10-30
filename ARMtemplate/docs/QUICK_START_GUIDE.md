@@ -131,12 +131,20 @@ az webapp log tail \
 Before deploying, make sure you have:
 
 - [ ] Azure subscription with sufficient permissions
-- [ ] Docker image pushed to ACR (`atgmpnregistry.azurecr.io/smarthing-app:latest`)
+- [ ] Docker images pushed to ACR (`${ACR_LOGIN_SERVER}/smartlib-web:<tag>` and `${ACR_LOGIN_SERVER}/smartlib-worker:<tag>`)
+- [ ] Parameter file updated with `webDockerImageName` and `workerDockerImageName` matching the pushed tags
 - [ ] Existing Redis Cache (or will create new one)
 - [ ] Existing Key Vault (or will create new one)
 - [ ] Azure OpenAI resource with deployment
 - [ ] App Registration with Client ID and Secret
 - [ ] ACR credentials (username and password)
+- [ ] (Optional) App Settings for automatic admin bootstrap (`AUTO_PROMOTE_ADMIN=true`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, optional `ADMIN_USERNAME`)
+- [ ] (Optional) Key Vault secret URIs (`appAdminPasswordSecretUri`, `appAdminEmailSecretUri`) if you prefer to supply admin secrets via Key Vault references
+- [ ] Worker container health settings (`WEBSITES_PORT=8080`, `WORKER_HEALTH_PORT=8080`, `ENABLE_WORKER_HEALTH_SERVER=true`)—the template sets these automatically
+- [ ] Optional: set `runDefaultModels=true` if you want the deployment to run `create_default_models.py` once (requires Azure OpenAI deployment name in App Settings)
+- [ ] `defaultEmbeddingModel` parameter (defaults to `all-MiniLM-L6-v2`) keeps the Basic-tier worker from loading heavy Hugging Face models
+
+> 💡 **Tip:** Run `./rebuild-micro.sh <tag>` (optionally with `ACR_LOGIN_SERVER=<registry> PUSH=true`) to rebuild and publish both images in one step before deploying the ARM templates.
 
 ---
 
@@ -150,7 +158,8 @@ Before deploying, make sure you have:
 - ✅ Added: `linuxFxVersion: DOCKER|...`
 - ✅ Added: `appCommandLine: ./docker-entrypoint.sh web`
 - ✅ Added: `alwaysOn: true`
-- ✅ Added: `WEBSITES_ENABLE_APP_SERVICE_STORAGE: false`
+- ✅ Added: `WEBSITES_ENABLE_APP_SERVICE_STORAGE: true`
+- ✅ Added default shared-path app settings (`DATA_VOLUME_PATH`, `UPLOAD_TEMP_DIR`, `MAP_PUBLIC_DIR`, `VECTOR_STORE_BASE_PATH`, `SQLALCHEMY_DATABASE_URI`)
 - ✅ Added: `DOCKER_ENABLE_CI: true`
 
 #### 2. `flask_appservice_template_existing_redis.json` ✅
@@ -210,7 +219,7 @@ Internet
 ```
 
 **Both Apps:**
-- Same Docker image
+- Separate Docker images (`smartlib-web` and `smartlib-worker`)
 - Same Redis connection
 - Same environment variables
 - Different startup commands
@@ -227,13 +236,13 @@ az webapp config show \
   --resource-group YOUR_RG \
   --query linuxFxVersion
 
-# Should return: "DOCKER|atgmpnregistry.azurecr.io/smarthing-app:latest"
+# Should return: "DOCKER|atgmpnregistry.azurecr.io/smartlib-web:<tag>"
 # If not, redeploy using fixed template
 ```
 
 ### Issue: "Worker not processing tasks"
 ```bash
-# Solution: Check Redis connection
+# Solution: Check Redis connection and SSL flags
 az webapp config appsettings list \
   --name flaskrag3-app \
   --resource-group YOUR_RG \
@@ -244,17 +253,22 @@ az webapp config appsettings list \
   --resource-group YOUR_RG \
   --query "[?name=='CELERY_BROKER_URL'].value" -o tsv
 
+# Expect: rediss://...:6380?ssl_cert_reqs=none (Azure Redis requires the query string)
 # Both should be identical
 ```
 
 ### Issue: "Container not starting"
 ```bash
-# Solution: Check ACR access
+# Solution: Check ACR access for both images
 az acr repository show \
   --name atgmpnregistry \
-  --repository smarthing-app
+  --repository smartlib-web
 
-# Verify image exists
+az acr repository show \
+  --name atgmpnregistry \
+  --repository smartlib-worker
+
+# Verify both images exist
 ```
 
 ---

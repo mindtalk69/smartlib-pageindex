@@ -98,13 +98,14 @@ Only bring scripts required for deployment/operations. Recommended shortlist:
    - `Dockerfile.worker-optimized` → `Dockerfile.worker`.
 2. Update `docker-compose.yaml`:
    - Change service names to `smartlib-web` and `smartlib-worker`.
-   - Use new image tags (`smartlib/web-ultralight`, `smartlib/worker-optimized`) when pushing to ACR.
+   - Use new image tags (`smartlib-web`, `smartlib-worker`) when pushing to ACR.
    - Ensure the volume mount points stay at `/app/data`.
 3. Copy `docker-entrypoint.sh` and change log messaging to SmartLib.
-4. Refresh shell helpers:
-   - Rename `rebuild-micro.sh` → `build-split-images.sh`, update tags and requirement filenames.
-   - Keep `test-local-compose.sh` but change container names, success messages, and expected URLs.
-   - Keep `diagnose-*.sh` scripts and rebrand output.
+ 4. Refresh shell helpers:
+    - Provide `rebuild-micro.sh` to build/tag `smartlib-web` and `smartlib-worker` images; update scripts to call it.
+    - Keep `test-local-compose.sh` but change container names, success messages, and expected URLs.
+    - Keep `diagnose-*.sh` scripts and rebrand output.
+    - Ensure entrypoint supports optional `AUTO_PROMOTE_ADMIN` bootstrap via app settings or Key Vault references.
 5. Retain `LOCAL_DOCKER_SETUP_SUMMARY.md` and place it in `docs/operations/` for reference.
 
 ## 9. ARM Templates & Azure Artifacts

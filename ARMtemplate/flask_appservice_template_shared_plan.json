@@ -112,11 +112,18 @@
         "description": "Password for the Azure Container Registry"
       }
     },
-    "dockerImageName": {
+    "webDockerImageName": {
       "type": "string",
-      "defaultValue": "smarthing-app:latest",
+      "defaultValue": "smartlib-web:latest",
       "metadata": {
-        "description": "Docker image name in ACR (e.g., flaskapp:latest)"
+        "description": "Docker image name for the web app (e.g., smartlib-web:latest)"
+      }
+    },
+    "workerDockerImageName": {
+      "type": "string",
+      "defaultValue": "smartlib-worker:latest",
+      "metadata": {
+        "description": "Docker image name for the worker app (e.g., smartlib-worker:latest)"
       }
     },
     "APP_CLIENT_ID": {
@@ -145,13 +152,48 @@
         "description": "Admin password for the application"
       }
     },
+    "appAdminPasswordSecretUri": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional: Key Vault secret URI for the admin password (overrides appAdminPassword when provided)"
+      }
+    },
     "appAdminEmail": {
       "type": "string",
       "defaultValue": "",
       "metadata": {
         "description": "Admin email for the application"
       }
+    },
+    "appAdminEmailSecretUri": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional: Key Vault secret URI for the admin email (overrides appAdminEmail when provided)"
+      }
     },    
+    "autoPromoteAdmin": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Bootstrap the admin account on startup (set to false to disable)"
+      }
+    },
+    "runDefaultModels": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Set to true to run create_default_models.py during startup"
+      }
+    },
+    "defaultEmbeddingModel": {
+      "type": "string",
+      "defaultValue": "all-MiniLM-L6-v2",
+      "metadata": {
+        "description": "Default embedding model to load on startup"
+      }
+    },
     "appServicePlanSkuName": {
       "type": "string",
       "defaultValue": "B1",
@@ -212,17 +254,17 @@
       "properties": {
         "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('sharedAppServicePlanName'))]",
         "siteConfig": {
-          "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/', parameters('dockerImageName'))]",
+          "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/', parameters('webDockerImageName'))]",
           "appCommandLine": "./docker-entrypoint.sh web",
           "alwaysOn": true,
           "appSettings": [
             {
               "name": "CELERY_BROKER_URL",
-              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380)]"
+              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380, '?ssl_cert_reqs=none')]"
             },
             {
               "name": "CELERY_RESULT_BACKEND",
-              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380)]"
+              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380, '?ssl_cert_reqs=none')]"
             },
             {
               "name": "AZURE_OPENAI_API_KEY",
@@ -246,7 +288,7 @@
             },
             {
               "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
-              "value": "false"
+              "value": "true"
             },
             {
               "name": "DOCKER_REGISTRY_SERVER_URL",
@@ -286,11 +328,27 @@
             },
             {
               "name": "APP_ADMIN_PASSWORD",
-              "value": "[parameters('appAdminPassword')]"
+              "value": "[if(equals(parameters('appAdminPasswordSecretUri'), ''), parameters('appAdminPassword'), concat('@Microsoft.KeyVault(SecretUri=', parameters('appAdminPasswordSecretUri'), ')'))]"
             },
             {
               "name": "APP_ADMIN_EMAIL",
-              "value": "[parameters('appAdminEmail')]"
+              "value": "[if(equals(parameters('appAdminEmailSecretUri'), ''), parameters('appAdminEmail'), concat('@Microsoft.KeyVault(SecretUri=', parameters('appAdminEmailSecretUri'), ')'))]"
+            },
+            {
+              "name": "AUTO_PROMOTE_ADMIN",
+              "value": "[if(parameters('autoPromoteAdmin'), 'true', 'false')]"
+            },
+            {
+              "name": "ADMIN_USERNAME",
+              "value": "[parameters('appAdminUsername')]"
+            },
+            {
+              "name": "ADMIN_PASSWORD",
+              "value": "[if(equals(parameters('appAdminPasswordSecretUri'), ''), parameters('appAdminPassword'), concat('@Microsoft.KeyVault(SecretUri=', parameters('appAdminPasswordSecretUri'), ')'))]"
+            },
+            {
+              "name": "ADMIN_EMAIL",
+              "value": "[if(equals(parameters('appAdminEmailSecretUri'), ''), parameters('appAdminEmail'), concat('@Microsoft.KeyVault(SecretUri=', parameters('appAdminEmailSecretUri'), ')'))]"
             }
           ]
         }
@@ -311,17 +369,17 @@
       "properties": {
         "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('sharedAppServicePlanName'))]",
         "siteConfig": {
-          "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/', parameters('dockerImageName'))]",
+          "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/', parameters('workerDockerImageName'))]",
           "appCommandLine": "./docker-entrypoint.sh worker",
           "alwaysOn": true,
           "appSettings": [
             {
               "name": "CELERY_BROKER_URL",
-              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380)]"
+              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380, '?ssl_cert_reqs=none')]"
             },
             {
               "name": "CELERY_RESULT_BACKEND",
-              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380)]"
+              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380, '?ssl_cert_reqs=none')]"
             },
             {
               "name": "AZURE_OPENAI_API_KEY",
@@ -341,7 +399,7 @@
             },
             {
               "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
-              "value": "false"
+              "value": "true"
             },
             {
               "name": "DOCKER_REGISTRY_SERVER_URL",
@@ -377,11 +435,76 @@
             },
             {
               "name": "APP_ADMIN_PASSWORD",
-              "value": "[parameters('appAdminPassword')]"
+              "value": "[if(equals(parameters('appAdminPasswordSecretUri'), ''), parameters('appAdminPassword'), concat('@Microsoft.KeyVault(SecretUri=', parameters('appAdminPasswordSecretUri'), ')'))]"
             },
             {
               "name": "APP_ADMIN_EMAIL",
-              "value": "[parameters('appAdminEmail')]"
+              "value": "[if(equals(parameters('appAdminEmailSecretUri'), ''), parameters('appAdminEmail'), concat('@Microsoft.KeyVault(SecretUri=', parameters('appAdminEmailSecretUri'), ')'))]"
+            },
+            {
+              "name": "AUTO_PROMOTE_ADMIN",
+              "value": "[if(parameters('autoPromoteAdmin'), 'true', 'false')]"
+            },
+            {
+              "name": "ADMIN_USERNAME",
+              "value": "[parameters('appAdminUsername')]"
+            },
+            {
+              "name": "ADMIN_PASSWORD",
+              "value": "[if(equals(parameters('appAdminPasswordSecretUri'), ''), parameters('appAdminPassword'), concat('@Microsoft.KeyVault(SecretUri=', parameters('appAdminPasswordSecretUri'), ')'))]"
+            },
+            {
+              "name": "ADMIN_EMAIL",
+              "value": "[if(equals(parameters('appAdminEmailSecretUri'), ''), parameters('appAdminEmail'), concat('@Microsoft.KeyVault(SecretUri=', parameters('appAdminEmailSecretUri'), ')'))]"
+            },
+            {
+              "name": "DEFAULT_EMBEDDING_MODEL",
+              "value": "[parameters('defaultEmbeddingModel')]"
+            },
+            {
+              "name": "DATA_VOLUME_PATH",
+              "value": "/home/data"
+            },
+            {
+              "name": "UPLOAD_TEMP_DIR",
+              "value": "/home/data/tmp_uploads"
+            },
+            {
+              "name": "MAP_PUBLIC_DIR",
+              "value": "/home/data/maps"
+            },
+            {
+              "name": "VECTOR_STORE_BASE_PATH",
+              "value": "/home/data/chroma"
+            },
+            {
+              "name": "SQLALCHEMY_DATABASE_URI",
+              "value": "sqlite:////home/data/app.db"
+            },
+            {
+              "name": "WEBSITES_PORT",
+              "value": "8000"
+            },
+
+            {
+              "name": "WEBSITES_PORT",
+              "value": "8080"
+            },
+            {
+              "name": "WORKER_HEALTH_PORT",
+              "value": "8080"
+            },
+            {
+              "name": "ENABLE_WORKER_HEALTH_SERVER",
+              "value": "true"
+            },
+            {
+              "name": "WEBSITES_CONTAINER_START_TIME_LIMIT",
+              "value": "400"
+            },
+            {
+              "name": "RUN_DEFAULT_MODELS",
+              "value": "[if(parameters('runDefaultModels'), 'true', 'false')]"
             }
           ]
         }

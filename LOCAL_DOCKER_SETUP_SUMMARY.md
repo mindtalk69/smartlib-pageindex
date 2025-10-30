@@ -188,6 +188,12 @@ docker logs flaskrag3-worker-1
 docker exec -it flaskrag3-web-1 python -c "import redis; r = redis.Redis(host='redis', port=6379); r.ping()"
 ```
 
+**Verify data volume mount (App Service / Docker):**
+```bash
+python scripts/check_data_mount.py --path /app/data
+```
+The entrypoint now runs this check automatically on both web and worker startup. Use `SKIP_DATA_MOUNT_CHECK=true` only when debugging. The manual command is handy for ad-hoc diagnostics or custom paths.
+
 ---
 
 **Your Flask RAG Agentic application is now ready for local Docker development and Azure Marketplace deployment! 🎉**

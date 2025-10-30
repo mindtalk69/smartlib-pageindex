@@ -66,11 +66,29 @@ Edit `ARMtemplate/smartlib-basic.parameters.json`:
     "azureOpenAIDeployment": {
       "value": "your-deployment-name"
     },
+    "webDockerImageName": {
+      "value": "smartlib-web:20251025"
+    },
+    "workerDockerImageName": {
+      "value": "smartlib-worker:20251025"
+    },
     "APP_CLIENT_ID": {
       "value": "your-app-client-id"
     },
     "APP_CLIENT_SECRET": {
       "value": "your-app-client-secret"
+    },
+    "appAdminUsername": {
+      "value": "admin"
+    },
+    "appAdminEmail": {
+      "value": "admin@example.com"
+    },
+    "appAdminPassword": {
+      "value": "P@ssw0rd!ChangeMe"
+    },
+    "autoPromoteAdmin": {
+      "value": true
     },
     "acrPassword": {
       "value": "your-acr-password"
@@ -130,9 +148,18 @@ az appservice plan show \
 
 Both web and worker apps share:
 - ✅ **App Service Plan** - Single B1 plan for cost efficiency
-- ✅ **Docker Image** - Same `smarthing-app:cpu-latest` image
 - ✅ **Environment Variables** - All OpenAI, Redis, Key Vault settings
 - ✅ **Resource Access** - Both have Key Vault access via managed identity
+
+They are deployed as separate container images to support the split architecture:
+- ✅ **Web image** – `webDockerImageName` parameter (default `smartlib-web:latest`)
+- ✅ **Worker image** – `workerDockerImageName` parameter (default `smartlib-worker:latest`)
+
+Optional web-app bootstrap:
+- Set `AUTO_PROMOTE_ADMIN=true` with `ADMIN_EMAIL` and `ADMIN_PASSWORD` (optional `ADMIN_USERNAME`) in App Settings to create the first admin automatically. A sentinel file at `/app/data/.admin_seeded` prevents repeat runs.
+- Prefer not to pass passwords directly? Supply `appAdminPasswordSecretUri` / `appAdminEmailSecretUri` parameters pointing to Key Vault secrets. The ARM template converts them into `@Microsoft.KeyVault(SecretUri=...)` references so App Service resolves the values without running `az` inside the container.
+- To seed the default model automatically, set `runDefaultModels=true`. The entrypoint runs `create_default_models.py` once on startup.
+- The deployment sets `DEFAULT_EMBEDDING_MODEL` to `all-MiniLM-L6-v2` by default; customers can change it later in `/admin/embeddings` if they have more memory.
 
 ### Differentiated Settings
 
@@ -140,8 +167,10 @@ Both web and worker apps share:
 |---------|---------|------------|
 | **Startup Command** | `./docker-entrypoint.sh web` | `./docker-entrypoint.sh worker` |
 | **Public Endpoint** | Yes (port 8000) | No (background only) |
-| **WEBSITES_PORT** | `8000` | Not set |
+| **WEBSITES_PORT** | `8000` | `8080` |
 | **Purpose** | User interface | Background tasks |
+| **Redis URL** | `rediss://…:6380?ssl_cert_reqs=none` | Same as web |
+| **Health Server** | N/A | Built-in `python -m http.server` on port 8080 (`ENABLE_WORKER_HEALTH_SERVER=true`) |
 
 ---
 
@@ -258,10 +287,13 @@ az appservice plan update \
 ### Updating Docker Image
 
 ```bash
-# Push new image to ACR
-docker push atgmpnregistry.azurecr.io/smarthing-app:cpu-latest
+# Push updated web image
+docker push ${ACR_LOGIN_SERVER}/smartlib-web:${TAG}
 
-# Restart both apps (DOCKER_ENABLE_CI=true handles this automatically)
+# Push updated worker image
+docker push ${ACR_LOGIN_SERVER}/smartlib-worker:${TAG}
+
+# Restart both apps (DOCKER_ENABLE_CI=true usually restarts automatically)
 az webapp restart --name smartlib-basic-web --resource-group YOUR_RESOURCE_GROUP
 az webapp restart --name smartlib-basic-worker --resource-group YOUR_RESOURCE_GROUP
 ```

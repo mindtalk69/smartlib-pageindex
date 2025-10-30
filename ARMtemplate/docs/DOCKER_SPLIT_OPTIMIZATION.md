@@ -215,23 +215,25 @@ docker compose up -d
 ### Azure Marketplace Deployment
 ```bash
 # Build and push web image
-docker build -f Dockerfile.cpu.micro -t smarthing-app:web-ultralight .
-docker tag smarthing-app:web-ultralight <registry>.azurecr.io/smarthing-app:web-ultralight
-docker push <registry>.azurecr.io/smarthing-app:web-ultralight
+docker build -f Dockerfile.web -t smartlib-web:${TAG} .
+docker tag smartlib-web:${TAG} ${ACR_LOGIN_SERVER}/smartlib-web:${TAG}
+docker push ${ACR_LOGIN_SERVER}/smartlib-web:${TAG}
 
 # Build and push worker image
-docker build -f Dockerfile.worker-optimized -t smarthing-app:worker-optimized .
-docker tag smarthing-app:worker-optimized <registry>.azurecr.io/smarthing-app:worker-optimized  
-docker push <registry>.azurecr.io/smarthing-app:worker-optimized
+docker build -f Dockerfile.worker -t smartlib-worker:${TAG} .
+docker tag smartlib-worker:${TAG} ${ACR_LOGIN_SERVER}/smartlib-worker:${TAG}
+docker push ${ACR_LOGIN_SERVER}/smartlib-worker:${TAG}
 ```
 
 ### ARM Template Updates Required
+
+Templates now expose dedicated `webDockerImageName` and `workerDockerImageName` parameters so each service can track its own image tag. Admin bootstrap can be enabled by passing `AUTO_PROMOTE_ADMIN=true` along with `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and optional `ADMIN_USERNAME` in the web app's settings (directly or via Key Vault secret URIs).
 
 #### Web App Service Configuration
 ```json
 {
   "properties": {
-    "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/smarthing-app:web-ultralight')]",
+    "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/', parameters('webDockerImageName'))]",
     "appCommandLine": "./docker-entrypoint.sh web"
   }
 }
@@ -241,7 +243,7 @@ docker push <registry>.azurecr.io/smarthing-app:worker-optimized
 ```json
 {
   "properties": {
-    "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/smarthing-app:worker-optimized')]",
+    "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/', parameters('workerDockerImageName'))]",
     "appCommandLine": "./docker-entrypoint.sh worker"
   }
 }

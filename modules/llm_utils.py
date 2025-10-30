@@ -93,9 +93,10 @@ def generate_simple_text(prompt: str, deployment_name: str, *, temperature: floa
 AZURE_EMBEDDING_MODELS: set[str] = {"text-embedding-3-small", "text-embedding-3-large"}
 
 embedding_function = None
-#embedding_model_name= "Qwen/Qwen3-Embedding-0.6B" # New default model, change as needed
-embedding_model_name = "BAAI/bge-m3" # Keep this if using bge-m3
-#embedding_model_name = "all-MiniLM-L6-v2" # Reverted for compatibility if bge-m3 isn't set up
+DEFAULT_EMBEDDING_FALLBACK = os.getenv(
+    "DEFAULT_EMBEDDING_MODEL", "all-MiniLM-L6-v2"
+)
+embedding_model_name = DEFAULT_EMBEDDING_FALLBACK
 # Track whether we've already warmed the embedding pipeline during this process lifetime
 _embedding_warmup_complete = False
 # Check CUDA availability for model_kwargs
@@ -115,26 +116,34 @@ encode_kwargs = {"normalize_embeddings": True} # Keep True for BGE, False or rem
 # query_instruction="Generate a representation for this sentence to be used for retrieving relevant articles:" # Specific to BGE, comment out if using MiniLM
 
 def get_embedding_model_name():
-    """Get the current default embedding model name from AppSettings, with fallback to hardcoded value."""
+    """Get the current default embedding model name from AppSettings, with graceful fallbacks."""
     try:
         # Import here to avoid circular imports
         from extensions import db
         from modules.database import AppSettings
-
-        # This function should be called from within a request context.
-        # The `current_app` proxy will be available.
         from flask import current_app
+
         setting = db.session.get(AppSettings, 'default_embedding_model')
         if setting and setting.value:
             return setting.value
 
-    except Exception as e:
-        # Log but don't fail - will fallback to hardcoded
-        import logging
-        logging.warning(f"Could not get embedding model from database: {e}")
+        config_model = current_app.config.get('DEFAULT_EMBEDDING_MODEL')
+        if config_model:
+            return config_model
 
-    # Fallback to hardcoded value
-    return embedding_model_name
+    except RuntimeError as exc:
+        logger.warning(
+            "Flask application context not available for embedding lookup: %s",
+            exc,
+        )
+    except Exception as exc:
+        logger.warning("Could not get embedding model from database: %s", exc)
+
+    env_model = os.getenv('DEFAULT_EMBEDDING_MODEL')
+    if env_model:
+        return env_model
+
+    return DEFAULT_EMBEDDING_FALLBACK
 
 
 def is_azure_embedding_model(model_name: str | None) -> bool:

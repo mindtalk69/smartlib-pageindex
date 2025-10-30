@@ -1,8 +1,9 @@
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from extensions import db
 from modules.database import AppSettings
 import logging
+import os
 
 embeddings_bp = Blueprint('admin_embeddings', __name__, url_prefix='/admin/embeddings')
 
@@ -100,16 +101,29 @@ def set_default_embedding():
         }), 500
 
 def get_current_embedding_model():
-    """Get the current default embedding model from AppSettings."""
+    """Get the current default embedding model with environment-aware fallbacks."""
     try:
         setting = db.session.get(AppSettings, 'default_embedding_model')
         if setting and setting.value:
             return setting.value
-    except Exception as e:
-        logger.warning(f"Could not get current embedding model from DB: {e}")
 
-    # Return default
-    return "BAAI/bge-m3"
+        config_default = current_app.config.get('DEFAULT_EMBEDDING_MODEL')
+        if config_default:
+            return config_default
+
+    except RuntimeError as exc:
+        logger.warning(
+            "Flask application context not available when reading embedding model: %s",
+            exc,
+        )
+    except Exception as exc:
+        logger.warning("Could not get current embedding model from DB: %s", exc)
+
+    env_default = os.getenv('DEFAULT_EMBEDDING_MODEL')
+    if env_default:
+        return env_default
+
+    return "all-MiniLM-L6-v2"
 
 def set_embedding_model(model_name):
     """Set the default embedding model in AppSettings."""

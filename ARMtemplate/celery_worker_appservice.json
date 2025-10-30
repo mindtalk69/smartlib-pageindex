@@ -92,11 +92,11 @@
         "description": "Password for the Azure Container Registry"
       }
     },
-    "dockerImageName": {
+    "workerDockerImageName": {
       "type": "string",
-      "defaultValue": "smarthing-app:latest",
+      "defaultValue": "smartlib-worker:latest",
       "metadata": {
-        "description": "Docker image name in ACR"
+        "description": "Docker image name for the worker app"
       }
     },
     "APP_CLIENT_ID": {
@@ -125,11 +125,32 @@
         "description": "Admin password"
       }
     },
+    "appAdminPasswordSecretUri": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional: Key Vault secret URI for the admin password (overrides appAdminPassword when provided)"
+      }
+    },
     "appAdminEmail": {
       "type": "string",
       "defaultValue": "",
       "metadata": {
         "description": "Admin email"
+      }
+    },
+    "appAdminEmailSecretUri": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional: Key Vault secret URI for the admin email (overrides appAdminEmail when provided)"
+      }
+    },
+    "defaultEmbeddingModel": {
+      "type": "string",
+      "defaultValue": "all-MiniLM-L6-v2",
+      "metadata": {
+        "description": "Default embedding model to load on startup"
       }
     },
     "appServicePlanSkuName": {
@@ -190,17 +211,17 @@
       "properties": {
         "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
         "siteConfig": {
-          "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/', parameters('dockerImageName'))]",
+          "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/', parameters('workerDockerImageName'))]",
           "appCommandLine": "./docker-entrypoint.sh worker",
           "alwaysOn": true,
           "appSettings": [
             {
               "name": "CELERY_BROKER_URL",
-              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380)]"
+              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380, '?ssl_cert_reqs=none')]"
             },
             {
               "name": "CELERY_RESULT_BACKEND",
-              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380)]"
+              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380, '?ssl_cert_reqs=none')]"
             },
             {
               "name": "AZURE_OPENAI_API_KEY",
@@ -220,7 +241,7 @@
             },
             {
               "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
-              "value": "false"
+              "value": "true"
             },
             {
               "name": "DOCKER_REGISTRY_SERVER_URL",
@@ -256,11 +277,51 @@
             },
             {
               "name": "APP_ADMIN_PASSWORD",
-              "value": "[parameters('appAdminPassword')]"
+              "value": "[if(equals(parameters('appAdminPasswordSecretUri'), ''), parameters('appAdminPassword'), concat('@Microsoft.KeyVault(SecretUri=', parameters('appAdminPasswordSecretUri'), ')'))]"
             },
             {
               "name": "APP_ADMIN_EMAIL",
-              "value": "[parameters('appAdminEmail')]"
+              "value": "[if(equals(parameters('appAdminEmailSecretUri'), ''), parameters('appAdminEmail'), concat('@Microsoft.KeyVault(SecretUri=', parameters('appAdminEmailSecretUri'), ')'))]"
+            },
+            {
+              "name": "DEFAULT_EMBEDDING_MODEL",
+              "value": "[parameters('defaultEmbeddingModel')]"
+            },
+            {
+              "name": "DATA_VOLUME_PATH",
+              "value": "/home/data"
+            },
+            {
+              "name": "UPLOAD_TEMP_DIR",
+              "value": "/home/data/tmp_uploads"
+            },
+            {
+              "name": "MAP_PUBLIC_DIR",
+              "value": "/home/data/maps"
+            },
+            {
+              "name": "VECTOR_STORE_BASE_PATH",
+              "value": "/home/data/chroma"
+            },
+            {
+              "name": "SQLALCHEMY_DATABASE_URI",
+              "value": "sqlite:////home/data/app.db"
+            },
+            {
+              "name": "WEBSITES_PORT",
+              "value": "8080"
+            },
+            {
+              "name": "WORKER_HEALTH_PORT",
+              "value": "8080"
+            },
+            {
+              "name": "ENABLE_WORKER_HEALTH_SERVER",
+              "value": "true"
+            },
+            {
+              "name": "WEBSITES_CONTAINER_START_TIME_LIMIT",
+              "value": "400"
             }
           ]
         }

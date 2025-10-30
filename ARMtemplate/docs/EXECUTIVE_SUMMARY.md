@@ -82,7 +82,7 @@ New shared plan template for marketplace deployment:
 "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/', parameters('dockerImageName'))]",
 "appCommandLine": "./docker-entrypoint.sh web",
 "alwaysOn": true,
-// + Added: WEBSITES_ENABLE_APP_SERVICE_STORAGE: false
+// + Added: WEBSITES_ENABLE_APP_SERVICE_STORAGE: true
 // + Added: DOCKER_ENABLE_CI: true
 ```
 
@@ -105,8 +105,9 @@ New shared plan template for marketplace deployment:
    - Prevents cold starts, keeps app running
 
 4. **Container Storage Setting**
-   - Added `WEBSITES_ENABLE_APP_SERVICE_STORAGE: false`
-   - Best practice for containerized applications
+   - Added `WEBSITES_ENABLE_APP_SERVICE_STORAGE: true`
+   - Ensures `/home` shared storage is mounted for uploads and docs
+   - Added default `/home/data` paths for uploads, maps, vector store, and SQLite
 
 5. **Continuous Integration**
    - Added `DOCKER_ENABLE_CI: true`
@@ -266,7 +267,7 @@ All existing documentation validated:
 - ✅ Deploy multiple services as separate App Services
 
 ### Flask + Celery Architecture
-- ✅ Web and worker use same Docker image
+- ✅ Web and worker use dedicated Docker images (`smartlib-web` and `smartlib-worker`)
 - ✅ Different startup commands (`web` vs `worker`)
 - ✅ Both connect to same Redis instance
 - ✅ Separate App Services for better isolation

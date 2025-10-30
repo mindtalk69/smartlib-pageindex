@@ -35,8 +35,8 @@ print_status "Docker is running"
 # Build the split architecture images if they don't exist
 echo ""
 echo "Checking Docker images..."
-WEB_IMAGE="smarthing-app:web-ultralight"
-WORKER_IMAGE="smarthing-app:worker-optimized"
+WEB_IMAGE="smartlib-web:latest"
+WORKER_IMAGE="smartlib-worker:latest"
 
 if ! docker image inspect "$WEB_IMAGE" >/dev/null 2>&1 || ! docker image inspect "$WORKER_IMAGE" >/dev/null 2>&1; then
     print_warning "Split architecture images not found. Building images..."
@@ -84,14 +84,14 @@ else
 fi
 
 echo "Web app status:"
-if docker ps | grep -q flaskrag3-web; then
+if docker ps | grep -q smartlib-web; then
     print_status "Web app container is running"
 else
     print_error "Web app container not found"
 fi
 
 echo "Worker status:"
-if docker ps | grep -q flaskrag3-worker; then
+if docker ps | grep -q smartlib-worker; then
     print_status "Worker container is running"
 else
     print_error "Worker container not found"
@@ -101,11 +101,11 @@ echo ""
 echo "📋 Container logs:"
 
 echo "Web app logs:"
-docker logs flaskrag3-web-1 2>/dev/null | tail -10 || echo "No web app logs available"
+docker logs smartlib-web-1 2>/dev/null | tail -10 || echo "No web app logs available"
 
 echo ""
 echo "Worker logs:"
-docker logs flaskrag3-worker-1 2>/dev/null | tail -10 || echo "No worker logs available"
+docker logs smartlib-worker-1 2>/dev/null | tail -10 || echo "No worker logs available"
 
 echo ""
 echo "🔗 Testing web application..."
@@ -127,11 +127,12 @@ echo "• Verify embedding model 'all-MiniLM-L6-v2' is selected"
 
 echo ""
 echo "🔧 Development commands:"
-echo "• View web logs:     docker logs -f flaskrag3-web-1"
-echo "• View worker logs:  docker logs -f flaskrag3-worker-1"
+echo "• View web logs:     docker logs -f smartlib-web-1"
+echo "• View worker logs:  docker logs -f smartlib-worker-1"
 echo "• Stop services:     docker compose down"
 echo "• Restart services:  docker compose restart"
-echo "• Shell access:      docker exec -it flaskrag3-web-1 /bin/bash"
+echo "• Shell access:      docker exec -it smartlib-web-1 /bin/bash"
+
 
 echo ""
 echo "📊 Service URLs:"

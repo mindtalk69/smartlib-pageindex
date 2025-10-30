@@ -4,9 +4,40 @@ set -e
 UPLOAD_TEMP_DIR="${UPLOAD_TEMP_DIR:-/app/data/tmp_uploads}"
 mkdir -p "$UPLOAD_TEMP_DIR"
 
+# Normalize arguments when invoked via Azure startup shim
+if [ "$1" = "./docker-entrypoint.sh" ] || [ "$1" = "docker-entrypoint.sh" ]; then
+    shift
+fi
+
+if [ -z "$1" ]; then
+    set -- web "$@"
+fi
+
+check_data_mount() {
+    local target_dir="${DATA_VOLUME_PATH:-/app/data}"
+    if [ "${SKIP_DATA_MOUNT_CHECK:-false}" = "true" ]; then
+        echo "Skipping data mount check (SKIP_DATA_MOUNT_CHECK=true)."
+        return 0
+    fi
+
+    if [ ! -f scripts/check_data_mount.py ]; then
+        echo "Mount check script not found; skipping." >&2
+        return 0
+    fi
+
+    echo "Validating data directory mount at ${target_dir}..."
+    if ! python scripts/check_data_mount.py --path "${target_dir}"; then
+        echo "ERROR: Data directory ${target_dir} failed mount validation." >&2
+        echo "Set SKIP_DATA_MOUNT_CHECK=true to bypass (not recommended)." >&2
+        exit 1
+    fi
+}
+
 # Check the first argument to decide which process to start
 if [ "$1" = "web" ]; then
     echo "Starting Flask web application..."
+
+    check_data_mount
 
     # Environment detection with better Azure check
     IS_AZURE=false
@@ -71,12 +102,33 @@ if [ "$1" = "web" ]; then
         echo "Category seed script not found; skipping."
     fi
 
+    # Optional admin bootstrap (runs once when AUTO_PROMOTE_ADMIN=true)
+    if [ "${AUTO_PROMOTE_ADMIN:-false}" = "true" ]; then
+        ADMIN_SENTINEL="${ADMIN_SENTINEL_PATH:-/app/data/.admin_seeded}"
+        if [ -f "$ADMIN_SENTINEL" ]; then
+            echo "Admin bootstrap already completed (found $ADMIN_SENTINEL)."
+        elif [ -z "$ADMIN_EMAIL" ] || [ -z "$ADMIN_PASSWORD" ]; then
+            echo "AUTO_PROMOTE_ADMIN=true but ADMIN_EMAIL or ADMIN_PASSWORD not provided. Skipping admin bootstrap."
+        elif [ ! -f promote_admin_sqlalchemy.py ]; then
+            echo "promote_admin_sqlalchemy.py not found; cannot bootstrap admin user."
+        else
+            ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
+            echo "Bootstrapping admin user $ADMIN_EMAIL (username: $ADMIN_USERNAME)..."
+            if python promote_admin_sqlalchemy.py --email "$ADMIN_EMAIL" --username "$ADMIN_USERNAME" --password "$ADMIN_PASSWORD"; then
+                touch "$ADMIN_SENTINEL"
+                echo "Admin bootstrap completed. Sentinel created at $ADMIN_SENTINEL."
+            else
+                echo "Admin bootstrap script reported an error." >&2
+            fi
+        fi
+    fi
+
     # Create default models if explicitly requested (handled by worker normally)
-    if [ "$IS_AZURE" = false ] && [ -f create_default_models.py ] && [ "$RUN_DEFAULT_MODELS" = "true" ]; then
+    if [ -f create_default_models.py ] && [ "${RUN_DEFAULT_MODELS:-false}" = "true" ]; then
         echo "RUN_DEFAULT_MODELS=true detected. Creating default models..."
         python create_default_models.py
     else
-        echo "Skipping local default model creation in web container. Set RUN_DEFAULT_MODELS=true to enable."
+        echo "Skipping default model creation. Set RUN_DEFAULT_MODELS=true to enable."
     fi
 
     # Determine which app file to use
@@ -107,9 +159,30 @@ if [ "$1" = "web" ]; then
 elif [ "$1" = "worker" ]; then
     echo "Starting Celery worker..."
 
+    check_data_mount
+
     # Environment detection (simplified for worker)
     if [ "$LOCAL_MODE" = "true" ] || [ "$RUNNING_LOCALLY" = "true" ]; then
         echo "Local mode detected for worker..."
+    fi
+
+    HEALTH_ENABLED="${ENABLE_WORKER_HEALTH_SERVER:-true}"
+    HEALTH_PORT="${WORKER_HEALTH_PORT:-8080}"
+    if [ "$HEALTH_ENABLED" = "true" ]; then
+        echo "Launching lightweight health server on port ${HEALTH_PORT} for App Service warmup checks..."
+        python -m http.server "$HEALTH_PORT" --bind 0.0.0.0 >/tmp/worker-health.log 2>&1 &
+    else
+        echo "Worker health server disabled (ENABLE_WORKER_HEALTH_SERVER=false)."
+    fi
+
+    # Ensure database schema is current before starting the worker
+    echo "Ensuring database schema is up to date before starting worker..."
+    if command -v alembic &> /dev/null; then
+        echo "Running alembic upgrade to ensure database is up to date..."
+        alembic upgrade head
+    else
+        echo "Alembic not found, running direct database initialization..."
+        python -c "from modules.database import init_db; init_db()"
     fi
 
     # Start the Celery worker
