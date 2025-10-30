@@ -1,24 +1,29 @@
-import sqlite3
 import os
-from urllib.parse import urlparse
+import sqlite3
+from sqlalchemy.engine import make_url
 
 
 def resolve_db_path() -> str:
     uri = os.environ.get("SQLALCHEMY_DATABASE_URI")
     if uri:
-        parsed = urlparse(uri)
-        if parsed.scheme == "sqlite":
-            path = parsed.path or ""
-            if parsed.netloc:
-                path = f"//{parsed.netloc}{path}"
-            if path:
-                if os.path.isabs(path):
-                    return path
-                return os.path.join(os.getcwd(), path.lstrip("/"))
+        try:
+            url = make_url(uri)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            print(
+                f"Warning: unable to parse SQLALCHEMY_DATABASE_URI '{uri}': {exc}"
+            )
+        else:
+            if url.get_backend_name() == "sqlite":
+                database = url.database or ""
+                if database == ":memory:":
+                    return database
+                if not os.path.isabs(database):
+                    return os.path.abspath(os.path.join(os.getcwd(), database))
+                return database
     data_root = os.environ.get("DATA_VOLUME_PATH")
     if data_root:
         return os.path.join(data_root, "app.db")
-    return os.path.join(os.getcwd(), "data", "app.db")
+    return os.path.abspath(os.path.join(os.getcwd(), "data", "app.db"))
 
 
 DB_PATH = resolve_db_path()
@@ -93,7 +98,9 @@ def insert_default_catalogs(conn, catalogs):
         print(f"Error inserting catalogs: {e}")
 
 def main():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    print(f"Using database path: {DB_PATH}")
+    if DB_PATH != ":memory:":
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = create_connection(DB_PATH)
     if conn:
         create_table(conn)
