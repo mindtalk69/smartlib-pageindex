@@ -1,7 +1,27 @@
 import sqlite3
 import os
+from urllib.parse import urlparse
 
-DB_PATH = os.path.join('data', 'app.db')
+
+def resolve_db_path() -> str:
+    uri = os.environ.get("SQLALCHEMY_DATABASE_URI")
+    if uri:
+        parsed = urlparse(uri)
+        if parsed.scheme == "sqlite":
+            path = parsed.path or ""
+            if parsed.netloc:
+                path = f"//{parsed.netloc}{path}"
+            if path:
+                if os.path.isabs(path):
+                    return path
+                return os.path.join(os.getcwd(), path.lstrip("/"))
+    data_root = os.environ.get("DATA_VOLUME_PATH")
+    if data_root:
+        return os.path.join(data_root, "app.db")
+    return os.path.join(os.getcwd(), "data", "app.db")
+
+
+DB_PATH = resolve_db_path()
 
 DEFAULT_LANGUAGES = [
     ('Indonesian', 'id'), ('English', 'en'), ('Chinese', 'lzh'),

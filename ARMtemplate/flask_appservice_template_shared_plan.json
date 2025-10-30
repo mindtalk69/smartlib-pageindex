@@ -349,6 +349,34 @@
             {
               "name": "ADMIN_EMAIL",
               "value": "[if(equals(parameters('appAdminEmailSecretUri'), ''), parameters('appAdminEmail'), concat('@Microsoft.KeyVault(SecretUri=', parameters('appAdminEmailSecretUri'), ')'))]"
+            },
+            {
+              "name": "DEFAULT_EMBEDDING_MODEL",
+              "value": "[parameters('defaultEmbeddingModel')]"
+            },
+            {
+              "name": "DATA_VOLUME_PATH",
+              "value": "/home/data"
+            },
+            {
+              "name": "UPLOAD_TEMP_DIR",
+              "value": "/home/data/tmp_uploads"
+            },
+            {
+              "name": "MAP_PUBLIC_DIR",
+              "value": "/home/data/maps"
+            },
+            {
+              "name": "VECTOR_STORE_BASE_PATH",
+              "value": "/home/data/chroma"
+            },
+            {
+              "name": "SQLALCHEMY_DATABASE_URI",
+              "value": "sqlite:////home/data/app.db"
+            },
+            {
+              "name": "RUN_DEFAULT_MODELS",
+              "value": "[if(parameters('runDefaultModels'), 'true', 'false')]"
             }
           ]
         }
@@ -481,11 +509,6 @@
               "name": "SQLALCHEMY_DATABASE_URI",
               "value": "sqlite:////home/data/app.db"
             },
-            {
-              "name": "WEBSITES_PORT",
-              "value": "8000"
-            },
-
             {
               "name": "WEBSITES_PORT",
               "value": "8080"

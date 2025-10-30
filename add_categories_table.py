@@ -1,7 +1,27 @@
 import sqlite3
 import os
+from urllib.parse import urlparse
 
-DB_PATH = os.path.join('data', 'app.db')
+
+def resolve_db_path() -> str:
+    uri = os.environ.get("SQLALCHEMY_DATABASE_URI")
+    if uri:
+        parsed = urlparse(uri)
+        if parsed.scheme == "sqlite":
+            path = parsed.path or ""
+            if parsed.netloc:
+                path = f"//{parsed.netloc}{path}"
+            if path:
+                if os.path.isabs(path):
+                    return path
+                return os.path.join(os.getcwd(), path.lstrip("/"))
+    data_root = os.environ.get("DATA_VOLUME_PATH")
+    if data_root:
+        return os.path.join(data_root, "app.db")
+    return os.path.join(os.getcwd(), "data", "app.db")
+
+
+DB_PATH = resolve_db_path()
 
 DEFAULT_CATEGORIES = [
     ('Public Data', 'Kategori \'Data Publik\' mencakup informasi yang tersedia untuk umum dan dapat diakses tanpa batasan. Konten dalam kategori ini meliputi statistik pemerintah, laporan penelitian, data demografis, informasi lingkungan, serta data terkait kesehatan dan pendidikan. Tujuan utama dari data publik adalah untuk meningkatkan transparansi, mendukung penelitian, dan memberikan dasar untuk pengambilan keputusan yang informasional oleh masyarakat, peneliti, dan pembuat kebijakan. Ketersediaan data ini berkontribusi pada partisipasi publik yang lebih besar dan pengembangan kebijakan yang berbasis bukti.'),

@@ -278,10 +278,6 @@
               "value": "8000"
             },
             {
-              "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
-              "value": "true"
-            },
-            {
               "name": "DOCKER_REGISTRY_SERVER_URL",
               "value": "[concat('https://', parameters('acrLoginServer'))]"
             },
