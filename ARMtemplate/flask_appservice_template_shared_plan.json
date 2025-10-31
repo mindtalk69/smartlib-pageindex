@@ -66,6 +66,31 @@
       "description": "Fill with: [reference(resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults/secrets', parameters('existingKeyVaultName'), 'AZURE_OPENAI_API_VERSION')).value]"
     }
   },
+    "storageAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "Storage account name that hosts the shared Azure Files share."
+      }
+    },
+    "storageAccountKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Access key for the storage account used to mount shared storage."
+      }
+    },
+    "dataShareName": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure Files share name mounted at /home/data."
+      }
+    },
+    "azureEmbeddingDeployment": {
+      "type": "string",
+      "defaultValue": "text-embedding-3-small",
+      "metadata": {
+        "description": "Azure OpenAI embedding deployment name used by the web and worker apps."
+      }
+    },
     "openAIAzureName": {
       "type": "string",
       "metadata": {
@@ -189,7 +214,7 @@
     },
     "defaultEmbeddingModel": {
       "type": "string",
-      "defaultValue": "all-MiniLM-L6-v2",
+      "defaultValue": "text-embedding-3-small",
       "metadata": {
         "description": "Default embedding model to load on startup"
       }
@@ -257,6 +282,15 @@
           "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/', parameters('webDockerImageName'))]",
           "appCommandLine": "./docker-entrypoint.sh web",
           "alwaysOn": true,
+          "azureStorageAccounts": {
+            "data": {
+              "type": "AzureFiles",
+              "accountName": "[parameters('storageAccountName')]",
+              "shareName": "[parameters('dataShareName')]",
+              "accessKey": "[parameters('storageAccountKey')]",
+              "mountPath": "/home/data"
+            }
+          },
           "appSettings": [
             {
               "name": "CELERY_BROKER_URL",
@@ -352,7 +386,11 @@
             },
             {
               "name": "DEFAULT_EMBEDDING_MODEL",
-              "value": "[parameters('defaultEmbeddingModel')]"
+              "value": "[parameters('azureEmbeddingDeployment')]"
+            },
+            {
+              "name": "AZURE_EMBEDDING_DEPLOYMENT",
+              "value": "[parameters('azureEmbeddingDeployment')]"
             },
             {
               "name": "DATA_VOLUME_PATH",
@@ -400,6 +438,15 @@
           "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/', parameters('workerDockerImageName'))]",
           "appCommandLine": "./docker-entrypoint.sh worker",
           "alwaysOn": true,
+          "azureStorageAccounts": {
+            "data": {
+              "type": "AzureFiles",
+              "accountName": "[parameters('storageAccountName')]",
+              "shareName": "[parameters('dataShareName')]",
+              "accessKey": "[parameters('storageAccountKey')]",
+              "mountPath": "/home/data"
+            }
+          },
           "appSettings": [
             {
               "name": "CELERY_BROKER_URL",
@@ -487,7 +534,11 @@
             },
             {
               "name": "DEFAULT_EMBEDDING_MODEL",
-              "value": "[parameters('defaultEmbeddingModel')]"
+              "value": "[parameters('azureEmbeddingDeployment')]"
+            },
+            {
+              "name": "AZURE_EMBEDDING_DEPLOYMENT",
+              "value": "[parameters('azureEmbeddingDeployment')]"
             },
             {
               "name": "DATA_VOLUME_PATH",

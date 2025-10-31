@@ -159,7 +159,7 @@ Optional web-app bootstrap:
 - Set `AUTO_PROMOTE_ADMIN=true` with `ADMIN_EMAIL` and `ADMIN_PASSWORD` (optional `ADMIN_USERNAME`) in App Settings to create the first admin automatically. A sentinel file at `/app/data/.admin_seeded` prevents repeat runs.
 - Prefer not to pass passwords directly? Supply `appAdminPasswordSecretUri` / `appAdminEmailSecretUri` parameters pointing to Key Vault secrets. The ARM template converts them into `@Microsoft.KeyVault(SecretUri=...)` references so App Service resolves the values without running `az` inside the container.
 - To seed the default model automatically, set `runDefaultModels=true`. The entrypoint runs `create_default_models.py` once on startup.
-- The deployment sets `DEFAULT_EMBEDDING_MODEL` to `all-MiniLM-L6-v2` by default; customers can change it later in `/admin/embeddings` if they have more memory.
+- The deployment sets `DEFAULT_EMBEDDING_MODEL` to the Azure embedding deployment (default `text-embedding-3-small`); customers can change it later in `/admin/embeddings` or swap in a local model if desired.
 
 ### Differentiated Settings
 

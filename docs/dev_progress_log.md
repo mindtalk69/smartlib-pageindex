@@ -1,5 +1,11 @@
 # SmartLib Dev Progress Log
 
+## 2025-10-31 – Azure Files Shared Storage
+- Updated all App Service ARM templates to add Azure Files parameters and mount `/home/data` so worker and web containers share uploads, maps, and vector assets.
+- Refreshed `ARMtemplate/docs/QUICK_START_GUIDE.md` deployment commands to include `storageAccountName`, `dataShareName`, and `storageAccountKey`, and called out the new storage prerequisite in the checklist.
+- Added SQLite preflight + WAL fallback in `docker-entrypoint.sh`/`extensions.py` so the new SMB mount reliably creates and opens `/home/data/app.db` before running migrations or seed scripts, and switched the default embedding configuration to Azure (`text-embedding-3-small`) with new ARM template parameters for `azureEmbeddingDeployment`.
+- Noted the storage requirement inline so future releases don’t regress into isolated temp dirs that break ingestion workflows.
+
 ## 2025-10-26 – Timeout + Docker Slimming Updates
 - Added `GUNICORN_TIMEOUT` support in `docker-entrypoint.sh` so web workers can run longer-lived requests; defaulted to 120s and set to 240s in Compose.
 - Surfaced `AGENT_TASK_TIMEOUT` via `Config` and passed it to `invoke_agent_via_worker`, aligning Celery task wait time with Gunicorn’s timeout (both now 240s in Compose).

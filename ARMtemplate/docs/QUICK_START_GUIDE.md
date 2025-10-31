@@ -17,6 +17,7 @@
 **Use this if you have existing Redis and Key Vault**
 
 **Template:** `flask_appservice_template_conditional_kv.json` ✅ (Already correct, no changes made)
+> ℹ️ Requires a shared Azure Files mount for `/home/data`.
 
 ```bash
 # Step 1: Deploy Web App
@@ -33,22 +34,30 @@ az deployment group create \
     openAIAzureName=YOUR_OPENAI_RESOURCE \
     APP_CLIENT_ID=YOUR_CLIENT_ID \
     APP_CLIENT_SECRET=YOUR_SECRET \
+    storageAccountName=YOUR_STORAGE_ACCOUNT \
+    dataShareName=YOUR_FILE_SHARE \
+    storageAccountKey=YOUR_STORAGE_KEY \
+    azureEmbeddingDeployment=YOUR_EMBEDDING_DEPLOYMENT \
     appServicePlanSkuName=B1 \
     createRoleAssignment=true
 
-# Step 2: Deploy Celery Worker
+# Then deploy worker separately
 az deployment group create \
   --resource-group YOUR_RG \
   --template-file ARMtemplate/celery_worker_appservice.json \
   --parameters \
-    existingRedisName=YOUR_REDIS \
-    existingKeyVaultName=YOUR_KV \
+    existingRedisName=flaskrag3-app-redis \
+    existingKeyVaultName=YOUR_KEYVAULT_NAME \
     azureOpenAIKey=YOUR_KEY \
     azureOpenAIEndpoint=YOUR_ENDPOINT \
     azureOpenAIDeployment=YOUR_DEPLOYMENT \
     acrPassword=YOUR_ACR_PASSWORD \
     APP_CLIENT_ID=YOUR_CLIENT_ID \
     APP_CLIENT_SECRET=YOUR_SECRET \
+    storageAccountName=YOUR_STORAGE_ACCOUNT \
+    dataShareName=YOUR_FILE_SHARE \
+    storageAccountKey=YOUR_STORAGE_KEY \
+    azureEmbeddingDeployment=YOUR_EMBEDDING_DEPLOYMENT \
     appServicePlanSkuName=B1
 ```
 
@@ -59,6 +68,7 @@ az deployment group create \
 **Use this for new environment (creates everything)**
 
 **Template:** `flask_appservice_template.json` ✅ (Just fixed!)
+> ℹ️ Includes shared Azure Files mount at `/home/data`.
 
 ```bash
 # Deploy everything at once
@@ -73,6 +83,10 @@ az deployment group create \
     openAIAzureName=YOUR_OPENAI_RESOURCE \
     APP_CLIENT_ID=YOUR_CLIENT_ID \
     APP_CLIENT_SECRET=YOUR_SECRET \
+    storageAccountName=YOUR_STORAGE_ACCOUNT \
+    dataShareName=YOUR_FILE_SHARE \
+    storageAccountKey=YOUR_STORAGE_KEY \
+    azureEmbeddingDeployment=YOUR_EMBEDDING_DEPLOYMENT \
     appServicePlanSkuName=B1
 
 # Then deploy worker separately
@@ -88,6 +102,10 @@ az deployment group create \
     acrPassword=YOUR_ACR_PASSWORD \
     APP_CLIENT_ID=YOUR_CLIENT_ID \
     APP_CLIENT_SECRET=YOUR_SECRET \
+    storageAccountName=YOUR_STORAGE_ACCOUNT \
+    dataShareName=YOUR_FILE_SHARE \
+    storageAccountKey=YOUR_STORAGE_KEY \
+    azureEmbeddingDeployment=YOUR_EMBEDDING_DEPLOYMENT \
     appServicePlanSkuName=B1
 ```
 
@@ -135,9 +153,11 @@ Before deploying, make sure you have:
 - [ ] Parameter file updated with `webDockerImageName` and `workerDockerImageName` matching the pushed tags
 - [ ] Existing Redis Cache (or will create new one)
 - [ ] Existing Key Vault (or will create new one)
-- [ ] Azure OpenAI resource with deployment
+- [ ] Azure OpenAI resource with deployments (chat + embeddings)
+- [ ] Embedding deployment name for `azureEmbeddingDeployment` (e.g., `text-embedding-3-small`)
 - [ ] App Registration with Client ID and Secret
 - [ ] ACR credentials (username and password)
+- [ ] Azure Storage account with Azure Files share (`storageAccountName`, `dataShareName`, `storageAccountKey`)
 - [ ] (Optional) App Settings for automatic admin bootstrap (`AUTO_PROMOTE_ADMIN=true`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, optional `ADMIN_USERNAME`)
 - [ ] (Optional) Key Vault secret URIs (`appAdminPasswordSecretUri`, `appAdminEmailSecretUri`) if you prefer to supply admin secrets via Key Vault references
 - [ ] Worker container health settings (`WEBSITES_PORT=8080`, `WORKER_HEALTH_PORT=8080`, `ENABLE_WORKER_HEALTH_SERVER=true`)—the template sets these automatically

@@ -33,6 +33,43 @@ check_data_mount() {
     fi
 }
 
+prepare_sqlite_db() {
+    if [ -z "${SQLALCHEMY_DATABASE_URI:-}" ]; then
+        return 0
+    fi
+
+    python <<'PY'
+import os
+import sqlite3
+from sqlalchemy.engine import make_url
+
+uri = os.environ.get("SQLALCHEMY_DATABASE_URI")
+if not uri or not uri.startswith("sqlite"):
+    raise SystemExit(0)
+
+url = make_url(uri)
+db_path = url.database
+if not db_path or db_path == ":memory:":
+    raise SystemExit(0)
+
+if not os.path.isabs(db_path):
+    db_path = os.path.abspath(db_path)
+
+os.makedirs(os.path.dirname(db_path), exist_ok=True)
+
+if not os.path.exists(db_path):
+    open(db_path, "a", encoding="utf-8").close()
+
+try:
+    conn = sqlite3.connect(db_path, timeout=30)
+    conn.execute("PRAGMA journal_mode=DELETE;")
+    conn.execute("PRAGMA busy_timeout = 10000;")
+    conn.close()
+except Exception as exc:
+    print(f"WARNING: SQLite preflight failed for {db_path}: {exc}")
+PY
+}
+
 # Check the first argument to decide which process to start
 if [ "$1" = "web" ]; then
     echo "Starting Flask web application..."
@@ -74,6 +111,7 @@ if [ "$1" = "web" ]; then
     # Initialize database if not exists and run migrations
     echo "Checking and initializing database..."
     if command -v alembic &> /dev/null; then
+        prepare_sqlite_db
         echo "Running alembic upgrade to ensure database is up to date..."
         alembic upgrade head
     else
@@ -178,6 +216,7 @@ elif [ "$1" = "worker" ]; then
     # Ensure database schema is current before starting the worker
     echo "Ensuring database schema is up to date before starting worker..."
     if command -v alembic &> /dev/null; then
+        prepare_sqlite_db
         echo "Running alembic upgrade to ensure database is up to date..."
         alembic upgrade head
     else

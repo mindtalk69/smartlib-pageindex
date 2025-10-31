@@ -94,7 +94,7 @@ AZURE_EMBEDDING_MODELS: set[str] = {"text-embedding-3-small", "text-embedding-3-
 
 embedding_function = None
 DEFAULT_EMBEDDING_FALLBACK = os.getenv(
-    "DEFAULT_EMBEDDING_MODEL", "all-MiniLM-L6-v2"
+    "DEFAULT_EMBEDDING_MODEL", "text-embedding-3-small"
 )
 embedding_model_name = DEFAULT_EMBEDDING_FALLBACK
 # Track whether we've already warmed the embedding pipeline during this process lifetime
