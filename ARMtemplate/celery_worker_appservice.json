@@ -53,6 +53,20 @@
         "description": "Azure OpenAI API Version"
       }
     },
+    "docIntelligenceEndpoint": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure Document Intelligence endpoint URL (e.g., https://<resource>.cognitiveservices.azure.com/)"
+      }
+    },
+    "docIntelligenceKeySecretUri": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Key Vault secret URI containing the Azure Document Intelligence key"
+      }
+    },
     "storageAccountName": {
       "type": "string",
       "metadata": {
@@ -272,6 +286,14 @@
             {
               "name": "AZURE_OPENAI_API_VERSION",
               "value": "[parameters('azureOpenAIAPIVersion')]"
+            },
+            {
+              "name": "DOC_INTELLIGENCE_ENDPOINT",
+              "value": "[parameters('docIntelligenceEndpoint')]"
+            },
+            {
+              "name": "DOC_INTELLIGENCE_KEY",
+              "value": "[if(equals(parameters('docIntelligenceKeySecretUri'), ''), '', concat('@Microsoft.KeyVault(SecretUri=', parameters('docIntelligenceKeySecretUri'), ')'))]"
             },
             {
               "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",

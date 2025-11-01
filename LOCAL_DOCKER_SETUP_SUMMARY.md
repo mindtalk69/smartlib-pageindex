@@ -164,7 +164,7 @@ Once local testing confirms everything works:
 docker compose logs
 
 # Verify Docker image exists
-docker images | grep smarthing-app
+docker images | grep smartlib-app
 
 # Test Redis connectivity
 docker exec -it flaskrag3-redis-1 redis-cli ping

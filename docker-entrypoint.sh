@@ -41,6 +41,7 @@ prepare_sqlite_db() {
     python <<'PY'
 import os
 import sqlite3
+import time
 from sqlalchemy.engine import make_url
 
 uri = os.environ.get("SQLALCHEMY_DATABASE_URI")
@@ -55,20 +56,33 @@ if not db_path or db_path == ":memory:":
 if not os.path.isabs(db_path):
     db_path = os.path.abspath(db_path)
 
-os.makedirs(os.path.dirname(db_path), exist_ok=True)
-
-if not os.path.exists(db_path):
-    open(db_path, "a", encoding="utf-8").close()
+parent_dir = os.path.dirname(db_path)
+os.makedirs(parent_dir, exist_ok=True)
 
 try:
-    conn = sqlite3.connect(db_path, timeout=30)
-    conn.execute("PRAGMA journal_mode=DELETE;")
-    conn.execute("PRAGMA busy_timeout = 10000;")
-    conn.close()
+    open(db_path, "a", encoding="utf-8").close()
 except Exception as exc:
-    print(f"WARNING: SQLite preflight failed for {db_path}: {exc}")
+    print(f"WARNING: SQLite preflight could not touch {db_path}: {exc}")
+
+journal_mode = os.environ.get("SQLITE_JOURNAL_MODE", "DELETE").upper()
+last_exc = None
+for attempt in range(5):
+    try:
+        conn = sqlite3.connect(db_path, timeout=30)
+        conn.execute(f"PRAGMA journal_mode={journal_mode};")
+        conn.execute("PRAGMA busy_timeout = 10000;")
+        conn.close()
+        if attempt:
+            print(f"INFO: SQLite preflight succeeded for {db_path} after {attempt + 1} attempts.")
+        break
+    except Exception as exc:
+        last_exc = exc
+        time.sleep(1 + attempt)
+else:
+    print(f"WARNING: SQLite preflight failed for {db_path}: {last_exc}")
 PY
 }
+
 
 # Check the first argument to decide which process to start
 if [ "$1" = "web" ]; then

@@ -6,6 +6,32 @@ import json
 import os
 from datetime import datetime, timezone # Import datetime and timezone
 
+
+def _resolve_data_root():
+    """Return the shared data root used for uploads (respects DATA_VOLUME_PATH)."""
+    from flask import current_app
+
+    candidates = []
+    try:
+        if current_app:
+            candidates.append(current_app.config.get("DATA_VOLUME_PATH"))
+    except RuntimeError:
+        # Outside app context
+        pass
+    candidates.append(os.environ.get("DATA_VOLUME_PATH"))
+
+    for candidate in candidates:
+        if candidate:
+            return os.path.abspath(candidate)
+    # Fallback to application directory /data if env not set
+    fallback = os.path.join(os.path.abspath(os.path.dirname(__file__)), "..", "data")
+    return os.path.abspath(fallback)
+
+
+def _resolve_job_directory(job_id: int) -> str:
+    data_root = _resolve_data_root()
+    return os.path.join(data_root, "admin_folder_uploads", str(job_id))
+
 admin_folder_upload_bp = Blueprint(
     "admin_folder_upload",
     __name__,
@@ -94,7 +120,7 @@ def upload_folder():
     db.session.add(job)
     db.session.commit()
 
-    job_dir = f"data/admin_folder_uploads/{job.id}"
+    job_dir = _resolve_job_directory(job.id)
     os.makedirs(job_dir, exist_ok=True)
 
     for file in uploaded_files:
@@ -226,7 +252,7 @@ def process_folder_upload_task(job_id):
     db.session.commit()
 
     # Directory where files are stored for this job
-    job_dir = os.path.join("data", "admin_folder_uploads", str(job_id))
+    job_dir = _resolve_job_directory(job_id)
     os.makedirs(job_dir, exist_ok=True)
 
     # Load file list and file types
@@ -271,6 +297,7 @@ def process_folder_upload_task(job_id):
                 'DOCLING_EXPORT_TYPE': current_app.config.get('DOCLING_EXPORT_TYPE', 'MARKDOWN'),
                 'VISUAL_GROUNDING_DOC_STORE_PATH': current_app.config.get('VISUAL_GROUNDING_DOC_STORE_PATH', 'data/doc_store'),
                 'AppSettings': AppSettings,
+                'DATA_VOLUME_PATH': _resolve_data_root(),
             }
             # Use the stored preference for visual grounding
             enable_visual_grounding = job.enable_visual_grounding_for_job if hasattr(job, 'enable_visual_grounding_for_job') and job.enable_visual_grounding_for_job is not None else False

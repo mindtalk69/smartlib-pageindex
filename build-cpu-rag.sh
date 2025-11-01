@@ -15,8 +15,8 @@ log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 # Configuration
-IMAGE_NAME="smarthing-app:cpu-rag-minimal"
-CONTAINER_NAME="smarthing-rag-test"
+IMAGE_NAME="smartlib-app:cpu-rag-minimal"
+CONTAINER_NAME="smartlib-rag-test"
 
 # =============================================================================
 # BUILD PROCESS

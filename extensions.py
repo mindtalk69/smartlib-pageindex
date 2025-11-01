@@ -18,10 +18,10 @@ csrf = CSRFProtect()
 # Event listener to set PRAGMA for SQLite connections
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
-    """Sets PRAGMA journal_mode=WAL and busy_timeout for SQLite connections."""
+    """Sets PRAGMA journal_mode and busy_timeout for SQLite connections."""
     if isinstance(dbapi_connection, sqlite3.Connection):
         cursor = dbapi_connection.cursor()
-        journal_mode = os.environ.get("SQLITE_JOURNAL_MODE", "WAL").upper()
+        journal_mode = os.environ.get("SQLITE_JOURNAL_MODE", "DELETE").upper()
         applied_mode = journal_mode
         try:
             cursor.execute(f"PRAGMA journal_mode={journal_mode};")

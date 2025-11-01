@@ -7,15 +7,15 @@ echo "╚═══════════════════════�
 echo ""
 
 # Find the last exited container
-CONTAINER=$(docker ps -a --filter "name=smarthing-test" --format "{{.ID}}" | head -1)
+CONTAINER=$(docker ps -a --filter "name=smartlib-test" --format "{{.ID}}" | head -1)
 
 if [ -z "$CONTAINER" ]; then
     # Try to find by image name
-    CONTAINER=$(docker ps -a --filter "ancestor=smarthing-app:cpu-latest" --format "{{.ID}}" | head -1)
+    CONTAINER=$(docker ps -a --filter "ancestor=smartlib-app:cpu-latest" --format "{{.ID}}" | head -1)
 fi
 
 if [ -z "$CONTAINER" ]; then
-    echo "❌ No smarthing-test container found"
+    echo "❌ No smartlib-test container found"
     echo ""
     echo "Recent containers:"
     docker ps -a | head -5
@@ -87,7 +87,7 @@ if echo "$LOGS" | grep -qi "no such file"; then
     echo "3. Wrong COPY paths in Dockerfile"
     echo ""
     echo "Check image contents:"
-    echo "  docker run --rm smarthing-app:cpu-latest ls -la /app"
+    echo "  docker run --rm smartlib-app:cpu-latest ls -la /app"
 fi
 
 if echo "$LOGS" | grep -qi "permission denied"; then
@@ -113,7 +113,7 @@ if echo "$LOGS" | grep -qi "ModuleNotFoundError\|ImportError"; then
     echo "3. Python packages not installed"
     echo ""
     echo "Check installed packages:"
-    echo "  docker run --rm smarthing-app:cpu-latest pip list"
+    echo "  docker run --rm smartlib-app:cpu-latest pip list"
 fi
 
 if echo "$LOGS" | grep -qi "cannot find module.*app"; then
@@ -128,8 +128,8 @@ if echo "$LOGS" | grep -qi "cannot find module.*app"; then
     echo "  /app/app/main.py"
     echo ""
     echo "Check what's in the image:"
-    echo "  docker run --rm smarthing-app:cpu-latest ls -la /app"
-    echo "  docker run --rm smarthing-app:cpu-latest ls -la /app/app"
+    echo "  docker run --rm smartlib-app:cpu-latest ls -la /app"
+    echo "  docker run --rm smartlib-app:cpu-latest ls -la /app/app"
 fi
 
 if echo "$LOGS" | grep -qi "uvicorn.*not found"; then
@@ -164,7 +164,7 @@ if [ -z "$LOGS" ] || [ ${#LOGS} -lt 10 ]; then
     echo "3. Wrong CMD/ENTRYPOINT in Dockerfile"
     echo ""
     echo "Check entrypoint:"
-    echo "  docker inspect smarthing-app:cpu-latest | grep -A5 Entrypoint"
+    echo "  docker inspect smartlib-app:cpu-latest | grep -A5 Entrypoint"
 fi
 
 echo ""
@@ -174,15 +174,15 @@ echo "╚═══════════════════════�
 echo ""
 
 echo "1. Check if entrypoint exists in image:"
-docker run --rm smarthing-app:cpu-latest ls -la /app/docker-entrypoint.sh 2>&1
+docker run --rm smartlib-app:cpu-latest ls -la /app/docker-entrypoint.sh 2>&1
 echo ""
 
 echo "2. Check if app directory exists:"
-docker run --rm smarthing-app:cpu-latest ls -la /app/app 2>&1 | head -10
+docker run --rm smartlib-app:cpu-latest ls -la /app/app 2>&1 | head -10
 echo ""
 
 echo "3. Check Python packages:"
-docker run --rm smarthing-app:cpu-latest pip list 2>&1 | grep -E "fastapi|uvicorn|pydantic" || echo "❌ Key packages missing!"
+docker run --rm smartlib-app:cpu-latest pip list 2>&1 | grep -E "fastapi|uvicorn|pydantic" || echo "❌ Key packages missing!"
 echo ""
 
 echo "╔══════════════════════════════════════════════════════════╗"
@@ -201,5 +201,5 @@ echo "3. Rebuild with correct Dockerfile:"
 echo "   ./rebuild-optimized.sh"
 echo ""
 echo "4. Test interactively:"
-echo "   docker run --rm -it smarthing-app:cpu-latest /bin/bash"
+echo "   docker run --rm -it smartlib-app:cpu-latest /bin/bash"
 echo ""

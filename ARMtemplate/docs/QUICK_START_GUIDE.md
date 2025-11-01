@@ -38,27 +38,11 @@ az deployment group create \
     dataShareName=YOUR_FILE_SHARE \
     storageAccountKey=YOUR_STORAGE_KEY \
     azureEmbeddingDeployment=YOUR_EMBEDDING_DEPLOYMENT \
-    appServicePlanSkuName=B1 \
-    createRoleAssignment=true
-
-# Then deploy worker separately
-az deployment group create \
-  --resource-group YOUR_RG \
-  --template-file ARMtemplate/celery_worker_appservice.json \
-  --parameters \
-    existingRedisName=flaskrag3-app-redis \
-    existingKeyVaultName=YOUR_KEYVAULT_NAME \
-    azureOpenAIKey=YOUR_KEY \
-    azureOpenAIEndpoint=YOUR_ENDPOINT \
-    azureOpenAIDeployment=YOUR_DEPLOYMENT \
-    acrPassword=YOUR_ACR_PASSWORD \
-    APP_CLIENT_ID=YOUR_CLIENT_ID \
-    APP_CLIENT_SECRET=YOUR_SECRET \
-    storageAccountName=YOUR_STORAGE_ACCOUNT \
-    dataShareName=YOUR_FILE_SHARE \
-    storageAccountKey=YOUR_STORAGE_KEY \
-    azureEmbeddingDeployment=YOUR_EMBEDDING_DEPLOYMENT \
+    docIntelligenceEndpoint=YOUR_DOC_INT_ENDPOINT \
+    docIntelligenceKeySecretUri=YOUR_DOC_INT_KEY_SECRET_URI \
     appServicePlanSkuName=B1
+
+
 ```
 
 ---
@@ -106,6 +90,8 @@ az deployment group create \
     dataShareName=YOUR_FILE_SHARE \
     storageAccountKey=YOUR_STORAGE_KEY \
     azureEmbeddingDeployment=YOUR_EMBEDDING_DEPLOYMENT \
+    docIntelligenceEndpoint=YOUR_DOC_INT_ENDPOINT \
+    docIntelligenceKeySecretUri=YOUR_DOC_INT_KEY_SECRET_URI \
     appServicePlanSkuName=B1
 ```
 
@@ -153,6 +139,7 @@ Before deploying, make sure you have:
 - [ ] Parameter file updated with `webDockerImageName` and `workerDockerImageName` matching the pushed tags
 - [ ] Existing Redis Cache (or will create new one)
 - [ ] Existing Key Vault (or will create new one)
+- [ ] Azure Document Intelligence endpoint URL (`docIntelligenceEndpoint`) and Key Vault secret URI for the key (`docIntelligenceKeySecretUri`)
 - [ ] Azure OpenAI resource with deployments (chat + embeddings)
 - [ ] Embedding deployment name for `azureEmbeddingDeployment` (e.g., `text-embedding-3-small`)
 - [ ] App Registration with Client ID and Secret
@@ -180,6 +167,7 @@ Before deploying, make sure you have:
 - ✅ Added: `alwaysOn: true`
 - ✅ Added: `WEBSITES_ENABLE_APP_SERVICE_STORAGE: true`
 - ✅ Added default shared-path app settings (`DATA_VOLUME_PATH`, `UPLOAD_TEMP_DIR`, `MAP_PUBLIC_DIR`, `VECTOR_STORE_BASE_PATH`, `SQLALCHEMY_DATABASE_URI`)
+- ✅ Added Key Vault-driven Azure Document Intelligence app settings (`DOC_INTELLIGENCE_ENDPOINT`, `DOC_INTELLIGENCE_KEY`)
 - ✅ Added: `DOCKER_ENABLE_CI: true`
 
 #### 2. `flask_appservice_template_existing_redis.json` ✅
@@ -191,10 +179,12 @@ Before deploying, make sure you have:
 ### Templates Already Correct:
 
 #### 4. `flask_appservice_template_conditional_kv.json` ✅
-**Status:** No changes needed - already had correct configuration
+**Changes:**
+- ✅ Added Key Vault-driven Azure Document Intelligence app settings so the key never leaves Key Vault
 
 #### 5. `celery_worker_appservice.json` ✅
-**Status:** No changes needed - already had correct configuration
+**Changes:**
+- ✅ Added Key Vault-driven Azure Document Intelligence app settings (`DOC_INTELLIGENCE_ENDPOINT`, `DOC_INTELLIGENCE_KEY`)
 
 ---
 

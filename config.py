@@ -26,17 +26,22 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # Ensure the data directory exists before defining the URI
-    data_dir = os.path.join(basedir, 'data')
+    # Resolve the shared data directory (respect DATA_VOLUME_PATH)
+    data_volume_path = os.environ.get('DATA_VOLUME_PATH')
+    if data_volume_path:
+        data_dir = os.path.abspath(data_volume_path)
+    else:
+        data_dir = os.path.join(basedir, 'data')
     os.makedirs(data_dir, exist_ok=True)
-    print(f"DEBUG: Ensured data directory exists: {data_dir}") # Add debug print
+    DATA_VOLUME_PATH = data_dir
+    print(f"DEBUG: Ensured data directory exists: {DATA_VOLUME_PATH}") # Add debug print
 
-    upload_tmp_dir = os.environ.get('UPLOAD_TEMP_DIR', os.path.join(data_dir, 'tmp_uploads'))
+    upload_tmp_dir = os.environ.get('UPLOAD_TEMP_DIR', os.path.join(DATA_VOLUME_PATH, 'tmp_uploads'))
     os.makedirs(upload_tmp_dir, exist_ok=True)
     UPLOAD_TEMP_DIR = upload_tmp_dir
     print(f"DEBUG: Ensured upload temp directory exists: {UPLOAD_TEMP_DIR}")
 
-    map_public_dir = os.environ.get('MAP_PUBLIC_DIR', os.path.join(data_dir, 'maps'))
+    map_public_dir = os.environ.get('MAP_PUBLIC_DIR', os.path.join(DATA_VOLUME_PATH, 'maps'))
     os.makedirs(map_public_dir, exist_ok=True)
     MAP_PUBLIC_DIR = map_public_dir
     print(f"DEBUG: Ensured map public directory exists: {MAP_PUBLIC_DIR}")
@@ -48,7 +53,7 @@ class Config:
     if VECTOR_STORE_PROVIDER == 'pgvector':
         SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI')
     else:
-        sqlite_path = os.path.join(data_dir, 'app.db')
+        sqlite_path = os.path.join(DATA_VOLUME_PATH, 'app.db')
         uri_env = os.environ.get('SQLALCHEMY_DATABASE_URI')
         if uri_env and uri_env.startswith('sqlite:///'):
             sqlite_target = uri_env.replace('sqlite:///', '', 1)
@@ -106,7 +111,7 @@ class Config:
     
     # --- Vector Store Configuration ---
     # Base path for local vector stores (ChromaDB)    
-    LOCAL_VECTOR_STORE_BASE_PATH = os.environ.get('VECTOR_STORE_BASE_PATH', os.path.join(data_dir, 'chroma'))
+    LOCAL_VECTOR_STORE_BASE_PATH = os.environ.get('VECTOR_STORE_BASE_PATH', os.path.join(DATA_VOLUME_PATH, 'chroma'))
 
     # ChromaDB specific settings
     CHROMA_COLLECTION_NAME = os.environ.get('CHROMA_COLLECTION_NAME', 'documents-vectors') # Default collection name

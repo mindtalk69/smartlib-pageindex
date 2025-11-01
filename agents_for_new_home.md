@@ -44,7 +44,7 @@
    - Enterprise: `SQLALCHEMY_DATABASE_URI=postgresql+psycopg://...`, `PGVECTOR_CONNECTION_STRING=postgresql+psycopg://...`.
    - Shared: Redis URLs, Azure OpenAI keys (placeholder values), Celery settings, feature flags.
 2. Copy `.env.dev` from `flaskrag3` only after redacting secrets (OpenAI keys, client IDs, LangSmith, etc.). Replace with placeholder tokens and move real values to your local untracked `.env.local`.
-3. In `config.py`, rename `SMARTHING_CONFIG_FILE` to `SMARTLIB_CONFIG_FILE` and default to `.env.dev`.
+3. In `config.py`, rename `smartlib_CONFIG_FILE` to `SMARTLIB_CONFIG_FILE` and default to `.env.dev`.
 4. Document how enterprise customers should store secrets with Azure Key Vault and managed identity (`docs/azure_managed_identity_keyvault_guide.md`).
 
 ## 5. Core Application Migration
@@ -52,7 +52,7 @@
 Copy and clean the following files into the new repository root:
 - `app.py`, `main.py` (if still routing requests), `celery_app.py`, `extensions.py`, `config.py`, `geo_utils.py`, `m365_tools.py`, `common_categories_data.md` (converted to JSON if used at runtime).
 - Remove noisy debug prints inside `config.py` and `app.py` before committing.
-- Update any `smarthing` or `flaskrag3` references (module names, logging prefixes, CLI banners) to `smartlib`.
+- Update any `smartlib` or `flaskrag3` references (module names, logging prefixes, CLI banners) to `smartlib`.
 
 ### 5.2 Module curation
 Copy only the actively used modules (skip backups or historical copies):
@@ -79,7 +79,7 @@ Only bring scripts required for deployment/operations. Recommended shortlist:
 ## 6. Templates, Static Assets & Frontend JS
 1. Copy the entire `templates/` tree, including `templates/admin/` and shared layout files like `templates/base.html`, `templates/index.html`, etc.
 2. Copy `static/css`, `static/js`, and `static/img`. Remove obsolete bundles created during experimentation.
-3. Update static references that use `smarthing` or `flaskrag3` naming in JS files (search for `smarthing`, `flaskrag`).
+3. Update static references that use `smartlib` or `flaskrag3` naming in JS files (search for `smartlib`, `flaskrag`).
 4. Make sure admin JS for folder upload (`static/js/admin/admin-folder-upload.js`) is included; it pairs with the Celery tasks documented above.
 
 ## 7. Database & Migrations
@@ -142,7 +142,7 @@ Only bring scripts required for deployment/operations. Recommended shortlist:
    ```
 4. Validate Celery background processing by uploading a sample document and checking worker logs.
 5. Execute `verify_migrations.sh` for both SQLite (Basic) and PostgreSQL (Enterprise).
-6. Review logs to ensure no lingering `flaskrag` or `smarthing` identifiers remain.
+6. Review logs to ensure no lingering `flaskrag` or `smartlib` identifiers remain.
 
 ## 12. Release Checklist
 - Update `docker-compose.yaml` and ARM template `linuxFxVersion` strings with the final registry/image tags (e.g., `smartlib.azurecr.io/web:1.0.0`).

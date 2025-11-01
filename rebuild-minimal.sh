@@ -33,14 +33,14 @@ fi
 
 # Clean up old images
 echo "🧹 Cleaning up old images..."
-docker rmi smarthing-app:cpu-latest smarthing-app:minimal 2>/dev/null || true
+docker rmi smartlib-app:cpu-latest smartlib-app:minimal 2>/dev/null || true
 docker system prune -f || true
 
 # Build optimized image
 echo "🏗️  Building minimal image..."
 DOCKER_BUILDKIT=1 docker build \
     -f "$DOCKERFILE" \
-    -t smarthing-app:minimal \
+    -t smartlib-app:minimal \
     --build-arg REQUIREMENTS_FILE="$REQUIREMENTS_FILE" \
     --target runtime \
     --progress=plain \
@@ -51,20 +51,20 @@ echo ""
 # Analyze size
 echo "📊 Image Analysis:"
 echo "─────────────────────────────────────────────────────────"
-docker images smarthing-app:minimal --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+docker images smartlib-app:minimal --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
 
-SIZE=$(docker images smarthing-app:minimal --format "{{.Size}}")
+SIZE=$(docker images smartlib-app:minimal --format "{{.Size}}")
 echo ""
 echo "🎯 Target for Azure B1: <1.5GB"
 echo "📏 Current size: $SIZE"
 
 # Tag as cpu-latest for deployment
-docker tag smarthing-app:minimal smarthing-app:cpu-latest
+docker tag smartlib-app:minimal smartlib-app:cpu-latest
 
 echo ""
 echo "✅ Build complete!"
 echo ""
 echo "To deploy to Azure:"
 echo "az acr login --name <your-registry>"
-echo "docker tag smarthing-app:cpu-latest <registry>.azurecr.io/smarthing-app:cpu-latest"
-echo "docker push <registry>.azurecr.io/smarthing-app:cpu-latest"
+echo "docker tag smartlib-app:cpu-latest <registry>.azurecr.io/smartlib-app:cpu-latest"
+echo "docker push <registry>.azurecr.io/smartlib-app:cpu-latest"

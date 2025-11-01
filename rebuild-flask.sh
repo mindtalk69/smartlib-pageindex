@@ -75,7 +75,7 @@ echo ""
 
 # Clean up
 echo "3️⃣  Cleaning up old images..."
-docker rmi smarthing-app:cpu-latest 2>/dev/null || echo "No old image to remove"
+docker rmi smartlib-app:cpu-latest 2>/dev/null || echo "No old image to remove"
 echo ""
 
 # Build
@@ -83,7 +83,7 @@ echo "4️⃣  Building Flask image..."
 echo "─────────────────────────────────────────────────────────"
 DOCKER_BUILDKIT=1 docker build \
     -f Dockerfile.cpu \
-    -t smarthing-app:cpu-latest \
+    -t smartlib-app:cpu-latest \
     --progress=plain \
     .
 
@@ -94,7 +94,7 @@ echo ""
 # Check size
 echo "5️⃣  Image size:"
 echo "─────────────────────────────────────────────────────────"
-docker images smarthing-app:cpu-latest --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+docker images smartlib-app:cpu-latest --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
 echo ""
 
 # Verify contents
@@ -102,15 +102,15 @@ echo "6️⃣  Verifying image contents..."
 echo "─────────────────────────────────────────────────────────"
 
 echo "Checking modules/ directory:"
-docker run --rm --entrypoint ls smarthing-app:cpu-latest -la /app/modules/ | head -5
+docker run --rm --entrypoint ls smartlib-app:cpu-latest -la /app/modules/ | head -5
 
 echo ""
 echo "Checking main files:"
-docker run --rm --entrypoint ls smarthing-app:cpu-latest -la /app/*.py | head -5
+docker run --rm --entrypoint ls smartlib-app:cpu-latest -la /app/*.py | head -5
 
 echo ""
 echo "Checking Flask installation:"
-docker run --rm --entrypoint pip smarthing-app:cpu-latest list | grep -i flask
+docker run --rm --entrypoint pip smartlib-app:cpu-latest list | grep -i flask
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════╗"

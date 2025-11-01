@@ -64,12 +64,31 @@ from modules.map_utils import purge_map_assets
 import re # Ensure re is imported
 from sqlalchemy import text # Ensure text is imported
 import traceback
+from urllib.parse import urlparse
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
+
+def purge_legacy_doc_intelligence_key() -> None:
+    """Remove any stored Azure Doc Intelligence keys from AppSettings."""
+    try:
+        legacy_entry = db.session.get(AppSettings, 'doc_intelligence_key')
+        if not legacy_entry:
+            return
+        db.session.delete(legacy_entry)
+        db.session.commit()
+        logging.info("Purged legacy 'doc_intelligence_key' from AppSettings.")
+    except Exception:
+        db.session.rollback()
+        logging.error(
+            "Failed to purge legacy 'doc_intelligence_key' entry:\n%s",
+            traceback.format_exc(),
+        )
+
+
 # --- Custom CSRF error handler for AJAX/API requests ---
 from flask import make_response
-from wtforms import StringField, RadioField, PasswordField, SelectField,HiddenField,StringField
+from wtforms import StringField, RadioField, SelectField, HiddenField
 from wtforms.validators import DataRequired, Optional, URL
 
 @admin_bp.app_errorhandler(CSRFError)
@@ -89,279 +108,9 @@ def handle_csrf_error(e):
 
 def init_admin(app):
     app.register_blueprint(admin_bp)
+    with app.app_context():
+        purge_legacy_doc_intelligence_key()
 
-@admin_bp.before_request
-@login_required
-def check_admin():
-    if not current_user.is_admin:
-        flash('Admin access required', 'danger')
-        return redirect(url_for('index'))
-
-@admin_bp.context_processor
-def inject_theme_and_ocr_flag():
-    # Theme
-    light_theme = request.cookies.get('light_theme') == 'true'
-    # OCR flag: check AppSettings, then os.environ
-    is_enabled_ocr = False
-    try:
-        setting = db.session.get(AppSettings, 'is_enabled_ocr')
-        if setting:
-            is_enabled_ocr = setting.value == '1'
-        else:
-            env_ocr = os.environ.get('IS_ENABLED_OCR', '0')
-            is_enabled_ocr = env_ocr in ['1', 'true', 'True']
-    except Exception:
-        env_ocr = os.environ.get('IS_ENABLED_OCR', '0')
-        is_enabled_ocr = env_ocr in ['1', 'true', 'True']
-    return {'light_theme': light_theme, 'is_enabled_ocr': is_enabled_ocr}
-
-@admin_bp.route('/')
-def dashboard():
-    # Initialize variables with default values
-    user_count = 0
-    file_count = 0
-    message_count = 0
-    library_counts_query = []
-    user_library_counts = []
-    file_url_counts_data = None # Initialize as None
-    user_ref_counts = []
-    library_counts_json = "[]" # Default to valid empty JSON array string
-    user_library_json = "[]"   # Default to valid empty JSON array string
-    file_url_counts_json = "{}" # Default to valid empty JSON object string
-
-    try:
-        user_count = User.query.count()
-        file_count = UploadedFile.query.count()
-        message_count = MessageHistory.query.count()
-
-        # Query for library reference counts by library
-        library_counts_query = db.session.query(
-            Library.name,
-            func.count(LibraryReference.reference_id)
-        ).join(LibraryReference, Library.library_id == LibraryReference.library_id)\
-         .group_by(Library.name)\
-         .order_by(Library.name)\
-         .all()
-        library_counts_data = [list(row) for row in library_counts_query]
-        library_counts_json = json.dumps(library_counts_data)
-
-        # Query for user distribution by library
-        user_library_counts = db.session.query(
-            Library.name,
-            func.count(distinct(LibraryReference.user_id))
-        ).join(LibraryReference, Library.library_id == LibraryReference.library_id)\
-         .group_by(Library.name)\
-         .order_by(Library.name)\
-         .all()
-        user_library_data = [list(row) for row in user_library_counts]
-        user_library_json = json.dumps(user_library_data)
-
-        # Query for file vs URL reference counts
-        file_url_counts = db.session.query(
-            func.sum(case((LibraryReference.reference_type == 'file', 1), else_=0)).label('files'),
-            func.sum(case((LibraryReference.reference_type == 'url_download', 1), else_=0)).label('urls')
-        ).first()
-        file_url_counts_data = dict(file_url_counts._mapping) if file_url_counts else {}
-        file_url_counts_json = json.dumps(file_url_counts_data)
-
-        # Query for library reference counts by user with library relationships
-        user_ref_counts = db.session.query(
-            User.username,
-            Library.name.label('library_name'),
-            func.count(LibraryReference.reference_id).label('total_references'),
-            func.sum(case((LibraryReference.reference_type == 'file', 1), else_=0)).label('file_references'),
-            func.sum(case((LibraryReference.reference_type == 'url_download', 1), else_=0)).label('url_references')
-        ).join(User, LibraryReference.user_id == User.user_id)\
-         .join(Library, LibraryReference.library_id == Library.library_id)\
-         .group_by(User.username, Library.name)\
-         .order_by(User.username, func.count(LibraryReference.reference_id).desc())\
-         .all()
-
-        # --- Knowledge Statistics ---
-        knowledges = Knowledge.query.all()
-        knowledge_stats = []
-        for k in knowledges:
-            file_count = UploadedFile.query.filter_by(knowledge_id=k.id).count()
-            download_count = UrlDownload.query.filter_by(knowledge_id=k.id).count()
-            # LibraryReference may not have knowledge_id, so count libraries associated with this knowledge
-            # If you have a knowledge_libraries association table, use that; otherwise, count unique libraries from files/downloads
-            library_ids = set()
-            for f in UploadedFile.query.filter_by(knowledge_id=k.id):
-                if f.library_id:
-                    library_ids.add(f.library_id)
-            for d in UrlDownload.query.filter_by(knowledge_id=k.id):
-                if d.library_id:
-                    library_ids.add(d.library_id)
-            knowledge_stats.append({
-                "name": k.name,
-                "file_count": file_count,
-                "download_count": download_count,
-                "library_count": len(library_ids)
-            })
-        knowledge_stats_json = json.dumps(knowledge_stats)
-
-    except Exception as e:
-        print(f"Error getting dashboard stats: {e}")
-        flash("Error loading dashboard statistics.", "danger")
-        print(f"Dashboard error caught: {e}")
-
-    return render_template('admin/dashboard.html',
-                          user_count=user_count,
-                          file_count=file_count,
-                          message_count=message_count,
-                          library_counts_query=library_counts_json,
-                          user_library_counts=user_library_json,
-                          file_url_counts=file_url_counts_json,
-                          user_ref_counts=user_ref_counts,
-                          knowledge_stats=knowledge_stats_json)
-
-@admin_bp.route('/settings_vector_store', methods=['GET', 'POST'])
-@login_required
-def settings_vector_store():
-    if not current_user.is_admin:
-        flash('Admin access required', 'danger')
-        return redirect(url_for('index'))
-    from modules.database import AppSettings, Knowledge
-    vector_store_mode = 'user'
-    # Try to read value from DB
-    setting = AppSettings.query.filter_by(key='vector_store_mode').first()
-    if setting:
-        vector_store_mode = setting.value
-    else:
-        # Also check legacy key
-        setting2 = AppSettings.query.filter_by(key='VECTOR_STORE_MODE').first()
-        if setting2:
-            vector_store_mode = setting2.value
-
-    if request.method == 'POST':
-        selected_mode = request.form.get('vector_store_mode')
-        if selected_mode in ['user', 'global', 'knowledge']:
-            # Upsert 'vector_store_mode'
-            setting_new = AppSettings.query.filter_by(key='vector_store_mode').first()
-            if setting_new:
-                setting_new.value = selected_mode
-            else:
-                db.session.add(AppSettings(key='vector_store_mode', value=selected_mode))
-
-            # Upsert 'VECTOR_STORE_MODE' (legacy)
-            setting_legacy = AppSettings.query.filter_by(key='VECTOR_STORE_MODE').first()
-            if setting_legacy:
-                setting_legacy.value = selected_mode
-            else:
-                db.session.add(AppSettings(key='VECTOR_STORE_MODE', value=selected_mode))
-            
-            db.session.commit()
-            vector_store_mode = selected_mode
-            flash(f"Vector store mode updated to '{selected_mode}'", 'success')
-        else:
-            flash("Invalid vector store mode selected.", "danger")
-    # Reload app.config after update to reflect changes immediately
-    settings_query = AppSettings.query.filter(AppSettings.key.in_([
-        'visual_grounding_enabled',
-        'visual_grounding_doc_store_path',
-        'vector_store_mode',
-        'VECTOR_STORE_MODE'
-    ])).all()
-    settings = {s.key: s.value for s in settings_query}
-    current_app.config['VISUAL_GROUNDING_ENABLED'] = settings.get('visual_grounding_enabled', 'false').lower() == 'true'
-    current_app.config['VISUAL_GROUNDING_DOC_STORE_PATH'] = settings.get('visual_grounding_doc_store_path', 'data/doc_store')
-    # Support both key types (for older or newer code)
-    current_app.config['VECTOR_STORE_MODE'] = settings.get('vector_store_mode', settings.get('VECTOR_STORE_MODE', 'user'))
-    # Now proceed with normal rendering
-    knowledges = Knowledge.query.order_by(Knowledge.name).all()
-    from modules.forms import DummyForm
-    form = DummyForm()
-    return render_template("admin/settings_vector_store.html",
-        form=form, vector_store_mode=vector_store_mode, knowledges=knowledges)
-@admin_bp.route('/prompts', endpoint='prompt_management')
-def prompt_management():
-    from modules.database import LLMPrompt
-    prompts = LLMPrompt.query.order_by(LLMPrompt.name).all()
-    # Serialize only the needed fields to avoid InstanceState error
-    prompts_json = [
-        {
-            'id': p.id,
-            'name': p.name,
-            'description': p.description,
-            'content': p.content,
-            'is_active': p.is_active
-        }
-        for p in prompts
-    ]
-    return render_template(
-        'admin/prompts.html',
-        prompts=prompts,
-        prompts_json=prompts_json
-    )
-
-@admin_bp.route('/prompts/save', methods=['POST'])
-def save_prompt():
-    if not request.is_json:
-        return jsonify({"status": "error", "message": "Request must be JSON"}), 400
-    
-    data = request.get_json()
-    prompt_id = data.get('id')
-    name = data.get('name')
-    description = data.get('description')
-    content = data.get('content')
-    is_active = data.get('is_active', False)
-
-    if not name or not content:
-        return jsonify({"status": "error", "message": "Name and content are required"}), 400
-
-    try:
-        if prompt_id:
-            # Update existing prompt
-            prompt = db.session.get(LLMPrompt, prompt_id)
-            if not prompt:
-                return jsonify({"status": "error", "message": "Prompt not found"}), 404
-            
-            prompt.name = name
-            prompt.description = description
-            prompt.content = content
-            prompt.is_active = is_active
-        else:
-            # Create new prompt
-            prompt = LLMPrompt(
-                name=name,
-                description=description,
-                content=content,
-                is_active=is_active
-            )
-            db.session.add(prompt)
-        
-        db.session.commit()
-        return jsonify({
-            "status": "success",
-            "message": "Prompt saved successfully",
-            "prompt": {
-                "id": prompt.id,
-                "name": prompt.name,
-                "description": prompt.description,
-                "content": prompt.content,
-                "is_active": prompt.is_active
-            }
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({
-            "status": "error", 
-            "message": f"Error saving prompt: {str(e)}"
-        }), 500
-@admin_bp.route('/users')
-def user_management():
-    try:
-        users = User.query.order_by(User.username).all()
-    except Exception as e:
-        print(f"Error fetching users: {e}")
-        flash("Error loading user list.", "danger")
-        users = []
-    return render_template('admin/users.html', users=users)
-
-# Register blueprint for user groups
-from modules.admin_user_groups import user_groups_bp
-def init_admin(app):
-    app.register_blueprint(admin_bp)
     app.register_blueprint(user_groups_bp)
     from modules.admin_groups import groups_bp
     app.register_blueprint(groups_bp, url_prefix='/admin/groups')
@@ -1186,11 +935,37 @@ class SettingsForm(FlaskForm):
         'OCR Mode',
         choices=[('azure', 'Azure Document Intelligence'), ('default', 'Default')],
         default='default',
-        validators=[DataRequired()]
+        validators=[DataRequired()],
     )
-    endpoint = StringField('Azure Document Intelligence Endpoint', validators=[Optional()])
-    key = PasswordField('Azure Document Intelligence Key', validators=[Optional()])
+    endpoint = StringField(
+        'Azure Document Intelligence Endpoint',
+        validators=[Optional(), URL(require_tld=True, message="Provide a valid https endpoint.")],
+    )
     dummy = HiddenField('dummy')  # Retain dummy for compatibility
+
+    def validate(self, extra_validators=None):
+        if self.endpoint.data:
+            self.endpoint.data = self.endpoint.data.strip()
+
+        is_valid = super().validate(extra_validators=extra_validators)
+        if not is_valid:
+            return False
+
+        if self.ocr_mode.data == 'azure':
+            if not self.endpoint.data:
+                self.endpoint.errors.append(
+                    'Endpoint is required when Azure Document Intelligence is selected.',
+                )
+                is_valid = False
+            else:
+                parsed = urlparse(self.endpoint.data)
+                if parsed.scheme != 'https' or not parsed.netloc:
+                    self.endpoint.errors.append(
+                        'Endpoint must start with https:// and include a valid host.',
+                    )
+                    is_valid = False
+
+        return is_valid
 
 # --- Visual Grounding Settings Route ---
 @admin_bp.route('/settings/visual_grounding', methods=['GET', 'POST'])
@@ -1288,13 +1063,14 @@ def ocr_settings():
     form = SettingsForm()
     # Load current settings from AppSettings
     try:
-        settings_query = AppSettings.query.filter(AppSettings.key.in_([
-            'is_enabled_ocr',
-            'is_auto_ocr',
-            'ocr_mode',
-            'doc_intelligence_endpoint',
-            'doc_intelligence_key'
-        ])).all()
+        settings_query = AppSettings.query.filter(
+            AppSettings.key.in_([
+                'is_enabled_ocr',
+                'is_auto_ocr',
+                'ocr_mode',
+                'doc_intelligence_endpoint',
+            ])
+        ).all()
         settings = {s.key: s.value for s in settings_query}
         # Set defaults if not found, and check env for IS_ENABLED_OCR
         if 'is_enabled_ocr' not in settings:
@@ -1303,7 +1079,6 @@ def ocr_settings():
         settings.setdefault('is_auto_ocr', '0')
         settings.setdefault('ocr_mode', 'default')
         settings.setdefault('doc_intelligence_endpoint', '')
-        settings.setdefault('doc_intelligence_key', '')
     except Exception as e:
         logging.error(f"Error fetching OCR settings: {traceback.format_exc()}")
         flash('Error loading OCR settings.', 'danger')
@@ -1311,8 +1086,14 @@ def ocr_settings():
             'is_enabled_ocr': '0',
             'ocr_mode': 'default',
             'doc_intelligence_endpoint': '',
-            'doc_intelligence_key': ''
         }
+
+    legacy_key_setting = db.session.get(AppSettings, 'doc_intelligence_key')
+    key_env_available = bool(
+        os.environ.get('DOC_INTELLIGENCE_KEY')
+        or os.environ.get('AZURE_DOCUMENT_INTELLIGENCE_KEY')
+    )
+    legacy_key_present = bool(legacy_key_setting and legacy_key_setting.value)
 
     if form.validate_on_submit():
         try:
@@ -1320,21 +1101,27 @@ def ocr_settings():
             is_auto_ocr = request.form.get('is_auto_ocr', '0')
             ocr_mode = form.ocr_mode.data
             endpoint = form.endpoint.data or ''
-            # --- MODIFICATION START ---
-            # Get the submitted key value. DO NOT use 'or '' here yet.
-            submitted_key = form.key.data
-            # --- MODIFICATION END ---
 
-            # Prepare settings to update, excluding the key initially
+            if ocr_mode == 'azure':
+                key_available = bool(
+                    os.environ.get('DOC_INTELLIGENCE_KEY')
+                    or os.environ.get('AZURE_DOCUMENT_INTELLIGENCE_KEY')
+                )
+                if not key_available:
+                    flash(
+                        'Configure DOC_INTELLIGENCE_KEY as a Key Vault reference before '
+                        'enabling Azure Document Intelligence.',
+                        'danger',
+                    )
+                    return redirect(url_for('admin.ocr_settings'))
+
             settings_to_update = {
                 'is_enabled_ocr': is_enabled_ocr,
                 'is_auto_ocr': is_auto_ocr,
                 'ocr_mode': ocr_mode,
                 'doc_intelligence_endpoint': endpoint,
-                # Key is handled conditionally below
             }
 
-            # Update non-key settings
             for key_name, value in settings_to_update.items():
                 setting = db.session.get(AppSettings, key_name)
                 if setting:
@@ -1343,64 +1130,39 @@ def ocr_settings():
                     new_setting = AppSettings(key=key_name, value=value)
                     db.session.add(new_setting)
 
-            # --- MODIFICATION START ---
-            # Conditionally update the key ONLY if a new value was submitted
-            if submitted_key: # Check if the user entered something in the key field
-                key_setting = db.session.get(AppSettings, 'doc_intelligence_key')
-                if key_setting:
-                    key_setting.value = submitted_key
-                else:
-                    new_key_setting = AppSettings(key='doc_intelligence_key', value=submitted_key)
-                    db.session.add(new_key_setting)
-                logging.info("Azure Document Intelligence Key was updated.")
-                # Update live config for the key as well
-                current_app.config['DOC_INTELLIGENCE_KEY'] = submitted_key
-            else:
-                # If submitted_key is empty, DO NOTHING to the database key entry.
-                # The existing value remains.
-                logging.info("Azure Document Intelligence Key field was empty, database value preserved.")
-                # Ensure live config reflects the potentially existing key from DB
-                # (It might have been loaded initially, but good to be explicit)
-                existing_db_key = settings.get('doc_intelligence_key', '')
-                current_app.config['DOC_INTELLIGENCE_KEY'] = existing_db_key
-
-            # --- MODIFICATION END ---
+            if legacy_key_setting:
+                db.session.delete(legacy_key_setting)
+                legacy_key_present = False
 
             db.session.commit()
 
-            # Update live app config for non-key settings
             current_app.config['IS_ENABLED_OCR'] = is_enabled_ocr == '1'
             current_app.config['IS_AUTO_OCR'] = is_auto_ocr == '1'
             current_app.config['OCR_MODE'] = ocr_mode
             current_app.config['DOC_INTELLIGENCE_ENDPOINT'] = endpoint
-            # DOC_INTELLIGENCE_KEY is updated conditionally above
+            current_app.config['DOC_INTELLIGENCE_KEY'] = (
+                os.environ.get('DOC_INTELLIGENCE_KEY')
+                or os.environ.get('AZURE_DOCUMENT_INTELLIGENCE_KEY')
+            )
 
             flash('OCR settings updated successfully.', 'success')
         except Exception as e:
             db.session.rollback()
             logging.error(f"Error updating OCR settings: {traceback.format_exc()}")
             flash(f'An error occurred while saving OCR settings: {str(e)}', 'danger')
-        # Redirect after successful POST or if validation fails (handled by validate_on_submit)
         return redirect(url_for('admin.ocr_settings'))
 
-    # Pre-fill form fields with current values
     if request.method == 'GET':
         form.ocr_mode.data = settings.get('ocr_mode', 'default')
         form.endpoint.data = settings.get('doc_intelligence_endpoint', '')
-        # Mask the key field if a key exists
-        if settings.get('doc_intelligence_key', ''):
-            form.key.data = ''
-            key_placeholder = '******************'
-        else:
-            form.key.data = ''
-            key_placeholder = ''
 
     return render_template(
         'admin/settings_ocr.html',
         form=form,
         is_enabled_ocr=settings.get('is_enabled_ocr', '0') == '1',
         is_auto_ocr=settings.get('is_auto_ocr', '0') == '1',
-        key_placeholder=locals().get('key_placeholder', '')
+        key_env_available=key_env_available,
+        legacy_key_present=legacy_key_present,
     )
 # --- Reset Global Vector Store Route ---
 @admin_bp.route('/reset_global_vector_store', methods=['POST'])

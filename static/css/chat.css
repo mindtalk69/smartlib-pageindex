@@ -542,6 +542,8 @@
   background: none !important;
   border: none !important;
   box-shadow: none !important;
+  position: relative;
+  z-index: 2100; /* Ensure it sits above placeholder animations */
 }
 
 /* Hide any title/heading in self-retriever-context */

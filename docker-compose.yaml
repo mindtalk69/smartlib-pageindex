@@ -27,11 +27,12 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - VECTOR_STORE_PROVIDER=chromadb
-      - DEFAULT_EMBEDDING_MODEL=all-MiniLM-L6-v2
+      - DEFAULT_EMBEDDING_MODEL=text-embedding-3-small
       - EMBEDDING_WARMUP_ENABLED=false
       - AGENT_TASK_TIMEOUT=240
       - GUNICORN_TIMEOUT=240
       - PYTHONPATH=/app
+      - IS_ENABLED_OCR=1
     command: ["web"]
     depends_on:
       redis:
@@ -51,7 +52,7 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - VECTOR_STORE_PROVIDER=chromadb
-      - DEFAULT_EMBEDDING_MODEL=all-MiniLM-L6-v2
+      - DEFAULT_EMBEDDING_MODEL=text-embedding-3-small
       - EMBEDDING_WARMUP_ENABLED=false
       - AGENT_TASK_TIMEOUT=240
       - PYTHONPATH=/app

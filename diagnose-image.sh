@@ -3,7 +3,7 @@
 # Image Size Diagnostic Tool
 set -e
 
-IMAGE_NAME="smarthing-app:cpu-latest"
+IMAGE_NAME="smartlib-app:cpu-latest"
 
 echo "╔══════════════════════════════════════════════════════════╗"
 echo "║         Docker Image Size Diagnostic Tool                ║"
@@ -110,7 +110,7 @@ echo "Common Issues to Check:"
 echo ""
 
 echo "1. Are you using Dockerfile.cpu?"
-echo "   Build with: docker build -f Dockerfile.cpu -t smarthing-app:cpu-latest ."
+echo "   Build with: docker build -f Dockerfile.cpu -t smartlib-app:cpu-latest ."
 echo ""
 
 echo "2. Do you have large files in your directory?"
@@ -132,11 +132,11 @@ echo "║                     QUICK FIXES                          ║"
 echo "╚══════════════════════════════════════════════════════════╝"
 echo ""
 echo "# 1. Ensure using optimized Dockerfile"
-echo "docker build -f Dockerfile.cpu -t smarthing-app:cpu-latest ."
+echo "docker build -f Dockerfile.cpu -t smartlib-app:cpu-latest ."
 echo ""
 echo "# 2. Clean up and rebuild"
 echo "docker system prune -a --volumes -f"
-echo "docker build -f Dockerfile.cpu -t smarthing-app:cpu-latest ."
+echo "docker build -f Dockerfile.cpu -t smartlib-app:cpu-latest ."
 echo ""
 echo "# 3. Check what's being copied"
 echo "cat .dockerignore"

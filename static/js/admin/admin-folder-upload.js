@@ -16,8 +16,96 @@ document.addEventListener("DOMContentLoaded", function () {
   // Set initial state
   scheduleTimeGroup.style.display = backgroundEnabled.checked ? "block" : "none";
 
+  function escapeHtml(value) {
+    if (typeof value !== "string") {
+      return "";
+    }
+    return value.replace(/[&<>"']/g, function (char) {
+      const escapeMap = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      };
+      return escapeMap[char] || char;
+    });
+  }
+
+  function deriveFolderLabel(fileList) {
+    if (!Array.isArray(fileList) || !fileList.length) {
+      return "—";
+    }
+
+    const folderSet = new Set();
+    const singleFileNames = [];
+
+    fileList.forEach((item) => {
+      if (!item || typeof item !== "object") {
+        return;
+      }
+      let candidate = "";
+      if (typeof item.filename === "string" && item.filename) {
+        candidate = item.filename;
+      } else if (typeof item.path === "string" && item.path) {
+        const parts = item.path.replace(/\\/g, "/").split("/");
+        candidate = parts.pop() || "";
+      }
+
+      if (!candidate) {
+        return;
+      }
+
+      const normalized = candidate.replace(/\\/g, "/");
+      const segments = normalized.split("/").filter(Boolean);
+
+      if (segments.length > 1) {
+        folderSet.add(segments[0]);
+      } else if (segments.length === 1) {
+        singleFileNames.push(segments[0]);
+      }
+    });
+
+    if (folderSet.size === 1) {
+      return [...folderSet][0];
+    }
+    if (folderSet.size > 1) {
+      return "Multiple folders";
+    }
+    if (fileList.length > 1) {
+      return "Multiple files";
+    }
+    if (singleFileNames.length === 1) {
+      return singleFileNames[0];
+    }
+    return "—";
+  }
+
   // Handle form submission
   const form = document.getElementById("folder-upload-form");
+  const submitButton = form.querySelector('button[type="submit"]');
+  const originalButtonContent = submitButton ? submitButton.innerHTML : "";
+  const loadingButtonContent =
+    '<span class="spinner-border spinner-border-sm me-2" role="status" ' +
+    'aria-hidden="true"></span>Scheduling...';
+  const originalBodyCursor = document.body.style.cursor || "";
+
+  function setLoadingState(isLoading) {
+    if (!submitButton) {
+      return;
+    }
+
+    if (isLoading) {
+      submitButton.disabled = true;
+      submitButton.innerHTML = loadingButtonContent;
+      document.body.style.cursor = "progress";
+    } else {
+      submitButton.disabled = false;
+      submitButton.innerHTML = originalButtonContent;
+      document.body.style.cursor = originalBodyCursor;
+    }
+  }
+
   form.addEventListener("submit", function (e) {
     e.preventDefault();
 
@@ -75,6 +163,8 @@ document.addEventListener("DOMContentLoaded", function () {
       console.log("FormData key:", key, "value:", formData.getAll(key));
     }
 
+    setLoadingState(true);
+
     // AJAX POST to upload endpoint
     fetch("/admin/folder_upload/upload", {
       method: "POST",
@@ -99,6 +189,9 @@ document.addEventListener("DOMContentLoaded", function () {
       .catch((error) => {
         console.error('Upload error:', error);
         alert(`Upload failed: ${error.message}`);
+      })
+      .finally(() => {
+        setLoadingState(false);
       });
   });
 
@@ -113,26 +206,37 @@ document.addEventListener("DOMContentLoaded", function () {
           return;
         }
         let html = "<table class='table table-sm table-bordered align-middle'><thead><tr>";
-        // Change header from Log to Actions
-        html += "<th>ID</th><th>Created</th><th>Status</th><th>Scheduled</th><th>Files</th><th>Actions</th></tr></thead><tbody>";
+        html += "<th>ID</th><th>Folder</th><th>Created</th><th>Status</th><th>Scheduled</th><th>Files</th><th>Actions</th></tr></thead><tbody>";
         jobs.forEach((job) => {
           // Format dates to local time string
           const createdAtLocal = job.created_at ? new Date(job.created_at).toLocaleString() : "";
           const scheduledTimeLocal = job.scheduled_time ? new Date(job.scheduled_time).toLocaleString() : "";
 
+          let parsedFileList = [];
+          if (job.file_list) {
+            try {
+              parsedFileList = JSON.parse(job.file_list) || [];
+            } catch (error) {
+              console.error("Failed to parse job file list", job.id, error);
+              parsedFileList = [];
+            }
+          }
+          const fileCount = Array.isArray(parsedFileList) ? parsedFileList.length : 0;
+          const folderLabel = deriveFolderLabel(parsedFileList);
+
           // Determine if the job is cancellable
-          const isCancellable = job.task_id && ['pending', 'scheduled', 'running'].includes(job.status);
+          const isCancellable = job.task_id && ["pending", "scheduled", "running"].includes(job.status);
           const cancelButtonHtml = isCancellable
             ? `<button class="btn btn-danger btn-sm" onclick="cancelJob(${job.id})">Cancel</button>`
             : `<button class="btn btn-secondary btn-sm" disabled>Cancel</button>`; // Disabled if not cancellable
 
           html += "<tr>";
           html += `<td>${job.id}</td>`;
-          html += `<td>${createdAtLocal}</td>`;
-          html += `<td>${job.status || ""}</td>`;
-          html += `<td>${scheduledTimeLocal}</td>`;
-          html += `<td>${job.file_list ? JSON.parse(job.file_list).length : 0}</td>`;
-          // Add Cancel button instead of View Log
+          html += `<td>${escapeHtml(folderLabel)}</td>`;
+          html += `<td>${escapeHtml(createdAtLocal)}</td>`;
+          html += `<td>${escapeHtml(job.status || "")}</td>`;
+          html += `<td>${escapeHtml(scheduledTimeLocal)}</td>`;
+          html += `<td>${fileCount}</td>`;
           html += `<td>${cancelButtonHtml}</td>`;
           html += "</tr>";
         });

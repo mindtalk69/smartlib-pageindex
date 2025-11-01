@@ -2181,6 +2181,33 @@ def resume_agent_graph(
 
 # --- Invocation Logic ---
 
+def _looks_like_structured_query_blob(text: str) -> bool:
+    """Return True if the streamed text is the transient structured query payload."""
+    if not text:
+        return False
+    stripped = text.strip()
+    if not (stripped.startswith("{") and stripped.endswith("}")):
+        return False
+    try:
+        data = json.loads(stripped)
+    except Exception:
+        return False
+    if not isinstance(data, dict):
+        return False
+    allowed_keys = {
+        "query",
+        "filter",
+        "filter_json",
+        "filter_context",
+        "structured_query",
+        "sql",
+        "metadata",
+        "top_k",
+    }
+    # If the blob only contains the allowed structured-query keys, treat it as a transient artifact
+    return set(data.keys()).issubset(allowed_keys)
+
+
 async def _collect_stream_chunks(graph, inputs, config):
     """Helper to collect chunks from an async stream into a single response structure."""
     final_response_obj = {
@@ -2234,6 +2261,9 @@ async def _collect_stream_chunks(graph, inputs, config):
             if kind == "on_chat_model_stream":
                 content = chunk_event["data"]["chunk"].content
                 if content:
+                    if _looks_like_structured_query_blob(content):
+                        logging.debug("[_collect_stream_chunks] Skipping structured-query chunk: %s", content)
+                        continue
                     full_streamed_content += content
                     yield f"data: {json.dumps({'type': 'text_chunk', 'content': content})}\n\n"
             

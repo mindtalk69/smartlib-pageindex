@@ -14,7 +14,11 @@ function getConversationId() {
     // console.log('[QueryFormJS] getConversationId: Tried loading from localStorage, found:', convId);
 
     if (!convId) {
-        convId = self.crypto.randomUUID();
+        if (typeof self.crypto !== 'undefined' && typeof self.crypto.randomUUID === 'function') {
+            convId = self.crypto.randomUUID();
+        } else {
+            convId = 'conv-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        }
         localStorage.setItem('chatConversationId', convId);
         console.log('[QueryFormJS] New conversation ID generated and stored in localStorage:', convId);
     }

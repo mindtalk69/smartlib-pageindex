@@ -42,11 +42,22 @@
       <div id="azureFields" style="display: none;">
         <div class="mb-3">
           <label class="form-label" for="endpoint">Azure Document Intelligence Endpoint</label>
-          {{ form.endpoint(class="form-control", id="endpoint", placeholder="your azure doc Intelligence service Endpoint (https://...)") }}
+          {{ form.endpoint(class="form-control", id="endpoint", placeholder="https://<resource-name>.cognitiveservices.azure.com/") }}
         </div>
-        <div class="mb-3">
-          <label class="form-label" for="key">Azure Document Intelligence Key</label>
-          {{ form.key(class="form-control", id="key", placeholder=key_placeholder) }}
+        <div class="alert alert-info small" role="note">
+          <p class="mb-1">
+            Manage the Azure Document Intelligence key via Azure Key Vault. Set the App Service
+            setting <code>DOC_INTELLIGENCE_KEY</code> to a Key Vault reference such as
+            <code>@Microsoft.KeyVault(SecretUri=https://&lt;vault&gt;.vault.azure.net/secrets/&lt;secret&gt;/&lt;version&gt;)</code>.
+          </p>
+          {% if key_env_available %}
+          <span class="text-success">Key Vault reference detected in the current configuration.</span>
+          {% else %}
+          <span class="text-warning">No Key Vault reference detected. Update the App Service setting before enabling Azure mode.</span>
+          {% endif %}
+          {% if legacy_key_present %}
+          <span class="text-danger d-block mt-1">A legacy key stored in the database will be removed when you save these settings.</span>
+          {% endif %}
         </div>
       </div>
     </div>
