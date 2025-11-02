@@ -181,9 +181,7 @@
                     <a href="{{ url_for('admin.visual_grounding_settings') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin.visual_grounding_settings' %}active{% endif %}">
                       <i class="fas fa-cog me-2"></i>Visual Grounding Settings
                     </a>
-                    <a href="{{ url_for('admin.prompt_management') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin.prompt_management' %}active{% endif %}">
-                      <i class="fas fa-terminal me-2"></i>Prompts
-                    </a>
+                    <!-- Prompts management temporarily disabled; awaiting admin.prompt_management endpoint -->
                     <a href="{{ url_for('admin_models.model_management') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_models.model_management' %}active{% endif %}">
                       <i class="fas fa-cogs me-2"></i>Models
                     </a>

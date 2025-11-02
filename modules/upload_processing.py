@@ -140,8 +140,24 @@ def process_uploaded_file(
         is_enabled_ocr_setting = AppSettings.query.filter_by(key='is_enabled_ocr').first()
         selected_ocr_setting = AppSettings.query.filter_by(key='ocr_mode').first()
         IS_AUTO_OCR = is_auto_ocr_setting.value == '1' if is_auto_ocr_setting else False
-        IS_ENABLED_OCR = is_enabled_ocr_setting.value == '1' if is_enabled_ocr_setting else False
-        IS_OCR_LOCAL = selected_ocr_setting.value == 'default' if selected_ocr_setting else False
+        IS_ENABLED_OCR = (
+            is_enabled_ocr_setting.value == '1'
+            if is_enabled_ocr_setting
+            else bool(app_config.get('IS_ENABLED_OCR', False))
+        )
+        IS_OCR_LOCAL = (
+            selected_ocr_setting.value == 'default'
+            if selected_ocr_setting
+            else app_config.get('OCR_MODE', 'default') == 'default'
+        )
+    else:
+        IS_AUTO_OCR = bool(app_config.get('IS_AUTO_OCR', False)) if app_config else False
+        IS_ENABLED_OCR = bool(app_config.get('IS_ENABLED_OCR', False)) if app_config else False
+        IS_OCR_LOCAL = (
+            app_config.get('OCR_MODE', 'default') == 'default'
+            if app_config
+            else True
+        )
 
     # --- Visual Grounding Save DoclingDocument ---
     IS_VISUAL_GROUNDING_COMPLETED = False

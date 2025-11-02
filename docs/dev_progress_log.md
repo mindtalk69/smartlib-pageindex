@@ -1,5 +1,14 @@
 # SmartLib Dev Progress Log
 
+## 2025-11-02 – Key Vault OCR Alignment & Admin Fixes
+- Restored `/admin` redirect and dashboard view, wiring an OCR context processor and `@login_required` guard so the menu reflects feature flags.
+- Updated `app.py` to prioritize `AppSettings` for OCR flags with env fallbacks and logging, keeping Celery and portal toggles consistent after restarts.
+- Ensured `modules/upload_processing.py` falls back to `app.config` when OCR settings are missing, so ingestion auto-enables azure mode once env vars are set.
+- Synced OCR environment flags back into `AppSettings` when provided, so ARM deployments keep `IS_ENABLED_OCR` without manual toggles.
+- Defaulted storage paths to `/home/data` (when writable) across config and admin folder uploads so Azure File shares stay mounted; this eliminated SQLite disk I/O errors on worker jobs when DATA_VOLUME_PATH isn’t explicitly set.
+- **Next:** Recreate the Document Intelligence secret with hyphenated names, update App Service references, and confirm managed identity access to clear worker 401s.
+
+
 ## 2025-10-31 – Azure Files Shared Storage
 - Updated all App Service ARM templates to add Azure Files parameters and mount `/home/data` so worker and web containers share uploads, maps, and vector assets.
 - Refreshed `ARMtemplate/docs/QUICK_START_GUIDE.md` deployment commands to include `storageAccountName`, `dataShareName`, and `storageAccountKey`, and called out the new storage prerequisite in the checklist.

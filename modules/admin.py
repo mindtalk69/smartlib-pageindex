@@ -57,7 +57,8 @@ from modules.database import (
     get_active_llm_languages,
     VisualGroundingActivity,  # Added for reset functionality
     FolderUploadJob,         # Added for reset functionality
-    Document                 # Added for reset functionality
+    Document,                # Added for reset functionality
+    knowledge_libraries_association,
 )
 from modules.llm_utils import generate_simple_text
 from modules.map_utils import purge_map_assets
@@ -67,6 +68,187 @@ import traceback
 from urllib.parse import urlparse
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
+
+
+@admin_bp.context_processor
+def inject_admin_flags():
+    flag = current_app.config.get('IS_ENABLED_OCR', False)
+    if isinstance(flag, str):
+        flag = flag.lower() in ('1', 'true', 'yes')
+    return {
+        'is_enabled_ocr': bool(flag),
+        'ocr_mode': current_app.config.get('OCR_MODE', 'default'),
+        'is_auto_ocr': current_app.config.get('IS_AUTO_OCR', False),
+    }
+
+
+@admin_bp.route('/')
+@login_required
+def admin_root():
+    if not current_user.is_admin:
+        flash('Admin access required', 'danger')
+        return redirect(url_for('index'))
+    return redirect(url_for('admin.dashboard'))
+
+
+@admin_bp.route('/dashboard', endpoint='dashboard')
+@login_required
+def admin_dashboard():
+    if not current_user.is_admin:
+        flash('Admin access required', 'danger')
+        return redirect(url_for('index'))
+
+    current_app.logger.info(
+        'admin_dashboard context: IS_ENABLED_OCR=%s, OCR_MODE=%s',
+        current_app.config.get('IS_ENABLED_OCR'),
+        current_app.config.get('OCR_MODE'),
+    )
+
+    user_count = db.session.query(func.count(User.user_id)).scalar() or 0
+    file_count = db.session.query(func.count(UploadedFile.file_id)).scalar() or 0
+    message_count = (
+        db.session.query(func.count(MessageHistory.message_id)).scalar() or 0
+    )
+
+    library_reference_counts = (
+        db.session.query(
+            Library.name,
+            func.count(LibraryReference.reference_id),
+        )
+        .join(LibraryReference, LibraryReference.library_id == Library.library_id)
+        .group_by(Library.library_id, Library.name)
+        .order_by(func.count(LibraryReference.reference_id).desc())
+        .all()
+    )
+    library_chart_data = [
+        [library_name or 'Unassigned', ref_count]
+        for library_name, ref_count in library_reference_counts
+        if ref_count
+    ]
+
+    user_library_distribution = (
+        db.session.query(
+            Library.name,
+            func.count(distinct(LibraryReference.user_id)),
+        )
+        .join(LibraryReference, LibraryReference.library_id == Library.library_id)
+        .group_by(Library.library_id, Library.name)
+        .having(func.count(distinct(LibraryReference.user_id)) > 0)
+        .order_by(func.count(distinct(LibraryReference.user_id)).desc())
+        .all()
+    )
+    user_library_chart_data = [
+        [library_name or 'Unassigned', user_count]
+        for library_name, user_count in user_library_distribution
+        if user_count
+    ]
+
+    reference_type_counts = {
+        'files': 0,
+        'urls': 0,
+    }
+    for ref_type, ref_count in (
+        db.session.query(
+            LibraryReference.reference_type,
+            func.count(LibraryReference.reference_id),
+        )
+        .group_by(LibraryReference.reference_type)
+        .all()
+    ):
+        if ref_type == 'file':
+            reference_type_counts['files'] = ref_count
+        elif ref_type == 'url_download':
+            reference_type_counts['urls'] = ref_count
+
+    file_counts_by_knowledge = dict(
+        db.session.query(
+            UploadedFile.knowledge_id,
+            func.count(UploadedFile.file_id),
+        )
+        .filter(UploadedFile.knowledge_id.isnot(None))
+        .group_by(UploadedFile.knowledge_id)
+        .all()
+    )
+    download_counts_by_knowledge = dict(
+        db.session.query(
+            UrlDownload.knowledge_id,
+            func.count(UrlDownload.download_id),
+        )
+        .filter(UrlDownload.knowledge_id.isnot(None))
+        .group_by(UrlDownload.knowledge_id)
+        .all()
+    )
+    knowledge_library_counts = dict(
+        db.session.query(
+            knowledge_libraries_association.c.knowledge_id,
+            func.count(distinct(knowledge_libraries_association.c.library_id)),
+        )
+        .group_by(knowledge_libraries_association.c.knowledge_id)
+        .all()
+    )
+    knowledge_stats = []
+    for knowledge in Knowledge.query.order_by(Knowledge.name).all():
+        knowledge_stats.append(
+            {
+                'name': knowledge.name,
+                'file_count': file_counts_by_knowledge.get(knowledge.id, 0),
+                'download_count': download_counts_by_knowledge.get(
+                    knowledge.id, 0
+                ),
+                'library_count': knowledge_library_counts.get(knowledge.id, 0),
+            }
+        )
+
+    user_reference_rows = (
+        db.session.query(
+            User.username,
+            Library.name,
+            func.count(LibraryReference.reference_id).label('total_refs'),
+            func.sum(
+                case((LibraryReference.reference_type == 'file', 1), else_=0)
+            ).label('file_refs'),
+            func.sum(
+                case((LibraryReference.reference_type == 'url_download', 1), else_=0)
+            ).label('url_refs'),
+        )
+        .join(LibraryReference, LibraryReference.user_id == User.user_id)
+        .join(Library, Library.library_id == LibraryReference.library_id)
+        .group_by(User.username, Library.name)
+        .order_by(func.count(LibraryReference.reference_id).desc())
+        .limit(25)
+        .all()
+    )
+    user_reference_stats = [
+        {
+            'username': username,
+            'library_name': library_name or 'Unassigned',
+            'total_references': total_refs or 0,
+            'file_references': file_refs or 0,
+            'url_references': url_refs or 0,
+        }
+        for (
+            username,
+            library_name,
+            total_refs,
+            file_refs,
+            url_refs,
+        ) in user_reference_rows
+    ]
+
+    light_theme = request.cookies.get('light_theme') == 'true'
+
+    return render_template(
+        'admin/dashboard.html',
+        user_count=user_count,
+        file_count=file_count,
+        message_count=message_count,
+        library_counts_query=json.dumps(library_chart_data),
+        user_library_counts=json.dumps(user_library_chart_data),
+        file_url_counts=json.dumps(reference_type_counts),
+        knowledge_stats=json.dumps(knowledge_stats),
+        user_ref_counts=user_reference_stats,
+        light_theme=light_theme,
+    )
 
 
 def purge_legacy_doc_intelligence_key() -> None:
@@ -111,6 +293,7 @@ def init_admin(app):
     with app.app_context():
         purge_legacy_doc_intelligence_key()
 
+    from modules.admin_user_groups import user_groups_bp
     app.register_blueprint(user_groups_bp)
     from modules.admin_groups import groups_bp
     app.register_blueprint(groups_bp, url_prefix='/admin/groups')
@@ -1059,7 +1242,12 @@ def visual_grounding_settings():
 
 # --- OCR Settings Route ---
 @admin_bp.route('/settings/ocr', methods=['GET', 'POST'])
+@login_required
 def ocr_settings():
+    if not current_user.is_admin:
+        flash('Admin access required', 'danger')
+        return redirect(url_for('admin.dashboard'))
+
     form = SettingsForm()
     # Load current settings from AppSettings
     try:

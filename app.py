@@ -202,14 +202,94 @@ def create_app():
                 'visual_grounding_enabled',
                 'visual_grounding_doc_store_path',
                 'vector_store_mode',
-                'multimodal_model_id'
+                'multimodal_model_id',
+                'is_enabled_ocr',
+                'is_auto_ocr',
+                'ocr_mode',
+                'doc_intelligence_endpoint',
             ])).all()
             settings = {s.key: s.value for s in settings_query}
+            settings_map = {s.key: s for s in settings_query}
+            settings_updates = {}
+
+            def _truthy(value):
+                return value is not None and value.lower() in ('1', 'true', 'yes')
 
             # Set config values, using defaults if not found in DB
-            app.config['VISUAL_GROUNDING_ENABLED'] = settings.get('visual_grounding_enabled', 'false').lower() == 'true'
-            app.config['VISUAL_GROUNDING_DOC_STORE_PATH'] = settings.get('visual_grounding_doc_store_path', 'data/doc_store')
-            app.config['VECTOR_STORE_MODE'] = settings.get('vector_store_mode', 'user') or settings.get('VECTOR_STORE_MODE', 'user')
+            app.config['VISUAL_GROUNDING_ENABLED'] = (
+                settings.get('visual_grounding_enabled', 'false').lower() == 'true'
+            )
+            app.config['VISUAL_GROUNDING_DOC_STORE_PATH'] = settings.get(
+                'visual_grounding_doc_store_path',
+                'data/doc_store',
+            )
+            app.config['VECTOR_STORE_MODE'] = (
+                settings.get('vector_store_mode', 'user')
+                or settings.get('VECTOR_STORE_MODE', 'user')
+            )
+
+            env_is_enabled_ocr_raw = os.environ.get('IS_ENABLED_OCR')
+            if env_is_enabled_ocr_raw is not None:
+                env_is_enabled_ocr = _truthy(env_is_enabled_ocr_raw)
+                app.config['IS_ENABLED_OCR'] = env_is_enabled_ocr
+                desired_value = '1' if env_is_enabled_ocr else '0'
+                if settings.get('is_enabled_ocr') != desired_value:
+                    settings_updates['is_enabled_ocr'] = desired_value
+            else:
+                app.config['IS_ENABLED_OCR'] = settings.get('is_enabled_ocr', '0') == '1'
+
+            env_is_auto_ocr_raw = os.environ.get('IS_AUTO_OCR')
+            if env_is_auto_ocr_raw is not None:
+                env_is_auto_ocr = _truthy(env_is_auto_ocr_raw)
+                app.config['IS_AUTO_OCR'] = env_is_auto_ocr
+                desired_value = '1' if env_is_auto_ocr else '0'
+                if settings.get('is_auto_ocr') != desired_value:
+                    settings_updates['is_auto_ocr'] = desired_value
+            else:
+                app.config['IS_AUTO_OCR'] = settings.get('is_auto_ocr', '0') == '1'
+
+            env_ocr_mode_raw = os.environ.get('OCR_MODE')
+            if env_ocr_mode_raw is not None and env_ocr_mode_raw.strip():
+                env_ocr_mode = env_ocr_mode_raw.strip()
+                app.config['OCR_MODE'] = env_ocr_mode
+                if settings.get('ocr_mode') != env_ocr_mode:
+                    settings_updates['ocr_mode'] = env_ocr_mode
+            else:
+                default_ocr_mode = os.environ.get('OCR_MODE', 'default')
+                app.config['OCR_MODE'] = settings.get('ocr_mode', default_ocr_mode)
+
+            env_doc_endpoint_raw = os.environ.get('DOC_INTELLIGENCE_ENDPOINT')
+            if env_doc_endpoint_raw:
+                env_doc_endpoint = env_doc_endpoint_raw.strip()
+                app.config['DOC_INTELLIGENCE_ENDPOINT'] = env_doc_endpoint
+                if settings.get('doc_intelligence_endpoint') != env_doc_endpoint:
+                    settings_updates['doc_intelligence_endpoint'] = env_doc_endpoint
+            else:
+                app.config['DOC_INTELLIGENCE_ENDPOINT'] = settings.get(
+                    'doc_intelligence_endpoint',
+                    '',
+                )
+
+            if settings_updates:
+                try:
+                    for key, value in settings_updates.items():
+                        setting_obj = settings_map.get(key)
+                        if setting_obj:
+                            setting_obj.value = value
+                        else:
+                            db.session.add(AppSettings(key=key, value=value))
+                    db.session.commit()
+                    settings.update(settings_updates)
+                    app.logger.info(
+                        "Synchronized AppSettings with environment overrides: %s",
+                        ", ".join(settings_updates.keys()),
+                    )
+                except Exception as sync_exc:
+                    db.session.rollback()
+                    app.logger.warning(
+                        "Failed to persist environment overrides to AppSettings: %s",
+                        sync_exc,
+                    )
 
             multimodal_model_id = settings.get('multimodal_model_id')
             if multimodal_model_id:
@@ -224,20 +304,47 @@ def create_app():
 
             app.logger.info("Loaded AppSettings into app.config.")
             app.logger.info(f"VISUAL_GROUNDING_ENABLED: {app.config['VISUAL_GROUNDING_ENABLED']}")
-            app.logger.info(f"VISUAL_GROUNDING_DOC_STORE_PATH: {app.config['VISUAL_GROUNDING_DOC_STORE_PATH']}")
-            app.logger.info(f"VECTOR_STORE_MODE: {app.config['VECTOR_STORE_MODE']}")
-            app.logger.info(f"AZURE_OPENAI_MULTIMODAL_DEPLOYMENT: {app.config.get('AZURE_OPENAI_MULTIMODAL_DEPLOYMENT')}")
+            app.logger.info(
+                'VISUAL_GROUNDING_DOC_STORE_PATH: %s',
+                app.config['VISUAL_GROUNDING_DOC_STORE_PATH'],
+            )
+            app.logger.info('VECTOR_STORE_MODE: %s', app.config['VECTOR_STORE_MODE'])
+            app.logger.info(
+                'AZURE_OPENAI_MULTIMODAL_DEPLOYMENT: %s',
+                app.config.get('AZURE_OPENAI_MULTIMODAL_DEPLOYMENT'),
+            )
+            app.logger.info(
+                'IS_ENABLED_OCR: %s (mode=%s)',
+                app.config.get('IS_ENABLED_OCR'),
+                app.config.get('OCR_MODE'),
+            )
 
             # Log Docling Export Type
             docling_export_type = app.config.get('DOCLING_EXPORT_TYPE', 'MARKDOWN').upper() # Default to MARKDOWN
             app.logger.info(f"Docling Export Mode configured: {docling_export_type}")
 
         except Exception as e:
-            app.logger.error(f"Error loading AppSettings from database: {e}. Using default values.")
+            app.logger.error(
+                'Error loading AppSettings from database: %s. Using default values.',
+                e,
+            )
             # Apply defaults explicitly in case of error
             app.config.setdefault('VISUAL_GROUNDING_ENABLED', False)
             app.config.setdefault('VISUAL_GROUNDING_DOC_STORE_PATH', 'data/doc_store')
             app.config.setdefault('VECTOR_STORE_MODE', 'user')
+            app.config.setdefault(
+                'IS_ENABLED_OCR',
+                os.environ.get('IS_ENABLED_OCR', '0').lower() in ('1', 'true', 'yes'),
+            )
+            app.config.setdefault(
+                'IS_AUTO_OCR',
+                os.environ.get('IS_AUTO_OCR', '0').lower() in ('1', 'true', 'yes'),
+            )
+            app.config.setdefault('OCR_MODE', os.environ.get('OCR_MODE', 'default'))
+            app.config.setdefault(
+                'DOC_INTELLIGENCE_ENDPOINT',
+                os.environ.get('DOC_INTELLIGENCE_ENDPOINT', ''),
+            )
 
     # Configure Login Manager
     login_manager.login_view = 'login_route'

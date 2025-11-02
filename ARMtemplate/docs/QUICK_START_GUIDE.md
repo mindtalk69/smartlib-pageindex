@@ -12,6 +12,40 @@
 
 ## 🚀 Recommended Deployment Path
 
+### 🔐 Key Vault Prerequisite (Applies to Marketplace Offers)
+
+Before running any template, make sure you have a Key Vault that already contains the following secrets:
+- `AZURE_OPENAI_API_KEY` — the Azure OpenAI API key
+- `AZURE_OPENAI_ENDPOINT` — the endpoint URL (stored as a secret value if you want the template to reference it)
+- `AZURE_OPENAI_DEPLOYMENT` — chat/completions deployment name (optional but recommended)
+- `doc-intelligence-key` — Azure Document Intelligence key referenced by `docIntelligenceKeySecretUri`
+- Optional admin bootstrap secrets (`ADMIN_EMAIL`, `ADMIN_PASSWORD`) if you plan to reference them by URI
+
+> **Marketplace requirement:** For the shared-plan and conditional Key Vault templates, the Key Vault **must exist before deployment**. Record the secret URIs because the template parameters expect full URIs (e.g., `https://<kv-name>.vault.azure.net/secrets/DOC_INTELLIGENCE_KEY/<version>`).
+
+If you do not yet have a Key Vault, create one first:
+```bash
+az keyvault create \
+  --name YOUR_KV_NAME \
+  --resource-group YOUR_RG \
+  --location YOUR_LOCATION
+
+# Add the Document Intelligence key
+doc_int_key="YOUR_DOC_INTELLIGENCE_KEY"
+az keyvault secret set \
+  --vault-name YOUR_KV_NAME \
+  --name doc-intelligence-key \
+  --value "$doc_int_key"
+
+# (Optional) Add OpenAI API key if you store it in Key Vault
+az keyvault secret set \
+  --vault-name YOUR_KV_NAME \
+  --name AZURE_OPENAI_API_KEY \
+  --value YOUR_OPENAI_KEY
+```
+
+Copy the resulting secret URIs and supply them to the template parameters. For tenants following Marketplace rules, this step is mandatory.
+
 ### Option 1: Production Deployment (RECOMMENDED)
 
 **Use this if you have existing Redis and Key Vault**
@@ -53,6 +87,7 @@ az deployment group create \
 
 **Template:** `flask_appservice_template.json` ✅ (Just fixed!)
 > ℹ️ Includes shared Azure Files mount at `/home/data`.
+> ℹ️ Creates a new Key Vault by default unless you override `keyVaultName`. If Marketplace review requires pre-provisioned secrets, create the vault first and pass the existing name so the template reuses it.
 
 ```bash
 # Deploy everything at once

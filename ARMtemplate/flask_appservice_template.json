@@ -10,12 +10,24 @@
     },
   "azureOpenAIKey": {
     "type": "secureString",
-    "defaultValue": "[reference(resourceId('Microsoft.KeyVault/vaults/secrets', 'myKeyVaultName', 'AZURE_OPENAI_API_KEY')).value]"
+    "defaultValue": "[reference(resourceId('Microsoft.KeyVault/vaults/secrets', 'myKeyVaultName', 'AZURE_OPENAI_API_KEY')).value]",
+    "metadata": {
+      "displayName": "Azure Open AI Key",
+      "description": "Azure OpenAI API Key sourced from Key Vault"
+    }
+  },
+  "openAIAzureName": {
+    "type": "string",
+    "metadata": {
+      "displayName": "Azure Open AI Name",
+      "description": "Name of the existing Azure OpenAI resource that must exist prior to deployment."
+    }
   },
   "azureOpenAIEndpoint": {
     "type": "string",
     "defaultValue": "",
     "metadata": {
+      "displayName": "Azure Open AI Endpoint",
       "description": "Fill with: [reference(resourceId('Microsoft.KeyVault/vaults/secrets', 'myKeyVaultName', 'AZURE_OPENAI_ENDPOINT')).value]"
     }
   },
@@ -23,6 +35,7 @@
     "type": "string",
     "defaultValue": "",
     "metadata": {
+      "displayName": "Azure Open AI Deployment Model",
       "description": "Fill with: [reference(resourceId('Microsoft.KeyVault/vaults/secrets', 'myKeyVaultName', 'AZURE_OPENAI_DEPLOYMENT')).value]"
     }
   },
@@ -30,6 +43,7 @@
     "type": "string",
     "defaultValue": "2024-10-21",
     "metadata": {
+      "displayName": "Azure Open AI API Version",
       "description": "Fill with: [reference(resourceId('Microsoft.KeyVault/vaults/secrets', 'myKeyVaultName', 'AZURE_OPENAI_API_VERSION')).value]"
     }
   },
@@ -69,15 +83,18 @@
       "type": "string",
       "defaultValue": "text-embedding-3-small",
       "metadata": {
+        "displayName": "Azure Embedding Deployment",
         "description": "Azure OpenAI embedding deployment name used by the web app."
       }
     },
-    "openAIAzureName": {
-    "type": "string",
-    "metadata": {
-      "description": "Name of the existing Azure OpenAI resource that must exist prior to deployment."
-    }
-  },
+    "defaultEmbeddingModel": {
+      "type": "string",
+      "defaultValue": "text-embedding-3-small",
+      "metadata": {
+        "displayName": "Default Embedding Model",
+        "description": "Default embedding model to load on startup"
+      }
+    },
     "webAppName": {
       "type": "string",
       "defaultValue": "flaskrag3-app",
@@ -191,13 +208,6 @@
       "defaultValue": false,
       "metadata": {
         "description": "Set to true to run create_default_models.py during startup"
-      }
-    },
-    "defaultEmbeddingModel": {
-      "type": "string",
-      "defaultValue": "text-embedding-3-small",
-      "metadata": {
-        "description": "Default embedding model to load on startup"
       }
     },
     "appServicePlanSkuName": {

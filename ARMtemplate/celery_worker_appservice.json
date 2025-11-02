@@ -31,18 +31,28 @@
     "azureOpenAIKey": {
       "type": "secureString",
       "metadata": {
+        "displayName": "Azure Open AI Key",
         "description": "Azure OpenAI API Key"
+      }
+    },
+    "openAIAzureName": {
+      "type": "string",
+      "metadata": {
+        "displayName": "Azure Open AI Name",
+        "description": "Name of the existing Azure OpenAI resource that must exist prior to deployment."
       }
     },
     "azureOpenAIEndpoint": {
       "type": "string",
       "metadata": {
+        "displayName": "Azure Open AI Endpoint",
         "description": "Azure OpenAI Endpoint"
       }
     },
     "azureOpenAIDeployment": {
       "type": "string",
       "metadata": {
+        "displayName": "Azure Open AI Deployment Model",
         "description": "Azure OpenAI Deployment Name"
       }
     },
@@ -50,6 +60,7 @@
       "type": "string",
       "defaultValue": "2024-10-21",
       "metadata": {
+        "displayName": "Azure Open AI API Version",
         "description": "Azure OpenAI API Version"
       }
     },
@@ -89,7 +100,16 @@
       "type": "string",
       "defaultValue": "text-embedding-3-small",
       "metadata": {
+        "displayName": "Azure Embedding Deployment",
         "description": "Azure OpenAI embedding deployment name used by the worker."
+      }
+    },
+    "defaultEmbeddingModel": {
+      "type": "string",
+      "defaultValue": "text-embedding-3-small",
+      "metadata": {
+        "displayName": "Default Embedding Model",
+        "description": "Default embedding model to load on startup"
       }
     },
     "workerAppName": {
@@ -183,13 +203,6 @@
       "defaultValue": "",
       "metadata": {
         "description": "Optional: Key Vault secret URI for the admin email (overrides appAdminEmail when provided)"
-      }
-    },
-    "defaultEmbeddingModel": {
-      "type": "string",
-      "defaultValue": "text-embedding-3-small",
-      "metadata": {
-        "description": "Default embedding model to load on startup"
       }
     },
     "appServicePlanSkuName": {

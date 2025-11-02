@@ -19,10 +19,22 @@ def _resolve_data_root():
         # Outside app context
         pass
     candidates.append(os.environ.get("DATA_VOLUME_PATH"))
+    home_default = os.path.join('/home', 'data')
+    candidates.append(home_default)
 
     for candidate in candidates:
-        if candidate:
-            return os.path.abspath(candidate)
+        if not candidate:
+            continue
+        candidate_path = os.path.abspath(candidate)
+        parent_dir = os.path.dirname(candidate_path)
+        if parent_dir and not os.path.isdir(parent_dir):
+            continue
+        try:
+            os.makedirs(candidate_path, exist_ok=True)
+        except OSError:
+            continue
+        if os.access(candidate_path, os.W_OK | os.X_OK):
+            return candidate_path
     # Fallback to application directory /data if env not set
     fallback = os.path.join(os.path.abspath(os.path.dirname(__file__)), "..", "data")
     return os.path.abspath(fallback)

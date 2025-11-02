@@ -31,7 +31,11 @@ class Config:
     if data_volume_path:
         data_dir = os.path.abspath(data_volume_path)
     else:
-        data_dir = os.path.join(basedir, 'data')
+        home_mount = os.path.join('/home', 'data')
+        if os.path.isdir('/home') and os.access('/home', os.W_OK | os.X_OK):
+            data_dir = home_mount
+        else:
+            data_dir = os.path.join(basedir, 'data')
     os.makedirs(data_dir, exist_ok=True)
     DATA_VOLUME_PATH = data_dir
     print(f"DEBUG: Ensured data directory exists: {DATA_VOLUME_PATH}") # Add debug print
