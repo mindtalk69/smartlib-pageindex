@@ -1,4 +1,4 @@
-# Flask RAG - Retrieval Augmented Generation Application
+# Smartlib - Retrieval Augmented Generation Application
 
 Flask RAG is a web application built with Flask, designed to demonstrate a Retrieval-Augmented Generation (RAG) system. It integrates with different vector stores like ChromaDB and PGVector for fast similarity searches and provides a user-friendly interface to perform tasks such as user login, registration, data uploads, and interactive retrieval of generated results.
 
