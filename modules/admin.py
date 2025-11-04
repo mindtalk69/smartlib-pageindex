@@ -341,21 +341,8 @@ def toggle_admin(user_id):
         return redirect(url_for('index'))
     if user_id == current_user.get_id():
          flash("You cannot change your own admin status.", 'danger')
-         return redirect(url_for('admin.user_management'))
-    user = db.session.get(User, user_id)
-    if user:
-        try:
-            new_status = not user.is_admin
-            user.is_admin = new_status
-            db.session.commit()
-            flash(f'Admin status {"granted" if new_status else "revoked"} successfully.', 'success')
-        except Exception as e:
-            db.session.rollback()
-            print(f"Error toggling admin status: {e}")
-            flash('An error occurred while updating admin status.', 'danger')
-    else:
-        flash('User not found.', 'danger')
-    return redirect(url_for('admin.user_management'))
+         return redirect(url_for('admin_users.user_management'))
+
 
 @admin_bp.route('/users/toggle-status/<string:user_id>')
 @login_required
@@ -365,7 +352,7 @@ def toggle_user_status(user_id):
         return redirect(url_for('index'))
     if user_id == current_user.get_id():
          flash("You cannot disable your own account.", 'danger')
-         return redirect(url_for('admin.user_management'))
+         return redirect(url_for('admin_users.user_management'))
     try:
         success = toggle_user_disabled_status(user_id)
         if success:

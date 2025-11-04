@@ -17,7 +17,7 @@ def user_management():
         flash("Error loading user list.", "danger")
         return render_template('admin/users.html', users=[])
 
-@users_bp.route('/toggle_admin/<string:user_id>')
+@users_bp.route('/actions/toggle_admin/<string:user_id>')
 @login_required
 def toggle_admin(user_id):
     if not current_user.is_admin:
@@ -41,7 +41,7 @@ def toggle_admin(user_id):
         flash('User not found.', 'danger')
     return redirect(url_for('admin_users.user_management'))
 
-@users_bp.route('/toggle-status/<string:user_id>')
+@users_bp.route('/actions/toggle-status/<string:user_id>')
 @login_required
 def toggle_user_status(user_id):
     if not current_user.is_admin:

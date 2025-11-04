@@ -1,5 +1,11 @@
 # SmartLib Dev Progress Log
 
+## 2025-11-04 – Admin Actions & ARM Secret URIs
+- Fixed the `/admin/users` toggle buttons by pointing their links to the `admin_users` blueprint routes, eliminating the 500s when promoting or disabling accounts from the grid.
+- Added optional `storageAccountKeySecretUri` parameters to every ARM template and wired the Azure Files mounts to favor Key Vault secrets while still allowing direct keys for local testing.
+- Introduced `azureOpenAIKeySecretUri` parameters so both web and worker templates can resolve the OpenAI key from Key Vault, keeping sensitive credentials out of the parameter payloads.
+- Authored `ARMtemplate/CreateUiDefinition.json` for Azure Managed Application onboarding, aligning user inputs with the updated App Service templates and optional Key Vault secret fields.
+
 ## 2025-11-02 – Key Vault OCR Alignment & Admin Fixes
 - Restored `/admin` redirect and dashboard view, wiring an OCR context processor and `@login_required` guard so the menu reflects feature flags.
 - Updated `app.py` to prioritize `AppSettings` for OCR flags with env fallbacks and logging, keeping Celery and portal toggles consistent after restarts.

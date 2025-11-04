@@ -43,13 +43,21 @@
     },
   "azureOpenAIKey": {
     "type": "secureString",
-    "defaultValue": "[reference(resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults/secrets', parameters('existingKeyVaultName'), 'AZURE_OPENAI_API_KEY')).value]",
     "metadata": {
       "displayName": "Azure Open AI Key",
-      "description": "Azure OpenAI API Key sourced from Key Vault"
+      "description": "Azure OpenAI API Key"
+    }
+  },
+  "azureOpenAIKeySecretUri": {
+    "type": "string",
+    "defaultValue": "",
+    "metadata": {
+      "displayName": "Azure Open AI Key Secret URI",
+      "description": "Optional Key Vault secret URI containing the Azure OpenAI API key."
     }
   },
   "openAIAzureName": {
+
     "type": "string",
     "metadata": {
       "displayName": "Azure Open AI Name",
@@ -102,8 +110,16 @@
     },
     "storageAccountKey": {
       "type": "securestring",
+      "defaultValue": "",
       "metadata": {
-        "description": "Access key for the storage account used to mount shared storage."
+        "description": "Access key for the storage account used to mount shared storage (used when no Key Vault secret URI provided)."
+      }
+    },
+    "storageAccountKeySecretUri": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional Key Vault secret URI containing the storage account key."
       }
     },
     "dataShareName": {
@@ -302,7 +318,7 @@
               "type": "AzureFiles",
               "accountName": "[parameters('storageAccountName')]",
               "shareName": "[parameters('dataShareName')]",
-              "accessKey": "[parameters('storageAccountKey')]",
+              "accessKey": "[if(equals(parameters('storageAccountKeySecretUri'), ''), parameters('storageAccountKey'), concat('@Microsoft.KeyVault(SecretUri=', parameters('storageAccountKeySecretUri'), ')'))]",
               "mountPath": "/home/data"
             }
           },
@@ -317,7 +333,7 @@
             },
             {
               "name": "AZURE_OPENAI_API_KEY",
-              "value": "[parameters('azureOpenAIKey')]"
+              "value": "[if(equals(parameters('azureOpenAIKeySecretUri'), ''), parameters('azureOpenAIKey'), concat('@Microsoft.KeyVault(SecretUri=', parameters('azureOpenAIKeySecretUri'), ')'))]"
             },
             {
               "name": "AZURE_OPENAI_ENDPOINT",

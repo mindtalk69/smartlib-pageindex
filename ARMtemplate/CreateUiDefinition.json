@@ -1,0 +1,457 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/uiDefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "handler": "Microsoft.Azure.CreateUIDef",
+  "parameters": {},
+  "basics": [
+    {
+      "name": "resourceGroup",
+      "type": "Microsoft.Common.ResourceGroupSelection",
+      "label": "Resource group",
+      "toolTip": "Select an existing resource group or create a new one for SmartLib."
+    },
+    {
+      "name": "location",
+      "type": "Microsoft.Common.Location",
+      "label": "Region",
+      "toolTip": "Choose the Azure region where SmartLib resources will be deployed.",
+      "allowedValues": [
+        {
+          "label": "Indonesia Central",
+          "value": "indonesiacentral"
+        },
+        {
+          "label": "Southeast Asia",
+          "value": "southeastasia"
+        },
+        {
+          "label": "East Asia",
+          "value": "eastasia"
+        }
+      ],
+      "defaultValue": "indonesiacentral"
+    }
+  ],
+  "steps": [
+    {
+      "name": "appSettingsStep",
+      "label": "Application settings",
+      "subLabel": {
+        "preValidation": "Configure SmartLib application core settings",
+        "postValidation": "SmartLib application core settings"
+      },
+      "elements": [
+        {
+          "name": "appSection",
+          "type": "Microsoft.Common.Section",
+          "label": "Core application configuration",
+          "elements": [
+            {
+              "name": "tenantId",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Azure AD tenant ID",
+              "toolTip": "Provide the Azure Active Directory tenant ID used for authentication.",
+              "constraints": {
+                "required": true,
+                "regex": "^[0-9a-fA-F-]{36}$",
+                "validationMessage": "Enter a valid tenant ID GUID."
+              }
+            },
+            {
+              "name": "webAppName",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Web app name",
+              "defaultValue": "smartlib-web",
+              "toolTip": "Name for the SmartLib web App Service instance.",
+              "constraints": {
+                "required": true,
+                "regex": "^[a-zA-Z0-9-]{2,60}$",
+                "validationMessage": "Use 2-60 alphanumeric characters or hyphens."
+              }
+            },
+            {
+              "name": "appServicePlanSkuName",
+              "type": "Microsoft.Common.DropDown",
+              "label": "App Service plan SKU",
+              "defaultValue": "B1",
+              "toolTip": "Select the pricing tier for the SmartLib App Service plan.",
+              "options": [
+                {
+                  "label": "B1 - Basic",
+                  "value": "B1"
+                },
+                {
+                  "label": "S1 - Standard",
+                  "value": "S1"
+                },
+                {
+                  "label": "P1v2 - Premium v2",
+                  "value": "P1v2"
+                }
+              ]
+            },
+            {
+              "name": "webDockerImageName",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Web container image",
+              "defaultValue": "smartlib-web:latest",
+              "toolTip": "Repository path and tag for the SmartLib web container image (e.g., smartlib-web:latest).",
+              "constraints": {
+                "required": true
+              }
+            },
+            {
+              "name": "createRoleAssignment",
+              "type": "Microsoft.Common.CheckBox",
+              "label": "Grant Key Vault access to web app",
+              "defaultValue": true,
+              "toolTip": "Create or update the role assignment that allows the web app to read secrets from Key Vault."
+            },
+            {
+              "name": "autoPromoteAdmin",
+              "type": "Microsoft.Common.CheckBox",
+              "label": "Auto-promote admin account",
+              "defaultValue": true,
+              "toolTip": "Bootstrap the initial SmartLib admin account on first startup."
+            },
+            {
+              "name": "runDefaultModels",
+              "type": "Microsoft.Common.CheckBox",
+              "label": "Load default models during deployment",
+              "defaultValue": false,
+              "toolTip": "Run create_default_models.py automatically when the web app starts."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dependencyStep",
+      "label": "Azure dependencies",
+      "subLabel": {
+        "preValidation": "Provide existing Azure services SmartLib depends on",
+        "postValidation": "SmartLib dependency settings"
+      },
+      "elements": [
+        {
+          "name": "existingResourcesSection",
+          "type": "Microsoft.Common.Section",
+          "label": "Existing resource configuration",
+          "elements": [
+            {
+              "name": "existingKeyVaultName",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Key Vault name",
+              "toolTip": "Name of the Azure Key Vault that stores SmartLib secrets.",
+              "constraints": {
+                "required": true
+              }
+            },
+            {
+              "name": "existingKeyVaultResourceGroup",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Key Vault resource group",
+              "defaultValue": "[basics('resourceGroup').name]",
+              "toolTip": "Resource group containing the Key Vault. Defaults to the deployment resource group."
+            },
+            {
+              "name": "existingRedisName",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Redis cache name",
+              "toolTip": "Name of the Azure Cache for Redis instance used by SmartLib.",
+              "constraints": {
+                "required": true
+              }
+            },
+            {
+              "name": "existingRedisResourceGroup",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Redis resource group",
+              "defaultValue": "[basics('resourceGroup').name]",
+              "toolTip": "Resource group containing the Redis cache. Defaults to the deployment resource group."
+            },
+            {
+              "name": "storageAccountName",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Storage account name",
+              "toolTip": "Storage account hosting the Azure Files share for SmartLib data.",
+              "constraints": {
+                "required": true
+              }
+            },
+            {
+              "name": "dataShareName",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Azure Files share name",
+              "toolTip": "Name of the Azure Files share mounted at /home/data inside the containers.",
+              "constraints": {
+                "required": true
+              }
+            },
+            {
+              "name": "storageAccountKey",
+              "type": "Microsoft.Common.PasswordBox",
+              "label": "Storage account key",
+              "toolTip": "Primary or secondary storage account key. Leave blank when using a Key Vault secret URI."
+            },
+            {
+              "name": "storageAccountKeySecretUri",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Storage account key secret URI",
+              "toolTip": "Optional Key Vault secret URI that contains the storage account key."
+            }
+          ]
+        },
+        {
+          "name": "openAISection",
+          "type": "Microsoft.Common.Section",
+          "label": "Azure OpenAI settings",
+          "elements": [
+            {
+              "name": "openAIAzureName",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Azure OpenAI resource name",
+              "toolTip": "Name of the existing Azure OpenAI resource backing SmartLib.",
+              "constraints": {
+                "required": true
+              }
+            },
+            {
+              "name": "azureOpenAIEndpoint",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Azure OpenAI endpoint",
+              "toolTip": "Endpoint URL for Azure OpenAI (e.g., https://your-instance.openai.azure.com).",
+              "constraints": {
+                "required": true
+              }
+            },
+            {
+              "name": "azureOpenAIDeployment",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Chat/completions deployment name",
+              "toolTip": "Deployment name for the Azure OpenAI GPT model SmartLib will use.",
+              "constraints": {
+                "required": true
+              }
+            },
+            {
+              "name": "azureOpenAIAPIVersion",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Azure OpenAI API version",
+              "defaultValue": "2024-10-21",
+              "toolTip": "API version string for Azure OpenAI requests."
+            },
+            {
+              "name": "azureEmbeddingDeployment",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Embedding deployment name",
+              "defaultValue": "text-embedding-3-small",
+              "toolTip": "Azure OpenAI embedding deployment to use for document indexing.",
+              "constraints": {
+                "required": true
+              }
+            },
+            {
+              "name": "defaultEmbeddingModel",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Default embedding model identifier",
+              "defaultValue": "text-embedding-3-small",
+              "toolTip": "Model identifier SmartLib loads on startup (matches embedding deployment by default)."
+            }
+          ]
+        },
+        {
+          "name": "docIntelligenceSection",
+          "type": "Microsoft.Common.Section",
+          "label": "Azure Document Intelligence",
+          "elements": [
+            {
+              "name": "docIntelligenceEndpoint",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Document Intelligence endpoint",
+              "toolTip": "Endpoint URL for Azure Document Intelligence (optional)."
+            },
+            {
+              "name": "docIntelligenceKeySecretUri",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Document Intelligence key secret URI",
+              "toolTip": "Key Vault secret URI containing the Azure Document Intelligence key (optional)."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "credentialStep",
+      "label": "Credentials and secrets",
+      "subLabel": {
+        "preValidation": "Provide SmartLib secrets and access credentials",
+        "postValidation": "SmartLib credential settings"
+      },
+      "elements": [
+        {
+          "name": "openAISecretsSection",
+          "type": "Microsoft.Common.Section",
+          "label": "Azure OpenAI credentials",
+          "elements": [
+            {
+              "name": "openAIInfo",
+              "type": "Microsoft.Common.InfoBox",
+              "options": {
+                "icon": "Info",
+                "text": "Provide either the Azure OpenAI key or a Key Vault secret URI. SmartLib will prefer the secret URI when both are supplied."
+              }
+            },
+            {
+              "name": "azureOpenAIKey",
+              "type": "Microsoft.Common.PasswordBox",
+              "label": "Azure OpenAI key",
+              "toolTip": "API key for Azure OpenAI. Leave blank when using a Key Vault secret URI."
+            },
+            {
+              "name": "azureOpenAIKeySecretUri",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Azure OpenAI key secret URI",
+              "toolTip": "Key Vault secret URI containing the Azure OpenAI key (optional)."
+            }
+          ]
+        },
+        {
+          "name": "acrSection",
+          "type": "Microsoft.Common.Section",
+          "label": "Container registry access",
+          "elements": [
+            {
+              "name": "acrLoginServer",
+              "type": "Microsoft.Common.TextBox",
+              "label": "ACR login server",
+              "defaultValue": "atgmpnregistry.azurecr.io",
+              "toolTip": "Fully qualified login server for the Azure Container Registry (e.g., myregistry.azurecr.io).",
+              "constraints": {
+                "required": true
+              }
+            },
+            {
+              "name": "acrUsername",
+              "type": "Microsoft.Common.TextBox",
+              "label": "ACR username",
+              "defaultValue": "atgmpnregistry",
+              "toolTip": "Username for the Azure Container Registry service principal or admin user.",
+              "constraints": {
+                "required": true
+              }
+            },
+            {
+              "name": "acrPassword",
+              "type": "Microsoft.Common.PasswordBox",
+              "label": "ACR password",
+              "toolTip": "Password or access key for the Azure Container Registry.",
+              "constraints": {
+                "required": true
+              }
+            }
+          ]
+        },
+        {
+          "name": "appIdentitySection",
+          "type": "Microsoft.Common.Section",
+          "label": "SmartLib application credentials",
+          "elements": [
+            {
+              "name": "appClientId",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Application (client) ID",
+              "toolTip": "Client ID for the SmartLib Azure AD application registration.",
+              "constraints": {
+                "required": true,
+                "regex": "^[0-9a-fA-F-]{36}$",
+                "validationMessage": "Enter a valid client ID GUID."
+              }
+            },
+            {
+              "name": "appClientSecret",
+              "type": "Microsoft.Common.PasswordBox",
+              "label": "Application client secret",
+              "toolTip": "Client secret issued for the SmartLib Azure AD application.",
+              "constraints": {
+                "required": true
+              }
+            },
+            {
+              "name": "appAdminUsername",
+              "type": "Microsoft.Common.TextBox",
+              "label": "SmartLib admin username",
+              "defaultValue": "admin",
+              "toolTip": "Username for the bootstrap SmartLib admin account.",
+              "constraints": {
+                "required": true
+              }
+            },
+            {
+              "name": "appAdminPassword",
+              "type": "Microsoft.Common.PasswordBox",
+              "label": "SmartLib admin password",
+              "toolTip": "Initial password for the SmartLib admin account. Leave blank when using a Key Vault secret URI."
+            },
+            {
+              "name": "appAdminPasswordSecretUri",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Admin password secret URI",
+              "toolTip": "Optional Key Vault secret URI containing the admin account password."
+            },
+            {
+              "name": "appAdminEmail",
+              "type": "Microsoft.Common.TextBox",
+              "label": "SmartLib admin email",
+              "toolTip": "Contact email for the SmartLib admin account (optional)."
+            },
+            {
+              "name": "appAdminEmailSecretUri",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Admin email secret URI",
+              "toolTip": "Optional Key Vault secret URI containing the admin email address."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "outputs": {
+    "location": "[basics('location')]",
+    "tenantId": "[steps('appSettingsStep').appSection.tenantId]",
+    "webAppName": "[steps('appSettingsStep').appSection.webAppName]",
+    "appServicePlanSkuName": "[steps('appSettingsStep').appSection.appServicePlanSkuName]",
+    "webDockerImageName": "[steps('appSettingsStep').appSection.webDockerImageName]",
+    "createRoleAssignment": "[steps('appSettingsStep').appSection.createRoleAssignment]",
+    "autoPromoteAdmin": "[steps('appSettingsStep').appSection.autoPromoteAdmin]",
+    "runDefaultModels": "[steps('appSettingsStep').appSection.runDefaultModels]",
+    "existingKeyVaultName": "[steps('dependencyStep').existingResourcesSection.existingKeyVaultName]",
+    "existingKeyVaultResourceGroup": "[if(equals(steps('dependencyStep').existingResourcesSection.existingKeyVaultResourceGroup, ''), basics('resourceGroup').name, steps('dependencyStep').existingResourcesSection.existingKeyVaultResourceGroup)]",
+    "existingRedisName": "[steps('dependencyStep').existingResourcesSection.existingRedisName]",
+    "existingRedisResourceGroup": "[if(equals(steps('dependencyStep').existingResourcesSection.existingRedisResourceGroup, ''), basics('resourceGroup').name, steps('dependencyStep').existingResourcesSection.existingRedisResourceGroup)]",
+    "storageAccountName": "[steps('dependencyStep').existingResourcesSection.storageAccountName]",
+    "storageAccountKey": "[steps('dependencyStep').existingResourcesSection.storageAccountKey]",
+    "storageAccountKeySecretUri": "[steps('dependencyStep').existingResourcesSection.storageAccountKeySecretUri]",
+    "dataShareName": "[steps('dependencyStep').existingResourcesSection.dataShareName]",
+    "openAIAzureName": "[steps('dependencyStep').openAISection.openAIAzureName]",
+    "azureOpenAIEndpoint": "[steps('dependencyStep').openAISection.azureOpenAIEndpoint]",
+    "azureOpenAIDeployment": "[steps('dependencyStep').openAISection.azureOpenAIDeployment]",
+    "azureOpenAIAPIVersion": "[steps('dependencyStep').openAISection.azureOpenAIAPIVersion]",
+    "azureEmbeddingDeployment": "[steps('dependencyStep').openAISection.azureEmbeddingDeployment]",
+    "defaultEmbeddingModel": "[steps('dependencyStep').openAISection.defaultEmbeddingModel]",
+    "docIntelligenceEndpoint": "[steps('dependencyStep').docIntelligenceSection.docIntelligenceEndpoint]",
+    "docIntelligenceKeySecretUri": "[steps('dependencyStep').docIntelligenceSection.docIntelligenceKeySecretUri]",
+    "azureOpenAIKey": "[steps('credentialStep').openAISecretsSection.azureOpenAIKey]",
+    "azureOpenAIKeySecretUri": "[steps('credentialStep').openAISecretsSection.azureOpenAIKeySecretUri]",
+    "acrLoginServer": "[steps('credentialStep').acrSection.acrLoginServer]",
+    "acrUsername": "[steps('credentialStep').acrSection.acrUsername]",
+    "acrPassword": "[steps('credentialStep').acrSection.acrPassword]",
+    "APP_CLIENT_ID": "[steps('credentialStep').appIdentitySection.appClientId]",
+    "APP_CLIENT_SECRET": "[steps('credentialStep').appIdentitySection.appClientSecret]",
+    "appAdminUsername": "[steps('credentialStep').appIdentitySection.appAdminUsername]",
+    "appAdminPassword": "[steps('credentialStep').appIdentitySection.appAdminPassword]",
+    "appAdminPasswordSecretUri": "[steps('credentialStep').appIdentitySection.appAdminPasswordSecretUri]",
+    "appAdminEmail": "[steps('credentialStep').appIdentitySection.appAdminEmail]",
+    "appAdminEmailSecretUri": "[steps('credentialStep').appIdentitySection.appAdminEmailSecretUri]"
+  }
+}

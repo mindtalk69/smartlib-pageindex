@@ -40,12 +40,12 @@
                         {% endif %}
                     </td>
                     <td> {# Reverted Actions cell to icon buttons #}
-                        <a href="{{ url_for('admin.toggle_admin', user_id=user.user_id) }}"
+                        <a href="{{ url_for('admin_users.toggle_admin', user_id=user.user_id) }}"
                            class="btn btn-sm btn-secondary" 
                            title="Toggle Admin Status">
                             <i class="bi bi-shield-check"></i>
                         </a>
-                        <a href="{{ url_for('admin.toggle_user_status', user_id=user.user_id) }}" 
+                        <a href="{{ url_for('admin_users.toggle_user_status', user_id=user.user_id) }}" 
                            class="btn btn-sm btn-warning ms-1" 
                            title="Toggle User Enabled/Disabled Status">
                             <i class="bi bi-person-x-fill"></i>
