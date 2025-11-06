@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}About SmartLib{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-8">
+    <h1 class="mb-3">About SmartLib</h1>
+    <p class="lead">
+      SmartLib helps organizations transform document collections into searchable,
+      AI-ready knowledge hubs powered by retrieval-augmented generation.
+    </p>
+    <p>
+      The platform combines Azure OpenAI, Docling, PyMuPDF, and other open-source
+      projects to deliver secure ingestion, vector indexing, and conversational
+      access to enterprise content. SmartLib is distributed under the MIT License
+      and publishes its source repository to satisfy the obligations of all
+      bundled open-source software.
+    </p>
+
+    <h2 class="h4 mt-4">Licensing &amp; Compliance</h2>
+    <p>
+      The following resources describe SmartLib licensing terms, third-party
+      attributions, and Azure Marketplace disclosures. All documents are served
+      from the deployed environment under the <code>/static/docs/licensing</code>
+      path.
+    </p>
+    <ul class="list-group list-group-flush">
+      {% for doc in licensing_docs %}
+        <li class="list-group-item px-0">
+          <a href="{{ url_for('static', filename=doc.filename) }}" target="_blank" rel="noopener">
+            {{ doc.title }}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+
+    <p class="mt-3 small text-muted">
+      Tip: Update the licensing inventory before every release and archive the
+      exported directory for audit purposes.
+    </p>
+  </div>
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h5">Contact &amp; Support</h2>
+        <p class="mb-1">SmartLib Compliance</p>
+        <p class="mb-3"><a href="mailto:compliance@smartlib.ai">compliance@smartlib.ai</a></p>
+        <p class="small text-muted">
+          Reach out for updated license inventories, source code requests, or to
+          report any issues with bundled notices.
+        </p>
+        <hr>
+        <h3 class="h6">Source Repository</h3>
+        <p class="small">
+          <a href="https://github.com/smartlib-ai/smartlib" target="_blank" rel="noopener">
+            github.com/smartlib-ai/smartlib
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

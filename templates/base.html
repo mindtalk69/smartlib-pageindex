@@ -75,6 +75,7 @@
             {% if current_user.is_admin %}
               <li class="nav-item"><a class="nav-link" href="/admin/">Admin Panel</a></li>
             {% endif %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('about.about') }}">About</a></li>
             {# Added Options Toggle Button - Now triggers modal #}
             {% if current_user.is_authenticated %}
             <li class="nav-item">

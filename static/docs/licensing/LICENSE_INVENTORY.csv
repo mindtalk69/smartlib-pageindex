@@ -1,0 +1,16 @@
+component,version_range,license,source_url,notes
+Flask,2.3.*,BSD-3-Clause,https://github.com/pallets/flask,Web framework
+Celery,5.3.*,BSD-3-Clause,https://github.com/celery/celery,Task queue processing
+SQLAlchemy,2.0.*,MIT,https://github.com/sqlalchemy/sqlalchemy,Database ORM
+Flask-Migrate,4.0.*,MIT,https://github.com/miguelgrinberg/Flask-Migrate,Migration helpers
+Flask-WTF,1.2.*,BSD-3-Clause,https://github.com/wtforms/flask-wtf,Form validation and CSRF
+LangChain,0.1.*,MIT,https://github.com/langchain-ai/langchain,RAG orchestration
+LangGraph,0.0.*,MIT,https://github.com/langchain-ai/langgraph,Conversational graph agents
+ChromaDB,0.4.*,Apache-2.0,https://github.com/chroma-core/chroma,Vector database
+Sentence-Transformers,2.5.*,Apache-2.0,https://github.com/UKPLab/sentence-transformers,Embedding models
+Torch,2.1.*,BSD-3-Clause,https://github.com/pytorch/pytorch,Machine learning runtime
+Docling,0.0.*,Apache-2.0,https://github.com/BAILOLOGY/docling,Document conversion
+PyMuPDF,1.23.*,AGPL-3.0,https://github.com/pymupdf/PyMuPDF,PDF parsing (AGPL source required)
+Azure-AI-DocumentIntelligence,1.0.*,MIT,https://github.com/Azure/azure-sdk-for-python,OCR SDK
+Azure-Identity,1.15.*,MIT,https://github.com/Azure/azure-sdk-for-python,Managed identity auth
+Gunicorn,21.2.*,MIT,https://github.com/benoitc/gunicorn,Production WSGI server

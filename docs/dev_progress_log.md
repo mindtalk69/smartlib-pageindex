@@ -5,6 +5,7 @@
 - Added optional `storageAccountKeySecretUri` parameters to every ARM template and wired the Azure Files mounts to favor Key Vault secrets while still allowing direct keys for local testing.
 - Introduced `azureOpenAIKeySecretUri` parameters so both web and worker templates can resolve the OpenAI key from Key Vault, keeping sensitive credentials out of the parameter payloads.
 - Authored `ARMtemplate/CreateUiDefinition.json` for Azure Managed Application onboarding, aligning user inputs with the updated App Service templates and optional Key Vault secret fields.
+- Added `/about` blueprint plus navigation link, mirrored licensing documentation to `static/docs/licensing/`, and published the compliance bundle under `docs/licensing/` for marketplace auditing.
 
 ## 2025-11-02 – Key Vault OCR Alignment & Admin Fixes
 - Restored `/admin` redirect and dashboard view, wiring an OCR context processor and `@login_required` guard so the menu reflects feature flags.

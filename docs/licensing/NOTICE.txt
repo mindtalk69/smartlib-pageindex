@@ -1,0 +1,25 @@
+SmartLib Notice
+==============
+
+This document provides attribution notices for third-party components that ship with
+SmartLib. Please review these notices and retain them wherever SmartLib binaries or
+containers are distributed.
+
+Primary Components
+------------------
+- Flask (BSD-3-Clause) powers the SmartLib web application stack.
+- Celery (BSD-3-Clause) delivers background processing and resilient task queues.
+- SQLAlchemy (MIT) manages database interactions and migrations.
+- LangChain & LangGraph (MIT) implement SmartLib retrieval-augmented workflows.
+- ChromaDB (Apache-2.0) stores vector embeddings for search and retrieval.
+- Azure Document Intelligence SDK (MIT) provides cognitive OCR capabilities.
+- PyMuPDF (AGPL-3.0) enables PDF parsing; SmartLib publishes source to satisfy AGPL.
+- Docling (Apache-2.0) handles document conversion and structured exports.
+
+Usage Requirements
+------------------
+- Preserve this NOTICE file with any customer-facing deployment artifacts.
+- Ensure downstream redistributors receive the full license inventory located in
+  docs/licensing/.
+- Track additional dependencies added to SmartLib releases and update
+  LICENSE_INVENTORY.csv accordingly.
