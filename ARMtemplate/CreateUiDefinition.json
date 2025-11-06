@@ -75,11 +75,28 @@
             "toolTip": "Resource group containing the Key Vault. Defaults to the deployment resource group."
           },
           {
+            "name": "kvRoleAssignmentInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "Ensure the deploying identity has Microsoft.Authorization/roleAssignments/write permission on the Key Vault resource group. If not, uncheck the option below and grant access manually after deployment."
+            }
+          },
+          {
             "name": "createRoleAssignment",
             "type": "Microsoft.Common.CheckBox",
             "label": "Grant Key Vault access to web app",
             "defaultValue": true,
-            "toolTip": "Create or update the role assignment that allows the web app to read secrets from Key Vault."
+            "toolTip": "Creates managed identity role assignments on the Key Vault. Disable if you lack RBAC rights on that resource group or are redeploying."
+          },
+          {
+            "name": "kvCrossRgWarning",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(not(equals(steps('infrastructureStep').existingKeyVaultResourceGroup, resourceGroup().name)), steps('infrastructureStep').createRoleAssignment)]",
+            "options": {
+              "icon": "Warning",
+              "text": "Key Vault resource group differs from the deployment resource group. Confirm you have RBAC rights there before keeping role assignment enabled."
+            }
           },
           {
             "name": "existingRedisName",

@@ -368,7 +368,8 @@ def create_app():
         from datetime import datetime
         return dict(
             current_user=current_user,
-            current_year=datetime.now().year
+            current_year=datetime.now().year,
+            has_about_endpoint="about.about" in app.view_functions,
         )
         
     @app.errorhandler(CSRFError)

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Admin | Smarthing{% endblock %}</title> {# Admin specific title #}
+    <title>{% block title %}Admin | SmartLib{% endblock %}</title> {# Admin specific title #}
     <!-- Bootswatch Cosmo Theme CSS from CDN -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.0/dist/cosmo/bootstrap.min.css" crossorigin="anonymous">
     <!-- Bootstrap Icons -->
@@ -51,14 +51,10 @@
 <body style="height: 100%; margin: 0; padding: 0;"> {# Body tag needed as we are not extending #}
 
     <!-- Bootstrap Navbar (Copied from base.html for consistency) -->
-    <nav class="navbar navbar-expand-lg navbar-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark" style="height: 48px;">
       <div class="container">
-        <a class="navbar-brand d-flex align-items-center" href="#">
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="me-2">
-            <circle cx="16" cy="16" r="15" stroke="currentColor" stroke-width="2"/>
-            <path d="M10 16L14 20L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span class="fw-semibold">Smarthing</span> {# Reverted to original title #}
+        <a class="navbar-brand d-flex align-items-center" href="#" style="height: 100%;">
+          <img src="{{ url_for('static', filename='img/logo.png') }}" width="128" height="128" class="me-2" alt="SmartLib Logo">
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="true" aria-label="Toggle navigation" style="z-index: 500;">
           <span class="navbar-toggler-icon"></span>
