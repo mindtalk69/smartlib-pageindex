@@ -23,6 +23,7 @@ from modules.upload import init_upload
 from modules.logout import init_logout
 from modules.login_azure import init_login_azure
 from modules.admin import init_admin, admin_bp
+from modules.about import init_about
 # Remove celery imports, context is handled in celery_app.ContextTask
 import modules.query
 import logging
@@ -123,11 +124,19 @@ def create_app():
 
     @app.context_processor
     def inject_current_user_context():
-        """Inject current_user and current_year into template context."""
+        """Inject current_user, current_year, and optional routes into templates."""
         from datetime import datetime
+        from werkzeug.routing import BuildError
+
+        try:
+            about_url = url_for("about.about")
+        except BuildError:
+            about_url = None
+
         return dict(
             current_user=current_user,
-            current_year=datetime.now().year
+            current_year=datetime.now().year,
+            about_url=about_url,
         )
         
     @app.errorhandler(CSRFError)
@@ -155,6 +164,7 @@ def create_app():
     init_logout(app)
     init_login_azure(app)
     init_admin(app)
+    init_about(app)
     modules.query.init_query(app)
 
     # Register feedback API blueprint

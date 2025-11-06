@@ -364,12 +364,20 @@ def create_app():
 
     @app.context_processor
     def inject_current_user_context():
-        """Inject current_user and current_year into template context."""
+        """Inject current_user, current_year, and optional routes into templates."""
         from datetime import datetime
+        from werkzeug.routing import BuildError
+
+        try:
+            about_url = url_for("about.about")
+        except BuildError:
+            about_url = None
+
+        app.logger.info(f"Generated about_url: {about_url}")
         return dict(
             current_user=current_user,
             current_year=datetime.now().year,
-            has_about_endpoint="about.about" in app.view_functions,
+            about_url=about_url,
         )
         
     @app.errorhandler(CSRFError)

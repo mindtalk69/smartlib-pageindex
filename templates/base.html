@@ -52,7 +52,7 @@
     <nav class="navbar navbar-expand-lg navbar-dark" style="overflow: visible !important; flex-shrink: 0;"> {# Added flex-shrink: 0 #}
       <div class="container" style="overflow: visible !important;"> {# Added overflow visible #}
         <a class="navbar-brand d-flex align-items-center" href="#">
-          <img id="img-logo" src="{{ url_for('static', filename='img/logo.png') }}" style="vertical-align:middle" width="128" height="128" class="me-2" alt="SmartLib Logo">          
+          <img id="img-logo" src="{{ url_for('static', filename='img/logo.png') }}" style="height: 128px; width: 128px; object-fit: contain;" class="me-2" alt="SmartLib Logo">
         </a>
         <button class="navbar-toggler" type="button" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation" style="z-index: 500;" onclick="event.preventDefault(); var menu = document.getElementById('navbarSupportedContent'); menu.classList.toggle('show'); this.setAttribute('aria-expanded', menu.classList.contains('show'));">
           <span class="navbar-toggler-icon"></span>
@@ -71,8 +71,8 @@
             {% if current_user.is_admin %}
               <li class="nav-item"><a class="nav-link" href="/admin/">Admin Panel</a></li>
             {% endif %}
-            {% if has_about_endpoint %}
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('about.about') }}">About</a></li>
+            {% if about_url %}
+            <li class="nav-item"><a class="nav-link" href="{{ about_url }}">About</a></li>
             {% endif %}
             {# Added Options Toggle Button - Now triggers modal #}
             {% if current_user.is_authenticated %}
