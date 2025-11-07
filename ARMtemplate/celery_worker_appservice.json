@@ -128,23 +128,25 @@
         "description": "Default embedding model to load on startup"
       }
     },
-    "workerAppName": {
+    "appPrefix": {
       "type": "string",
-      "defaultValue": "flaskrag3-worker",
+      "defaultValue": "smartlib-basic",
       "metadata": {
-        "description": "Name of the Celery Worker App Service"
+        "description": "Prefix for resource naming (used to derive worker App Service resources)"
+      }
+    },
+    "resourceBaseName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional override for the base resource name. Provide the value emitted by the web deployment to align worker naming."
       }
     },
     "location": {
       "type": "string",
-      "defaultValue": "indonesiacentral",
-      "allowedValues": [
-        "indonesiacentral",
-        "southeastasia",
-        "eastasia"
-      ],
+      "defaultValue": "[resourceGroup().location]",
       "metadata": {
-        "description": "Location for all resources."
+        "description": "Deployment region for all resources."
       }
     },
     "acrLoginServer": {
@@ -235,7 +237,9 @@
     }
   },
   "variables": {
-    "appServicePlanName": "[concat(parameters('workerAppName'), '-plan')]",
+    "baseAppName": "[if(equals(parameters('resourceBaseName'), ''), concat(parameters('appPrefix'), '-', uniqueString(resourceGroup().id, deployment().name)), parameters('resourceBaseName'))]",
+    "workerAppName": "[concat(variables('baseAppName'), '-worker')]",
+    "appServicePlanName": "[concat(variables('baseAppName'), '-worker-plan')]",
     "skuMap": {
       "B1": {
         "name": "B1",
@@ -267,7 +271,7 @@
     {
       "type": "Microsoft.Web/sites",
       "apiVersion": "2022-03-01",
-      "name": "[parameters('workerAppName')]",
+      "name": "[variables('workerAppName')]",
       "location": "[parameters('location')]",
       "kind": "app,linux",
       "identity": {
@@ -349,6 +353,18 @@
               "value": "[parameters('existingKeyVaultName')]"
             },
             {
+              "name": "WORKER_APP_NAME",
+              "value": "[variables('workerAppName')]"
+            },
+            {
+              "name": "APP_PREFIX",
+              "value": "[parameters('appPrefix')]"
+            },
+            {
+              "name": "RESOURCE_BASE_NAME",
+              "value": "[variables('baseAppName')]"
+            },
+            {
               "name": "APP_CLIENT_ID",
               "value": "[parameters('APP_CLIENT_ID')]"
             },
@@ -419,9 +435,13 @@
     }
   ],
   "outputs": {
+    "baseAppName": {
+      "type": "string",
+      "value": "[variables('baseAppName')]"
+    },
     "workerAppName": {
       "type": "string",
-      "value": "[parameters('workerAppName')]"
+      "value": "[variables('workerAppName')]"
     },
     "workerAppServicePlan": {
       "type": "string",

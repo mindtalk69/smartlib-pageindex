@@ -2,6 +2,13 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
   "parameters": {
+    "resourceGroup": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().name]",
+      "metadata": {
+        "description": "Name of the resource group selected during deployment."
+      }
+    },
     "tenantId": {
       "type": "string",
       "metadata": {
@@ -43,9 +50,10 @@
     },
   "azureOpenAIKey": {
     "type": "secureString",
+    "defaultValue": "[reference(resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults/secrets', parameters('existingKeyVaultName'), 'AZURE_OPENAI_API_KEY')).value]",
     "metadata": {
       "displayName": "Azure Open AI Key",
-      "description": "Azure OpenAI API Key"
+      "description": "Azure OpenAI API Key sourced from Key Vault"
     }
   },
   "azureOpenAIKeySecretUri": {
@@ -57,7 +65,6 @@
     }
   },
   "openAIAzureName": {
-
     "type": "string",
     "metadata": {
       "displayName": "Azure Open AI Name",
@@ -133,7 +140,7 @@
       "defaultValue": "text-embedding-3-small",
       "metadata": {
         "displayName": "Azure Embedding Deployment",
-        "description": "Azure OpenAI embedding deployment name used by the web app."
+        "description": "Azure OpenAI embedding deployment name used by the web and worker apps."
       }
     },
     "defaultEmbeddingModel": {
@@ -144,11 +151,11 @@
         "description": "Default embedding model to load on startup"
       }
     },
-    "webAppName": {
+    "appPrefix": {
       "type": "string",
-      "defaultValue": "flaskrag3-app",
+      "defaultValue": "smartlib-basic",
       "metadata": {
-        "description": "Name of the Web App"
+        "description": "Prefix for resource naming (smartlib-basic for marketplace)"
       }
     },
     "location": {
@@ -173,7 +180,7 @@
       }
     },
     "acrPassword": {
-      "type": "securestring",
+      "type": "secureString",
       "defaultValue": "YKcqIqD4SROyXx366E4VyicHuq+qtRN+LaB6mnjCgb+ACRB4aJoJ",
       "metadata": {
         "description": "Password for the Azure Container Registry"
@@ -186,6 +193,13 @@
         "description": "Docker image name for the web app (e.g., smartlib-web:latest)"
       }
     },
+    "workerDockerImageName": {
+      "type": "string",
+      "defaultValue": "smartlib-worker:latest",
+      "metadata": {
+        "description": "Docker image name for the worker app (e.g., smartlib-worker:latest)"
+      }
+    },
     "APP_CLIENT_ID": {
       "type": "string",
       "metadata": {
@@ -193,7 +207,7 @@
       }
     },
     "APP_CLIENT_SECRET": {
-      "type": "securestring",
+      "type": "secureString",
       "metadata": {
         "description": "Application Client Secret"
       }
@@ -206,7 +220,7 @@
       }
     },
     "appAdminPassword": {
-      "type": "securestring",
+      "type": "secureString",
       "defaultValue": "admin",
       "metadata": {
         "description": "Admin password for the application"
@@ -256,13 +270,15 @@
         "P1v2"
       ],
       "metadata": {
-        "description": "The SKU for the App Service Plan. Determines the pricing tier and capacity. B1=Basic, S1=Standard, P1v2=PremiumV2."
+        "description": "The SKU for the shared App Service Plan. Determines the pricing tier and capacity. B1=Basic, S1=Standard, P1v2=PremiumV2."
       }
     }
   },
   "variables": {
-    "effectiveWebAppName": "[if(or(equals(parameters('webAppName'), ''), equals(toLower(parameters('webAppName')), 'flaskrag3-app')), concat('smartlib-web-', uniqueString(resourceGroup().id, deployment().name)), parameters('webAppName'))]",
-    "appServicePlanName": "[concat(variables('effectiveWebAppName'), '-plan')]",
+    "baseAppName": "[concat(parameters('appPrefix'), '-', uniqueString(resourceGroup().id, deployment().name))]",
+    "sharedAppServicePlanName": "[concat(variables('baseAppName'), '-plan')]",
+    "webAppName": "[concat(variables('baseAppName'), '-web')]",
+    "workerAppName": "[concat(variables('baseAppName'), '-worker')]",
     "skuMap": {
       "B1": {
         "name": "B1",
@@ -283,7 +299,7 @@
     {
       "type": "Microsoft.Web/serverfarms",
       "apiVersion": "2022-03-01",
-      "name": "[variables('appServicePlanName')]",
+      "name": "[variables('sharedAppServicePlanName')]",
       "location": "[parameters('location')]",
       "sku": "[variables('selectedSku')]",
       "kind": "linux",
@@ -294,17 +310,17 @@
     {
       "type": "Microsoft.Web/sites",
       "apiVersion": "2022-03-01",
-      "name": "[parameters('webAppName')]",
+      "name": "[variables('webAppName')]",
       "location": "[parameters('location')]",
       "kind": "app,linux",
       "identity": {
         "type": "SystemAssigned"
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+        "[resourceId('Microsoft.Web/serverfarms', variables('sharedAppServicePlanName'))]"
       ],
       "properties": {
-        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('sharedAppServicePlanName'))]",
         "siteConfig": {
           "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/', parameters('webDockerImageName'))]",
           "appCommandLine": "./docker-entrypoint.sh web",
@@ -356,6 +372,10 @@
               "value": "8000"
             },
             {
+              "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
+              "value": "true"
+            },
+            {
               "name": "DOCKER_REGISTRY_SERVER_URL",
               "value": "[concat('https://', parameters('acrLoginServer'))]"
             },
@@ -377,7 +397,7 @@
             },
             {
               "name": "WEB_APP_NAME",
-              "value": "[parameters('webAppName')]"
+              "value": "[variables('webAppName')]"
             },
             {
               "name": "APP_CLIENT_ID",
@@ -443,12 +463,178 @@
               "name": "SQLALCHEMY_DATABASE_URI",
               "value": "sqlite:////home/data/app.db"
             },
-
+            {
+              "name": "RUN_DEFAULT_MODELS",
+              "value": "[if(parameters('runDefaultModels'), 'true', 'false')]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2022-03-01",
+      "name": "[variables('workerAppName')]",
+      "location": "[parameters('location')]",
+      "kind": "app,linux",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('sharedAppServicePlanName'))]"
+      ],
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('sharedAppServicePlanName'))]",
+        "siteConfig": {
+          "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/', parameters('workerDockerImageName'))]",
+          "appCommandLine": "./docker-entrypoint.sh worker",
+          "alwaysOn": true,
+          "azureStorageAccounts": {
+            "data": {
+              "type": "AzureFiles",
+              "accountName": "[parameters('storageAccountName')]",
+              "shareName": "[parameters('dataShareName')]",
+              "accessKey": "[if(equals(parameters('storageAccountKeySecretUri'), ''), parameters('storageAccountKey'), concat('@Microsoft.KeyVault(SecretUri=', parameters('storageAccountKeySecretUri'), ')'))]",
+              "mountPath": "/home/data"
+            }
+          },
+          "appSettings": [
+            {
+              "name": "CELERY_BROKER_URL",
+              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380, '?ssl_cert_reqs=none')]"
+            },
+            {
+              "name": "CELERY_RESULT_BACKEND",
+              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380, '?ssl_cert_reqs=none')]"
+            },
+            {
+              "name": "AZURE_OPENAI_API_KEY",
+              "value": "[if(equals(parameters('azureOpenAIKeySecretUri'), ''), parameters('azureOpenAIKey'), concat('@Microsoft.KeyVault(SecretUri=', parameters('azureOpenAIKeySecretUri'), ')'))]"
+            },
+            {
+              "name": "AZURE_OPENAI_ENDPOINT",
+              "value": "[parameters('azureOpenAIEndpoint')]"
+            },
+            {
+              "name": "AZURE_OPENAI_DEPLOYMENT",
+              "value": "[parameters('azureOpenAIDeployment')]"
+            },
+            {
+              "name": "AZURE_OPENAI_API_VERSION",
+              "value": "[parameters('azureOpenAIAPIVersion')]"
+            },
+            {
+              "name": "DOC_INTELLIGENCE_ENDPOINT",
+              "value": "[parameters('docIntelligenceEndpoint')]"
+            },
+            {
+              "name": "DOC_INTELLIGENCE_KEY",
+              "value": "[if(equals(parameters('docIntelligenceKeySecretUri'), ''), '', concat('@Microsoft.KeyVault(SecretUri=', parameters('docIntelligenceKeySecretUri'), ')'))]"
+            },
             {
               "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
               "value": "true"
             },
-
+            {
+              "name": "DOCKER_REGISTRY_SERVER_URL",
+              "value": "[concat('https://', parameters('acrLoginServer'))]"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_USERNAME",
+              "value": "[parameters('acrUsername')]"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_PASSWORD",
+              "value": "[parameters('acrPassword')]"
+            },
+            {
+              "name": "DOCKER_ENABLE_CI",
+              "value": "true"
+            },
+            {
+              "name": "KEY_VAULT_NAME",
+              "value": "[parameters('existingKeyVaultName')]"
+            },
+            {
+              "name": "APP_CLIENT_ID",
+              "value": "[parameters('APP_CLIENT_ID')]"
+            },
+            {
+              "name": "APP_CLIENT_SECRET",
+              "value": "[parameters('APP_CLIENT_SECRET')]"
+            },
+            {
+              "name": "APP_ADMIN_USERNAME",
+              "value": "[parameters('appAdminUsername')]"
+            },
+            {
+              "name": "APP_ADMIN_PASSWORD",
+              "value": "[if(equals(parameters('appAdminPasswordSecretUri'), ''), parameters('appAdminPassword'), concat('@Microsoft.KeyVault(SecretUri=', parameters('appAdminPasswordSecretUri'), ')'))]"
+            },
+            {
+              "name": "APP_ADMIN_EMAIL",
+              "value": "[if(equals(parameters('appAdminEmailSecretUri'), ''), parameters('appAdminEmail'), concat('@Microsoft.KeyVault(SecretUri=', parameters('appAdminEmailSecretUri'), ')'))]"
+            },
+            {
+              "name": "AUTO_PROMOTE_ADMIN",
+              "value": "[if(parameters('autoPromoteAdmin'), 'true', 'false')]"
+            },
+            {
+              "name": "ADMIN_USERNAME",
+              "value": "[parameters('appAdminUsername')]"
+            },
+            {
+              "name": "ADMIN_PASSWORD",
+              "value": "[if(equals(parameters('appAdminPasswordSecretUri'), ''), parameters('appAdminPassword'), concat('@Microsoft.KeyVault(SecretUri=', parameters('appAdminPasswordSecretUri'), ')'))]"
+            },
+            {
+              "name": "ADMIN_EMAIL",
+              "value": "[if(equals(parameters('appAdminEmailSecretUri'), ''), parameters('appAdminEmail'), concat('@Microsoft.KeyVault(SecretUri=', parameters('appAdminEmailSecretUri'), ')'))]"
+            },
+            {
+              "name": "DEFAULT_EMBEDDING_MODEL",
+              "value": "[parameters('azureEmbeddingDeployment')]"
+            },
+            {
+              "name": "AZURE_EMBEDDING_DEPLOYMENT",
+              "value": "[parameters('azureEmbeddingDeployment')]"
+            },
+            {
+              "name": "DATA_VOLUME_PATH",
+              "value": "/home/data"
+            },
+            {
+              "name": "UPLOAD_TEMP_DIR",
+              "value": "/home/data/tmp_uploads"
+            },
+            {
+              "name": "MAP_PUBLIC_DIR",
+              "value": "/home/data/maps"
+            },
+            {
+              "name": "VECTOR_STORE_BASE_PATH",
+              "value": "/home/data/chroma"
+            },
+            {
+              "name": "SQLALCHEMY_DATABASE_URI",
+              "value": "sqlite:////home/data/app.db"
+            },
+            {
+              "name": "WEBSITES_PORT",
+              "value": "8080"
+            },
+            {
+              "name": "WORKER_HEALTH_PORT",
+              "value": "8080"
+            },
+            {
+              "name": "ENABLE_WORKER_HEALTH_SERVER",
+              "value": "true"
+            },
+            {
+              "name": "WEBSITES_CONTAINER_START_TIME_LIMIT",
+              "value": "400"
+            },
             {
               "name": "RUN_DEFAULT_MODELS",
               "value": "[if(parameters('runDefaultModels'), 'true', 'false')]"
@@ -460,7 +646,7 @@
     {
       "type": "Microsoft.Insights/components",
       "apiVersion": "2020-02-02",
-      "name": "[concat(parameters('webAppName'), '-ai')]",
+      "name": "[concat(variables('webAppName'), '-ai')]",
       "location": "[parameters('location')]",
       "kind": "web",
       "properties": {
@@ -471,13 +657,27 @@
       "condition": "[parameters('createRoleAssignment')]",
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
-      "name": "[guid(resourceId('Microsoft.Web/sites', parameters('webAppName')), resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName')))]",
+      "name": "[guid(resourceId('Microsoft.Web/sites', variables('webAppName')), resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName')))]",
       "dependsOn": [
-        "[resourceId('Microsoft.Web/sites', parameters('webAppName'))]"
+        "[resourceId('Microsoft.Web/sites', variables('webAppName'))]"
       ],
       "scope": "[resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName'))]",
       "properties": {
-                "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')]",         "principalId": "[reference(resourceId('Microsoft.Web/sites', parameters('webAppName')), '2022-03-01', 'Full').identity.principalId]",
+                "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')]",         "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2022-03-01', 'Full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      }
+    },
+    {
+      "condition": "[parameters('createRoleAssignment')]",
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(resourceId('Microsoft.Web/sites', variables('workerAppName')), resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName')))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', variables('workerAppName'))]"
+      ],
+      "scope": "[resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName'))]",
+      "properties": {
+                "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')]",         "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2022-03-01', 'Full').identity.principalId]",
         "principalType": "ServicePrincipal"
       }
     }
@@ -485,7 +685,15 @@
   "outputs": {
     "webAppUrl": {
       "type": "string",
-      "value": "[concat('https://', parameters('webAppName'), '.azurewebsites.net')]"
+      "value": "[concat('https://', variables('webAppName'), '.azurewebsites.net')]"
+    },
+    "workerAppName": {
+      "type": "string",
+      "value": "[variables('workerAppName')]"
+    },
+    "sharedAppServicePlan": {
+      "type": "string",
+      "value": "[variables('sharedAppServicePlanName')]"
     },
     "acrLoginServer": {
       "type": "string",
@@ -494,6 +702,14 @@
     "keyVaultName": {
     "type": "string",
     "value": "[parameters('existingKeyVaultName')]"
+  },
+  "costSavings": {
+    "type": "object",
+    "value": {
+      "monthlyCost": "~$30",
+      "savings": "~$13 (30%)",
+      "description": "Shared App Service Plan reduces costs compared to separate plans"
+    }
   }
   }
 }

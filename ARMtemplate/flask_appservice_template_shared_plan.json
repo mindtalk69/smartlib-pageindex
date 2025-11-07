@@ -43,7 +43,7 @@
     },
   "azureOpenAIKey": {
     "type": "secureString",
-    "defaultValue": "[reference(resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults/secrets', parameters('existingKeyVaultName'), 'AZURE_OPENAI_API_KEY')).value]",
+    "defaultValue": "",
     "metadata": {
       "displayName": "Azure Open AI Key",
       "description": "Azure OpenAI API Key sourced from Key Vault"
@@ -153,14 +153,9 @@
     },
     "location": {
       "type": "string",
-      "defaultValue": "indonesiacentral",
-      "allowedValues": [
-        "indonesiacentral",
-        "southeastasia",
-        "eastasia"
-      ],
+      "defaultValue": "[resourceGroup().location]",
       "metadata": {
-        "description": "Location for all resources."
+        "description": "Deployment region for all resources."
       }
     },
     "acrLoginServer": {
@@ -273,9 +268,10 @@
     }
   },
   "variables": {
-    "sharedAppServicePlanName": "[concat(parameters('appPrefix'), '-plan')]",
-    "webAppName": "[concat(parameters('appPrefix'), '-web')]",
-    "workerAppName": "[concat(parameters('appPrefix'), '-worker')]",
+    "baseAppName": "[concat(parameters('appPrefix'), '-', uniqueString(resourceGroup().id, deployment().name))]",
+    "sharedAppServicePlanName": "[concat(variables('baseAppName'), '-plan')]",
+    "webAppName": "[concat(variables('baseAppName'), '-web')]",
+    "workerAppName": "[concat(variables('baseAppName'), '-worker')]",
     "skuMap": {
       "B1": {
         "name": "B1",

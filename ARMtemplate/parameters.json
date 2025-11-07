@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "tenantId": {
+      "value": "YOUR_TENANT_ID"
+    },
+    "existingRedisName": {
+      "value": "YOUR_REDIS_NAME"
+    },
+    "existingKeyVaultName": {
+      "value": "YOUR_KEY_VAULT_NAME"
+    },
+    "openAIAzureName": {
+      "value": "YOUR_OPENAI_RESOURCE_NAME"
+    },
+    "docIntelligenceEndpoint": {
+      "value": "YOUR_DOC_INTELLIGENCE_ENDPOINT"
+    },
+    "storageAccountName": {
+      "value": "YOUR_STORAGE_ACCOUNT_NAME"
+    },
+    "dataShareName": {
+      "value": "YOUR_DATA_SHARE_NAME"
+    },
+    "APP_CLIENT_ID": {
+      "value": "YOUR_APP_CLIENT_ID"
+    },
+    "APP_CLIENT_SECRET": {
+      "value": "YOUR_APP_CLIENT_SECRET"
+    }
+  }
+}

@@ -8,15 +8,14 @@
         "description": "The Azure AD tenant ID (required)"
       }
     },
-  "azureOpenAIKey": {
-    "type": "secureString",
-    "defaultValue": "[reference(resourceId('Microsoft.KeyVault/vaults/secrets', 'myKeyVaultName', 'AZURE_OPENAI_API_KEY')).value]",
-    "metadata": {
-      "displayName": "Azure Open AI Key",
-      "description": "Azure OpenAI API Key sourced from Key Vault"
-    }
-  },
-  "azureOpenAIKeySecretUri": {
+      "azureOpenAIKey": {
+        "type": "secureString",
+        "defaultValue": "",
+        "metadata": {
+          "displayName": "Azure Open AI Key",
+          "description": "Azure OpenAI API Key. Leave blank if using azureOpenAIKeySecretUri."
+        }
+      },  "azureOpenAIKeySecretUri": {
     "type": "string",
     "defaultValue": "",
     "metadata": {
@@ -31,31 +30,29 @@
       "description": "Name of the existing Azure OpenAI resource that must exist prior to deployment."
     }
   },
-  "azureOpenAIEndpoint": {
-    "type": "string",
-    "defaultValue": "",
-    "metadata": {
-      "displayName": "Azure Open AI Endpoint",
-      "description": "Fill with: [reference(resourceId('Microsoft.KeyVault/vaults/secrets', 'myKeyVaultName', 'AZURE_OPENAI_ENDPOINT')).value]"
-    }
-  },
-  "azureOpenAIDeployment": {
-    "type": "string",
-    "defaultValue": "",
-    "metadata": {
-      "displayName": "Azure Open AI Deployment Model",
-      "description": "Fill with: [reference(resourceId('Microsoft.KeyVault/vaults/secrets', 'myKeyVaultName', 'AZURE_OPENAI_DEPLOYMENT')).value]"
-    }
-  },
-  "azureOpenAIAPIVersion": {
-    "type": "string",
-    "defaultValue": "2024-10-21",
-    "metadata": {
-      "displayName": "Azure Open AI API Version",
-      "description": "Fill with: [reference(resourceId('Microsoft.KeyVault/vaults/secrets', 'myKeyVaultName', 'AZURE_OPENAI_API_VERSION')).value]"
-    }
-  },
-  "docIntelligenceEndpoint": {
+      "azureOpenAIEndpoint": {
+        "type": "string",
+        "defaultValue": "",
+        "metadata": {
+          "displayName": "Azure Open AI Endpoint",
+          "description": "Azure OpenAI Endpoint. Leave blank if using a Key Vault secret URI."
+        }
+      },    "azureOpenAIDeployment": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "displayName": "Azure Open AI Deployment Model",
+        "description": "Azure OpenAI Deployment Name. Leave blank if using a Key Vault secret URI."
+      }
+    },
+      "azureOpenAIAPIVersion": {
+        "type": "string",
+        "defaultValue": "2024-02-15-preview",
+        "metadata": {
+          "displayName": "Azure Open AI API Version",
+          "description": "Azure OpenAI API Version. Default is 2024-02-15-preview."
+        }
+      },  "docIntelligenceEndpoint": {
     "type": "string",
     "defaultValue": "",
     "metadata": {
@@ -111,23 +108,26 @@
         "description": "Default embedding model to load on startup"
       }
     },
-    "webAppName": {
+    "appPrefix": {
       "type": "string",
-      "defaultValue": "flaskrag3-app",
+      "defaultValue": "smartlib-basic",
       "metadata": {
-        "description": "Name of the Web App"
+        "description": "Prefix for resource naming (smartlib-basic for marketplace)"
+      }
+    },
+    "resourceBaseName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional override for the base resource name. Leave blank to auto-generate using the prefix and deployment context."
       }
     },
     "location": {
+
       "type": "string",
-      "defaultValue": "indonesiacentral",
-      "allowedValues": [
-        "indonesiacentral",
-        "southeastasia",
-        "eastasia"
-      ],
+      "defaultValue": "[resourceGroup().location]",
       "metadata": {
-        "description": "Location for all resources."
+        "description": "Deployment region for all resources."
       }
     },
     "acrLoginServer": {
@@ -160,9 +160,9 @@
     },
     "keyVaultName": {
       "type": "string",
-      "defaultValue": "[concat('kv', uniqueString(concat(parameters('webAppName'), utcNow())))]",
+      "defaultValue": "[concat('kv', uniqueString(resourceGroup().id, deployment().name))]",
       "metadata": {
-        "description": "Optional. Name of the Key Vault. If not specified, a unique name will be generated. Must be globally unique, 3-24 characters, alphanumeric, and no hyphens at start/end."
+        "description": "Optional. Name of the Key Vault. If left empty, a unique name is generated from the deployment context."
       }
     },    
     "APP_CLIENT_ID": {
@@ -240,8 +240,10 @@
     }
   },
   "variables": {
-    "appServicePlanName": "[concat(parameters('webAppName'), '-plan')]",
-    "redisCacheName": "[concat(parameters('webAppName'), '-redis')]",
+    "baseAppName": "[if(equals(parameters('resourceBaseName'), ''), concat(parameters('appPrefix'), '-', uniqueString(resourceGroup().id, deployment().name)), parameters('resourceBaseName'))]",
+    "appServicePlanName": "[concat(variables('baseAppName'), '-plan')]",
+    "webAppName": "[concat(variables('baseAppName'), '-web')]",
+    "redisCacheName": "[concat(variables('baseAppName'), '-redis')]",
     "skuMap": {
       "B1": {
         "name": "B1",
@@ -288,7 +290,7 @@
     {
       "type": "Microsoft.Web/sites",
       "apiVersion": "2022-03-01",
-      "name": "[parameters('webAppName')]",
+      "name": "[variables('webAppName')]",
       "location": "[parameters('location')]",
       "kind": "app,linux",
       "identity": {
@@ -357,8 +359,17 @@
     },
     {
       "name": "WEB_APP_NAME",
-      "value": "[parameters('webAppName')]"
+      "value": "[variables('webAppName')]"
     },
+    {
+      "name": "APP_PREFIX",
+      "value": "[parameters('appPrefix')]"
+    },
+    {
+      "name": "RESOURCE_BASE_NAME",
+      "value": "[variables('baseAppName')]"
+    },
+
     {
       "name": "APP_CLIENT_ID",
       "value": "[parameters('APP_CLIENT_ID')]"
@@ -456,7 +467,7 @@
     {
       "type": "Microsoft.Insights/components",
       "apiVersion": "2020-02-02",
-      "name": "[concat(parameters('webAppName'), '-ai')]",
+      "name": "[concat(variables('webAppName'), '-ai')]",
       "location": "[parameters('location')]",
       "kind": "web",
       "properties": {
@@ -483,24 +494,37 @@
     {
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
-      "name": "[guid(resourceId('Microsoft.Web/sites', parameters('webAppName')), resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')))]",
+      "name": "[guid(resourceId('Microsoft.Web/sites', variables('webAppName')), resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')))]",
       "dependsOn": [
-        "[resourceId('Microsoft.Web/sites', parameters('webAppName'))]",
+        "[resourceId('Microsoft.Web/sites', variables('webAppName'))]",
         "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
       ],
       "scope": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
       "properties": {
-                "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')]",         "principalId": "[reference(resourceId('Microsoft.Web/sites', parameters('webAppName')), '2022-03-01', 'Full').identity.principalId]",
+                "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')]",         "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2022-03-01', 'Full').identity.principalId]",
         "principalType": "ServicePrincipal"
       }
     }
   ],
   "outputs": {
+    "baseAppName": {
+      "type": "string",
+      "value": "[variables('baseAppName')]"
+    },
     "webAppUrl": {
       "type": "string",
-      "value": "[concat('https://', parameters('webAppName'), '.azurewebsites.net')]"
+      "value": "[concat('https://', variables('webAppName'), '.azurewebsites.net')]"
+    },
+    "webAppName": {
+      "type": "string",
+      "value": "[variables('webAppName')]"
+    },
+    "redisCacheName": {
+      "type": "string",
+      "value": "[variables('redisCacheName')]"
     },
     "acrLoginServer": {
+
       "type": "string",
       "value": "[parameters('acrLoginServer')]"
     },
