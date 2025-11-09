@@ -53,12 +53,12 @@
     <!-- Bootstrap Navbar (Copied from base.html for consistency) -->
     <nav class="navbar navbar-expand-lg navbar-dark" style="height: 48px;">
       <div class="container">
-          <img id="img-logo" src="{{ url_for('static', filename='img/logo.png') }}" style="height: 64px; width: 64px; object-fit: contain;" class="me-2" alt="SmartLib Logo">
+          <img id="img-logo" src="{{ url_for('static', filename='img/logo.png') }}" style="height: 48px; width: 48px; object-fit: contain;" class="me-2" alt="SmartLib Logo">
           <span class="fw-semibold">Smartlib</span>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="true" aria-label="Toggle navigation" style="z-index: 500;">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation" style="z-index: 500;">
           <span class="navbar-toggler-icon"></span>
         </button>
-        <div class="collapse navbar-collapse show" id="navbarSupportedContent" style="display: flex !important;">
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
           <ul class="navbar-nav ms-auto mb-0 mb-lg-0">
             {% if current_user.is_authenticated %}
               {# Note: Removed mb-2 from Home link as it might not be desired globally #}

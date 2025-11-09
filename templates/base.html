@@ -52,10 +52,10 @@
     <nav class="navbar navbar-expand-lg navbar-dark" style="overflow: visible !important; flex-shrink: 0;"> {# Added flex-shrink: 0 #}
       <div class="container" style="overflow: visible !important;"> {# Added overflow visible #}
         <a class="navbar-brand d-flex align-items-center" href="#">
-          <img id="img-logo" src="{{ url_for('static', filename='img/logo.png') }}" style="height: 64px; width: 64px; object-fit: contain;" class="me-2" alt="SmartLib Logo">
+          <img id="img-logo" src="{{ url_for('static', filename='img/logo.png') }}" style="height: 48px; width: 48px; object-fit: contain;" class="me-2" alt="SmartLib Logo">
           <span class="fw-semibold">Smartlib</span>
         </a>
-        <button class="navbar-toggler" type="button" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation" style="z-index: 500;" onclick="event.preventDefault(); var menu = document.getElementById('navbarSupportedContent'); menu.classList.toggle('show'); this.setAttribute('aria-expanded', menu.classList.contains('show'));">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation" style="z-index: 500;">
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarSupportedContent">

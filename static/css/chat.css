@@ -1,3 +1,30 @@
+/* Enhancement: Align mobile navbar menu under burger icon (right-aligned) */
+@media (max-width: 991.98px) {
+  .navbar-collapse.show {
+    left: auto;
+    right: 0;
+    width: 220px;
+    border-radius: 0 0 0.5rem 0.5rem;
+    margin-top: 2px;
+    /* Keep previous background, shadow, z-index, etc. */
+  }
+}
+/* Fix: Ensure mobile navbar menu overlays content with background and shadow */
+@media (max-width: 991.98px) {
+  .navbar-collapse.show {
+    background: var(--bs-dark, #222);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100vw;
+    z-index: 1050;
+    padding: 1rem 0;
+  }
+  .navbar-nav .nav-link {
+    color: #fff !important;
+  }
+}
 /* Set query-form background to dark, and query-form-inner transparent */
 
 /* Hide self-retriever context by default */
