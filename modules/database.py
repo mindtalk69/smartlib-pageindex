@@ -768,9 +768,8 @@ def delete_url_download(download_id):
         )
         return False
     try:
-        VectorReference.query.filter_by(url_download_id=download_id).update(
-            {"url_download_id": None}, synchronize_session=False
-        )
+        VectorReference.query.filter_by(url_download_id=download_id).delete(synchronize_session=False)
+        LibraryReference.query.filter_by(reference_type='url_download', source_id=download_id).delete(synchronize_session=False)
         db.session.delete(download)
         db.session.commit()
         logging.info(f"Deleted URL download {download_id}")

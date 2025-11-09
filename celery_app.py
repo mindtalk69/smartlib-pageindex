@@ -11,7 +11,7 @@ CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localho
 
 # Initialize Celery
 celery = Celery(
-    'flaskrag3',
+    'smartlib',
     broker=CELERY_BROKER_URL,
     backend=CELERY_RESULT_BACKEND,
 )

@@ -3,6 +3,20 @@
 
 let currentConversationId = null;
 
+const SELF_RETRIEVER_PREF_KEY = 'autoSelfRetrieverEnabled';
+
+function isSelfRetrieverAutoEnabled() {
+    if (typeof localStorage === 'undefined') {
+        return true;
+    }
+    try {
+        const storedValue = localStorage.getItem(SELF_RETRIEVER_PREF_KEY);
+        return storedValue === null ? true : storedValue === 'true';
+    } catch (error) {
+        return true;
+    }
+}
+
 const TYPEWRITER_STATES = new Map();
 const TYPEWRITER_CHAR_INTERVAL = 18;
 if (typeof window !== 'undefined') {
@@ -258,6 +272,19 @@ async function updateSelfRetrieverContextVisibility() {
         // This function is more for when "New Conversation" is clicked.
         console.log('[UpdateSelfRetriever] Chat is empty. Attempting to show self-retriever, hiding placeholder.');
 
+        if (!isSelfRetrieverAutoEnabled()) {
+            if (selfRetrieverPanel) {
+                selfRetrieverPanel.style.display = 'none';
+                selfRetrieverPanel.innerHTML = '';
+            }
+            if (typeof window.startPlaceholderAnimationAndShow === 'function') {
+                window.startPlaceholderAnimationAndShow();
+            } else if (placeholder) {
+                placeholder.style.display = 'block';
+            }
+            return;
+        }
+
         if (placeholder) {
             console.log('[UpdateSelfRetriever] Hiding placeholder initially, as self-retriever will be attempted.')
             placeholder.style.display = 'none';
@@ -335,6 +362,14 @@ function populateSelfRetrieverPanel(contextText) {
 // Fetch/generate self-retriever questions from backend
 // Make it return the promise for await
 function fetchSelfRetrieverContext(libraryId, knowledgeId) { 
+    if (!isSelfRetrieverAutoEnabled()) {
+        const panel = document.getElementById('self-retriever-context');
+        if (panel) {
+            panel.style.display = 'none';
+            panel.innerHTML = '';
+        }
+        return Promise.resolve(false);
+    }
     // CRITICAL: Ensure the promise chain is returned
     return window.fetchWithCsrfRetry('/api/self-retriever-questions', { // Use fetchWithCsrfRetry
         method: 'POST',
@@ -660,7 +695,9 @@ document.addEventListener('DOMContentLoaded', function() {
     setupLibrarySelect(); // Re-apply selection in case dropdown content changed
  
     // --- Self-Retriever: Initial fetch ---
-    fetchSelfRetrieverContext(libraryInputHidden ? (libraryInputHidden.value || null) : null, window.selectedKnowledgeId);
+    if (isSelfRetrieverAutoEnabled()) {
+        fetchSelfRetrieverContext(libraryInputHidden ? (libraryInputHidden.value || null) : null, window.selectedKnowledgeId);
+    }
  
     // --- Knowledge Dropdown Selection ---
 
@@ -690,7 +727,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
                 const currentLibraryId = libraryInputHidden ? (libraryInputHidden.value || null) : null;
-                fetchSelfRetrieverContext(currentLibraryId, window.selectedKnowledgeId);
+                if (isSelfRetrieverAutoEnabled()) {
+                    fetchSelfRetrieverContext(currentLibraryId, window.selectedKnowledgeId);
+                } else {
+                    const panel = document.getElementById('self-retriever-context');
+                    if (panel) {
+                        panel.style.display = 'none';
+                        panel.innerHTML = '';
+                    }
+                    const placeholder = document.getElementById('replacement-placeholder');
+                    const isChatEmpty = window.chatCore && window.chatCore.state && window.chatCore.state.messages.length === 0;
+                    if (isChatEmpty) {
+                        if (typeof window.startPlaceholderAnimationAndShow === 'function') {
+                            window.startPlaceholderAnimationAndShow();
+                        } else if (placeholder) {
+                            placeholder.style.display = 'block';
+                        }
+                    }
+                }
                 updateLibraryDropdown(window.selectedKnowledgeId);
                 setupLibrarySelect();
             }

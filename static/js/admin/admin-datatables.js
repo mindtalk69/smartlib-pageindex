@@ -93,9 +93,9 @@ $(document).ready(function() {
                     } else if (tableSelector === '#knowledgesTable') {
                         config.columnDefs.push({ targets: 4, render: data => data ? data : 'N/A' });
                     } else if (tableSelector === '#filesTable') {
-                        config.order = [[3, 'desc']];
+                        config.order = [[6, 'desc']];
                     } else if (tableSelector === '#downloadsTable') {
-                        config.order = [[7, 'desc']];
+                        config.order = [[8, 'desc']];
                     } else if (tableSelector === '#messagesTable') {
                         config.order = [[2, 'desc']];
                     }

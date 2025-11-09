@@ -398,7 +398,7 @@
             "name": "acrLoginServer",
             "type": "Microsoft.Common.TextBox",
             "label": "ACR login server",
-            "defaultValue": "atgmpnregistry.azurecr.io",
+            "defaultValue": "smartlibregistry-a0cpeuazg3cahnbr.azurecr.io",
             "toolTip": "Fully qualified login server for the Azure Container Registry (e.g., myregistry.azurecr.io).",
             "constraints": {
               "required": true
@@ -408,7 +408,7 @@
             "name": "acrUsername",
             "type": "Microsoft.Common.TextBox",
             "label": "ACR username",
-            "defaultValue": "atgmpnregistry",
+            "defaultValue": "smartlibregistry",
             "toolTip": "Username for the Azure Container Registry service principal or admin user.",
             "constraints": {
               "required": true

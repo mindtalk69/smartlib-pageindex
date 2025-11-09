@@ -100,7 +100,12 @@ class Config:
     APP_CLIENT_SECRET = os.environ.get('APP_CLIENT_SECRET')
     APP_TENANT_ID = os.environ.get('APP_TENANT_ID')
     APP_AUTHORITY = os.environ.get('APP_AUTHORITY') or f"https://login.microsoftonline.com/{os.environ.get('APP_TENANT_ID')}"
-    REDIRECT_URI = os.environ.get('REDIRECT_URI')
+
+    _website_hostname = os.environ.get('WEBSITE_HOSTNAME')
+    _default_redirect = (
+        f"https://{_website_hostname}/login_azure" if _website_hostname else None
+    )
+    REDIRECT_URI = os.environ.get('REDIRECT_URI', _default_redirect)
 
     # --- Docling Config ---
     DOCLING_EXPORT_TYPE = os.environ.get('DOCLING_EXPORT_TYPE', 'MARKDOWN')

@@ -1,10 +1,27 @@
-from flask import Blueprint, render_template, flash
-from modules.database import UploadedFile, User, build_knowledge_metadata_summary
 import logging
+import re
+from pathlib import Path
+
+from flask import Blueprint, jsonify, render_template, flash, current_app
+from flask_login import login_required
+
+from modules.database import (
+    Document,
+    LibraryReference,
+    UploadedFile,
+    User,
+    VectorReference,
+    VisualGroundingActivity,
+    build_knowledge_metadata_summary,
+    db,
+)
+from modules.llm_utils import get_lc_store_path
 
 files_bp = Blueprint('admin_files', __name__, url_prefix='/admin/files')
 
+
 @files_bp.route('/')
+@login_required
 def file_management():
     files = []
     try:
@@ -56,3 +73,107 @@ def file_management():
         flash("Error loading files.", "danger")
         files = []
     return render_template('admin/files.html', files=files)
+
+
+def _sanitize_collection_name(raw_value: str) -> str:
+    candidate = (raw_value or '').strip().replace(' ', '_') or 'documents-vectors'
+    if re.match(r'^[A-Za-z0-9._-]{3,512}$', candidate):
+        return candidate
+    return 'documents-vectors'
+
+
+def _delete_vectors(doc_ids, user_id, knowledge_id) -> int:
+    if not doc_ids:
+        return 0
+
+    vector_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb')
+    if vector_provider != 'chromadb':
+        logging.info("Vector deletion for provider %s is not implemented.", vector_provider)
+        return 0
+
+    try:
+        persist_path = get_lc_store_path(user_id=user_id, knowledge_id=knowledge_id)
+    except Exception as path_exc:
+        logging.error("Unable to resolve vector store path for user %s knowledge %s: %s", user_id, knowledge_id, path_exc)
+        return 0
+
+    if not persist_path:
+        logging.warning("Vector store path returned None for user %s knowledge %s", user_id, knowledge_id)
+        return 0
+
+    persist_dir = Path(persist_path)
+    if not persist_dir.exists():
+        logging.info("Vector store directory %s does not exist; skipping vector deletion", persist_dir)
+        return 0
+
+    collection_name = _sanitize_collection_name(current_app.config.get('CHROMA_COLLECTION_NAME', 'documents-vectors'))
+
+    try:
+        import chromadb
+    except ImportError as import_exc:
+        logging.error("Chroma backend not available when attempting vector deletion: %s", import_exc)
+        return 0
+
+    try:
+        client = chromadb.PersistentClient(path=str(persist_dir))
+        try:
+            collection = client.get_collection(name=collection_name)
+        except Exception as lookup_exc:
+            logging.info(
+                "Chroma collection %s not available at %s; skipping vector deletion (%s)",
+                collection_name,
+                persist_dir,
+                lookup_exc,
+            )
+            return 0
+
+        collection.delete(ids=doc_ids)
+        logging.info("Deleted %s vector entries from collection %s", len(doc_ids), collection_name)
+        return len(doc_ids)
+    except Exception as delete_exc:
+        logging.error("Failed removing vectors for doc_ids %s: %s", doc_ids, delete_exc, exc_info=True)
+        raise
+
+
+@files_bp.route('/delete/<int:file_id>', methods=['DELETE'])
+@login_required
+def delete_file(file_id: int):
+    uploaded_file = UploadedFile.query.get(file_id)
+    if not uploaded_file:
+        logging.warning("Attempt to delete missing file_id %s", file_id)
+        return jsonify({"status": "error", "message": "File record not found."}), 404
+
+    try:
+        docs = (
+            Document.query
+            .filter_by(
+                source=uploaded_file.original_filename,
+                library_id=uploaded_file.library_id,
+                knowledge_id=uploaded_file.knowledge_id,
+            )
+            .all()
+        )
+        doc_ids = [str(doc.id) for doc in docs]
+
+        vector_removed = 0
+        if doc_ids:
+            vector_removed = _delete_vectors(doc_ids, uploaded_file.user_id, uploaded_file.knowledge_id)
+            for doc in docs:
+                db.session.delete(doc)
+
+        VectorReference.query.filter_by(file_id=file_id).delete(synchronize_session=False)
+        LibraryReference.query.filter_by(reference_type='file', source_id=file_id).delete(synchronize_session=False)
+        VisualGroundingActivity.query.filter_by(file_id=file_id).delete(synchronize_session=False)
+
+        db.session.delete(uploaded_file)
+        db.session.commit()
+
+        message = "File deleted successfully."
+        if vector_removed:
+            message = f"File deleted successfully. Removed {vector_removed} vector chunk(s)."
+        logging.info("Admin removed file_id %s", file_id)
+        return jsonify({"status": "success", "message": message})
+    except Exception as exc:
+        logging.error("Failed to delete file_id %s: %s", file_id, exc, exc_info=True)
+        db.session.rollback()
+        return jsonify({"status": "error", "message": "Failed to delete file."}), 500

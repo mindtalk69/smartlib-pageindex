@@ -160,21 +160,21 @@
     },
     "acrLoginServer": {
       "type": "string",
-      "defaultValue": "atgmpnregistry.azurecr.io",
+      "defaultValue": "smartlibregistry-a0cpeuazg3cahnbr.azurecr.io",
       "metadata": {
         "description": "Full login server name of your existing Azure Container Registry (e.g., myregistry.azurecr.io)"
       }
     },
     "acrUsername": {
       "type": "string",
-      "defaultValue": "atgmpnregistry",
+      "defaultValue": "smartlibregistry",
       "metadata": {
         "description": "Username for the Azure Container Registry"
       }
     },
     "acrPassword": {
       "type": "secureString",
-      "defaultValue": "YKcqIqD4SROyXx366E4VyicHuq+qtRN+LaB6mnjCgb+ACRB4aJoJ",
+      "defaultValue": "fNH1+wgA26boX9Hhu8N/UttbQwAhGvy161HapmZb3++ACRA44py/",
       "metadata": {
         "description": "Password for the Azure Container Registry"
       }

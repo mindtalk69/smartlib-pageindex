@@ -5,6 +5,14 @@
 {% block admin_content %}
 <div class="container mt-4">
     {# Removed H2 and H6 as title is now in admin_title block #}
+    {% set download_list = downloads|default([]) %}
+    {% set has_downloads = download_list|length > 0 %}
+
+    {% if not has_downloads %}
+    <div class="alert alert-info text-center" role="status">
+        No URL downloads recorded yet.
+    </div>
+    {% endif %}
     
     <div class="table-responsive">
         <table class="table table-striped" id="downloadsTable"> 
@@ -24,7 +32,8 @@
                 </tr>
             </thead>
             <tbody>
-                {% for download in downloads %}
+                {% if has_downloads %}
+                {% for download in download_list %}
                 <tr data-id="{{ download.id }}">
                     <td>{{ loop.index }}</td>
                     <td>
@@ -74,13 +83,8 @@
                         </div>
                     </td>
                 </tr>
-                {% else %}
-                <tr>
-                    <td colspan="11" class="text-center text-muted py-4">
-                        No URL downloads recorded yet.
-                    </td>
-                </tr>
                 {% endfor %}
+                {% endif %}
             </tbody>
         </table>
     </div>

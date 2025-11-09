@@ -118,6 +118,36 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`[Options Controller] Restore last chat toggle initialized: ${restoreChatToggle.checked}`);
     }
 
+    const selfRetrieverToggle = document.getElementById('enable-self-retriever');
+    if (selfRetrieverToggle) {
+        const autoPref = localStorage.getItem('autoSelfRetrieverEnabled');
+        selfRetrieverToggle.checked = autoPref === null ? true : (autoPref === 'true');
+        selfRetrieverToggle.addEventListener('change', () => {
+            localStorage.setItem('autoSelfRetrieverEnabled', selfRetrieverToggle.checked ? 'true' : 'false');
+            if (!selfRetrieverToggle.checked) {
+                const panel = document.getElementById('self-retriever-context');
+                if (panel) {
+                    panel.style.display = 'none';
+                    panel.innerHTML = '';
+                }
+                const placeholder = document.getElementById('replacement-placeholder');
+                const chatEmpty = window.chatCore && window.chatCore.state && window.chatCore.state.messages.length === 0;
+                if (chatEmpty) {
+                    if (typeof window.startPlaceholderAnimationAndShow === 'function') {
+                        window.startPlaceholderAnimationAndShow();
+                    } else if (placeholder) {
+                        placeholder.style.display = 'block';
+                    }
+                }
+            } else if (typeof window.updateSelfRetrieverContextVisibility === 'function') {
+                window.updateSelfRetrieverContextVisibility();
+            }
+            console.log(`[Options Controller] Self-retriever auto generation setting changed: ${selfRetrieverToggle.checked}`);
+        });
+
+        console.log(`[Options Controller] Self-retriever toggle initialized: ${selfRetrieverToggle.checked}`);
+    }
+
     // --- Streaming answers toggle logic ---
     // Use MutationObserver for robust persistence across dynamic DOM changes
     function setupStreamTogglePersistence() {

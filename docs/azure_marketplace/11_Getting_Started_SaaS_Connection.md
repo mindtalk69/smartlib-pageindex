@@ -69,6 +69,8 @@ To enable single sign-on with your organization's Azure AD:
 3. Follow the guided setup process to connect your Azure AD tenant
 4. Enable or customize sync options for users and groups
 
+> **Provisioning note:** During Azure Marketplace deployments, the web app automatically falls back to the value of the platform-provided `WEBSITE_HOSTNAME` when building the Entra redirect URI (`https://<hostname>/login_azure`). Ensure the same hostname is registered as a redirect URI in your Entra application, or override `REDIRECT_URI` via App Settings if you need a custom domain. ARM templates can set this value automatically using the generated site name.
+
 #### Document Intelligence Setup
 
 SmartLib offers two OCR processing options:

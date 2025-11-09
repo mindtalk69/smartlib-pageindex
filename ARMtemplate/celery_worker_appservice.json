@@ -151,14 +151,14 @@
     },
     "acrLoginServer": {
       "type": "string",
-      "defaultValue": "atgmpnregistry.azurecr.io",
+      "defaultValue": "smartlibregistry-a0cpeuazg3cahnbr.azurecr.io",
       "metadata": {
         "description": "Full login server name of your Azure Container Registry"
       }
     },
     "acrUsername": {
       "type": "string",
-      "defaultValue": "atgmpnregistry",
+      "defaultValue": "smartlibregistry",
       "metadata": {
         "description": "Username for the Azure Container Registry"
       }

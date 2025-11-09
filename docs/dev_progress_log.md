@@ -1,5 +1,11 @@
 # SmartLib Dev Progress Log
 
+## 2025-11-05 – Admin Cleanup & Vector Hygiene
+- Synced the chat homepage and upload experience so knowledge/library pickers always reflect the same filtered sets for each user or group, preventing cross-assignment during ingestion.
+- Built an authenticated `/admin/files/delete/<id>` endpoint that removes documents, vector references, and Chroma chunks tied to an uploaded file, and wired the admin UI to call it with CSRF-aware fetch logic.
+- Hardened `/admin/downloads` empty states to avoid DataTables column warnings and fixed download deletion by purging matching `LibraryReference` rows before removing the URL record.
+- Documented the changes here ahead of the next rebuild/test cycle.
+
 ## 2025-11-04 – Admin Actions & ARM Secret URIs
 - Fixed the `/admin/users` toggle buttons by pointing their links to the `admin_users` blueprint routes, eliminating the 500s when promoting or disabling accounts from the grid.
 - Added optional `storageAccountKeySecretUri` parameters to every ARM template and wired the Azure Files mounts to favor Key Vault secrets while still allowing direct keys for local testing.
