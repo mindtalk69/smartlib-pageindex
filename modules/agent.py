@@ -529,13 +529,19 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
                     chroma_filter = explicit_filters
                 search_kwargs = {'k': k_docs, 'filter': chroma_filter}
 
+            retrieved_docs: List[Document] = []
+            manual_filter_fallback_used = False
+            last_chroma_error: Optional[Exception] = None
+
             if vector_provider == 'chromadb' and ChromaInternalError is not None:
                 max_attempts = 2
                 for attempt in range(1, max_attempts + 1):
                     try:
                         retrieved_docs = store.similarity_search(query, **search_kwargs)
+                        last_chroma_error = None
                         break
                     except ChromaInternalError as chroma_exc:
+                        last_chroma_error = chroma_exc
                         logging.warning(
                             "[RAG] Chroma InternalError during similarity_search (attempt %s/%s): %s",
                             attempt,
@@ -543,15 +549,40 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
                             chroma_exc,
                         )
                         if attempt == max_attempts:
-                            raise
+                            break
                         time.sleep(0.4)
                         store = Chroma(**chroma_kwargs)
-                else:
-                    retrieved_docs = []
+                if last_chroma_error is not None and not retrieved_docs:
+                    logging.warning(
+                        "[RAG] Falling back to manual metadata filter after Chroma InternalError: %s",
+                        last_chroma_error,
+                    )
+                    try:
+                        unfiltered_docs = store.similarity_search(query, k=k_docs * 3)
+                    except Exception as fallback_exc:
+                        logging.error(
+                            "[RAG] Manual fallback retrieval failed: %s",
+                            fallback_exc,
+                            exc_info=True,
+                        )
+                        unfiltered_docs = []
+                    else:
+                        filtered_docs: List[Document] = []
+                        for doc in unfiltered_docs:
+                            if all(doc.metadata.get(key) == value for key, value in explicit_filters.items()):
+                                filtered_docs.append(doc)
+                        retrieved_docs = filtered_docs
+                        manual_filter_fallback_used = True
+                        logging.info(
+                            "[RAG] Manual filter fallback produced %d documents",
+                            len(retrieved_docs),
+                        )
             else:
                 retrieved_docs = store.similarity_search(query, **search_kwargs)
 
             structured_query_string = f"Direct search with filters: {explicit_filters}"
+            if manual_filter_fallback_used:
+                structured_query_string += " (manual filter fallback)"
 
             logging.info(f"[RAG] Direct search retrieved {len(retrieved_docs)} documents")
 
@@ -2186,26 +2217,43 @@ def _looks_like_structured_query_blob(text: str) -> bool:
     if not text:
         return False
     stripped = text.strip()
-    if not (stripped.startswith("{") and stripped.endswith("}")):
-        return False
-    try:
-        data = json.loads(stripped)
-    except Exception:
-        return False
-    if not isinstance(data, dict):
-        return False
-    allowed_keys = {
-        "query",
-        "filter",
-        "filter_json",
-        "filter_context",
-        "structured_query",
-        "sql",
-        "metadata",
-        "top_k",
-    }
-    # If the blob only contains the allowed structured-query keys, treat it as a transient artifact
-    return set(data.keys()).issubset(allowed_keys)
+
+    lowered = stripped.lower()
+    if lowered.startswith("json"):
+        stripped = stripped[4:].lstrip(" :\n\t")
+    elif lowered.startswith("call_arguments"):
+        stripped = stripped[len("call_arguments"):].lstrip(" :\n\t")
+
+    if stripped.startswith("{") and stripped.endswith("}"):
+        try:
+            data = json.loads(stripped)
+        except Exception:
+            data = None
+        if isinstance(data, dict):
+            allowed_keys = {
+                "query",
+                "filter",
+                "filter_json",
+                "filter_context",
+                "structured_query",
+                "sql",
+                "metadata",
+                "top_k",
+            }
+            if set(data.keys()).issubset(allowed_keys):
+                return True
+
+    # Catch LangChain structured query dumps like "query='foo' filter=None limit=None"
+    if (
+        "query=" in stripped
+        and "filter" in stripped
+        and all(token in stripped for token in ["query=", "filter", "limit"])
+        and "\n" not in stripped
+        and len(stripped) < 200
+    ):
+        return True
+
+    return False
 
 
 async def _collect_stream_chunks(graph, inputs, config):
