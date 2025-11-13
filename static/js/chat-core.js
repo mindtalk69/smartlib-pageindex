@@ -102,6 +102,15 @@ class ChatCore {
     this.state.messages[messageIndex] = updatedMessage;
      // Log the *complete* state of the message AFTER the update, stringified for clarity
     console.log(`[ChatCore] Message ${messageId} updated in internal state:`, JSON.stringify(updatedMessage));
+
+    try {
+      const max = this.config.maxMessages || 1000;
+      const trimmed = this.state.messages.slice(-max);
+      localStorage.setItem('chatHistory', JSON.stringify(trimmed));
+    } catch (e) {
+      console.error('[ChatCore] Failed to persist updated chat history to localStorage:', e);
+    }
+
     this._triggerEvent('messageUpdated', { 
       message: updatedMessage,
       previous: this.state.messages[messageIndex]

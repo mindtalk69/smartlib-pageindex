@@ -17,14 +17,35 @@ from transformers import AutoTokenizer
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 # Import the correct Document class from Langchain and alias it
 from langchain.docstore.document import Document as LangchainDocument
-from modules.ocr_utils import is_image_only_pdf,Is_cuda_available, clean_markdown_content, Get_image_first_page_base64, run_easyocr_on_image, run_easyocr_on_pdf_all_pages
+from modules.ocr_utils import (
+    is_image_only_pdf,
+    Is_cuda_available,
+    clean_markdown_content,
+    Get_image_first_page_base64,
+    run_rapidocr_on_pdf_all_pages,
+)
 from uuid import uuid4 # create Id documents
 from modules.llm_utils import get_embedding_model_name, classify_document_metadata, classify_document_metadata_multimodal
 from modules.database import (
-    add_vector_reference, add_uploaded_file, add_library_reference, add_document, get_knowledge_by_id, add_visual_grounding_activities, 
-    Library, Knowledge, Document as DBDocument,  db # Renamed DB Document to avoid confusion, import DB
+    add_vector_reference,
+    add_uploaded_file,
+    add_library_reference,
+    add_document,
+    get_knowledge_by_id,
+    add_visual_grounding_activities,
+    cleanup_failed_ingestion,
+    Library,
+    Knowledge,
+    Document as DBDocument,
+    db,
 )
-from modules.database import UploadedFile, LibraryReference, VisualGroundingActivity, AppSettings, update_url_download
+from modules.database import (
+    UploadedFile,
+    LibraryReference,
+    VisualGroundingActivity,
+    AppSettings,
+    update_url_download,
+)
 # Import the vector store processing function from the new utility module
 from modules.vector_store_utils import process_and_store_chunks
 
@@ -248,7 +269,7 @@ def process_uploaded_file(
                  # Preparing docling pipeline for local OCR
                 from docling.datamodel.pipeline_options import (
                         PdfPipelineOptions,
-                        EasyOcrOptions
+                        RapidOcrOptions
                     )
                 # Configure local OCR for PDFs whenever local OCR is enabled (not only for image-only PDFs)
                 pipeline_options = PdfPipelineOptions()
@@ -257,10 +278,10 @@ def process_uploaded_file(
                 pipeline_options.do_ocr = True
                 pipeline_options.do_table_structure = True
                 pipeline_options.table_structure_options.do_cell_matching = True
-                # Prefer EasyOCR for local OCR; fall back to RapidOCR if EasyOCR options are not available
+                # Prefer RapidOCR for local OCR when available
                 try:
-                    ocr_options = EasyOcrOptions(force_full_page_ocr=True)
-                    logger.info("Configuring local OCR with EasyOCR (fallback) for PDFs")
+                    ocr_options = RapidOcrOptions(force_full_page_ocr=True)
+                    logger.info("Configuring local OCR with RapidOCR for PDFs")
                 except Exception as ocr_e:
                     ocr_options = None
 
@@ -406,14 +427,14 @@ def process_uploaded_file(
     if not splits:
         logger.warning(f"No content chunks generated for {filename}.")
 
-        # Attempt OCR fallback using EasyOCR on all pages for PDFs
+        # Attempt OCR fallback using RapidOCR on all pages for PDFs
         fallback_created = False
         try:
             if file_ext == ".pdf":
                 try:
                     # Use project defaults tuned for balanced OCR quality and speed:
                     # DPI=200, preprocess=True, threshold=True. GPU usage follows IS_CUDA.
-                    pages_ocr = run_easyocr_on_pdf_all_pages(
+                    pages_ocr = run_rapidocr_on_pdf_all_pages(
                         file_path,
                         languages=['en'],
                         gpu=IS_CUDA,
@@ -422,7 +443,10 @@ def process_uploaded_file(
                         threshold=True,
                     )
                 except Exception as e_pages:
-                    logger.error(f"Failed to run multi-page EasyOCR fallback: {e_pages}", exc_info=True)
+                    logger.error(
+                        f"Failed to run multi-page RapidOCR fallback: {e_pages}",
+                        exc_info=True,
+                    )
                     pages_ocr = []
 
                 if pages_ocr:
@@ -602,6 +626,8 @@ def process_uploaded_file(
          return {'success': False, 'message': f"Server configuration error (embedding model): {emb_err}"}
 
 
+    library_ref_id = None
+
     try:
         uploaded_file = UploadedFile(
             user_id=user_id,
@@ -630,6 +656,8 @@ def process_uploaded_file(
             source_id=file_id
         )
         db.session.add(library_ref)
+        db.session.flush()
+        library_ref_id = library_ref.reference_id
         logger.info(f"Added file_id {file_id} to library_id {library_id}")
 
         # --- Vector Store Processing ---
@@ -693,31 +721,55 @@ def process_uploaded_file(
             db.session.rollback()
             return {'success': False, 'message': f"Failed to save document metadata: {meta_e}"}
 
+        try:
+            db.session.commit()
+        except Exception as commit_err:
+            db.session.rollback()
+            logger.error(
+                "Failed to commit metadata transaction for %s: %s",
+                filename,
+                commit_err,
+                exc_info=True,
+            )
+            return {'success': False, 'message': f"Failed to persist document metadata: {commit_err}"}
 
         # --- Add to Vector Store ---
-        chunks_count = 0 # Initialize count
+        chunks_count = 0
         try:
-            
             chunks_count = process_and_store_chunks(
-                processed_splits, # Pass the final list with all metadata
+                processed_splits,
                 user_id,
                 embedding_function,
                 logger,
-                file_id=file_id, # Pass file_id for association
+                file_id=file_id,
                 url_download_id=url_download_id,
-                knowledge_id=knowledge_id_int, # Pass knowledge_id for pathing
-                new_uuid_indexes=new_uuid_strings, # Pass the generated UUIDs
+                knowledge_id=knowledge_id_int,
+                new_uuid_indexes=new_uuid_strings,
             )
-            logger.info(f"Saved {chunks_count} document chunks to vector store completed")
+            logger.info("Saved %s document chunks to vector store completed", chunks_count)
         except Exception as vector_e:
-            logger.error(f"Failed to save to Vector store: {vector_e}", exc_info=True)
-            # Rollback DB changes if vector store fails
-            db.session.rollback()
+            logger.error("Failed to save to Vector store: %s", vector_e, exc_info=True)
+            try:
+                cleanup_failed_ingestion(
+                    file_id=file_id,
+                    document_ids=new_uuid_objects,
+                    library_reference_id=library_ref_id,
+                    url_download_id=url_download_id,
+                )
+            except Exception as cleanup_err:
+                logger.error(
+                    "Failed to clean up after vector store error for %s: %s",
+                    filename,
+                    cleanup_err,
+                    exc_info=True,
+                )
             return {'success': False, 'message': f"Failed to save document vectors: {vector_e}"}
 
-        # If everything succeeded, commit the database transaction
-        db.session.commit()
-        return {'success': True, 'message': f"Processed successfully ({chunks_count} chunks){grounding_msg}.", 'file_id': file_id}
+        return {
+            'success': True,
+            'message': f"Processed successfully ({chunks_count} chunks){grounding_msg}.",
+            'file_id': file_id,
+        }
 
     except Exception as proc_e:
         # Catch any other unexpected errors during the DB/vector store phase

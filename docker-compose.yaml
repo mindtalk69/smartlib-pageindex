@@ -19,7 +19,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/app/data
+      - ./data:/home/data
     env_file:
       - .env.dev
     environment:
@@ -44,7 +44,7 @@ services:
       context: .
       dockerfile: Dockerfile.worker
     volumes:
-      - ./data:/app/data
+      - ./data:/home/data
     env_file:
       - .env.dev
     environment:

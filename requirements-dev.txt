@@ -53,7 +53,6 @@ docling-core==2.27.0
 docling-ibm-models==3.4.1
 docling-parse==4.0.1
 durationpy==0.9
-easyocr==1.7.2
 et_xmlfile==2.0.0
 executing==2.2.0
 fastapi==0.115.9

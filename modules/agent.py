@@ -2224,6 +2224,10 @@ def _looks_like_structured_query_blob(text: str) -> bool:
     elif lowered.startswith("call_arguments"):
         stripped = stripped[len("call_arguments"):].lstrip(" :\n\t")
 
+    # Skip obvious markdown fences such as ```json
+    if lowered.startswith("```json"):
+        return True
+
     if stripped.startswith("{") and stripped.endswith("}"):
         try:
             data = json.loads(stripped)
@@ -2242,6 +2246,11 @@ def _looks_like_structured_query_blob(text: str) -> bool:
             }
             if set(data.keys()).issubset(allowed_keys):
                 return True
+
+        # Handle uppercase / unquoted LangChain blobs like { QUERY: ..., FILTER: ... }
+        upper = stripped.upper()
+        if "QUERY" in upper and "FILTER" in upper:
+            return True
 
     # Catch LangChain structured query dumps like "query='foo' filter=None limit=None"
     if (
@@ -2283,6 +2292,77 @@ async def _collect_stream_chunks(graph, inputs, config):
     user_id_from_config = configurable_values.get("user_id")  # Get user_id for DB ops
     thread_id_from_config = configurable_values.get("thread_id")
 
+    skip_structured_fence_active = False
+
+    def _coerce_chunk_to_text(raw_content: Any) -> str:
+        if raw_content is None:
+            return ""
+        if isinstance(raw_content, str):
+            return raw_content
+        if isinstance(raw_content, list):
+            parts: List[str] = []
+            for item in raw_content:
+                if isinstance(item, dict):
+                    parts.append(str(item.get("text", "")))
+                else:
+                    parts.append(str(item))
+            return "".join(parts)
+        return str(raw_content)
+
+    def _sanitize_stream_chunk(raw_content: Any) -> str:
+        nonlocal skip_structured_fence_active
+        text = _coerce_chunk_to_text(raw_content)
+        if not text:
+            return ""
+
+        result_segments: List[str] = []
+        cursor = 0
+        length = len(text)
+
+        while cursor < length:
+            if skip_structured_fence_active:
+                closing_idx = text.find("```", cursor)
+                if closing_idx == -1:
+                    # Entire remainder stays inside fenced block; drop it.
+                    cursor = length
+                    break
+                cursor = closing_idx + 3
+                skip_structured_fence_active = False
+                continue
+
+            lowered_slice = text.lower()
+            json_fence_idx = lowered_slice.find("```json", cursor)
+            generic_fence_idx = text.find("```", cursor)
+
+            # Determine the next fence (prefer ```json if both present at same position)
+            start_idx = -1
+            fence_len = 3
+            if json_fence_idx != -1 and (generic_fence_idx == -1 or json_fence_idx <= generic_fence_idx):
+                start_idx = json_fence_idx
+                fence_len = len("```json")
+            elif generic_fence_idx != -1:
+                start_idx = generic_fence_idx
+                fence_len = 3
+
+            if start_idx == -1:
+                segment = text[cursor:]
+                cursor = length
+                if segment and not _looks_like_structured_query_blob(segment.strip()):
+                    result_segments.append(segment)
+                break
+
+            if start_idx > cursor:
+                segment = text[cursor:start_idx]
+                if segment and not _looks_like_structured_query_blob(segment.strip()):
+                    result_segments.append(segment)
+            cursor = start_idx + fence_len
+            skip_structured_fence_active = True
+
+        sanitized = "".join(result_segments)
+        if sanitized and _looks_like_structured_query_blob(sanitized.strip()):
+            return ""
+        return sanitized
+
     if db_message_id_from_config is not None:
         final_response_obj["message_id"] = str(db_message_id_from_config)
     if thread_id_from_config is not None:
@@ -2307,13 +2387,11 @@ async def _collect_stream_chunks(graph, inputs, config):
             kind = chunk_event["event"]
 
             if kind == "on_chat_model_stream":
-                content = chunk_event["data"]["chunk"].content
-                if content:
-                    if _looks_like_structured_query_blob(content):
-                        logging.debug("[_collect_stream_chunks] Skipping structured-query chunk: %s", content)
-                        continue
-                    full_streamed_content += content
-                    yield f"data: {json.dumps({'type': 'text_chunk', 'content': content})}\n\n"
+                raw_content = chunk_event["data"]["chunk"].content
+                sanitized_content = _sanitize_stream_chunk(raw_content)
+                if sanitized_content:
+                    full_streamed_content += sanitized_content
+                    yield f"data: {json.dumps({'type': 'text_chunk', 'content': sanitized_content})}\n\n"
             
             elif kind == "on_tool_end":
                 tool_name = chunk_event.get("name")
@@ -2330,19 +2408,40 @@ async def _collect_stream_chunks(graph, inputs, config):
                 if isinstance(node_output, dict) and "agent_output" in node_output:
                     agent_output_data = node_output["agent_output"]
                     if isinstance(agent_output_data, dict):
-                        for key in ["citations", "suggested_questions", "usage_metadata", "is_evidence", "source_type", 
-                                    "chart_image_base64", "chart_image_mime_type", 
-                                    "map_image_base64", "map_image_mime_type", "html_map_url",
-                                    "confirmation_required", "confirmation_type", "thread_id", "structured_query", "hil_options"]:
+                        if "structured_query" in agent_output_data:
+                            final_response_obj["structured_query"] = agent_output_data["structured_query"]
+                        for key in [
+                            "citations",
+                            "suggested_questions",
+                            "usage_metadata",
+                            "is_evidence",
+                            "source_type",
+                            "chart_image_base64",
+                            "chart_image_mime_type",
+                            "map_image_base64",
+                            "map_image_mime_type",
+                            "html_map_url",
+                            "confirmation_required",
+                            "confirmation_type",
+                            "thread_id",
+                            "hil_options",
+                        ]:
                             if key in agent_output_data:
                                 final_response_obj[key] = agent_output_data[key]
                         if "answer" in agent_output_data:
                             formatted_answer = agent_output_data.get("answer") or ""
                             if not isinstance(formatted_answer, str):
                                 formatted_answer = str(formatted_answer)
-                            final_response_obj["answer"] = formatted_answer
-                            full_streamed_content = formatted_answer
-                        yield f"data: {json.dumps({'type': 'metadata_update', 'metadata': agent_output_data})}\n\n"
+                            sanitized_answer = _sanitize_stream_chunk(formatted_answer)
+                            final_response_obj["answer"] = sanitized_answer or formatted_answer
+                            full_streamed_content = final_response_obj["answer"]
+                        safe_metadata = {
+                            key: value
+                            for key, value in agent_output_data.items()
+                            if key != "structured_query"
+                        }
+                        if safe_metadata:
+                            yield f"data: {json.dumps({'type': 'metadata_update', 'metadata': safe_metadata})}\n\n"
     except GraphInterrupt:
         hil_interrupt = True
         logging.info("[_collect_stream_chunks] GraphInterrupt caught during streaming; preparing HIL confirmation payload.")

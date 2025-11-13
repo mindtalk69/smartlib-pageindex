@@ -35,6 +35,35 @@ THRESHOLD_CLIPPING = 200 # Character limit for text clipping
 def clip_text(text, threshold=THRESHOLD_CLIPPING):
     return f"{text[:threshold]}..." if len(text) > threshold else text
 
+
+def _fetch_document_record(document_id_str: str):
+    """Resolve a Document row regardless of UUID string formatting."""
+    import uuid
+
+    try:
+        doc_uuid = uuid.UUID(document_id_str)
+    except (ValueError, TypeError):
+        return None
+
+    candidates = []
+    for candidate in (doc_uuid, doc_uuid.hex, document_id_str.replace('-', '')):
+        if candidate and candidate not in candidates:
+            candidates.append(candidate)
+
+    for candidate in candidates:
+        try:
+            record = db.session.get(DB_Document, candidate)
+        except Exception:
+            record = None
+        if record is not None:
+            return record
+
+    string_candidates = [candidate for candidate in candidates if isinstance(candidate, str)]
+    if string_candidates:
+        return DB_Document.query.filter(DB_Document.id.in_(string_candidates)).first()
+
+    return None
+
 # --- Helper generators for streaming responses ---
 def _stream_cancellation_event_for_resume():
     """Generator that yields a cancellation SSE payload for resume endpoints."""
@@ -1033,15 +1062,13 @@ def init_query(app):
             return jsonify({"error": "Missing document_id parameter"}), 400
 
         try:
-            # The document_id from the citation is the chunk's UUID
-            document_uuid = uuid.UUID(document_id_str)
+            # Validate the UUID format first
+            uuid.UUID(document_id_str)
         except ValueError:
             return jsonify({"error": "Invalid document_id format"}), 400
 
         try:
-            # Query the Document table for the specific chunk that was cited
-            trigger_chunk = db.session.get(DB_Document, document_uuid)
-
+            trigger_chunk = _fetch_document_record(document_id_str)
             if not trigger_chunk:
                 return jsonify({"error": "Document chunk not found"}), 404
 
@@ -1133,7 +1160,7 @@ def init_query(app):
         document_id = request.args.get('document_id')
         if not document_id:
             return jsonify({"error": "Missing document_id parameter"}), 400
-        doc_obj = DB_Document.query.filter_by(id=uuid.UUID(document_id)).first()
+        doc_obj = _fetch_document_record(document_id)
         if not doc_obj:
             return jsonify({"error": "Document not found"}), 404
         page = None
@@ -1164,7 +1191,7 @@ def init_query(app):
 
         if document_id:
             try:
-                doc_obj = DB_Document.query.filter_by(id=uuid.UUID(document_id)).first()
+                doc_obj = _fetch_document_record(document_id)
                 if not doc_obj:
                     return jsonify({"error": "Document not found in database."}), 404
                 docling_json_path_rel = doc_obj.docling_json_path

@@ -1,125 +1,141 @@
-import os,fitz  # PyMuPDF
-import logging
-from langchain_community.document_loaders import AzureAIDocumentIntelligenceLoader
-from pdfminer.high_level import extract_text
-import re
 import base64
+import logging
+import os
+import re
 from io import BytesIO
-from PIL import Image
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
-logger = logging.getLogger(__name__) # Add logger
+import fitz  # type: ignore[import-not-found]  # PyMuPDF
+import numpy as np
+from pdfminer.high_level import extract_text
+from PIL import Image, ImageOps
+
+if TYPE_CHECKING:  # pragma: no cover - import only for type hints
+    from rapidocr_onnxruntime import RapidOCR
+
+logger = logging.getLogger(__name__)
+
+PathLike = Union[str, os.PathLike[str]]
 
 
-def is_image_only_pdf(pdf_path):
-    doc = fitz.open(pdf_path)
-    text = extract_text(pdf_path).strip()
-    
-    # Check if any page has extractable text
-    if text:
-        return False  # Contains selectable text, not just images
-    
-    # Check if every page contains images
-    for page_num in range(len(doc)):
-        images = doc[page_num].get_images(full=True)
-        if not images:  # If a page lacks images, it may contain actual text
+def is_image_only_pdf(pdf_path: PathLike) -> bool:
+    try:
+        doc: Any = fitz.open(pdf_path)
+    except Exception as exc:
+        logger.error(
+            "Failed to open PDF for inspection %s: %s", pdf_path, exc, exc_info=True
+        )
+        return False
+
+    try:
+        try:
+            extracted_text = extract_text(str(pdf_path)).strip()
+        except Exception as extract_exc:
+            logger.warning(
+                "Failed to extract text while checking PDF %s: %s",
+                pdf_path,
+                extract_exc,
+                exc_info=True,
+            )
+            extracted_text = ""
+
+        if extracted_text:
             return False
 
-    return True  # All pages contain images, likely an image-only PDF
+        for page_index in range(len(doc)):
+            page: Any = doc.load_page(page_index)
+            images = page.get_images(full=True)  # type: ignore[attr-defined]
+            if not images:
+                return False
+        return True
+    finally:
+        try:
+            doc.close()
+        except Exception:
+            pass
 
-def Is_cuda_available():
-#"*** Check if avaliale with torch***"
-    import torch
 
-    return torch.cuda.is_available()
-    
+def Is_cuda_available() -> bool:
+    try:
+        import torch
+
+        return bool(torch.cuda.is_available())
+    except Exception:
+        return False
+
+
 # Clean up markdown content
-def clean_markdown_content(content):    
-    content = re.sub(r"<.*?>", "", content)  # Remove HTML tags like <figure>
-    content = re.sub(r"[\\]+", "", content) # Remove escape characters like \
+def clean_markdown_content(content: str) -> str:
+    content = re.sub(r"<.*?>", "", content)
+    content = re.sub(r"[\\]+", "", content)
     return content.strip()
 
 
-def Get_image_first_page_base64(pdf_path):
-    """
-    Extracts the first page of a PDF as a Base64 encoded PNG image.
-
-    Args:
-        pdf_path (str): The path to the PDF file.
-
-    Returns:
-        str: Base64 encoded PNG image string, or None if an error occurs.
-    """
-    doc = None  # Initialize doc to None for the finally block
+def Get_image_first_page_base64(pdf_path: PathLike) -> Optional[str]:
+    doc: Optional[Any] = None
     try:
         if not os.path.exists(pdf_path):
-            logger.error(f"PDF file not found: {pdf_path}")
+            logger.error("PDF file not found: %s", pdf_path)
             return None
 
         doc = fitz.open(pdf_path)
-
         if len(doc) == 0:
-            logger.error(f"PDF has no pages: {pdf_path}")
+            logger.error("PDF has no pages: %s", pdf_path)
             return None
 
-        # Get the first page
-        page = doc.load_page(0)  # 0-based index
+        page: Any = doc.load_page(0)
+        pix = page.get_pixmap()  # type: ignore[attr-defined]
 
-        # Render the page to a pixmap (consider increasing DPI for higher quality if needed)
-        # pix = page.get_pixmap(dpi=150) # Example: Higher DPI
-        pix = page.get_pixmap() # Default DPI
+        image = Image.frombytes(
+            "RGB",
+            (int(pix.width), int(pix.height)),
+            pix.samples,
+        )
 
-        # Convert pixmap to PIL Image
-        image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-
-        # Save image to BytesIO for Base64 encoding
-        image_bytes = BytesIO()
-        image.save(image_bytes, format="PNG")  # Save as PNG format
-        image_bytes.seek(0) # Reset buffer position to the beginning
-
-        # Encode image as Base64
-        image_base64 = base64.b64encode(image_bytes.read()).decode("utf-8")
-
-        return image_base64
-
-    except Exception as e:
-        logger.error(f"Error processing PDF '{pdf_path}' for first page image: {e}", exc_info=True)
+        buffer = BytesIO()
+        image.save(buffer, format="PNG")
+        buffer.seek(0)
+        encoded = base64.b64encode(buffer.read()).decode("utf-8")
+        return encoded
+    except Exception as exc:
+        logger.error(
+            "Error processing PDF '%s' for first page image: %s",
+            pdf_path,
+            exc,
+            exc_info=True,
+        )
         return None
     finally:
-        if doc:
+        if doc is not None:
             try:
-                doc.close() # Ensure the document is closed
-            except Exception as close_e:
-                logger.error(f"Error closing PDF document '{pdf_path}': {close_e}")
+                doc.close()
+            except Exception:
+                pass
 
-def _preprocess_pil_image_for_ocr(image, resize_to=None, enhance_contrast=True, to_grayscale=True, threshold=False):
-    """
-    Apply preprocessing to a PIL Image to improve OCR accuracy.
 
-    - image: PIL.Image instance
-    - resize_to: (width, height) tuple or None — if provided, image will be resized preserving aspect ratio to the given width (height can be None)
-    - enhance_contrast: apply autocontrast
-    - to_grayscale: convert to 'L' mode
-    - threshold: apply simple binary thresholding (after grayscale)
-
-    Returns a new PIL.Image instance ready for OCR.
-    """
-    try:
-        from PIL import ImageOps, ImageFilter, Image
-    except Exception:
-        return image
-
+def _preprocess_pil_image_for_ocr(
+    image: Image.Image,
+    resize_to: Optional[Tuple[Optional[int], Optional[int]]] = None,
+    enhance_contrast: bool = True,
+    to_grayscale: bool = True,
+    threshold: bool = False,
+) -> Image.Image:
     img = image.copy()
+    resampling_module = getattr(Image, "Resampling", Image)
 
-    # Optional resize (scale up for small images)
     if resize_to:
-        try:
-            target_w, target_h = resize_to
-            if target_w and not target_h:
-                w_percent = target_w / float(img.width)
-                target_h = int(float(img.height) * float(w_percent))
-            img = img.resize((target_w, target_h), Image.LANCZOS)
-        except Exception:
-            pass
+        target_w, target_h = resize_to
+        if target_w and not target_h:
+            w_percent = target_w / float(img.width)
+            target_h = int(float(img.height) * w_percent)
+        if target_w and target_h:
+            try:
+                img = img.resize(
+                    (target_w, target_h),
+                    resampling_module.LANCZOS,  # type: ignore[attr-defined]
+                )
+            except Exception:
+                img = img.resize((target_w, target_h))
 
     if enhance_contrast:
         try:
@@ -135,178 +151,224 @@ def _preprocess_pil_image_for_ocr(image, resize_to=None, enhance_contrast=True, 
 
     if threshold:
         try:
-            # Simple adaptive threshold: use a fixed threshold after converting to L
             thresh = 160
-            img = img.point(lambda p: 255 if p > thresh else 0)
+            img = img.point(lambda pixel: 255 if pixel > thresh else 0)  # type: ignore[arg-type]
         except Exception:
             pass
 
-    # Optional slight blur/denoise (uncomment if desired)
-    # try:
-    #     img = img.filter(ImageFilter.MedianFilter(size=3))
-    # except Exception:
-    #     pass
-
     return img
 
-def run_easyocr_on_image(image_path, languages=['en'], gpu=False, preprocess=False, resize_width=None, threshold=False):
-    """
-    Run EasyOCR on an image file and return a tuple (concatenated_text, detailed_results).
 
-    - image_path: path to an image file (PNG/JPG/etc.) or a file-like object supported by easyocr.
-    - languages: list of language codes for EasyOCR (default ['en'])
-    - gpu: whether to use GPU (default False)
-    - preprocess: whether to run simple preprocessing to improve OCR quality
-    - resize_width: if set, scale image to this width before OCR (helps small PDFs)
-    - threshold: whether to apply binary thresholding during preprocessing
-
-    Returns:
-      (text, results) where:
-        - text is the concatenated OCR text (or None on failure)
-        - results is the raw EasyOCR result list of (bbox, text, confidence)
-    """
+def _create_rapidocr_reader(gpu: bool = False) -> Optional["RapidOCR"]:
     try:
-        import easyocr
-    except Exception as e:
-        logger.error(f"EasyOCR import failed: {e}")
+        from rapidocr_onnxruntime import RapidOCR
+    except (ImportError, RuntimeError) as exc:
+        logger.error("RapidOCR import failed: %s", exc)
+        return None
+
+    try:
+        reader = RapidOCR()
+        if gpu:
+            logger.warning(
+                "RapidOCR GPU flag requested, but default CPU configuration "
+                "is being used."
+            )
+        return reader
+    except Exception as exc:
+        logger.error(
+            "Failed to initialize RapidOCR reader: %s", exc, exc_info=True
+        )
+        return None
+
+
+def _format_rapidocr_results(
+    raw_result: Optional[Iterable[Sequence[Any]]],
+) -> Tuple[str, List[List[Any]]]:
+    if not raw_result:
+        return "", []
+
+    texts: List[str] = []
+    formatted: List[List[Any]] = []
+    for item in raw_result:
+        if not isinstance(item, Sequence) or len(item) < 3:
+            continue
+        bbox = item[0]
+        text_value = item[1]
+        score = item[2]
+        formatted.append([bbox, text_value, score])
+        if isinstance(text_value, str) and text_value:
+            texts.append(text_value)
+
+    return "\n".join(texts), formatted
+
+
+def _image_to_png_bytes(image: Image.Image) -> bytes:
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def run_rapidocr_on_image(
+    image_path: PathLike,
+    languages: Sequence[str] | None = None,
+    gpu: bool = False,
+    preprocess: bool = False,
+    resize_width: Optional[int] = None,
+    threshold: bool = False,
+) -> Tuple[Optional[str], List[List[Any]]]:
+    reader = _create_rapidocr_reader(gpu=gpu)
+    if reader is None:
         return None, []
 
+    if languages and any(lang.lower() != "en" for lang in languages):
+        logger.warning(
+            "RapidOCR multi-language input requested (%s); default English "
+            "models will be used.",
+            languages,
+        )
+
+    input_for_reader: Union[str, np.ndarray] = str(image_path)
+
+    if preprocess or resize_width or threshold:
+        try:
+            with Image.open(image_path) as pil_image:
+                pil_rgb = pil_image.convert("RGB")
+                resize_to = (resize_width, None) if resize_width else None
+                processed = _preprocess_pil_image_for_ocr(
+                    pil_rgb,
+                    resize_to=resize_to,
+                    threshold=threshold,
+                )
+        except Exception as exc:
+            logger.error(
+                "Failed to open image %s for RapidOCR preprocessing: %s",
+                image_path,
+                exc,
+                exc_info=True,
+            )
+            return None, []
+        input_for_reader = np.array(processed)
+
     try:
-        reader = easyocr.Reader(languages, gpu=gpu)
-    except Exception as e:
-        logger.error(f"Failed to initialize EasyOCR Reader: {e}", exc_info=True)
+        raw_result, _ = reader(input_for_reader)
+    except Exception as exc:
+        logger.error(
+            "RapidOCR recognition failed for %s: %s",
+            image_path,
+            exc,
+            exc_info=True,
+        )
         return None, []
 
-    # If preprocessing requested and image is a path, load and preprocess then pass temporary file to reader
-    tmp_path = None
+    text, formatted = _format_rapidocr_results(raw_result)
+    return text or "", formatted
+
+
+def run_rapidocr_on_pdf_all_pages(
+    pdf_path: PathLike,
+    languages: Sequence[str] | None = None,
+    gpu: bool = False,
+    dpi: int = 200,
+    preprocess: bool = False,
+    resize_width: Optional[int] = None,
+    threshold: bool = False,
+) -> List[Dict[str, Any]]:
+    reader = _create_rapidocr_reader(gpu=gpu)
+    if reader is None:
+        return []
+
+    if languages and any(lang.lower() != "en" for lang in languages):
+        logger.warning(
+            "RapidOCR multi-language input requested (%s); default English "
+            "models will be used.",
+            languages,
+        )
+
+    if not os.path.exists(pdf_path):
+        logger.error("PDF file not found for multi-page OCR: %s", pdf_path)
+        return []
+
+    doc: Optional[Any] = None
+    pages_output: List[Dict[str, Any]] = []
     try:
-        if preprocess:
-            from PIL import Image
-            img = Image.open(image_path).convert("RGB")
-            resize_to = (resize_width, None) if resize_width else None
-            img = _preprocess_pil_image_for_ocr(img, resize_to=resize_to, threshold=threshold)
-            import tempfile
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_img:
-                img.save(tmp_img, format="PNG")
-                tmp_path = tmp_img.name
-            target_for_reader = tmp_path
-        else:
-            target_for_reader = image_path
-
-        results = reader.readtext(target_for_reader, detail=1)
-        if not results:
-            return "", []
-        texts = [r[1] for r in results if len(r) > 1]
-        concatenated = "\n".join(texts)
-        return concatenated, results
-    except Exception as e:
-        logger.error(f"EasyOCR recognition failed for {image_path}: {e}", exc_info=True)
-        return None, []
-    finally:
-        if tmp_path:
-            try:
-                os.remove(tmp_path)
-            except Exception:
-                pass
-
-def run_easyocr_on_pdf_all_pages(pdf_path, languages=['en'], gpu=False, dpi=200):
-    """
-    Run EasyOCR on all pages of a PDF and return a list of page OCR results.
-
-    Returns a list of dicts:
-      [{"page_number": 1, "text": "...", "results": [...], "image_bytes": b"..."}, ...]
-
-    - pdf_path: path to the PDF file
-    - languages: list of language codes for EasyOCR
-    - gpu: whether to use GPU
-    - dpi: rendering DPI for page images (higher DPI improves OCR accuracy)
-    """
-    pages_output = []
-    try:
-        import easyocr
-    except Exception as e:
-        logger.error(f"EasyOCR import failed: {e}", exc_info=True)
-        return pages_output
-
-    try:
-        reader = easyocr.Reader(languages, gpu=gpu)
-    except Exception as e:
-        logger.error(f"Failed to initialize EasyOCR Reader: {e}", exc_info=True)
-        return pages_output
-
-    doc = None
-    try:
-        if not os.path.exists(pdf_path):
-            logger.error(f"PDF file not found for multi-page OCR: {pdf_path}")
-            return pages_output
-
         doc = fitz.open(pdf_path)
         if len(doc) == 0:
-            logger.error(f"PDF has no pages for multi-page OCR: {pdf_path}")
+            logger.error("PDF has no pages for multi-page OCR: %s", pdf_path)
             return pages_output
 
         for page_index in range(len(doc)):
             try:
-                page = doc.load_page(page_index)
-                # Render at requested DPI
-                try:
-                    pix = page.get_pixmap(dpi=dpi)
-                except TypeError:
-                    # Older pymupdf versions may use matrix instead
-                    mat = fitz.Matrix(dpi / 72.0, dpi / 72.0)
-                    pix = page.get_pixmap(matrix=mat)
+                page: Any = doc.load_page(page_index)
+                pix = page.get_pixmap(dpi=dpi)  # type: ignore[attr-defined]
+                image = Image.frombytes(
+                    "RGB",
+                    (int(pix.width), int(pix.height)),
+                    pix.samples,
+                )
 
-                # Convert to PIL image
-                image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                resize_to = (resize_width, None) if resize_width else None
+                processed = (
+                    _preprocess_pil_image_for_ocr(
+                        image,
+                        resize_to=resize_to,
+                        threshold=threshold,
+                    )
+                    if preprocess or resize_width or threshold
+                    else image
+                )
 
-                # Optional preprocessing could be added here (grayscale, thresholding)
+                image_bytes = _image_to_png_bytes(processed)
+                numpy_image = np.array(processed)
 
-                # Save to bytes for easyocr and return
-                from io import BytesIO
-                buf = BytesIO()
-                image.save(buf, format="PNG")
-                image_bytes = buf.getvalue()
-                buf.seek(0)
+                raw_result, _ = reader(numpy_image)
+                text, formatted = _format_rapidocr_results(raw_result)
 
-                # easyocr can accept numpy arrays or image file paths; pass bytes via PIL image
-                # Use a temporary file to avoid format issues with reader
-                import tempfile
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_img:
-                    tmp_img.write(image_bytes)
-                    tmp_img_path = tmp_img.name
-
-                try:
-                    results = reader.readtext(tmp_img_path, detail=1)
-                except Exception as rr:
-                    logger.error(f"EasyOCR failed on page {page_index+1}: {rr}", exc_info=True)
-                    results = []
-
-                # Remove temp file
-                try:
-                    os.remove(tmp_img_path)
-                except Exception:
-                    pass
-
-                texts = [r[1] for r in results if len(r) > 1]
-                concatenated = "\n".join(texts) if texts else ""
-
-                pages_output.append({
-                    "page_number": page_index + 1,
-                    "text": concatenated,
-                    "results": results,
-                    "image_bytes": image_bytes,
-                })
-
-            except Exception as page_e:
-                logger.error(f"Error processing page {page_index+1} for OCR: {page_e}", exc_info=True)
-                continue
-
-    except Exception as e:
-        logger.error(f"Failed to run multi-page EasyOCR on PDF {pdf_path}: {e}", exc_info=True)
+                pages_output.append(
+                    {
+                        "page_number": page_index + 1,
+                        "text": text,
+                        "results": formatted,
+                        "image_bytes": image_bytes,
+                    }
+                )
+            except Exception as page_exc:
+                logger.error(
+                    "RapidOCR failed on page %s for %s: %s",
+                    page_index + 1,
+                    pdf_path,
+                    page_exc,
+                    exc_info=True,
+                )
+    except Exception as exc:
+        logger.error(
+            "Failed to run multi-page RapidOCR on PDF %s: %s",
+            pdf_path,
+            exc,
+            exc_info=True,
+        )
     finally:
-        if doc:
+        if doc is not None:
             try:
                 doc.close()
-            except Exception as close_e:
-                logger.error(f"Error closing PDF document '{pdf_path}': {close_e}")
+            except Exception:
+                pass
+
     return pages_output
+
+
+def run_easyocr_on_image(
+    *args: Any, **kwargs: Any
+) -> Tuple[Optional[str], List[List[Any]]]:
+    logger.warning(
+        "EasyOCR support has been replaced by RapidOCR. Using RapidOCR instead."
+    )
+    return run_rapidocr_on_image(*args, **kwargs)
+
+
+def run_easyocr_on_pdf_all_pages(
+    *args: Any, **kwargs: Any
+) -> List[Dict[str, Any]]:
+    logger.warning(
+        "EasyOCR support has been replaced by RapidOCR. Using RapidOCR instead."
+    )
+    return run_rapidocr_on_pdf_all_pages(*args, **kwargs)

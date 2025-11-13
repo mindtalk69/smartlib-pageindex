@@ -1,5 +1,8 @@
+import json
 import logging
 import os
+import re
+from typing import List, Sequence, Set
 
 from flask import Blueprint, request, jsonify, current_app
 
@@ -22,6 +25,108 @@ logger = logging.getLogger(__name__)
 selfquery_bp = Blueprint('selfquery', __name__)
 
 from modules.database import get_knowledge_by_id, get_library_by_id
+
+QUESTION_LINE_PATTERN = re.compile(r"^\s*[\-\*\u2022]?\s*(?:\d+[\).:\-]?\s*)?(?P<question>.+\?)\s*$")
+
+
+def _dedupe_questions(questions: Sequence[str]) -> List[str]:
+    seen: Set[str] = set()
+    deduped: List[str] = []
+    for item in questions:
+        if item is None:
+            continue
+        cleaned = str(item).strip()
+        if not cleaned:
+            continue
+        lowered = cleaned.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        deduped.append(cleaned)
+    return deduped
+
+
+def _extract_questions_from_text(raw_text: object) -> List[str]:
+    if raw_text is None:
+        return []
+
+    results: List[str] = []
+    text: str = raw_text if isinstance(raw_text, str) else str(raw_text)
+
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, list):
+            results.extend(str(item).strip() for item in parsed if str(item).strip())
+        elif isinstance(parsed, dict):
+            maybe_list = parsed.get("questions")
+            if isinstance(maybe_list, list):
+                results.extend(str(item).strip() for item in maybe_list if str(item).strip())
+        if results:
+            return _dedupe_questions(results)
+    except Exception:
+        pass
+
+    for line in text.splitlines():
+        match = QUESTION_LINE_PATTERN.match(line)
+        if not match:
+            continue
+        extracted = match.group("question").strip()
+        if extracted:
+            results.append(extracted)
+    if not results:
+        quoted = re.findall(r'"([^"\n]+\?)"', text)
+        results.extend(quoted)
+
+    return _dedupe_questions(results)
+
+
+def _request_additional_questions(
+    llm,
+    context: str,
+    language: str,
+    existing_questions: Sequence[str],
+    amount: int,
+) -> List[str]:
+    if amount <= 0:
+        return []
+
+    existing_list = _dedupe_questions(existing_questions)
+    lead_in = ""
+    if existing_list:
+        existing_preview = " | ".join(existing_list)
+        lead_in = (
+            "You previously generated the following user starter questions: "
+            f"{existing_preview}.\n"
+        )
+
+    prompt_parts = [
+        lead_in,
+        f"The knowledge context is: {context}.\n",
+        f"Generate {amount} additional unique and helpful questions in {language}. ",
+        "Do not repeat any existing questions. ",
+        "Return ONLY a JSON array of the new questions.",
+    ]
+    prompt = "".join(prompt_parts)
+
+    try:
+        response = llm.invoke(prompt)
+        candidates = _extract_questions_from_text(getattr(response, "content", response))
+    except Exception as exc:
+        logger.warning("Failed to request supplemental self-retriever questions: %s", exc, exc_info=True)
+        return []
+
+    existing_lower: Set[str] = {q.lower() for q in existing_list}
+    filtered: List[str] = []
+    for candidate in candidates:
+        lowered = candidate.lower()
+        if lowered in existing_lower:
+            continue
+        existing_lower.add(lowered)
+        filtered.append(candidate)
+        if len(filtered) >= amount:
+            break
+    return filtered
+
 
 @selfquery_bp.route('/api/self-retriever-questions', methods=['POST'])
 def api_self_retriever_questions():
@@ -79,38 +184,73 @@ def api_self_retriever_questions():
     default_language = get_active_language_name()
     language_instruction = f"Generate the questions in {default_language}.\n"
 
-    prompt = (
-        f"You are an AI assistant helping users explore a knowledge base.\n",
+    prompt = "".join([
+        "You are an AI assistant helping users explore a knowledge base.\n",
         f"Context: {context_str}\n",
-        f"Generate 6 diverse, interesting, and helpful questions a user might want to ask about this knowledge/library. ",
-        f"Questions should cover summary, recent content, topics, authors, languages, catalogs, categories, groups, product, and brand. ",
-        f"{language_instruction}",
-        f"Return ONLY a JSON array of 6 questions, e.g.:\n",
-        f'["Question 1?", "Question 2?", ...]',
-        f"Do not include any explanations or extra text.",
-    )
+        "Generate 6 diverse, interesting, and helpful questions a user might want to ask about this knowledge/library. ",
+        "Questions should cover summary, recent content, topics, authors, languages, catalogs, categories, groups, product, and brand. ",
+        language_instruction,
+        "Return ONLY a JSON array of 6 questions, e.g.:\n",
+        '["Question 1?", "Question 2?", ...]',
+        "Do not include any explanations or extra text.",
+    ])
 
     logger.info(f"[self-retriever-questions] LLM prompt context: {context_str}")
 
     try:
         llm = get_llm()
         response = llm.invoke(prompt)
-        logger.info(f"[self-retriever-questions] LLM raw response: {response.content}")
-        import json
-        questions = []
-        try:
-            # Try to parse as JSON array
-            questions = json.loads(response.content)
-        except Exception:
-            # Fallback: extract lines ending with '?'
-            questions = [line.strip() for line in response.content.split('\n') if line.strip().endswith('?')]
-        # Ensure we have 6 questions
-        questions = [q for q in questions if q]
-        if len(questions) < 6:
-            # Pad with generic questions if needed
-            while len(questions) < 6:
-                questions.append("What else can I learn from this knowledge/library?")
-        return jsonify({"questions": questions[:6]}), 200, {'Content-Type': 'application/json'}
+        raw_content = getattr(response, "content", response)
+        logger.info("[self-retriever-questions] LLM raw response: %s", raw_content)
+
+        questions = _extract_questions_from_text(raw_content)
+        total_needed = 6
+        attempts = 0
+        while len(questions) < total_needed and attempts < 2:
+            missing = total_needed - len(questions)
+            supplemental = _request_additional_questions(
+                llm, context_str, default_language, questions, missing
+            )
+            if not supplemental:
+                break
+            questions.extend(supplemental)
+            attempts += 1
+
+        if not questions:
+            supplemental = _request_additional_questions(
+                llm, context_str, default_language, [], total_needed
+            )
+            if supplemental:
+                questions.extend(supplemental)
+
+        questions = _dedupe_questions(questions)
+        if len(questions) > total_needed:
+            questions = questions[:total_needed]
+        elif len(questions) < total_needed and questions:
+            while len(questions) < total_needed:
+                questions.append(questions[-1])
+        elif not questions:
+            fallback_prompt = "".join([
+                f"Generate {total_needed} helpful starter questions in {default_language}. ",
+                f"The knowledge context is: {context_str}. ",
+                "Return ONLY a JSON array of the questions.",
+            ])
+            try:
+                fallback_response = llm.invoke(fallback_prompt)
+                fallback_raw = getattr(fallback_response, "content", fallback_response)
+                fallback_questions = _extract_questions_from_text(fallback_raw)
+                if fallback_questions:
+                    questions = _dedupe_questions(fallback_questions)[:total_needed]
+            except Exception as fallback_exc:
+                logger.warning(
+                    "Final fallback for self-retriever questions failed: %s",
+                    fallback_exc,
+                    exc_info=True,
+                )
+                filler = f"{default_language}: further explore this knowledge."
+                questions = [filler] * total_needed
+
+        return jsonify({"questions": questions}), 200, {'Content-Type': 'application/json'}
     except Exception as e:
         logger.error(f"Error generating dynamic self-retriever questions: {e}", exc_info=True)
         return jsonify({"error": "Failed to generate questions."}), 500

@@ -214,7 +214,11 @@ def create_app():
             settings_updates = {}
 
             def _truthy(value):
-                return value is not None and value.lower() in ('1', 'true', 'yes')
+                if value is None:
+                    return False
+                if isinstance(value, bool):
+                    return value
+                return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
 
             # Set config values, using defaults if not found in DB
             app.config['VISUAL_GROUNDING_ENABLED'] = (
@@ -335,11 +339,11 @@ def create_app():
             app.config.setdefault('VECTOR_STORE_MODE', 'user')
             app.config.setdefault(
                 'IS_ENABLED_OCR',
-                os.environ.get('IS_ENABLED_OCR', '0').lower() in ('1', 'true', 'yes'),
+                str(os.environ.get('IS_ENABLED_OCR', '0')).strip().lower() in ('1', 'true', 'yes', 'on'),
             )
             app.config.setdefault(
                 'IS_AUTO_OCR',
-                os.environ.get('IS_AUTO_OCR', '0').lower() in ('1', 'true', 'yes'),
+                str(os.environ.get('IS_AUTO_OCR', '0')).strip().lower() in ('1', 'true', 'yes', 'on'),
             )
             app.config.setdefault('OCR_MODE', os.environ.get('OCR_MODE', 'default'))
             app.config.setdefault(

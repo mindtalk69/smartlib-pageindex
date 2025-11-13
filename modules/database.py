@@ -1523,8 +1523,45 @@ def add_visual_grounding_activities(user_id, file_id, status=None,group_id=None 
         logging.error(f"Error adding Visual Grounding Activity for user {user_id}: {e}")
         raise
 
-    
 
+def cleanup_failed_ingestion(file_id, document_ids=None, library_reference_id=None, url_download_id=None):
+    """Remove partially persisted records after a failed ingestion attempt."""
+    from uuid import UUID
+
+    normalized_doc_ids = []
+    if document_ids:
+        for doc_id in document_ids:
+            if isinstance(doc_id, uuid.UUID):
+                normalized_doc_ids.append(doc_id)
+            else:
+                try:
+                    normalized_doc_ids.append(UUID(str(doc_id)))
+                except (TypeError, ValueError):
+                    logging.warning("Skipping invalid document_id during cleanup: %s", doc_id)
+
+    try:
+        if normalized_doc_ids:
+            Document.query.filter(Document.id.in_(normalized_doc_ids)).delete(synchronize_session=False)
+
+        if file_id is not None:
+            VectorReference.query.filter_by(file_id=file_id).delete(synchronize_session=False)
+            VisualGroundingActivity.query.filter_by(file_id=file_id).delete(synchronize_session=False)
+            LibraryReference.query.filter_by(reference_type='file', source_id=file_id).delete(synchronize_session=False)
+            UploadedFile.query.filter_by(file_id=file_id).delete(synchronize_session=False)
+
+        if url_download_id is not None:
+            VectorReference.query.filter_by(url_download_id=url_download_id).delete(synchronize_session=False)
+            LibraryReference.query.filter_by(reference_type='url_download', source_id=url_download_id).delete(synchronize_session=False)
+
+        if library_reference_id is not None:
+            LibraryReference.query.filter_by(reference_id=library_reference_id).delete(synchronize_session=False)
+
+        db.session.commit()
+        logging.info("Cleaned up failed ingestion artifacts for file_id=%s", file_id)
+    except Exception as exc:
+        db.session.rollback()
+        logging.error("Failed to clean up ingestion artifacts for file_id=%s: %s", file_id, exc, exc_info=True)
+        raise
 
 
 # --- Database Initialization ---

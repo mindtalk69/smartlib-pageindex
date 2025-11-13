@@ -1,5 +1,9 @@
 # SmartLib Dev Progress Log
 
+## 2025-11-13 – Streaming Structured Query Cleanup
+- Suppressed transient structured-query chunks (```json { QUERY: … } ``` fences) in `modules/agent.py` so streaming answers no longer flash intermediate LangChain metadata before the final response arrives.
+- Filtered `structured_query` out of streaming metadata updates to keep the client from briefly rendering raw retrieval diagnostics while the final answer streams in.
+
 ## 2025-11-05 – Admin Cleanup & Vector Hygiene
 - Synced the chat homepage and upload experience so knowledge/library pickers always reflect the same filtered sets for each user or group, preventing cross-assignment during ingestion.
 - Built an authenticated `/admin/files/delete/<id>` endpoint that removes documents, vector references, and Chroma chunks tied to an uploaded file, and wired the admin UI to call it with CSRF-aware fetch logic.

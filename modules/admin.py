@@ -72,14 +72,46 @@ admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
 @admin_bp.context_processor
 def inject_admin_flags():
-    flag = current_app.config.get('IS_ENABLED_OCR', False)
-    if isinstance(flag, str):
-        flag = flag.lower() in ('1', 'true', 'yes')
+    flag = current_app.config.get('IS_ENABLED_OCR')
+    if flag is None:
+        try:
+            from modules.database import AppSettings
+
+            setting = db.session.get(AppSettings, 'is_enabled_ocr')
+            if setting is not None:
+                flag = setting.value == '1'
+            else:
+                env_flag = os.environ.get('IS_ENABLED_OCR')
+                if env_flag is not None:
+                    flag = env_flag.strip().lower() in ('1', 'true', 'yes', 'on')
+        except Exception:
+            flag = False
+    elif isinstance(flag, str):
+        flag = flag.strip().lower() in ('1', 'true', 'yes', 'on')
+
+    auto_flag = current_app.config.get('IS_AUTO_OCR')
+    if auto_flag is None:
+        try:
+            from modules.database import AppSettings
+
+            auto_setting = db.session.get(AppSettings, 'is_auto_ocr')
+            if auto_setting is not None:
+                auto_flag = auto_setting.value == '1'
+            else:
+                env_auto = os.environ.get('IS_AUTO_OCR')
+                if env_auto is not None:
+                    auto_flag = env_auto.strip().lower() in ('1', 'true', 'yes', 'on')
+        except Exception:
+            auto_flag = False
+    elif isinstance(auto_flag, str):
+        auto_flag = auto_flag.strip().lower() in ('1', 'true', 'yes', 'on')
+
     return {
         'is_enabled_ocr': bool(flag),
         'ocr_mode': current_app.config.get('OCR_MODE', 'default'),
-        'is_auto_ocr': current_app.config.get('IS_AUTO_OCR', False),
+        'is_auto_ocr': bool(auto_flag),
     }
+
 
 
 @admin_bp.route('/')
