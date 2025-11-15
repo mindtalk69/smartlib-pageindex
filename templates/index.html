@@ -6,60 +6,6 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}?v=1.2">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}?v=1.2">
 {% endblock %}
-<style>
-  #loading-indicator {
-    background: rgba(34, 40, 49, 0.85);
-    backdrop-filter: blur(8px);
-    border-radius: 1.5rem;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.22), 0 1.5px 8px rgba(80,180,255,0.12);
-    padding: 2rem 2.5rem;
-    min-width: 220px;
-    min-height: 110px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 2000 !important;
-    border: 1.5px solid rgba(80,180,255,0.18);
-    transition: box-shadow 0.2s, background 0.2s;
-  }
-  #loading-indicator .dots-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.7rem;
-  }
-  #loading-indicator .dot {
-    width: 16px;
-    height: 16px;
-    margin: 0 4px;
-    background: linear-gradient(135deg, #50b4ff 60%, #1e293b 100%);
-    border-radius: 50%;
-    box-shadow: 0 2px 8px rgba(80,180,255,0.18);
-    display: inline-block;
-    animation: loading-bounce 1.2s infinite alternate;
-  }
-  #loading-indicator .dot:nth-child(2) {
-    animation-delay: 0.2s;
-  }
-  #loading-indicator .dot:nth-child(3) {
-    animation-delay: 0.4s;
-  }
-  @keyframes loading-bounce {
-    0% { transform: translateY(0); opacity: 1; }
-    100% { transform: translateY(-12px); opacity: 0.7; }
-  }
-  #loading-indicator .thinking-text {
-    margin-top: 1.2rem;
-    font-size: 1.1rem;
-    font-weight: 500;
-    color: #eaf6ff;
-    text-shadow: 0 1px 8px rgba(80,180,255,0.18);
-    letter-spacing: 0.03em;
-    text-align: center;
-  }
-</style>
-
 {% block head %}
 {{ super() }}
 <!-- Any additional head content specific to index.html can go here -->
@@ -182,7 +128,7 @@
   </div> <!-- close chat-content -->
 
   <!-- Loading Indicator (Positioned absolutely) -->
-    <div id="loading-indicator" class="loading-dots" style="display: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1000;">
+    <div id="loading-indicator" class="loading-dots" style="display: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2000;">
       <div class="dots-container">
         <div class="dot"></div>
         <div class="dot"></div>

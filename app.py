@@ -139,7 +139,7 @@ atexit.register(_shutdown_children)
 
 # Note: load_dotenv is now handled within config.py
 import os
-from flask import Flask, session
+from flask import Flask, session, has_request_context
 from flask_wtf.csrf import CSRFProtect
 from flask_login import LoginManager, current_user
 from flask_migrate import Migrate # Import Migrate
@@ -249,31 +249,44 @@ def create_app():
             app.logger.warning("Asset '%s' not found in manifest.", name)
             return SimpleNamespace(scripts=[], styles=[])
 
+        def build_bundle():
+            scripts: list[str] = []
+            styles: list[str] = []
 
-        scripts: list[str] = []
-        styles: list[str] = []
+            def add_entry(manifest_entry):
+                if not manifest_entry:
+                    return
+                file_name = manifest_entry.get('file')
+                if file_name:
+                    url = url_for('static', filename=f"dist/{file_name}")
+                    if file_name.endswith('.css'):
+                        if url not in styles:
+                            styles.append(url)
+                    else:
+                        if url not in scripts:
+                            scripts.append(url)
+                for css_path in manifest_entry.get('css', []):
+                    css_url = url_for('static', filename=f"dist/{css_path}")
+                    if css_url not in styles:
+                        styles.append(css_url)
+                for import_name in manifest_entry.get('imports', []):
+                    add_entry(manifest.get(import_name))
 
-        def add_entry(manifest_entry):
-            if not manifest_entry:
-                return
-            file_name = manifest_entry.get('file')
-            if file_name:
-                url = url_for('static', filename=f"dist/{file_name}")
-                if file_name.endswith('.css'):
-                    if url not in styles:
-                        styles.append(url)
-                else:
-                    if url not in scripts:
-                        scripts.append(url)
-            for css_path in manifest_entry.get('css', []):
-                css_url = url_for('static', filename=f"dist/{css_path}")
-                if css_url not in styles:
-                    styles.append(css_url)
-            for import_name in manifest_entry.get('imports', []):
-                add_entry(manifest.get(import_name))
+            add_entry(entry)
+            return SimpleNamespace(scripts=scripts, styles=styles)
 
-        add_entry(entry)
-        return SimpleNamespace(scripts=scripts, styles=styles)
+        try:
+            if has_request_context():
+                return build_bundle()
+            with app.test_request_context():
+                return build_bundle()
+        except RuntimeError as exc:
+            app.logger.warning(
+                "Unable to build asset bundle '%s': %s",
+                name,
+                exc,
+            )
+            return SimpleNamespace(scripts=[], styles=[])
 
     app.jinja_env.globals['asset_bundle'] = asset_bundle
     app.add_template_global(asset_bundle, name='asset_bundle')
