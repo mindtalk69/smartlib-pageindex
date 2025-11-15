@@ -711,8 +711,14 @@ def process_uploaded_file(
                     docling_json_path=json_bin_path,
                 )
 
+            selected_group_id = Groups_ids[0] if Groups_ids else None
             if enable_visual_grounding and IS_VISUAL_GROUNDING_COMPLETED:
-                add_visual_grounding_activities(user_id, file_id,status='completed')
+                add_visual_grounding_activities(
+                    user_id,
+                    file_id,
+                    status='completed',
+                    group_id=selected_group_id,
+                )
 
             logger.info(f"Saved document metadata to Document table for file: {filename}")
         except Exception as meta_e:

@@ -23,10 +23,23 @@
                     {% for activity in activities %}
                     <tr>
                         <td>{{ activity.id }}</td>
-                        <td>{{ activity.user_username if activity.user_username is defined else (activity.user.username if activity.user else 'N/A') }}</td>
-                        <td>{{ activity.group_name if activity.group_name is defined else (activity.group.name if activity.group is defined and activity.group else 'N/A') }}</td>
-                        <td>{{ activity.file_name if activity.file_name is defined else (activity.uploaded_file.original_filename if activity.uploaded_file else 'N/A') }}</td>
-                        <td>{{ activity.status }}</td>
+                        <td>{{ activity.user or 'N/A' }}</td>
+                        <td>{{ activity.group or 'N/A' }}</td>
+                        <td>
+                            {% if activity.file %}
+                                {{ activity.file }}
+                                {% if activity.library_id or activity.file_id %}
+                                    <div class="small text-muted">
+                                        {% if activity.library_id %}Library #{{ activity.library_id }}{% endif %}
+                                        {% if activity.library_id and activity.file_id %} · {% endif %}
+                                        {% if activity.file_id %}File #{{ activity.file_id }}{% endif %}
+                                    </div>
+                                {% endif %}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                        <td>{{ activity.status|default('pending')|title }}</td>
                         <td>{{ activity.created_at.strftime('%Y-%m-%d %H:%M') if activity.created_at else 'N/A' }}</td>
                         <td>{{ activity.updated_at.strftime('%Y-%m-%d %H:%M') if activity.updated_at else 'N/A' }}</td>
                         <td>

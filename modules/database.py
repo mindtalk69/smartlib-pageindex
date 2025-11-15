@@ -3,6 +3,7 @@ import contextlib # Keep for old connection functions
 from datetime import datetime, timezone
 from pathlib import Path
 import logging
+import re
 from typing import Iterable
 from extensions import db # Import the db instance from extensions.py
 from sqlalchemy.sql import func # For default timestamps
@@ -287,6 +288,9 @@ class VisualGroundingActivity(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
     updated_at = db.Column(db.DateTime(timezone=True), onupdate=func.now())
     status = db.Column(db.String, nullable=False, default='pending')
+
+    user = db.relationship('User', backref=db.backref('visual_grounding_activities', lazy='dynamic'))
+    uploaded_file = db.relationship('UploadedFile', backref=db.backref('visual_grounding_activity', uselist=False))
 
 class FolderUploadJob(db.Model):
     __tablename__ = 'folder_upload_jobs'
@@ -1506,18 +1510,25 @@ def get_user_url_downloads(user_id, limit=50):
     return UrlDownload.query.filter_by(user_id=user_id).order_by(UrlDownload.processed_at.desc()).limit(limit).all()
 
 
-def add_visual_grounding_activities(user_id, file_id, status=None,group_id=None ):
+def add_visual_grounding_activities(user_id, file_id, status=None, group_id=None):
     """Record a visual grounding activity using SQLAlchemy."""
-    
-    new_activity = VisualGroundingActivity(        
-        user_id = user_id,
-        file_id = file_id,
-        status = status,
-        group_id = group_id
+
+    normalized_status = (status or 'pending').lower()
+    new_activity = VisualGroundingActivity(
+        user_id=user_id,
+        file_id=file_id,
+        status=normalized_status,
+        group_id=group_id,
     )
     try:
-        db.session.add(new_activity)        
-        logging.info(f"Added Visual Grounding Activity for user {user_id}, file_id: {file_id}, group_id: {group_id}")
+        db.session.add(new_activity)
+        logging.info(
+            "Added Visual Grounding Activity for user %s, file_id: %s, group_id: %s, status: %s",
+            user_id,
+            file_id,
+            group_id,
+            normalized_status,
+        )
     except Exception as e:
         db.session.rollback()
         logging.error(f"Error adding Visual Grounding Activity for user {user_id}: {e}")

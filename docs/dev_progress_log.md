@@ -1,5 +1,16 @@
 # SmartLib Dev Progress Log
 
+## 2025-11-14 – Document Viewer Blueprint Fix
+- Traced `/view_document` 404s to the Gunicorn entrypoint using `main.py`, which never registered the document viewer blueprint even though `app.py` had the new code.
+- Imported `init_view_document` into `main.py` and wired it into the factory alongside the other module initializers so both WSGI entrypoints expose the route.
+- Rebuilt and relaunched the web/worker containers to confirm the updated blueprint serves citations, and verified the logs now show collection fallback attempts plus successful Chroma fetches.
+
+## 2025-11-13 – Visual Grounding Citations & Activity Fixes
+- Added Docling document path and raw bounding boxes into citation metadata so chat responses can render the visual-evidence icon when grounding data exists.
+- Updated the chat client to attach one-click visual evidence triggers that call `/api/visual_evidence` with the raw Docling payload, falling back gracefully when only document metadata is available.
+- Suppressed the visual-evidence icon whenever a citation lacks Docling artifacts so mixed-library answers don’t surface broken preview buttons, tightened the client request guardrails before hitting `/api/visual_evidence`, and let `/view_document` fall back to the vector store so historical ingests keep working.
+- Recorded the originating group for visual-grounded ingests, normalized activity records, and rebuilt the admin activities table to show user, group, file, and status details reliably.
+
 ## 2025-11-13 – Streaming Structured Query Cleanup
 - Suppressed transient structured-query chunks (```json { QUERY: … } ``` fences) in `modules/agent.py` so streaming answers no longer flash intermediate LangChain metadata before the final response arrives.
 - Filtered `structured_query` out of streaming metadata updates to keep the client from briefly rendering raw retrieval diagnostics while the final answer streams in.

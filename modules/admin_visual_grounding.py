@@ -83,11 +83,47 @@ def visual_grounding_settings():
 @login_required
 def visual_grounding_activities():
     try:
-        # Assuming VisualGroundingActivity model exists and is imported
         from modules.database import VisualGroundingActivity
-        activities = VisualGroundingActivity.query.order_by(VisualGroundingActivity.created_at.desc()).all()
+
+        from modules.database import UploadedFile, User, Group
+
+        activity_rows = (
+            db.session.query(
+                VisualGroundingActivity.id.label('id'),
+                VisualGroundingActivity.status.label('status'),
+                VisualGroundingActivity.created_at.label('created_at'),
+                VisualGroundingActivity.updated_at.label('updated_at'),
+                VisualGroundingActivity.file_id.label('file_id'),
+                User.username.label('username'),
+                Group.name.label('group_name'),
+                UploadedFile.original_filename.label('file_name'),
+                UploadedFile.library_id.label('library_id'),
+            )
+            .outerjoin(User, VisualGroundingActivity.user_id == User.user_id)
+            .outerjoin(Group, VisualGroundingActivity.group_id == Group.group_id)
+            .outerjoin(UploadedFile, VisualGroundingActivity.file_id == UploadedFile.file_id)
+            .order_by(VisualGroundingActivity.created_at.desc())
+            .all()
+        )
+
+        activities = [
+            {
+                "id": row.id,
+                "status": (row.status or 'pending'),
+                "created_at": row.created_at,
+                "updated_at": row.updated_at,
+                "user": row.username,
+                "group": row.group_name,
+                "file": row.file_name,
+                "file_id": row.file_id,
+                "library_id": row.library_id,
+            }
+            for row in activity_rows
+        ]
+
+
         return render_template('admin/visual_grounding_activities.html', activities=activities)
-    except Exception as e:
+    except Exception:
         logging.error(f"Error loading visual grounding activities: {traceback.format_exc()}")
         flash('Error loading visual grounding activities.', 'danger')
         return redirect(url_for('admin.dashboard'))

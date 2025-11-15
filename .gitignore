@@ -136,6 +136,7 @@ data/chroma/
 data/logs/
 data/tmp/
 data/uploads/
+data/doc_store/
 
 # IDE files
 .vscode/

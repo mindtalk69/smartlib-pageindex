@@ -329,26 +329,57 @@ class ChatUI {
           const visualEvidenceButton = e.target.closest('.visual-evidence-icon');
           if (visualEvidenceButton) {
             console.log('[ChatUI] Delegated click: Visual evidence icon CLICKED. Element:', visualEvidenceButton, 'Dataset:', visualEvidenceButton.dataset);
-            e.preventDefault(); // Prevent any default action if the icon were, e.g., an <a>
-            e.stopPropagation(); // Stop the click from bubbling further if needed
-            
+            e.preventDefault();
+            e.stopPropagation();
+
             const documentId = visualEvidenceButton.dataset.documentId;
             const pageNo = visualEvidenceButton.dataset.pageNo;
+            const rawBboxString = visualEvidenceButton.dataset.rawBbox;
             const bboxString = visualEvidenceButton.dataset.bbox;
+            const doclingJsonPath = visualEvidenceButton.dataset.doclingJsonPath;
 
-            if (documentId && pageNo !== undefined && bboxString) {
-              try {
-                const bbox = JSON.parse(bboxString);
-                this._showVisualEvidenceModal(documentId, pageNo, bbox);
-              } catch (parseError) {
-                console.error('[ChatUI] Error parsing bbox for visual evidence:', parseError, "Bbox string was:", bboxString);
-                alert('Error processing visual evidence data.');
+            if (documentId && pageNo !== undefined) {
+              let parsedRawBbox = null;
+              let parsedDisplayBbox = null;
+
+              if (rawBboxString) {
+                try {
+                  parsedRawBbox = JSON.parse(rawBboxString);
+                } catch (parseError) {
+                  console.warn('[ChatUI] Unable to parse raw bbox payload:', parseError, 'Payload:', rawBboxString);
+                }
               }
+
+              if (bboxString) {
+                try {
+                  parsedDisplayBbox = JSON.parse(bboxString);
+                } catch (parseError) {
+                  console.warn('[ChatUI] Unable to parse display bbox payload:', parseError, 'Payload:', bboxString);
+                }
+              }
+
+              if (!doclingJsonPath) {
+                console.warn('[ChatUI] Visual evidence requested without a docling path.', { documentId, pageNo });
+                alert('Visual evidence is unavailable for this citation.');
+                return;
+              }
+
+              if (!parsedDisplayBbox || !Array.isArray(parsedDisplayBbox) || parsedDisplayBbox.length !== 4) {
+                console.warn('[ChatUI] Missing or invalid display bbox payload.', { documentId, pageNo, bboxString });
+                alert('Unable to show visual evidence because the bounding box is missing.');
+                return;
+              }
+
+              this._showVisualEvidenceModal(documentId, pageNo, {
+                rawBbox: parsedRawBbox,
+                displayBbox: parsedDisplayBbox,
+                doclingJsonPath,
+              });
             } else {
-              console.warn('[ChatUI] Missing data attributes on visual evidence icon for modal display.', {documentId, pageNo, bboxString});
+              console.warn('[ChatUI] Missing data attributes on visual evidence icon for modal display.', { documentId, pageNo, rawBboxString, bboxString });
               alert('Cannot show visual evidence: data missing from icon.');
             }
-            return; // Important: Stop further processing if it was a visual evidence click
+            return;
           }
           // --- END ADDED ---
 
@@ -1199,63 +1230,82 @@ class ChatUI {
     tempDiv.innerHTML = contentHtml;
 
     const citationRegex = /\[cite:(\d+)\]/g;
-    
     const textNodes = [];
-    const walk = document.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, null, false);
+    const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, null, false);
     let node;
-    while(node = walk.nextNode()) {
+    while ((node = walker.nextNode())) {
         textNodes.push(node);
     }
 
-    textNodes.forEach(textNode => {
+    textNodes.forEach((textNode) => {
         let match;
         let lastIndex = 0;
         const parent = textNode.parentNode;
-        if (!parent) return;
-        const fragment = document.createDocumentFragment();
+        if (!parent) {
+            return;
+        }
 
-        citationRegex.lastIndex = 0; 
+        const fragment = document.createDocumentFragment();
+        citationRegex.lastIndex = 0;
 
         while ((match = citationRegex.exec(textNode.nodeValue)) !== null) {
-            const citeNumber = parseInt(match[1], 10);
-            const citationData = citations.find(c => c.id === citeNumber);
-
             if (match.index > lastIndex) {
-                fragment.appendChild(document.createTextNode(textNode.nodeValue.substring(lastIndex, match.index)));
+                fragment.appendChild(
+                    document.createTextNode(textNode.nodeValue.substring(lastIndex, match.index))
+                );
             }
 
-            const librarySelect = document.getElementById('library-select');
-            const libraryId = librarySelect ? librarySelect.value : null;
+            const citeNumber = parseInt(match[1], 10);
+            const citationData = citations.find((c) => c.id === citeNumber);
+            const documentId = citationData?.document_id;
+            const pageNumber = citationData?.page;
+            const displayBbox = Array.isArray(citationData?.bbox) ? citationData.bbox : null;
+            const rawBbox = citationData?.raw_bbox ?? null;
+            const doclingJsonPath = citationData?.docling_json_path || null;
+            const libraryId = citationData?.library_id ?? null;
+            const hasVisualEvidence = Boolean(
+              citationData?.has_visual_evidence === true &&
+              documentId &&
+              displayBbox &&
+              doclingJsonPath &&
+              pageNumber !== undefined &&
+              pageNumber !== null
+            );
 
-            if (citationData && citationData.document_id && citationData.document_id !== 'N/A' && libraryId) {
-                const link = document.createElement('a');
-                link.href = `/view_document/${libraryId}/${encodeURIComponent(citationData.document_id)}`;
-                link.target = '_blank';
-                link.className = 'inline-citation-link';
-                link.textContent = match[0];
-
-                if (citationData.bbox && citationData.bbox.length > 0) {
-                    link.classList.add('has-visual-evidence');
-                    const icon = document.createElement('i');
-                    icon.className = 'bi bi-image visual-evidence-icon ms-1';
-                    icon.setAttribute('aria-hidden', 'true');
-                    icon.title = 'Show visual evidence';
-                    icon.style.cursor = 'pointer';
-
-                    icon.dataset.documentId = citationData.document_id;
-                    icon.dataset.pageNo = citationData.page;
-                    icon.dataset.bbox = JSON.stringify(citationData.bbox);
-                    
-                    // The click event for visual evidence is delegated at the container level
-                    link.appendChild(icon);
-                }
-                fragment.appendChild(link);
-
+            let citeElement;
+            if (documentId && libraryId) {
+                citeElement = document.createElement('a');
+                citeElement.href = `/view_document/${libraryId}/${encodeURIComponent(documentId)}`;
+                citeElement.target = '_blank';
+                citeElement.className = 'inline-citation-link';
+                citeElement.textContent = match[0];
             } else {
-                const citeSpan = document.createElement('span');
-                citeSpan.className = 'inline-citation';
-                citeSpan.textContent = match[0];
-                fragment.appendChild(citeSpan);
+                citeElement = document.createElement('span');
+                citeElement.className = 'inline-citation';
+                citeElement.textContent = match[0];
+            }
+            fragment.appendChild(citeElement);
+
+            if (hasVisualEvidence) {
+                const iconWrapper = document.createElement('span');
+                iconWrapper.className = 'visual-evidence-icon ms-1';
+                iconWrapper.setAttribute('role', 'button');
+                iconWrapper.setAttribute('tabindex', '0');
+                iconWrapper.title = 'Show visual evidence';
+
+                iconWrapper.dataset.documentId = documentId;
+                iconWrapper.dataset.pageNo = String(pageNumber);
+                iconWrapper.dataset.bbox = JSON.stringify(displayBbox);
+                if (rawBbox) {
+                  iconWrapper.dataset.rawBbox = JSON.stringify(rawBbox);
+                }
+                iconWrapper.dataset.doclingJsonPath = doclingJsonPath;
+
+                const icon = document.createElement('i');
+                icon.className = 'bi bi-image';
+                iconWrapper.appendChild(icon);
+
+                fragment.appendChild(iconWrapper);
             }
 
             lastIndex = citationRegex.lastIndex;
@@ -1269,9 +1319,9 @@ class ChatUI {
             parent.replaceChild(fragment, textNode);
         }
     });
-    
+
     return tempDiv.innerHTML;
-}
+  }
 
 _showCitationPopover(targetElement, docId, libraryId) {
     // Check if a popover is already shown for this element and destroy it to toggle
@@ -1341,20 +1391,38 @@ _showCitationPopover(targetElement, docId, libraryId) {
         });
 }
 
-_showVisualEvidenceModal(documentId, pageNo, bbox) {
-    console.log('[ChatUI] _showVisualEvidenceModal called with:', { documentId, pageNo, bbox });
-    if (!documentId || pageNo === undefined || !bbox) {
-        console.error("Missing data for visual evidence:", { documentId, pageNo, bbox });
-        alert("Could not load visual evidence: missing data.");
+_showVisualEvidenceModal(documentId, pageNo, options = {}) {
+    const { rawBbox, displayBbox, doclingJsonPath } = options || {};
+    console.log('[ChatUI] _showVisualEvidenceModal called with:', { documentId, pageNo, rawBbox, displayBbox, doclingJsonPath });
+
+    if (!documentId) {
+        console.error('Missing document identifier for visual evidence.');
+        alert('Could not load visual evidence: missing document reference.');
+        return;
+    }
+    if (pageNo === undefined || pageNo === null || pageNo === '') {
+        console.error('Missing page number for visual evidence.', { pageNo });
+        alert('Could not load visual evidence: missing page reference.');
+        return;
+    }
+    if (!doclingJsonPath) {
+        console.error('Missing docling JSON path for visual evidence.');
+        alert('Visual evidence is unavailable for this citation.');
         return;
     }
 
-    console.log('[ChatUI] Constructing API URL for visual evidence.');
-    const bboxParams = `bbox_x=${bbox[0]}&bbox_y=${bbox[1]}&bbox_width=${bbox[2]}&bbox_height=${bbox[3]}`;
-    const apiUrl = `/api/visual_evidence?document_id=${documentId}&page_no=${pageNo}&${bboxParams}`;
+    const apiUrlObj = new URL('/api/visual_evidence', window.location.origin);
+    apiUrlObj.searchParams.set('document_id', documentId);
+    apiUrlObj.searchParams.set('page_no', pageNo);
+    apiUrlObj.searchParams.set('docling_json_path', doclingJsonPath);
+
+    const bboxPayload = rawBbox ? JSON.stringify(rawBbox) : (displayBbox ? JSON.stringify(displayBbox) : null);
+    if (bboxPayload) {
+        apiUrlObj.searchParams.set('bbox', bboxPayload);
+    }
+    const apiUrl = apiUrlObj.toString();
     console.log('[ChatUI] Visual evidence API URL:', apiUrl);
     
-    // Get or create modal elements (ensure IDs match your HTML or create dynamically)
     let modalElement = document.getElementById('visualEvidenceModal');
     if (!modalElement) {
         modalElement = document.createElement('div');
@@ -1374,8 +1442,8 @@ _showVisualEvidenceModal(documentId, pageNo, bbox) {
               </div>
             </div>
         `;
-        document.body.appendChild(modalElement.firstElementChild); // Append the actual modal div
-        modalElement = document.getElementById('visualEvidenceModal'); // Re-fetch it
+        document.body.appendChild(modalElement.firstElementChild);
+        modalElement = document.getElementById('visualEvidenceModal');
         console.log('[ChatUI] Dynamically created and fetched visualEvidenceModal element:', modalElement);
     } else {
         console.log('[ChatUI] Found existing visualEvidenceModal element:', modalElement);
@@ -1385,20 +1453,26 @@ _showVisualEvidenceModal(documentId, pageNo, bbox) {
     const modalLoading = modalElement.querySelector('#visualEvidenceLoading');
     const modalTitle = modalElement.querySelector('#visualEvidenceModalLabel');
 
-    if (modalTitle) modalTitle.textContent = `Visual Evidence (Page ${pageNo})`;
-    else console.warn('[ChatUI] Modal title element not found.');
+    if (modalTitle) {
+        modalTitle.textContent = `Visual Evidence (Page ${pageNo})`;
+    } else {
+        console.warn('[ChatUI] Modal title element not found.');
+    }
 
-    if (modalImage) modalImage.src = ''; // Clear previous
-    else console.warn('[ChatUI] Modal image element not found.');
+    if (modalImage) {
+        modalImage.src = '';
+        modalImage.style.display = 'none';
+    } else {
+        console.warn('[ChatUI] Modal image element not found.');
+    }
+    if (modalLoading) {
+        modalLoading.style.display = 'block';
+    } else {
+        console.warn('[ChatUI] Modal loading spinner element not found.');
+    }
 
-    if (modalImage) modalImage.style.display = 'none';
-    if (modalLoading) modalLoading.style.display = 'block';
-    else console.warn('[ChatUI] Modal loading spinner element not found.');
-
-    console.log('[ChatUI] Attempting to get/create Bootstrap modal instance.');
     const bsModal = bootstrap.Modal.getOrCreateInstance(modalElement);
     if (bsModal) {
-        console.log('[ChatUI] Bootstrap modal instance obtained. Showing modal.');
         bsModal.show();
     } else {
         console.error('[ChatUI] Failed to get or create Bootstrap modal instance. Is Bootstrap JS loaded?');
@@ -1407,30 +1481,35 @@ _showVisualEvidenceModal(documentId, pageNo, bbox) {
 
     console.log('[ChatUI] Fetching visual evidence from:', apiUrl);
     fetch(apiUrl)
-        .then(response => {
+        .then((response) => {
             console.log('[ChatUI] Received response from /api/visual_evidence:', response);
             if (!response.ok) {
                 throw new Error(`HTTP error ${response.status} fetching visual evidence.`);
             }
             return response.blob();
         })
-        .then(blob => {
+        .then((blob) => {
             console.log('[ChatUI] Received blob for visual evidence. Creating object URL.');
             const imageUrl = URL.createObjectURL(blob);
             if (modalImage) {
                 modalImage.src = imageUrl;
                 modalImage.style.display = 'block';
-                modalImage.onload = () => URL.revokeObjectURL(imageUrl); // Revoke after load
+                modalImage.onload = () => URL.revokeObjectURL(imageUrl);
             }
-            if (modalLoading) modalLoading.style.display = 'none';
+            if (modalLoading) {
+                modalLoading.style.display = 'none';
+            }
         })
-        .catch(error => {
+        .catch((error) => {
             console.error('[ChatUI] Error fetching/displaying visual evidence:', error);
-            if (modalImage) modalImage.alt = 'Error loading visual evidence.';
-            if (modalLoading) modalLoading.style.display = 'none';
-            // You might want to display an error message in the modal body
+            if (modalImage) {
+                modalImage.alt = 'Error loading visual evidence.';
+            }
+            if (modalLoading) {
+                modalLoading.style.display = 'none';
+            }
         });
-}
+  }
 
   async _copyChartToClipboard(base64ImageSrc) {
     if (!navigator.clipboard || !navigator.clipboard.write) {

@@ -23,6 +23,7 @@ from modules.upload import init_upload
 from modules.logout import init_logout
 from modules.login_azure import init_login_azure
 from modules.admin import init_admin, admin_bp
+from modules.view_document import init_view_document
 from modules.about import init_about
 # Remove celery imports, context is handled in celery_app.ContextTask
 import modules.query
@@ -164,6 +165,7 @@ def create_app():
     init_logout(app)
     init_login_azure(app)
     init_admin(app)
+    init_view_document(app)
     init_about(app)
     modules.query.init_query(app)
 

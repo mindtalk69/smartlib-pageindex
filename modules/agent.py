@@ -1261,28 +1261,47 @@ Answer:"""
                     if 0 <= original_doc_idx < len(retrieved_docs):
                         doc = retrieved_docs[original_doc_idx]
                         doc_metadata = doc.metadata or {}
-                        source_filename = doc_metadata.get("source", "Unknown") 
+                        source_filename = doc_metadata.get("source", "Unknown")
                         page_number_meta = doc_metadata.get("page_number")
                         text_snippet = doc.page_content[:300] + "..."
                         library_id_from_meta = doc_metadata.get("library_id")
                         document_id_str = doc_metadata.get("doc_id")
+                        docling_json_path = doc_metadata.get("docling_json_path")
                         api_bbox_list = None
+                        raw_bbox_obj = None
 
                         if document_id_str and page_number_meta is not None:
                             try:
                                 page_number_int = int(float(page_number_meta))
                                 raw_bbox_obj, page_h = get_visual_info_for_chunk(document_id_str, page_number_int)
                                 if raw_bbox_obj and page_h is not None and isinstance(raw_bbox_obj, dict):
-                                    if all(k in raw_bbox_obj and isinstance(raw_bbox_obj[k], (int, float)) for k in ['l', 't', 'r', 'b']):
-                                        dl_l, dl_t, dl_r, dl_b = raw_bbox_obj['l'], raw_bbox_obj['t'], raw_bbox_obj['r'], raw_bbox_obj['b']
+                                    if all(
+                                        k in raw_bbox_obj and isinstance(raw_bbox_obj[k], (int, float))
+                                        for k in ['l', 't', 'r', 'b']
+                                    ):
+                                        dl_l, dl_t, dl_r, dl_b = (
+                                            raw_bbox_obj['l'],
+                                            raw_bbox_obj['t'],
+                                            raw_bbox_obj['r'],
+                                            raw_bbox_obj['b'],
+                                        )
                                         api_x, api_y = float(dl_l), float(page_h - dl_t)
                                         api_width, api_height = float(dl_r - dl_l), float(dl_t - dl_b)
                                         api_bbox_list = [round(v, 4) for v in [api_x, api_y, api_width, api_height]]
-                                        logging.info(f"[AgentPy] Successfully created api_bbox_list for citation {new_num}: {api_bbox_list}")
+                                        logging.info(
+                                            f"[AgentPy] Successfully created visual bbox for citation {new_num}: {api_bbox_list}"
+                                        )
                                     else:
-                                        logging.warning(f"[AgentPy] Invalid or incomplete raw_bbox_obj structure from evidence_utils: {raw_bbox_obj}")
+                                        logging.warning(
+                                            f"[AgentPy] Invalid or incomplete raw_bbox_obj structure from evidence_utils: {raw_bbox_obj}"
+                                        )
                             except Exception as e_vis:
-                                logging.error(f"Error processing visual info for doc {document_id_str}, page {page_number_meta}: {e_vis}", exc_info=True)
+                                logging.error(
+                                    f"Error processing visual info for doc {document_id_str}, page {page_number_meta}: {e_vis}",
+                                    exc_info=True,
+                                )
+
+                        has_visual_evidence = bool(api_bbox_list and docling_json_path)
 
                         citations.append({
                             "id": new_num,
@@ -1291,7 +1310,10 @@ Answer:"""
                             "text_snippet": text_snippet,
                             "document_id": document_id_str,
                             "library_id": library_id_from_meta,
-                            "bbox": api_bbox_list
+                            "bbox": api_bbox_list if has_visual_evidence else None,
+                            "raw_bbox": raw_bbox_obj if has_visual_evidence else None,
+                            "docling_json_path": docling_json_path if has_visual_evidence else None,
+                            "has_visual_evidence": has_visual_evidence,
                         })
             
             # Handle multi-modal responses (e.g. maps)

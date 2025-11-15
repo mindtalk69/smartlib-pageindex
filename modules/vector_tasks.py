@@ -50,9 +50,30 @@ def fetch_document_chunks(persist_directory: str, collection_name: str, document
     try:
         client = chromadb.PersistentClient(path=persist_directory)
         collection = client.get_collection(name=collection_name)
-        result = collection.get(where={"doc_id": document_id})
+
+        result = collection.get(ids=[document_id])
         documents = list(result.get("documents") or [])
         metadatas = list(result.get("metadatas") or [])
+        logger.info("[ChromaFetch] lookup by id %s returned %d docs", document_id, len(documents))
+
+        if not documents and document_id:
+            compact_id = document_id.replace('-', '')
+            if compact_id != document_id:
+                result = collection.get(ids=[compact_id])
+                documents = list(result.get("documents") or [])
+                metadatas = list(result.get("metadatas") or [])
+                logger.info("[ChromaFetch] lookup by compact id %s returned %d docs", compact_id, len(documents))
+
+        if not documents:
+            result = collection.get(where={"doc_id": document_id})
+            documents = list(result.get("documents") or [])
+            metadatas = list(result.get("metadatas") or [])
+            logger.info(
+                "[ChromaFetch] lookup by metadata doc_id=%s returned %d docs",
+                document_id,
+                len(documents),
+            )
+
         return {"documents": documents, "metadatas": metadatas}
     except Exception as exc:
         logger.exception("Failed to fetch document chunks for %s from %s", document_id, collection_name)

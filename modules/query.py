@@ -5,6 +5,8 @@ import io  # For image buffer
 import json  # For parsing bbox
 import asyncio
 import inspect
+import importlib
+from functools import lru_cache
 from lark.exceptions import UnexpectedCharacters, UnexpectedToken
 from extensions import db
 
@@ -34,6 +36,29 @@ logging.basicConfig(level=logging.INFO)
 THRESHOLD_CLIPPING = 200 # Character limit for text clipping
 def clip_text(text, threshold=THRESHOLD_CLIPPING):
     return f"{text[:threshold]}..." if len(text) > threshold else text
+
+
+@lru_cache(maxsize=1)
+def _resolve_docling_document_cls():
+    for module_path in (
+        "docling_core.types.doc.document",
+        "docling.datamodel.document",
+    ):
+        try:
+            module = importlib.import_module(module_path)
+            doc_cls = getattr(module, "DoclingDocument", None)
+            if doc_cls is not None:
+                return doc_cls
+        except ImportError:
+            continue
+    raise RuntimeError(
+        "DoclingDocument is unavailable. Install docling-core (or docling) in the web environment to enable visual evidence previews."
+    )
+
+
+def _load_docling_document(json_path: Path):
+    DoclingDocument = _resolve_docling_document_cls()
+    return DoclingDocument.load_from_json(json_path)
 
 
 def _fetch_document_record(document_id_str: str):
@@ -1237,11 +1262,11 @@ def init_query(app):
                 return jsonify({"error": "Source document data not found."}), 404
 
             logging.info(f"Loading DoclingDocument from: {doc_json_path_str} (Using relative path: {docling_json_path_rel})")
-            from docling.datamodel.document import DoclingDocument
-            dl_doc = DoclingDocument.load_from_json(doc_json_path)
+            dl_doc = _load_docling_document(doc_json_path)
 
-        except ImportError as e:
-            logging.error(f"Failed to import DoclingDocument: {e}. Is docling installed correctly?")
+
+        except (ImportError, RuntimeError) as e:
+            logging.error(f"Failed to resolve DoclingDocument: {e}. Is docling installed correctly?")
             return jsonify({"error": "Server configuration error (Docling library)."}), 500
         except Exception as e:
             logging.error(f"Error loading DoclingDocument using relative path {docling_json_path_rel}: {e}", exc_info=True)

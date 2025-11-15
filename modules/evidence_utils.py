@@ -40,22 +40,80 @@ def get_visual_info_for_chunk(chunk_id_str: str, page_no_1_indexed: int):
                     with open(db_chunk_row.docling_json_path, 'r') as f:
                         doc_page_data = json.load(f)
 
-                    # Expect "pages" to be an object/dictionary keyed by page number (as string)
-                    if 'pages' in doc_page_data and isinstance(doc_page_data['pages'], dict):
-                        pages_dict = doc_page_data['pages']
-                        page_key_str = str(page_no_1_indexed) # Page numbers are keys as strings
+                    pages_obj = doc_page_data.get('pages')
+                    page_info_obj = None
 
-                        if page_key_str in pages_dict:
-                            page_info_obj = pages_dict[page_key_str]
-                            if isinstance(page_info_obj, dict) and 'size' in page_info_obj and isinstance(page_info_obj['size'], dict):
-                                page_height = page_info_obj['size'].get('height')
-                                logging.info(f"[EvidenceUtils] Fetched page_height: {page_height} for page '{page_key_str}' from {db_chunk_row.docling_json_path}")
-                            else:
-                                logging.warning(f"[EvidenceUtils] Page object for page '{page_key_str}' in {db_chunk_row.docling_json_path} is malformed or missing 'size' object with 'height'.")
+                    def _matches_page(entry):
+                        if not isinstance(entry, dict):
+                            return False
+                        candidate_keys = ('page_no', 'pageNo', 'page_number', 'pageNumber', 'number', 'index')
+                        for key in candidate_keys:
+                            if key not in entry:
+                                continue
+                            value = entry.get(key)
+                            if key == 'index' and isinstance(value, int):
+                                value = value + 1
+                            try:
+                                if int(value) == page_no_1_indexed:
+                                    return True
+                            except (TypeError, ValueError):
+                                continue
+                        entry_id = entry.get('id') or entry.get('self_ref') or entry.get('ref')
+                        if isinstance(entry_id, str):
+                            match = re.search(r'(\d+)$', entry_id)
+                            if match and int(match.group(1)) == page_no_1_indexed:
+                                return True
+                        return False
+
+                    if isinstance(pages_obj, dict):
+                        page_info_obj = pages_obj.get(str(page_no_1_indexed)) or pages_obj.get(page_no_1_indexed)
+                    elif isinstance(pages_obj, list):
+                        for entry in pages_obj:
+                            if _matches_page(entry):
+                                page_info_obj = entry
+                                break
+
+                    if isinstance(page_info_obj, dict):
+                        size_obj = page_info_obj.get('size') if isinstance(page_info_obj.get('size'), dict) else None
+                        if size_obj:
+                            page_height = size_obj.get('height')
+                        if page_height is None:
+                            page_height = (
+                                page_info_obj.get('height')
+                                or page_info_obj.get('page_height')
+                            )
+                        if page_height is None and isinstance(page_info_obj.get('image'), dict):
+                            page_height = page_info_obj['image'].get('height')
+                        if page_height is not None:
+                            try:
+                                page_height = float(page_height)
+                                logging.info(
+                                    "[EvidenceUtils] Fetched page_height: %s for page '%s' from %s",
+                                    page_height,
+                                    page_no_1_indexed,
+                                    db_chunk_row.docling_json_path,
+                                )
+                            except (TypeError, ValueError):
+                                logging.warning(
+                                    "[EvidenceUtils] Page height value %s for page '%s' in %s is not numeric.",
+                                    page_height,
+                                    page_no_1_indexed,
+                                    db_chunk_row.docling_json_path,
+                                )
+                                page_height = None
                         else:
-                            logging.warning(f"[EvidenceUtils] Page key '{page_key_str}' (for page_no_1_indexed: {page_no_1_indexed}) not found in 'pages' object in {db_chunk_row.docling_json_path}. Available page keys: {list(pages_dict.keys())}. No page_height set.")
+                            logging.warning(
+                                "[EvidenceUtils] Could not locate page size for page '%s' in %s.",
+                                page_no_1_indexed,
+                                db_chunk_row.docling_json_path,
+                            )
                     else:
-                        logging.warning(f"[EvidenceUtils] 'pages' key in {db_chunk_row.docling_json_path} is missing or not an object/dictionary. No page_height set.")
+                        logging.warning(
+                            "[EvidenceUtils] Page data for page '%s' not found in %s (pages_obj type: %s).",
+                            page_no_1_indexed,
+                            db_chunk_row.docling_json_path,
+                            type(pages_obj).__name__,
+                        )
                 except Exception as e_json:
                     logging.error(f"[EvidenceUtils] Error reading/parsing {db_chunk_row.docling_json_path}: {e_json}", exc_info=True)
             

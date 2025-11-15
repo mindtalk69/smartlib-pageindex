@@ -1,5 +1,6 @@
 from flask import Blueprint, abort, current_app, render_template
-from .database import db, Library, Document
+from sqlalchemy import select
+from .database import db, Library, Document, knowledge_libraries_association
 from .llm_utils import get_lc_store_path, get_embedding_model_name
 from modules.celery_tasks import fetch_document_chunks
 import logging
@@ -21,46 +22,123 @@ def view_document(library_id, document_id):
 
     doc = db.session.get(Document, doc_uuid)
     if not doc:
-        abort(404, description="Document metadata not found in database.")
+        logging.warning("Document metadata not found for %s; attempting vector-store fallback.", document_id)
 
     library = db.session.get(Library, library_id)
     if not library:
         abort(404, description="Library not found.")
 
-    knowledge_id = doc.knowledge_id
+    knowledge_id = doc.knowledge_id if doc else None
     user_id = library.created_by_user_id
+
+    vector_mode = current_app.config.get('VECTOR_STORE_MODE', 'user')
+    if knowledge_id is None and vector_mode == 'knowledge':
+        fallback_knowledge = None
+        try:
+            stmt = select(knowledge_libraries_association.c.knowledge_id).where(
+                knowledge_libraries_association.c.library_id == library.library_id
+            )
+            result = db.session.execute(stmt).first()
+            if result is not None:
+                fallback_knowledge = result[0]
+        except Exception as assoc_err:
+            logging.error(
+                "Failed to resolve knowledge fallback for library %s: %s",
+                library.library_id,
+                assoc_err,
+            )
+        if fallback_knowledge is None:
+            logging.error(
+                "Unable to resolve knowledge ID for document %s in knowledge mode.",
+                document_id,
+            )
+            abort(404, description="Knowledge scope not found for this document.")
+        knowledge_id = fallback_knowledge
 
     base_collection_name = current_app.config.get('CHROMA_COLLECTION_NAME', 'documents-vectors')
     persist_directory = None
+
+    collection_candidates = []
     try:
         embedding_model_id = get_embedding_model_name()
         sanitized_model_id = embedding_model_id.replace('/', '_').replace('-', '_')
-        collection_name = f"{base_collection_name}_{sanitized_model_id}"
-        logging.info(f"Viewing document from dynamic ChromaDB collection: {collection_name}")
+        dynamic_name = f"{base_collection_name}_{sanitized_model_id}"
+        if dynamic_name != base_collection_name:
+            collection_candidates.append(dynamic_name)
     except Exception as e:
-        logging.warning(f"Could not get embedding model name for dynamic collection name during document view, falling back to static. Error: {e}")
-        collection_name = base_collection_name
+        logging.warning(
+            "Could not resolve embedding-specific collection name; will retry with base collection. Error: %s",
+            e,
+        )
 
-    logging.info(f"Attempting to view document '{document_id}' from library '{collection_name}' (ID: {library_id}).")
+    collection_candidates.append(base_collection_name)
+    collection_candidates = list(dict.fromkeys(collection_candidates))
 
+    logging.info(
+        "Attempting to view document '%s' from library %s using candidate collections: %s",
+        document_id,
+        library_id,
+        collection_candidates,
+    )
+
+    selected_collection = None
     try:
         persist_directory_obj = get_lc_store_path(user_id=user_id, knowledge_id=knowledge_id)
         if not persist_directory_obj:
             abort(500, "Could not determine vector store path.")
         persist_directory = str(persist_directory_obj)
 
-        result = fetch_document_chunks(persist_directory, collection_name, str(document_id))
-        if not result:
-            logging.warning("Vector worker did not return chunks for document %s", document_id)
-            abort(503, description="Vector worker unavailable. Please ensure the worker container is running.")
+        documents = []
+        metadatas = []
+        selected_collection = None
+        worker_unavailable = False
 
-        documents = result.get('documents') or []
-        metadatas = result.get('metadatas') or []
+        for candidate in collection_candidates:
+            logging.info(
+                "Requesting chunks for document '%s' from collection '%s' at '%s'.",
+                document_id,
+                candidate,
+                persist_directory,
+            )
+            result = fetch_document_chunks(persist_directory, candidate, str(document_id))
+            if result is None:
+                worker_unavailable = True
+                logging.warning(
+                    "Vector worker returned no payload for document %s (collection %s)",
+                    document_id,
+                    candidate,
+                )
+                continue
+
+            documents = result.get('documents') or []
+            metadatas = result.get('metadatas') or []
+            if documents:
+                selected_collection = candidate
+                break
+            logging.info(
+                "Collection '%s' did not contain document '%s'; trying next candidate.",
+                candidate,
+                document_id,
+            )
+
         if not documents:
-            logging.warning(f"Document with doc_id '{document_id}' not found in collection '{collection_name}'.")
+            if worker_unavailable:
+                abort(503, description="Vector worker unavailable. Please ensure the worker container is running.")
+            logging.warning(
+                "Unable to locate document '%s' in any collection %s at '%s'.",
+                document_id,
+                collection_candidates,
+                persist_directory,
+            )
             abort(404, description=f"Document content not found in vector store for ID '{document_id}'.")
 
-        logging.info(f"Successfully retrieved {len(documents)} chunks for document '{document_id}'.")
+        resolved_collection = selected_collection or collection_candidates[-1]
+        logging.info(
+            "Successfully retrieved %d chunks for document '%s' from collection '%s'.",
+            len(documents),
+            document_id,
+            resolved_collection,
+        )
         document_chunks = []
         for i, content in enumerate(documents):
             metadata = metadatas[i] if i < len(metadatas) else {}
@@ -79,20 +157,24 @@ def view_document(library_id, document_id):
         except (ValueError, TypeError):
             pass
 
-        source = doc.source or "Unknown Source"
+        if doc and doc.source:
+            source = doc.source
+        else:
+            source = library.name or "Unknown Source"
         return render_template('view_document.html',
                                document={'name': source, 'content': '', 'chunks': document_chunks, 'id': document_id},
                                library_id=library_id)
 
     except ValueError as e:
         if "does not exist" in str(e):
+            target_collection = selected_collection or collection_candidates[-1]
             logging.error(
                 "Vector collection '%s' not found in '%s'. Error: %s",
-                collection_name,
+                target_collection,
                 persist_directory,
                 e,
             )
-            abort(404, description=f"Collection '{collection_name}' not found. You may need to re-ingest documents with the current embedding model.")
+            abort(404, description=f"Collection '{target_collection}' not found. You may need to re-ingest documents with the current embedding model.")
         else:
             logging.error(f"A value error occurred while fetching document '{document_id}': {str(e)}", exc_info=True)
             abort(500, description="An internal error occurred.")
