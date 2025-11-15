@@ -43,13 +43,23 @@ def fetch_document_chunks(persist_directory: str, collection_name: str, document
     """
     try:
         import chromadb
+        from chromadb.errors import NotFoundError
     except ImportError as exc:
         logger.error("ChromaDB is not installed in this environment: %s", exc)
         raise
 
     try:
         client = chromadb.PersistentClient(path=persist_directory)
-        collection = client.get_collection(name=collection_name)
+        try:
+            collection = client.get_collection(name=collection_name)
+        except NotFoundError as missing_collection:
+            logger.info(
+                "Chroma collection '%s' not found at '%s': %s",
+                collection_name,
+                persist_directory,
+                missing_collection,
+            )
+            return {"documents": [], "metadatas": []}
 
         result = collection.get(ids=[document_id])
         documents = list(result.get("documents") or [])

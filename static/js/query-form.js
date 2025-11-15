@@ -1784,3 +1784,9 @@ function resumeQuery(threadId, confirmation) {
 function fetchDynamicQuestions() {
     // Implement as needed or leave as placeholder
 }
+
+if (typeof window !== 'undefined') {
+    window.updateSelfRetrieverContextVisibility = updateSelfRetrieverContextVisibility;
+    window.fetchSelfRetrieverContext = fetchSelfRetrieverContext;
+    window.resumeQuery = resumeQuery;
+}

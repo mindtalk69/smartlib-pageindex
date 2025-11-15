@@ -1,5 +1,13 @@
 # syntax=docker/dockerfile:1.5
 
+FROM node:20-alpine AS assets
+WORKDIR /app
+COPY package.json ./
+RUN npm install --silent
+COPY vite.config.js ./
+COPY static ./static
+RUN npm run build
+
 FROM python:3.11-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -42,6 +50,7 @@ RUN pip install --upgrade pip \
     && pip cache purge >/dev/null 2>&1 || true
 
 COPY . /app
+COPY --from=assets /app/static/dist /app/static/dist
 
 RUN chmod +x docker-entrypoint.sh
 

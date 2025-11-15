@@ -1,4 +1,5 @@
 import os
+# pyright: reportGeneralTypeIssues=false
 import folium
 import base64 # For encoding map image
 import io # For image bytes
@@ -26,7 +27,7 @@ from modules.callbacks import UsageMetadataCallbackHandler # Import Usage Callba
 from pydantic import BaseModel, Field # Import Pydantic BaseModel and Field
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import ToolNode
-from langchain.chains.query_constructor.base import AttributeInfo
+from langchain.chains.query_constructor.schema import AttributeInfo
 #import pandas as pd # For type hinting active_dataframe
 from langchain.retrievers.self_query.base import SelfQueryRetriever
 from langchain_openai import AzureChatOpenAI
@@ -384,11 +385,44 @@ def _build_explicit_metadata_filters(config: dict) -> dict:
         filters['library_id'] = int(config['library_id'])
     if config.get('category_id'):
         filters['category_id'] = int(config['category_id'])
-    
+
     logging.info(f"[RAG Filter] Built explicit filters: {filters}")
     return filters
 
+
+def _rerank_documents_by_query_terms(query: str, documents: List[Document]) -> List[Document]:
+    """Simple textual re-ranking to prioritize chunks containing query terms."""
+    if not query or not documents:
+        return documents
+
+    tokens = [tok for tok in re.split(r"\W+", query.lower()) if len(tok) > 2]
+    if not tokens:
+        return documents
+
+    scored_docs: List[tuple[int, int, Document]] = []
+    for index, doc in enumerate(documents):
+        content = (doc.page_content or "").lower()
+        source = str(doc.metadata.get("source", "")).lower()
+        score = 0
+        if content:
+            for token in tokens:
+                if token in content:
+                    score += content.count(token) * 5
+        if source:
+            for token in tokens:
+                if token in source:
+                    score += 3
+        scored_docs.append((score, -index, doc))
+
+    if not scored_docs or all(score == 0 for score, _, _ in scored_docs):
+        return documents
+
+    scored_docs.sort(reverse=True)
+    return [entry[2] for entry in scored_docs]
+
+
 def _rehydrate_documents(payload: Dict[str, Any]) -> Dict[str, Any]:
+
     documents = payload.get("documents")
     if not documents:
         return payload
@@ -429,7 +463,11 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
     library_id = tool_call_config.get('library_id')
     mode_for_operation = tool_call_config.get('mode', app_default_vector_store_mode)
     search_strategy = tool_call_config.get('search_strategy', 'similarity')
-    k_docs = tool_call_config.get('k', 4)
+    k_docs_raw = tool_call_config.get('k', 4)
+    try:
+        k_docs = int(k_docs_raw)
+    except (TypeError, ValueError):
+        k_docs = 4
 
     embed_func = get_embedding_function()
     llm_instance = get_llm()
@@ -595,32 +633,93 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
                     )
 
         else:
-            logging.info(f"[RAG] Using SelfQueryRetriever (no explicit filters in config)")
-            retrieval_mode = "self_query"
-
-            if llm_instance is None:
-                raise ValueError("LLM instance is None, cannot initialize SelfQueryRetriever.")
-
-            retriever = SelfQueryRetriever.from_llm(
-                llm=llm_instance,
-                vectorstore=store,
-                document_contents=document_content_description,
-                metadata_field_info=metadata_field_info,
-                verbose=True,
-                use_original_query=True,
-                search_kwargs={'k': k_docs}
+            chosen_strategy = (search_strategy or "self_query").lower()
+            logging.info(
+                "[RAG] No explicit filters provided. Applying search strategy '%s'.",
+                chosen_strategy,
             )
 
-            try:
-                structured_query_dict = retriever.query_constructor.invoke({"query": query})
-                structured_query_string = str(structured_query_dict)
-                logging.info(f"[RAG] SelfQueryRetriever generated: {structured_query_string}")
-            except Exception as sq_err:
-                logging.warning(f"[RAG] Failed to generate structured query: {sq_err}")
-                structured_query_string = "SelfQueryRetriever (no structured query generated)"
+            if chosen_strategy in {"similarity", "cosine"}:
+                retrieval_mode = "similarity"
+                structured_query_string = "Direct similarity search (no metadata filters)"
+                try:
+                    retrieved_docs = store.similarity_search(query, k=k_docs)
+                except Exception as retrieval_err:  # pragma: no cover - defensive logging
+                    logging.error(
+                        "[RAG] Similarity search failed: %s",
+                        retrieval_err,
+                        exc_info=True,
+                    )
+                    raise
+                logging.info("[RAG] Direct similarity search retrieved %d documents", len(retrieved_docs))
+            elif chosen_strategy == "mmr":
+                retrieval_mode = "mmr"
+                fetch_k_raw = tool_call_config.get("fetch_k")
+                try:
+                    fetch_k = int(fetch_k_raw) if fetch_k_raw is not None else k_docs * 3
+                except (TypeError, ValueError):
+                    fetch_k = k_docs * 3
+                lambda_raw = tool_call_config.get("mmr_lambda", 0.5)
+                try:
+                    lambda_mult = float(lambda_raw)
+                except (TypeError, ValueError):
+                    lambda_mult = 0.5
+                try:
+                    retrieved_docs = store.max_marginal_relevance_search(
+                        query,
+                        k=k_docs,
+                        fetch_k=fetch_k,
+                        lambda_mult=lambda_mult,
+                    )
+                except Exception as retrieval_err:  # pragma: no cover - defensive logging
+                    logging.error(
+                        "[RAG] MMR search failed: %s",
+                        retrieval_err,
+                        exc_info=True,
+                    )
+                    raise
+                structured_query_string = (
+                    f"MMR search (lambda={lambda_mult}, fetch_k={fetch_k})"
+                )
+                logging.info("[RAG] MMR search retrieved %d documents", len(retrieved_docs))
+            else:
+                logging.info(
+                    "[RAG] Using SelfQueryRetriever (strategy '%s')",
+                    chosen_strategy,
+                )
+                retrieval_mode = "self_query"
 
-            retrieved_docs = retriever.invoke(query)
-            logging.info(f"[RAG] SelfQueryRetriever retrieved {len(retrieved_docs)} documents")
+                if llm_instance is None:
+                    raise ValueError("LLM instance is None, cannot initialize SelfQueryRetriever.")
+
+                retriever = SelfQueryRetriever.from_llm(
+                    llm=llm_instance,
+                    vectorstore=store,
+                    document_contents=document_content_description,
+                    metadata_field_info=metadata_field_info,
+                    verbose=True,
+                    use_original_query=True,
+                    search_kwargs={'k': k_docs}
+                )
+
+                try:
+                    structured_query_dict = retriever.query_constructor.invoke({"query": query})
+                    structured_query_string = str(structured_query_dict)
+                    logging.info("[RAG] SelfQueryRetriever generated: %s", structured_query_string)
+                except Exception as sq_err:
+                    logging.warning("[RAG] Failed to generate structured query: %s", sq_err)
+                    structured_query_string = "SelfQueryRetriever (no structured query generated)"
+
+                retrieved_docs = retriever.invoke(query)
+                logging.info("[RAG] SelfQueryRetriever retrieved %d documents", len(retrieved_docs))
+
+        if retrieved_docs:
+            reranked_docs = _rerank_documents_by_query_terms(query, retrieved_docs)
+            if reranked_docs is not retrieved_docs and reranked_docs:
+                logging.info("[RAG] Applied token-based re-ranking to retrieved documents.")
+            if k_docs and len(reranked_docs) > k_docs:
+                reranked_docs = reranked_docs[:k_docs]
+            retrieved_docs = reranked_docs
 
         if has_explicit_filters and retrieved_docs:
             mismatched = []
@@ -1089,6 +1188,7 @@ Think step-by-step."""
             messages = state.get("messages", [])
             context_source = "none"
             language = get_active_language_name()
+            context_str = ""
 
             if image_base64 and not documents:
                 # Image description case
@@ -1133,6 +1233,38 @@ Question: {question}
 
 Answer:"""
 
+            import re
+
+            def _response_indicates_no_answer(text: str | None) -> bool:
+                if not text:
+                    return False
+                lowered = text.lower()
+                phrases = (
+                    "could not find",
+                    "unable to find",
+                    "cannot find",
+                    "no information",
+                    "information not found",
+                    "tidak menemukan",
+                    "tidak dapat menemukan",
+                    "tidak menemukan informasi",
+                )
+                return any(phrase in lowered for phrase in phrases)
+
+            def _context_mentions_query(query_text: str | None, docs: List[Document]) -> bool:
+                if not query_text:
+                    return False
+                tokens = [tok for tok in re.split(r"\W+", query_text.lower()) if len(tok) > 2]
+                if not tokens:
+                    return False
+                for doc in docs:
+                    content = (doc.page_content or "").lower()
+                    if not content:
+                        continue
+                    if any(tok in content for tok in tokens):
+                        return True
+                return False
+
             llm_message_content = [{"type": "text", "text": generation_prompt_text}]
             if image_base64 and image_mime_type:
                 llm_message_content.append({
@@ -1145,20 +1277,59 @@ Answer:"""
                 llm_response = llm.invoke([llm_input_message], config={"callbacks": [callback_handler]})
                 usage_metadata = callback_handler.usage_metadata
                 logging.info(f"[Generate Node] Captured usage_metadata: {usage_metadata}")
-                return_payload = {
-                    "messages": messages + [llm_response],
-                    "generation_context_source": context_source,
-                    "usage_metadata": usage_metadata
-                }
             except Exception as gen_e:
                 logging.error(f"Error during final answer generation: {gen_e}", exc_info=True)
                 llm_response = AIMessage(content=f"Error generating final answer: {gen_e}")
-                return_payload = {
+                return {
                     "messages": messages + [llm_response],
                     "generation_context_source": "none",
                     "usage_metadata": {}
                 }
-            return return_payload
+
+            if (
+                documents
+                and _response_indicates_no_answer(getattr(llm_response, "content", ""))
+                and _context_mentions_query(question, documents)
+            ):
+                logging.info("Initial answer reported no information despite retrieved context; triggering fallback generation.")
+                fallback_prompt_text = f"""Please answer in {language}.
+You are a retrieval-augmented assistant. The provided context contains information related to the user's request.
+Summarize any relevant details that appear in the context, even if they are partial, and clearly acknowledge any gaps.
+Always cite the supporting sources using bracketed numbers like [1], [2], etc. Do not answer that the information is unavailable when related details are present.
+
+Context:
+{context_str}
+
+Question: {question}
+
+Answer:"""
+                fallback_message_content = [{"type": "text", "text": fallback_prompt_text}]
+                if image_base64 and image_mime_type:
+                    fallback_message_content.append({
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{image_mime_type};base64,{image_base64}"}
+                    })
+                fallback_handler = UsageMetadataCallbackHandler()
+                try:
+                    fallback_response = llm.invoke(
+                        [HumanMessage(content=fallback_message_content)],
+                        config={"callbacks": [fallback_handler]},
+                    )
+                    usage_metadata = _sum_usage_metadata(usage_metadata, fallback_handler.usage_metadata)
+                    llm_response = fallback_response
+                    logging.info("Fallback answer generated using retrieved context.")
+                except Exception as fallback_err:
+                    logging.error(
+                        "Fallback generation failed: %s",
+                        fallback_err,
+                        exc_info=True,
+                    )
+
+            return {
+                "messages": messages + [llm_response],
+                "generation_context_source": context_source,
+                "usage_metadata": usage_metadata,
+            }
         
         
          
@@ -1176,8 +1347,65 @@ Answer:"""
             usage_metadata = state.get('usage_metadata', {})
             context_source = state.get('generation_context_source')
             structured_query = state.get('structured_query')
-            
+            query_text = state.get('input')
+
             import re
+
+            def _response_indicates_no_answer(text: str | None) -> bool:
+                if not text:
+                    return False
+                lowered = text.lower()
+                phrases = (
+                    "could not find",
+                    "unable to find",
+                    "cannot find",
+                    "no information",
+                    "information not found",
+                    "tidak menemukan",
+                    "tidak dapat menemukan",
+                    "tidak menemukan informasi",
+                )
+                return any(phrase in lowered for phrase in phrases)
+
+            def _context_mentions_query(query: str | None, docs: List[Document]) -> bool:
+                if not query:
+                    return False
+                tokens = [tok for tok in re.split(r"\W+", query.lower()) if len(tok) > 2]
+                if not tokens:
+                    return False
+                for doc in docs or []:
+                    content = (doc.page_content or "").lower()
+                    if not content:
+                        continue
+                    if any(tok in content for tok in tokens):
+                        return True
+                return False
+
+            if (
+                retrieved_docs
+                and _response_indicates_no_answer(final_answer_from_llm)
+                and _context_mentions_query(query_text, retrieved_docs)
+            ):
+                logging.info("Formatter detected a 'no information' response despite retrieved context; constructing fallback summary.")
+                fallback_segments: List[tuple[int, str]] = []
+                for idx, doc in enumerate(retrieved_docs, 1):
+                    snippet = (doc.page_content or "").strip()
+                    if not snippet:
+                        continue
+                    trimmed = snippet[:400].rstrip()
+                    if len(snippet) > 400:
+                        trimmed += "..."
+                    fallback_segments.append((idx, trimmed))
+                    if len(fallback_segments) >= 3:
+                        break
+
+                if fallback_segments:
+                    intro_line = "Here are the closest snippets from the available documents that reference your topic:" \
+                        if language.lower().startswith("en") else "Berikut cuplikan terdekat dari dokumen yang menyinggung topik Anda:"
+                    lines = [intro_line]
+                    for cite_idx, snippet in fallback_segments:
+                        lines.append(f"[{cite_idx}] {snippet}")
+                    final_answer_from_llm = "\n\n".join(lines)
 
             def _normalize_question(text: str) -> str:
                 cleaned = re.sub(r'^[\s\-\d\.\)\(•\u2022\*]+', '', (text or '').strip())

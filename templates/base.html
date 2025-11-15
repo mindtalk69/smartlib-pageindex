@@ -143,36 +143,41 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
     
-    <!-- CSRF Utilities (load early as other scripts depend on it) -->
-    <script src="{{ url_for('static', filename='js/csrf-utils.js') }}?v={{ config['APP_VERSION'] }}"></script>
+    {% block page_scripts %}{% endblock %}
+    {% block scripts %}
+      {% if asset_bundle is defined %}
+        {% set bundle = asset_bundle('chat') %}
+        {% for style_url in bundle.styles %}
+          <link rel="stylesheet" href="{{ style_url }}">
+        {% endfor %}
+        {% for script_url in bundle.scripts %}
+          <script type="module" src="{{ script_url }}"></script>
+        {% endfor %}
+      {% else %}
+        <!-- Fallback: load individual modules when Vite bundle unavailable -->
+        <script src="{{ url_for('static', filename='js/csrf-utils.js') }}?v={{ config['APP_VERSION'] }}"></script>
+        <script src="{{ url_for('static', filename='js/darkmode.js') }}?v={{ config['APP_VERSION'] }}"></script>
+        <script src="{{ url_for('static', filename='js/utilities.js') }}?v={{ config['APP_VERSION'] }}"></script>
+        <script src="{{ url_for('static', filename='js/chat-core.js') }}?v={{ config['APP_VERSION'] }}"></script>
+        <script src="{{ url_for('static', filename='js/chat-ui.js') }}?v={{ config['APP_VERSION'] }}"></script>
+        <script src="{{ url_for('static', filename='js/chat-init.js') }}?v={{ config['APP_VERSION'] }}"></script>
+        <script src="{{ url_for('static', filename='js/main.js') }}?v={{ config['APP_VERSION'] }}"></script>
+        <script src="{{ url_for('static', filename='js/feedback.js') }}?v={{ config['APP_VERSION'] }}"></script>
+        <script src="{{ url_for('static', filename='js/visual-evidence.js') }}?v={{ config['APP_VERSION'] }}"></script>
+        <script src="{{ url_for('static', filename='js/particles.js') }}?v={{ config['APP_VERSION'] }}"></script>
+        <script src="{{ url_for('static', filename='js/flow.js') }}?v={{ config['APP_VERSION'] }}"></script>
+        <script src="{{ url_for('static', filename='js/constellation.js') }}?v={{ config['APP_VERSION'] }}"></script>
+        <script src="{{ url_for('static', filename='js/animation-manager.js') }}?v={{ config['APP_VERSION'] }}"></script>
+        <script src="{{ url_for('static', filename='js/text-animations.js') }}?v={{ config['APP_VERSION'] }}"></script>
+        <script src="{{ url_for('static', filename='js/options-controller.js') }}?v={{ config['APP_VERSION'] }}"></script>
+        <script src="{{ url_for('static', filename='js/speech-recognition.js') }}?v={{ config['APP_VERSION'] }}"></script>
+        <script src="{{ url_for('static', filename='js/query-form.js') }}?v={{ config['APP_VERSION'] }}"></script>
+        <script src="{{ url_for('static', filename='js/init-conversation.js') }}?v={{ config['APP_VERSION'] }}"></script>
+      {% endif %}
+    {% endblock %}
 
-    <!-- Application Scripts -->
-    <script src="{{ url_for('static', filename='js/darkmode.js') }}?v={{ config['APP_VERSION'] }}"></script>
-    <!-- Chat Modules -->
-    <script src="{{ url_for('static', filename='js/utilities.js') }}?v={{ config['APP_VERSION'] }}"></script>
-    <script src="{{ url_for('static', filename='js/chat-core.js') }}?v={{ config['APP_VERSION'] }}"></script>
-    <script src="{{ url_for('static', filename='js/chat-ui.js') }}?v={{ config['APP_VERSION'] }}"></script>
-    <script src="{{ url_for('static', filename='js/chat-init.js') }}?v={{ config['APP_VERSION'] }}"></script>
-
-    <!-- Main Application -->
-    <script src="{{ url_for('static', filename='js/main.js') }}?v={{ config['APP_VERSION'] }}"></script>
-    <!-- zoom for visual evidence zoom -->
     <script src="https://cdn.jsdelivr.net/npm/medium-zoom/dist/medium-zoom.min.js"></script>
 
-    <!-- New Modular JS -->
-    <script src="{{ url_for('static', filename='js/feedback.js') }}?v={{ config['APP_VERSION'] }}"></script>
-    <script src="{{ url_for('static', filename='js/visual-evidence.js') }}?v={{ config['APP_VERSION'] }}"></script>
-    
-    <!-- Animation System -->
-    <script src="{{ url_for('static', filename='js/particles.js') }}?v={{ config['APP_VERSION'] }}"></script>
-    <script src="{{ url_for('static', filename='js/flow.js') }}?v={{ config['APP_VERSION'] }}"></script>
-    <script src="{{ url_for('static', filename='js/constellation.js') }}?v={{ config['APP_VERSION'] }}"></script>
-    <script src="{{ url_for('static', filename='js/animation-manager.js') }}?v={{ config['APP_VERSION'] }}"></script>
-    <script src="{{ url_for('static', filename='js/text-animations.js') }}?v={{ config['APP_VERSION'] }}"></script>
-
-    <!-- Options Controller -->
-    <script src="{{ url_for('static', filename='js/options-controller.js') }}?v={{ config['APP_VERSION'] }}"></script>
-    
     <!-- Animation Options Modal -->
     {% if current_user.is_authenticated %}
     <div class="modal fade" id="animationOptionsModal" tabindex="-1" aria-labelledby="animationOptionsModalLabel" aria-hidden="true">
@@ -239,12 +244,6 @@
     </div>
     {% endif %}
 
-    {% block page_scripts %}{% endblock %}
-    {% block scripts %}{% endblock %}
-    <script src="{{ url_for('static', filename='js/speech-recognition.js') }}?v={{ config['APP_VERSION'] }}"></script>
-    <script src="{{ url_for('static', filename='js/query-form.js') }}?v={{ config['APP_VERSION'] }}"></script> {# Moved Query Form JS to end of body #}
-  
-    
     <!-- Mobile Menu Auto-Close Script -->
     <script>
       document.addEventListener('DOMContentLoaded', function() {

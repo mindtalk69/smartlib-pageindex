@@ -243,18 +243,23 @@
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js" crossorigin="anonymous"></script>
     <!-- DataTables Bootstrap 5 Integration JS -->
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js" crossorigin="anonymous"></script>
-    <!-- Bootstrap Toggle JS -->
-    <!-- <script src="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/js/bootstrap4-toggle.min.js"></script> -->
-    <!-- Custom JavaScript (Link main darkmode script for toggle functionality) -->
-    <script src="{{ url_for('static', filename='js/darkmode.js') }}"></script>
-    <!-- CSRF Utilities (load early as other scripts depend on it) -->
-    <script src="{{ url_for('static', filename='js/csrf-utils.js') }}"></script>
-    <!-- Admin Form Utils - Universal form handler -->
-    <script src="{{ url_for('static', filename='js/admin/admin-form-utils.js') }}"></script>
-    <!-- Admin DataTables - Standardized admin tables -->
-    <script src="{{ url_for('static', filename='js/admin/admin-datatables.js') }}"></script>
-    {# Link admin-specific JS if needed in the future #}
-    {# <script src="{{ url_for('static', filename='js/admin/main.js') }}"></script> #}
+
+    {% if asset_bundle is defined %}
+      {% set bundle = asset_bundle('admin') %}
+      {% for style_url in bundle.styles %}
+        <link rel="stylesheet" href="{{ style_url }}">
+      {% endfor %}
+      {% for script_url in bundle.scripts %}
+        <script type="module" src="{{ script_url }}"></script>
+      {% endfor %}
+    {% else %}
+      <!-- Fallback: load individual modules when Vite bundle unavailable -->
+      <script src="{{ url_for('static', filename='js/darkmode.js') }}?v={{ config['APP_VERSION'] }}"></script>
+      <script src="{{ url_for('static', filename='js/csrf-utils.js') }}?v={{ config['APP_VERSION'] }}"></script>
+      <script src="{{ url_for('static', filename='js/admin/admin-form-utils.js') }}?v={{ config['APP_VERSION'] }}"></script>
+      <script src="{{ url_for('static', filename='js/admin/admin-datatables.js') }}?v={{ config['APP_VERSION'] }}"></script>
+    {% endif %}
+
     {% block admin_scripts %}{% endblock %}
 </body>
 </html>

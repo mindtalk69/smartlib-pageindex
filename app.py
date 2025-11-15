@@ -4,6 +4,9 @@ import signal
 import atexit
 import warnings
 import logging
+import json
+from types import SimpleNamespace
+from typing import Any, Dict
 
 # Set a safer multiprocessing start method early to avoid leaked semaphores with libraries like torch
 try:
@@ -182,7 +185,99 @@ def create_app():
     # Load configuration from config.py based on FLASK_ENV/FLASK_CONFIG
     config_obj = get_config()
     app.config.from_object(config_obj)
+    app.config.setdefault('VITE_DEV_SERVER_URL', os.getenv('VITE_DEV_SERVER_URL'))
     #app.logger.setLevel(logging.DEBUG)
+
+    asset_manifest_cache: Dict[str, Any] = {'data': None}
+
+    def get_asset_manifest():
+        if asset_manifest_cache['data'] is not None:
+            return asset_manifest_cache['data']
+        manifest_candidates = [
+            os.path.join(
+                app.root_path,
+                'static',
+                'dist',
+                '.vite',
+                'manifest.json',
+            ),
+            os.path.join(
+                app.root_path,
+                'static',
+                'dist',
+                'manifest.json',
+            ),
+        ]
+        manifest_path = None
+        for candidate in manifest_candidates:
+            if os.path.exists(candidate):
+                manifest_path = candidate
+                break
+        if manifest_path is None:
+            app.logger.warning(
+                "Asset manifest not found. Run `npm run build` to generate frontend assets.",
+            )
+            asset_manifest_cache['data'] = {}
+            return asset_manifest_cache['data']
+        try:
+            with open(manifest_path, 'r', encoding='utf-8') as manifest_file:
+                asset_manifest_cache['data'] = json.load(manifest_file)
+        except json.JSONDecodeError as exc:
+            app.logger.warning(
+                "Unable to parse asset manifest %s: %s",
+                manifest_path,
+                exc,
+            )
+            asset_manifest_cache['data'] = {}
+        return asset_manifest_cache['data']
+
+    def asset_bundle(name):
+        dev_server = app.config.get('VITE_DEV_SERVER_URL')
+        if dev_server:
+            base = dev_server.rstrip('/')
+            return SimpleNamespace(
+                scripts=[f"{base}/@vite/client", f"{base}/{name}.js"],
+                styles=[],
+            )
+        manifest = get_asset_manifest()
+        entry = (
+            manifest.get(name)
+            or manifest.get(f"{name}.js")
+            or manifest.get(f"static/src/{name}.js")
+        )
+        if not entry:
+            app.logger.warning("Asset '%s' not found in manifest.", name)
+            return SimpleNamespace(scripts=[], styles=[])
+
+
+        scripts: list[str] = []
+        styles: list[str] = []
+
+        def add_entry(manifest_entry):
+            if not manifest_entry:
+                return
+            file_name = manifest_entry.get('file')
+            if file_name:
+                url = url_for('static', filename=f"dist/{file_name}")
+                if file_name.endswith('.css'):
+                    if url not in styles:
+                        styles.append(url)
+                else:
+                    if url not in scripts:
+                        scripts.append(url)
+            for css_path in manifest_entry.get('css', []):
+                css_url = url_for('static', filename=f"dist/{css_path}")
+                if css_url not in styles:
+                    styles.append(css_url)
+            for import_name in manifest_entry.get('imports', []):
+                add_entry(manifest.get(import_name))
+
+        add_entry(entry)
+        return SimpleNamespace(scripts=scripts, styles=styles)
+
+    app.jinja_env.globals['asset_bundle'] = asset_bundle
+    app.add_template_global(asset_bundle, name='asset_bundle')
+
     app.logger.info(f"DEBUG [app.py]: Value in app.config['VECTOR_STORE_PROVIDER'] = {app.config.get('VECTOR_STORE_PROVIDER')}") # Check app.config
 
     # Log the configured database URI after loading config
@@ -382,6 +477,7 @@ def create_app():
             current_user=current_user,
             current_year=datetime.now().year,
             about_url=about_url,
+            asset_bundle=asset_bundle,
         )
         
     @app.errorhandler(CSRFError)
