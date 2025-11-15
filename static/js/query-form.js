@@ -5,6 +5,10 @@ let currentConversationId = null;
 
 const SELF_RETRIEVER_PREF_KEY = 'autoSelfRetrieverEnabled';
 
+if (typeof window !== 'undefined' && typeof window.selfRetrieverUserRequested === 'undefined') {
+    window.selfRetrieverUserRequested = false;
+}
+
 function isSelfRetrieverAutoEnabled() {
     if (typeof localStorage === 'undefined') {
         return true;
@@ -86,6 +90,9 @@ function initializeQueryForm() {
         const chatContainer = document.getElementById('chat-container'); // Get chat container here for logging
         console.log('[QueryFormJS] Before startNewConversation - chatCore message count:', window.chatCore ? window.chatCore.state.messages.length : 'N/A');
         console.log('[QueryFormJS] Before startNewConversation - chatContainer child count:', chatContainer ? chatContainer.children.length : 'N/A');
+        if (typeof window !== 'undefined') {
+            window.selfRetrieverUserRequested = true;
+        }
         if (window.chatCore && typeof window.chatCore.startNewConversation === 'function') {
             try {
                 localStorage.removeItem('chatConversationId'); // Clear stored ID
@@ -262,6 +269,8 @@ async function updateSelfRetrieverContextVisibility() {
         return;
     }
 
+    const userRequestedSelfRetriever = typeof window !== 'undefined' && window.selfRetrieverUserRequested === true;
+
     console.log('[UpdateSelfRetriever] Checking chat emptiness...');
     // Use chatCore.state.messages.length for a more reliable check of emptiness
     const isChatEmpty = window.chatCore && window.chatCore.state.messages.length === 0;
@@ -270,6 +279,20 @@ async function updateSelfRetrieverContextVisibility() {
         // Scenario: New conversation started, or initial load results in an empty chat.
         // init-conversation.js handles the very initial load placeholder visibility.
         // This function is more for when "New Conversation" is clicked.
+        if (!userRequestedSelfRetriever) {
+            console.log('[UpdateSelfRetriever] Chat is empty but self-retriever not requested. Showing placeholder only.');
+            if (selfRetrieverPanel) {
+                selfRetrieverPanel.style.display = 'none';
+                selfRetrieverPanel.innerHTML = '';
+            }
+            if (typeof window.startPlaceholderAnimationAndShow === 'function') {
+                window.startPlaceholderAnimationAndShow();
+            } else if (placeholder) {
+                placeholder.style.display = 'block';
+            }
+            return;
+        }
+
         console.log('[UpdateSelfRetriever] Chat is empty. Attempting to show self-retriever, hiding placeholder.');
 
         if (!isSelfRetrieverAutoEnabled()) {
@@ -286,7 +309,7 @@ async function updateSelfRetrieverContextVisibility() {
         }
 
         if (placeholder) {
-            console.log('[UpdateSelfRetriever] Hiding placeholder initially, as self-retriever will be attempted.')
+            console.log('[UpdateSelfRetriever] Hiding placeholder initially, as self-retriever will be attempted.');
             placeholder.style.display = 'none';
         }
 
@@ -294,7 +317,7 @@ async function updateSelfRetrieverContextVisibility() {
         // fetchSelfRetrieverContext handles showing/hiding the selfRetrieverPanel based on content.
         // Optionally, fetch context for current library/knowledge selection
         const libraryHiddenInput = document.getElementById('selected-library-id');
-        const libraryId = libraryHiddenInput ? (libraryHiddenInput.value || null) : null; 
+        const libraryId = libraryHiddenInput ? (libraryHiddenInput.value || null) : null;
         const knowledgeId = window.selectedKnowledgeId || null;
         console.log('[UpdateSelfRetriever] Calling fetchSelfRetrieverContext...');
         try {
@@ -328,14 +351,15 @@ async function updateSelfRetrieverContextVisibility() {
                 console.warn('[UpdateSelfRetriever] window.startPlaceholderAnimationAndShow not found. Manually showing placeholder on error.');
             }
         }
-    }
-    else {
+    } else {
         // Scenario: Chat has messages (e.g., after a query is submitted).
         console.log('[UpdateSelfRetriever] Chat not empty. Hiding self-retriever and placeholder.');
-        if (selfRetrieverPanel) 
-            {
+        if (typeof window !== 'undefined') {
+            window.selfRetrieverUserRequested = false;
+        }
+        if (selfRetrieverPanel) {
             selfRetrieverPanel.style.display = 'none';
-            }
+        }
         if (placeholder) {
             placeholder.style.display = 'none';
         }
@@ -694,11 +718,6 @@ document.addEventListener('DOMContentLoaded', function() {
     updateLibraryDropdown(null); // Initially load all libraries (no-op in user mode)
     setupLibrarySelect(); // Re-apply selection in case dropdown content changed
  
-    // --- Self-Retriever: Initial fetch ---
-    if (isSelfRetrieverAutoEnabled()) {
-        fetchSelfRetrieverContext(libraryInputHidden ? (libraryInputHidden.value || null) : null, window.selectedKnowledgeId);
-    }
- 
     // --- Knowledge Dropdown Selection ---
 
     if (knowledgeDropdown && knowledgeSelectBtn) {
@@ -726,9 +745,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 }
-                const currentLibraryId = libraryInputHidden ? (libraryInputHidden.value || null) : null;
                 if (isSelfRetrieverAutoEnabled()) {
-                    fetchSelfRetrieverContext(currentLibraryId, window.selectedKnowledgeId);
+                    if (typeof window.updateSelfRetrieverContextVisibility === 'function') {
+                        window.updateSelfRetrieverContextVisibility();
+                    }
                 } else {
                     const panel = document.getElementById('self-retriever-context');
                     if (panel) {

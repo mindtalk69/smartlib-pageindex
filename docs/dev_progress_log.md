@@ -1,5 +1,9 @@
 # SmartLib Dev Progress Log
 
+## 2025-11-15 – Self-Retriever Trigger Guard
+- Blocked initial self-retriever fetches on page load so suggested questions only appear after the user explicitly starts a new conversation, avoiding idle token usage.
+- Introduced a page-level flag to gate follow-up refreshes (knowledge/library changes) and reset it after the first user message, keeping manual triggers functional without background calls.
+
 ## 2025-11-14 – Document Viewer Blueprint Fix
 - Traced `/view_document` 404s to the Gunicorn entrypoint using `main.py`, which never registered the document viewer blueprint even though `app.py` had the new code.
 - Imported `init_view_document` into `main.py` and wired it into the factory alongside the other module initializers so both WSGI entrypoints expose the route.

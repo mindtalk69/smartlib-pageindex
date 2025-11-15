@@ -172,6 +172,9 @@ class ChatCore {
    // Start a new conversation
   async startNewConversation() {
     console.log('[ChatCore] Starting new conversation...');
+    if (typeof window !== 'undefined') {
+      window.selfRetrieverUserRequested = true;
+    }
     this.clearMessages(); // This clears internal state, localStorage, and triggers 'chatCleared'
     console.log('[ChatCore] Messages cleared. State message count:', this.state.messages.length);
 
