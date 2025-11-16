@@ -209,10 +209,10 @@ class ChatCore {
 
 
 
-// Export for module system if available
+// Support both module systems and global usage
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = ChatCore;
-} else {
-  // Make available globally
+}
+if (typeof window !== 'undefined') {
   window.ChatCore = ChatCore;
 }

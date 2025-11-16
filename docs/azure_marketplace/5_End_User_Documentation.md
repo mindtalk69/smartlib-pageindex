@@ -31,12 +31,12 @@ If self-registration is enabled:
 
 #### 2.2.3 Password Recovery
 
-If you forget your password:
+If users forget the password:
 
-1. Click "Forgot Password" on the login page
-2. Enter your email address
-3. Follow the instructions sent to your email
-4. Create a new password when prompted
+1. Admin shall go to admin panel
+2. click the button in list of particular users for menu reset password, and admin will see the requested to create temporary password
+3. Temp password will be share to user
+4. Once the user logs in with temp password and user can changes it at change password page.
 
 ### 2.3 User Interface Overview
 
@@ -223,24 +223,7 @@ Your personal workspace provides:
 
 ## 7. Collaboration Features
 
-### 7.1 Sharing Content
-
-To share content with colleagues:
-
-1. Open the document you want to share
-2. Click the "Share" button in the document toolbar
-3. Choose the sharing method:
-   - Generate a link
-   - Share by email
-   - Share to specific users or groups
-4. Set permissions (if applicable):
-   - View only
-   - Comment
-   - Edit
-5. Add an optional message
-6. Click "Share" to complete
-
-### 7.2 Comments and Feedback
+### 7.1 Comments and Feedback
 
 To comment on documents (if enabled):
 
@@ -251,7 +234,7 @@ To comment on documents (if enabled):
 5. Use @mentions to notify specific users
 6. Reply to existing comments as needed
 
-### 7.3 Document Ratings and Feedback
+### 7.2 Document Ratings and Feedback
 
 Provide feedback on documents to improve quality:
 

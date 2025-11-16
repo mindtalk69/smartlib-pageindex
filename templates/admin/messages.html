@@ -6,13 +6,83 @@
 {% block admin_content %}
 <div class="container mt-4">
     {# Removed H2 and H6 as title is now in admin_title block #}
-    
-    <div class="mb-3">
-        <a href="{{ url_for('admin.export_message_history_csv') }}" class="btn btn-outline-primary">
-            <i class="fas fa-download me-1"></i> Export as CSV
-        </a>
+
+    <style>
+      .message-snippet {
+        max-height: 4.2rem;
+        overflow: hidden;
+        position: relative;
+      }
+      .message-snippet::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 1.2rem;
+        background: linear-gradient(180deg, rgba(255,255,255,0) 0%, var(--bs-body-bg) 100%);
+      }
+      .message-snippet.no-fade::after {
+        display: none;
+      }
+    </style>
+
+    <div class="row row-cols-1 row-cols-lg-2 mb-4 g-3">
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-database me-2"></i>Export &amp; Cleanup
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        Export conversation history older than a retention window, remove it from SQLite,
+                        and run <code>VACUUM</code> to reclaim disk space.
+                    </p>
+                    <form method="post" action="{{ url_for('admin_messages.cleanup_messages') }}" class="row g-2">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="col-8">
+                            <label for="retention_days" class="form-label">Retention window (days)</label>
+                            <input
+                                type="number"
+                                class="form-control"
+                                id="retention_days"
+                                name="retention_days"
+                                min="1"
+                                value="{{ default_retention_days }}"
+                                required
+                            >
+                        </div>
+                        <div class="col-4 d-flex align-items-end">
+                            <button type="submit" class="btn btn-danger w-100">
+                                <i class="fas fa-broom me-1"></i>Export &amp; Purge
+                            </button>
+                        </div>
+                    </form>
+                    <small class="text-muted d-block mt-2">
+                        Archives are saved in <code>{{ message_log_directory }}</code> using the pattern
+                        <code>message_history_archive_YYYYMMDD_HHMMSS.csv</code>.
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-download me-2"></i>Quick Export
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">
+                        Download the current table contents as CSV without deleting anything.
+                    </p>
+                    <a href="{{ url_for('admin.export_message_history_csv') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-file-export me-1"></i> Export Active Messages
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="table-responsive">
+
+    <div class="table-responsive mt-2">
         <table class="table table-striped" id="messagesTable"> 
             <thead>
                 <tr>
@@ -24,11 +94,32 @@
             </thead>
             <tbody>
                 {% for msg in messages %} {# msg is a MessageHistory object #}
+                {% set timestamp_text = msg.timestamp.strftime('%Y-%m-%d %H:%M:%S') if msg.timestamp else 'N/A' %}
+                {% set message_text = msg.message_text or '' %}
+                {% set answer_text = msg.answer or '' %}
                 <tr data-id="{{ msg.message_id }}">
                     <td>{{ msg.author.username if msg.author else 'Unknown User' }}</td>
-                    <td style="word-wrap: break-word;">{{ msg.message_text }}</td>
-                    <td style="word-wrap: break-word;">{{ msg.answer or '' }}</td>
-                    <td>{{ msg.timestamp.strftime('%Y-%m-%d %H:%M:%S') if msg.timestamp else 'N/A' }}</td>
+                    <td>
+                        <div class="message-snippet{% if message_text|length <= 240 %} no-fade{% endif %}">
+                            {{ message_text }}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="message-snippet{% if answer_text|length <= 240 %} no-fade{% endif %}">
+                            {{ answer_text or '—' }}
+                        </div>
+                        <button
+                            type="button"
+                            class="btn btn-link btn-sm p-0 mt-1 btn-view-message"
+                            data-user="{{ msg.author.username if msg.author else 'Unknown User' }}"
+                            data-timestamp="{{ timestamp_text }}"
+                            data-message="{{ message_text|e }}"
+                            data-answer="{{ answer_text|e }}"
+                        >
+                            View full text
+                        </button>
+                    </td>
+                    <td>{{ timestamp_text }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -36,9 +127,68 @@
         {# Removed server-side pagination controls as DataTables will handle it #}
     </div>
 </div>
+
+<div class="modal fade" id="messageDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Message Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <dl class="row">
+          <dt class="col-sm-3">User</dt>
+          <dd class="col-sm-9" id="modalMessageUser">—</dd>
+          <dt class="col-sm-3">Timestamp</dt>
+          <dd class="col-sm-9" id="modalMessageTimestamp">—</dd>
+        </dl>
+        <h6>Message</h6>
+        <p class="border rounded p-2 bg-light" id="modalMessageText" style="white-space: pre-wrap;">—</p>
+        <h6>Answer</h6>
+        <p class="border rounded p-2 bg-light" id="modalMessageAnswer" style="white-space: pre-wrap;">—</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
-{# DataTables initialization moved to admin-datatables.js #}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const modalElement = document.getElementById('messageDetailModal');
+    if (!modalElement) {
+      return;
+    }
+    let modalInstance;
+    function getModal() {
+      if (!modalInstance) {
+        modalInstance = new bootstrap.Modal(modalElement);
+      }
+      return modalInstance;
+    }
+
+    document.body.addEventListener('click', function (event) {
+      const button = event.target.closest('.btn-view-message');
+      if (!button) {
+        return;
+      }
+      const user = button.getAttribute('data-user') || 'Unknown User';
+      const timestamp = button.getAttribute('data-timestamp') || '—';
+      const message = button.getAttribute('data-message') || '';
+      const answer = button.getAttribute('data-answer') || '';
+
+      document.getElementById('modalMessageUser').textContent = user;
+      document.getElementById('modalMessageTimestamp').textContent = timestamp;
+      document.getElementById('modalMessageText').textContent = message || '—';
+      document.getElementById('modalMessageAnswer').textContent = answer || '—';
+
+      getModal().show();
+    });
+  });
+</script>
+{# DataTables initialization handled in admin-datatables.js #}
 {% endblock %}

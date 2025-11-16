@@ -160,6 +160,34 @@ class MessageFeedback(db.Model):
     timestamp = db.Column(db.DateTime(timezone=True), server_default=func.now())
     __table_args__ = (db.UniqueConstraint('message_id', 'user_id', name='uq_message_user_feedback'),)
 
+
+class PasswordResetRequest(db.Model):
+    __tablename__ = 'password_reset_requests'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String, db.ForeignKey('users.user_id'), nullable=False)
+    username = db.Column(db.String, nullable=False)
+    email = db.Column(db.String, nullable=True)
+    status = db.Column(db.String(32), nullable=False, default='pending', index=True)
+    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now(), nullable=False)
+    processed_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    processed_by = db.Column(db.String, nullable=True)
+    request_reason = db.Column(db.Text, nullable=True)
+    admin_notes = db.Column(db.Text, nullable=True)
+
+    user = db.relationship('User', backref='password_reset_requests', lazy=True)
+
+
+PASSWORD_RESET_STATUS_PENDING = 'pending'
+PASSWORD_RESET_STATUS_COMPLETED = 'completed'
+PASSWORD_RESET_STATUS_DENIED = 'denied'
+
+VALID_PASSWORD_RESET_STATUSES = {
+    PASSWORD_RESET_STATUS_PENDING,
+    PASSWORD_RESET_STATUS_COMPLETED,
+    PASSWORD_RESET_STATUS_DENIED,
+}
+
+
 class Library(db.Model):
     __tablename__ = 'libraries'
     library_id = db.Column(db.Integer, primary_key=True)
@@ -698,6 +726,126 @@ def count_user_documents(user_id):
 def count_user_messages(user_id):
     """Count messages sent by user using SQLAlchemy."""
     return MessageHistory.query.filter_by(user_id=user_id).count()
+
+
+def _clean_optional_text(value):
+    if value is None:
+        return None
+    cleaned = str(value).strip()
+    return cleaned or None
+
+
+def get_password_reset_request_by_id(request_id: int | None):
+    """Fetch a password reset request by its primary key."""
+    if request_id is None:
+        return None
+    return db.session.get(PasswordResetRequest, request_id)
+
+
+def get_latest_pending_password_reset_request(user_id: str):
+    """Return the most recent pending reset request for the given user, if any."""
+    return (
+        PasswordResetRequest.query.filter_by(
+            user_id=user_id,
+            status=PASSWORD_RESET_STATUS_PENDING,
+        )
+        .order_by(PasswordResetRequest.created_at.desc())
+        .first()
+    )
+
+
+def create_password_reset_request(
+    user: User,
+    request_reason: str | None = None,
+    contact_email: str | None = None,
+):
+    """Create a password reset request for a local user.
+
+    Returns a tuple of (request, created_flag) where created_flag indicates
+    whether a new record was inserted or an existing pending request was reused.
+    """
+    if user is None:
+        raise ValueError("user is required")
+
+    existing_request = get_latest_pending_password_reset_request(user.user_id)
+    if existing_request:
+        return existing_request, False
+
+    request = PasswordResetRequest(
+        user_id=user.user_id,
+        username=user.username,
+        email=_clean_optional_text(contact_email) or user.email,
+        status=PASSWORD_RESET_STATUS_PENDING,
+        request_reason=_clean_optional_text(request_reason),
+    )
+    try:
+        db.session.add(request)
+        db.session.commit()
+        return request, True
+    except Exception as exc:
+        db.session.rollback()
+        logging.error(
+            "Error creating password reset request for user %s: %s",
+            user.user_id,
+            exc,
+        )
+        raise
+
+
+def list_password_reset_requests(statuses: Iterable[str] | None = None):
+    """Return password reset requests filtered by the provided statuses."""
+    query = PasswordResetRequest.query.options(joinedload(PasswordResetRequest.user)).order_by(
+        PasswordResetRequest.created_at.desc()
+    )
+
+    if statuses:
+        if isinstance(statuses, str):
+            statuses = [statuses]
+        normalized = [status for status in statuses if status in VALID_PASSWORD_RESET_STATUSES]
+        if normalized:
+            query = query.filter(PasswordResetRequest.status.in_(normalized))
+
+    return query.all()
+
+
+def count_password_reset_requests(status: str | None = None) -> int:
+    """Return a count of password reset requests, optionally filtered by status."""
+    query = PasswordResetRequest.query
+    if status in VALID_PASSWORD_RESET_STATUSES:
+        query = query.filter(PasswordResetRequest.status == status)
+    return query.count()
+
+
+def resolve_password_reset_request(
+    request: PasswordResetRequest,
+    new_status: str,
+    admin_user_id: str | None = None,
+    admin_notes: str | None = None,
+):
+    """Update status/admin metadata for a password reset request."""
+    if request is None:
+        raise ValueError("request is required")
+    if new_status not in VALID_PASSWORD_RESET_STATUSES:
+        raise ValueError(f"Invalid password reset status: {new_status}")
+
+    request.status = new_status
+    request.processed_at = datetime.now(timezone.utc)
+    request.processed_by = admin_user_id
+    if admin_notes is not None:
+        request.admin_notes = _clean_optional_text(admin_notes)
+
+    try:
+        db.session.commit()
+        return request
+    except Exception as exc:
+        db.session.rollback()
+        logging.error(
+            "Error updating password reset request %s: %s",
+            request.id,
+            exc,
+        )
+        raise
+
 
 # --- Rewritten URL Download Functions using SQLAlchemy ---
 

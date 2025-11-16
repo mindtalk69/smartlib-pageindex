@@ -40,6 +40,15 @@ class Config:
     DATA_VOLUME_PATH = data_dir
     print(f"DEBUG: Ensured data directory exists: {DATA_VOLUME_PATH}") # Add debug print
 
+    log_dir = os.environ.get('LOG_DIR', os.path.join(DATA_VOLUME_PATH, 'logs'))
+    os.makedirs(log_dir, exist_ok=True)
+    LOG_DIR = log_dir
+    APPLICATION_LOG_FILE = os.environ.get(
+        'APPLICATION_LOG_FILE',
+        os.path.join(LOG_DIR, 'smartlib.log'),
+    )
+    print(f"DEBUG: Application logs will be written to: {APPLICATION_LOG_FILE}")
+
     upload_tmp_dir = os.environ.get('UPLOAD_TEMP_DIR', os.path.join(DATA_VOLUME_PATH, 'tmp_uploads'))
     os.makedirs(upload_tmp_dir, exist_ok=True)
     UPLOAD_TEMP_DIR = upload_tmp_dir

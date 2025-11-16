@@ -12,7 +12,8 @@
             <strong>Vector Reference Log System</strong><br>
             This system tracks file processing activity with timestamp, file_id, and chunk_index information.
             <br><br>
-            <strong>Log Location:</strong> <code>/data/logs/vector_references_YYYY-MM-DD.log</code><br>
+            <strong>Log Directory:</strong> <code>{{ log_directory }}</code><br>
+            <strong>File Pattern:</strong> <code>vector_references_YYYY-MM-DD.log</code><br>
             <strong>Format:</strong> JSON lines (one entry per line)
         </div>
     </div>
@@ -35,7 +36,7 @@
                                 <td><code>{{ log_file }}</code></td>
                                 <td>{{ log_file.replace('vector_references_', '').replace('.log', '') }}</td>
                                 <td>
-                                    <a href="{{ url_for('admin.view_vector_reference_log', log_filename=log_file) }}" 
+                                    <a href="{{ url_for('vector_reference_logs.view_vector_reference_log', log_filename=log_file) }}" 
                                        class="button is-small is-primary">
                                         View Entries
                                     </a>

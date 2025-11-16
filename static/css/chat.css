@@ -54,6 +54,9 @@
 /* Match input wrapper background to form background */
 .query-input-wrapper {
   background: inherit !important;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
 }
 
 /* Textarea styling: curve, border, theme background */
@@ -66,6 +69,8 @@
   transition: border-color 0.15s;
   margin-top: 6px !important;
   margin-bottom: 6px !important;
+  flex: 1 1 260px;
+  min-width: 200px;
 }
 #query-input:focus {
   border-color: var(--bs-primary, #0d6efd) !important;
@@ -148,6 +153,24 @@
 #show-files-btn {
   width: auto !important;
   min-width: 0 !important;
+}
+
+@media (max-width: 992px) {
+  .query-input-wrapper {
+    flex-wrap: wrap;
+  }
+  #query-input {
+    order: 2;
+    flex: 1 1 100%;
+    min-width: 100%;
+  }
+  #send-btn,
+  #mic-btn {
+    order: 3;
+  }
+  .query-input-btn {
+    flex: 0 0 auto;
+  }
 }
 #show-files-btn i,
 #historyBtn i,
@@ -571,6 +594,39 @@
   box-shadow: none !important;
   position: relative;
   z-index: 2100; /* Ensure it sits above placeholder animations */
+}
+
+@media (max-width: 1200px) {
+  #self-retriever-context {
+    width: 80%;
+  }
+  .self-retriever-questions-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  #self-retriever-context {
+    width: 100%;
+  }
+  .self-retriever-questions-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  #self-retriever-context .question-box {
+    font-size: 0.9em;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 576px) {
+  .self-retriever-questions-grid {
+    grid-template-columns: 1fr;
+  }
+  #self-retriever-context .question-box {
+    min-height: 40px;
+  }
 }
 
 /* Hide any title/heading in self-retriever-context */

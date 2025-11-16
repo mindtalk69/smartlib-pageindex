@@ -22,37 +22,85 @@
     <link href="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/css/bootstrap4-toggle.min.css" rel="stylesheet">
     <!-- CSRF Token for AJAX requests -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <style>
-      /* Base UI improvements (copied from base.html, could be moved to a shared CSS) */
-      .theme-toggle-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: transform 0.2s ease;
-      }
-      .theme-toggle-btn:hover {
-        transform: scale(1.1);
-      }
-      .theme-toggle-btn i {
-        font-size: 1.2rem;
-      }
-      /* Disable particles animation in admin pages */
-      #particles-js {
-        display: none !important;
-      }
-      /* High-contrast group titles in dark mode */
-      [data-bs-theme="dark"] .admin-menu-container .list-group-item.fw-bold {
-        color: #fff !important;
-        background: transparent;
-      }
-    </style>
+     <style>
+       .navbar {
+         position: relative;
+         z-index: 1060;
+       }
+       .navbar .nav-link {
+         transition: color 0.15s ease-in-out;
+       }
+       [data-bs-theme="light"] .navbar.navbar-dark .nav-link {
+         color: #212529;
+       }
+       [data-bs-theme="light"] .navbar.navbar-dark .nav-link:hover,
+       [data-bs-theme="light"] .navbar.navbar-dark .nav-link:focus {
+         color: #0d6efd;
+       }
+       [data-bs-theme="light"] .navbar.navbar-dark .navbar-toggler-icon {
+         filter: invert(0.85);
+       }
+       [data-bs-theme="light"] .navbar.navbar-dark .navbar-brand,
+       [data-bs-theme="light"] .navbar.navbar-dark .navbar-brand span {
+         color: #212529;
+       }
+       /* Base UI improvements (copied from base.html, could be moved to a shared CSS) */
+       .theme-toggle-btn {
+         display: flex;
+         align-items: center;
+         justify-content: center;
+         transition: transform 0.2s ease;
+       }
+       .theme-toggle-btn:hover {
+         transform: scale(1.1);
+       }
+       .theme-toggle-btn i {
+         font-size: 1.2rem;
+       }
+       /* Disable particles animation in admin pages */
+       #particles-js {
+         display: none !important;
+       }
+       /* High-contrast group titles in dark mode */
+       [data-bs-theme="dark"] .admin-menu-container .list-group-item.fw-bold {
+         color: #fff !important;
+         background: transparent;
+       }
+       @media (max-width: 991.98px) {
+         .navbar .container {
+           position: relative;
+         }
+         .navbar .navbar-collapse {
+           position: absolute;
+           top: 100%;
+           left: 0;
+           right: 0;
+           z-index: 1050;
+           background-color: rgba(15, 23, 42, 0.98);
+           border-radius: 0.5rem;
+           padding: 1rem;
+           margin-top: 0.5rem;
+           box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.3);
+         }
+         [data-bs-theme="light"] .navbar .navbar-collapse {
+           background-color: rgba(255, 255, 255, 0.98);
+           box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+         }
+         [data-bs-theme="light"] .navbar .navbar-collapse .nav-link,
+         [data-bs-theme="light"] .navbar .navbar-collapse .nav-link span,
+         [data-bs-theme="light"] .navbar .navbar-collapse .nav-link i {
+           color: #212529 !important;
+         }
+       }
+     </style>
+
     {% block admin_head_extra %}{% endblock %} {# Allow specific pages to add more head content #}
 </head>
 <body style="height: 100%; margin: 0; padding: 0;"> {# Body tag needed as we are not extending #}
 
     <!-- Bootstrap Navbar (Copied from base.html for consistency) -->
-    <nav class="navbar navbar-expand-lg navbar-dark" style="height: 48px;">
-      <div class="container">
+    <nav class="navbar navbar-expand-lg navbar-dark" style="overflow: visible !important;">
+      <div class="container" style="overflow: visible !important;">
           <img id="img-logo" src="{{ logo_url }}" style="height: 48px; width: 48px; object-fit: contain;" class="me-2" alt="SmartLib Logo">
           <span class="fw-semibold">Smartlib</span>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation" style="z-index: 500;">
@@ -110,6 +158,12 @@
                     <a href="{{ url_for('admin_users.user_management') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_users.user_management' %}active{% endif %}">
                       <i class="fas fa-user me-2"></i>Users
                     </a>
+                    <a href="{{ url_for('admin_users.password_reset_requests') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_users.password_reset_requests' %}active{% endif %}">
+                      <i class="fas fa-unlock-alt me-2"></i>Password Reset Requests
+                      {% if pending_password_reset_count %}
+                        <span class="badge bg-danger ms-2">{{ pending_password_reset_count }}</span>
+                      {% endif %}
+                    </a>
                     <a href="{{ url_for('admin_user_groups.user_groups') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_user_groups.user_groups' %}active{% endif %}">
                       <i class="fas fa-users me-2"></i>User Groups
                     </a>
@@ -159,7 +213,7 @@
                     <span class="fas fa-chevron-down small"></span>
                   </button>
                   <div class="collapse show" id="collapseAI">
-                    <a href="{{ url_for('admin.list_vector_reference_logs') }}" class="list-group-item list-group-item-action {% if request.endpoint in ['admin.list_vector_reference_logs', 'admin.view_vector_reference_log'] %}active{% endif %}">
+                    <a href="{{ url_for('vector_reference_logs.list_vector_reference_logs') }}" class="list-group-item list-group-item-action {% if request.endpoint in ['vector_reference_logs.list_vector_reference_logs', 'vector_reference_logs.view_vector_reference_log'] %}active{% endif %}">
                       <i class="fas fa-project-diagram me-2"></i>Vector References
                     </a>
                     <a href="{{ url_for('admin.vector_store_settings') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin.vector_store_settings' %}active{% endif %}">

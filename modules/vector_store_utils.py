@@ -18,7 +18,10 @@ def log_vector_reference(file_id, url_download_id, chunk_index):
     Logs vector reference information to a file instead of the database.
     Log files are created daily.
     """
-    log_dir = os.path.join('data', 'logs')
+    log_dir = current_app.config.get('LOG_DIR')
+    if not log_dir:
+        data_volume = current_app.config.get('DATA_VOLUME_PATH') or os.path.join(current_app.root_path, 'data')
+        log_dir = os.path.join(data_volume, 'logs')
     os.makedirs(log_dir, exist_ok=True)
     log_filename = f"vector_references_{datetime.utcnow().strftime('%Y-%m-%d')}.log"
     log_file = os.path.join(log_dir, log_filename)

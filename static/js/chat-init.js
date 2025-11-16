@@ -7,7 +7,17 @@ async function initChat() { // Make initChat async
     if (isNaN(maxMessages) || maxMessages < 1) maxMessages = 100;
     if (maxMessages > 1000) maxMessages = 1000;
 
-    window.chatCore = new ChatCore({
+    const ChatCoreClass = window.ChatCore;
+    const ChatUIClass = window.ChatUI;
+
+    if (!ChatCoreClass) {
+      throw new Error('ChatCore global is not available. Ensure chat-core.js ran before chat-init.js.');
+    }
+    if (!ChatUIClass) {
+      throw new Error('ChatUI global is not available. Ensure chat-ui.js ran before chat-init.js.');
+    }
+
+    window.chatCore = new ChatCoreClass({
       markdown: true,
       sanitize: true,
       maxMessages: maxMessages
@@ -15,7 +25,7 @@ async function initChat() { // Make initChat async
     console.log('[ChatInit] ChatCore initialized:', window.chatCore); // Log Core init
     
     // Initialize ChatUI
-    window.chatUI = new ChatUI('#chat-container', {
+    window.chatUI = new ChatUIClass('#chat-container', {
       bubbleClass: 'chat-bubble',
       userBubbleClass: 'user-bubble',
       agentBubbleClass: 'agent-bubble'

@@ -34,6 +34,19 @@
 /* Bootstrap handles modal display */
 
 
+/* Elevate animation options modal above self-retriever panels */
+#animationOptionsModal.show {
+  z-index: 5000;
+}
+
+#animationOptionsModal.show .modal-dialog {
+  z-index: 5001;
+}
+
+#animationOptionsModal.show ~ .modal-backdrop {
+  z-index: 4990;
+}
+
 /* Apply form container styling look to the options modal content */
 #animationOptionsModal .modal-content {
   border-radius: 16px; /* Match form container radius */

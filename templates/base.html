@@ -11,23 +11,72 @@
     <!-- Favicon -->
     <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}?v={{ config['APP_VERSION'] }}">
     <!-- Application styles -->
-    <style>
-      /* Base UI improvements */
-      .theme-toggle-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: transform 0.2s ease;
-      }
-      
-      .theme-toggle-btn:hover {
-        transform: scale(1.1);
-      }
-      
-      .theme-toggle-btn i {
-        font-size: 1.2rem;
-      }
-    </style>
+     <style>
+       .navbar {
+         position: relative;
+         z-index: 1060;
+       }
+       .navbar .nav-link {
+         transition: color 0.15s ease-in-out;
+       }
+       [data-bs-theme="light"] .navbar.navbar-dark .nav-link {
+         color: #212529;
+       }
+       [data-bs-theme="light"] .navbar.navbar-dark .nav-link:hover,
+       [data-bs-theme="light"] .navbar.navbar-dark .nav-link:focus {
+         color: #0d6efd;
+       }
+       [data-bs-theme="light"] .navbar.navbar-dark .navbar-toggler-icon {
+         filter: invert(0.85);
+       }
+       [data-bs-theme="light"] .navbar.navbar-dark .navbar-brand,
+       [data-bs-theme="light"] .navbar.navbar-dark .navbar-brand span {
+         color: #212529;
+       }
+       /* Base UI improvements */
+       .theme-toggle-btn {
+         display: flex;
+         align-items: center;
+         justify-content: center;
+         transition: transform 0.2s ease;
+       }
+       
+       .theme-toggle-btn:hover {
+         transform: scale(1.1);
+       }
+       
+       .theme-toggle-btn i {
+         font-size: 1.2rem;
+       }
+
+       @media (max-width: 991.98px) {
+         .navbar .container {
+           position: relative;
+         }
+         .navbar .navbar-collapse {
+           position: absolute;
+           top: 100%;
+           left: 0;
+           right: 0;
+           z-index: 1050;
+           background-color: rgba(15, 23, 42, 0.98);
+           border-radius: 0.5rem;
+           padding: 1rem;
+           margin-top: 0.5rem;
+           box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.3);
+         }
+         [data-bs-theme="light"] .navbar .navbar-collapse {
+           background-color: rgba(255, 255, 255, 0.98);
+           box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+         }
+         [data-bs-theme="light"] .navbar .navbar-collapse .nav-link,
+         [data-bs-theme="light"] .navbar .navbar-collapse .nav-link span,
+         [data-bs-theme="light"] .navbar .navbar-collapse .nav-link i {
+           color: #212529 !important;
+         }
+       }
+     </style>
+
     <!-- Dark mode stylesheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/darkmode.css') }}?v={{ config['APP_VERSION'] }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}?v={{ config['APP_VERSION'] }}"> {# Added shared form styles #}
@@ -51,7 +100,7 @@
     <!-- Bootstrap Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark" style="overflow: visible !important; flex-shrink: 0;"> {# Added flex-shrink: 0 #}
       <div class="container" style="overflow: visible !important;"> {# Added overflow visible #}
-        <a class="navbar-brand d-flex align-items-center" href="#">
+        <a class="navbar-brand d-flex align-items-center" href="/">
           <img id="img-logo" src="{{ logo_url }}" style="height: 48px; width: 48px; object-fit: contain;" class="me-2" alt="SmartLib Logo">
           <span class="fw-semibold">Smartlib</span>
         </a>

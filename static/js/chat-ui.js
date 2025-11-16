@@ -1546,6 +1546,7 @@ _showVisualEvidenceModal(documentId, pageNo, options = {}) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = ChatUI;
-} else {
+}
+if (typeof window !== 'undefined') {
   window.ChatUI = ChatUI;
 }

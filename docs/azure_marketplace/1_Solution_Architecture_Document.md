@@ -16,7 +16,6 @@ The SmartLib application provides an intuitive interface for users to leverage t
 
 ### 2.2 Target Users
 
-- Data scientists and ML engineers
 - Knowledge management professionals
 - Enterprise content managers
 - Research organizations
@@ -66,14 +65,19 @@ Data Layer (Document Storage, Vector Indices, User Database)
 ## 4. Azure Resource Requirements
 
 ### 4.1 Compute Resources
+- Existing (user deployed)
+- Azure Open Ai with model deployment
+- Azure Keyvault
+- Azure Storage Account ( file share to hold data)
+- Azure Redis cache
+- Azure Document Intelligence (optional)
+Smartlib deployment via ARM Template:
 - Azure App Service Plan: Minimum B1 (1 core, 1.75GB memory), recommended P1v2 (2 cores, 7GB memory)
-- Azure Kubernetes Service (optional for high-scale deployments)
+
 
 ### 4.2 Storage Resources
-- Azure Blob Storage for document storage
 - Azure Files for shared data volume (/home/data)
 - SQLite database (default, stored on Azure Files)
-- Azure Database for PostgreSQL (optional, only when using PGVector)
 
 ### 4.3 Authentication Resources
 - Azure Active Directory B2C (optional for enterprise deployments)
@@ -84,7 +88,7 @@ Data Layer (Document Storage, Vector Indices, User Database)
 - Azure Document Intelligence (optional) for advanced OCR capabilities
 
 ### 4.5 Networking Resources
-- Virtual Network
+- Virtual Network (optional)
 - Application Gateway (optional for high-security deployments)
 - Private Link (for secure database connections)
 
@@ -99,59 +103,26 @@ Azure App Service (Web App) ← Azure Application Insights
          ↓
 Azure App Service (Worker) ← Azure Cache for Redis (Task Queue)
          ↓
-Azure Files (SQLite DB + ChromaDB Vectors + Shared Data) ← Azure Backup Service
+Azure Files (SQLite DB + ChromaDB Vectors + Shared Data) ← Azure Backup Service (User configuration)
          ↓
-Azure Blob Storage ← Azure CDN (for static assets)
+Azure Storage Account ← Azure File share ← Azure CDN (for static assets) - User configuration
 ```
 
-### 5.2 PGVector Deployment (Optional)
-
-For deployments opting to use PGVector as the vector store instead of ChromaDB:
-
-```
-Azure App Service (Web App) ← Azure Application Insights
-         ↓
-Azure App Service (Worker) ← Azure Cache for Redis (Task Queue)
-         ↓
-Azure Database for PostgreSQL (PGVector) ← Azure Backup Service
-         ↓
-Azure Files (SQLite DB + Shared Data) ← Azure Backup Service
-         ↓
-Azure Blob Storage ← Azure CDN (for static assets)
-```
-
-### 5.3 High-Scale Deployment
-
-For high-scale deployments, the architecture can be expanded to:
-
-```
-Azure Front Door
-         ↓
-Azure Kubernetes Service ← Azure Monitor
-         ↓
-Azure Files (SQLite + ChromaDB) OR Azure Database for PostgreSQL (Optional, for PGVector)
-         ↓
-Azure Blob Storage (with Premium Performance) ← Azure CDN
-```
 
 ## 6. Integration Points
 
 ### 6.1 External API Integrations
-- Azure OpenAI Service for language model integration
-- Azure Document Intelligence for advanced OCR capabilities
-- Azure Cognitive Services for additional AI features
-- Optional: Customer-provided LLM endpoints
+- Azure OpenAI Service for language model integration,  (Customer-provided LLM endpoints) on Provision ArmTemplate
+- Azure Document Intelligence for advanced OCR capabilities, (Customer-provided LLM endpoints) on Provision ArmTemplate
+- Azure Keyvault (Customer-provided LLM endpoints) on Provision ArmTemplate
+
 
 ### 6.2 Authentication Integrations
-- Azure Active Directory
 - Microsoft Account authentication
-- Custom authentication providers
+- Custom authentication providers (local)
 
 ### 6.3 Data Source Integrations
-- SharePoint Online
-- Azure Blob Storage
-- OneDrive for Business
-- External document repositories via connectors
+- Not applicable in this version.
 
 ## 7. OCR Integration
 
@@ -163,7 +134,9 @@ SmartLib offers dual OCR processing options to accommodate different deployment 
    - Built into the worker container
    - No additional Azure services required
    - Good for basic OCR needs and air-gapped environments
-   - Uses CPU resources on the worker container
+   - Uses CPU and memory resources on the worker container
+   - Need more memory to produce fast result since it use CPU.
+   - If enable virtual grounding it will add more task to save the image
 
 2. **Azure Document Intelligence**
    - Cloud-based advanced document processing
@@ -175,7 +148,7 @@ SmartLib offers dual OCR processing options to accommodate different deployment 
 
 **Local OCR Processing Flow:**
 ```
-Document Upload → Worker Processing → Tesseract OCR
+Document Upload → Worker Processing → Local OCR
     → Text Extraction → Vector Store
 ```
 
@@ -190,7 +163,7 @@ Document Upload → Worker Pre-processing → Azure Document Intelligence API
 - Admin interface for OCR method selection
 - Document Intelligence API key stored securely in Key Vault
 - Environment variables set during deployment for Document Intelligence endpoint and key reference
-- Dynamic switching between OCR methods without redeployment
+- Dynamic switching between OCR methods without redeployment ( need restart web & worker service to apply)
 
 ## 8. Security Architecture
 
@@ -200,21 +173,17 @@ Document Upload → Worker Pre-processing → Azure Document Intelligence API
 - TLS 1.2+ for all communications
 
 ### 8.2 Authentication Security
-- OAuth 2.0 / OpenID Connect
-- Multi-factor authentication support
 - Role-based access control (RBAC)
 
-### 8.3 Network Security
-- Azure DDoS Protection
+### 8.3 Network Security (user can add or customize if needed)
+- Azure DDoS Protection 
 - Web Application Firewall (WAF)
 - Private endpoints for internal resources
 
 ## 9. Scalability and Performance
 
 ### 9.1 Scaling Mechanisms
-- Horizontal scaling via App Service Scale Sets or AKS
 - Auto-scaling based on CPU, memory, and request metrics
-- Connection pooling for database access
 
 ### 9.2 Performance Optimizations
 - Azure CDN for static assets
@@ -224,13 +193,14 @@ Document Upload → Worker Pre-processing → Azure Document Intelligence API
 
 ## 10. Availability and Disaster Recovery
 
-### 10.1 High Availability
-- Multi-AZ deployment for critical components
-- Load balancing for web tier
-- Database replication for data tier
+Since it works on local each azure web apps, user can copy each database since it save in azure storage files.
 
-### 10.2 Disaster Recovery
-- Regular automated backups
+### 10.1 High Availability
+- No applied yet
+
+
+### 10.2 Disaster Recovery ( Adjust in Azure Storage Account)
+- Regular automated backups or copy azure storage file
 - Point-in-time recovery for databases
 - Geographic replication for critical data
 
@@ -250,4 +220,4 @@ Document Upload → Worker Pre-processing → Azure Document Intelligence API
 
 This solution architecture provides a robust, scalable, and secure foundation for deploying the SmartLib application to the Azure Marketplace. The architecture leverages Azure's native services to ensure optimal performance, security, and reliability while providing customers with flexibility in deployment options based on their specific requirements.
 
-By default, SmartLib uses SQLite for the application database and ChromaDB for vector storage, both stored on Azure Files. This provides a simple, cost-effective solution that works well for most deployments. For users with specific requirements, the architecture supports optional PGVector deployment using Azure Database for PostgreSQL and Azure Document Intelligence for advanced document processing capabilities.
+By default, SmartLib uses SQLite for the application database and ChromaDB for vector storage, both stored on Azure Files. This provides a simple, cost-effective solution that works well for most deployments. For users with specific requirements, the architecture supports optional PGVector deployment using Azure Database for PostgreSQL (Not applicable in this version) and Azure Document Intelligence for advanced document processing capabilities.

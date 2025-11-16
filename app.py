@@ -4,6 +4,7 @@ import signal
 import atexit
 import warnings
 import logging
+from logging.handlers import RotatingFileHandler
 import json
 from types import SimpleNamespace
 from typing import Any, Dict
@@ -148,7 +149,14 @@ from flask_migrate import Migrate # Import Migrate
 from config import get_config
 
 # Import database models and functions needed for user loading
-from modules.database import User, get_user_by_id, AppSettings, ModelConfig # Added AppSettings
+from modules.database import (
+    AppSettings,
+    ModelConfig,
+    User,
+    count_password_reset_requests,
+    get_user_by_id,
+    PASSWORD_RESET_STATUS_PENDING,
+)  # Added AppSettings
 
 # Import extensions (assuming they are defined without app initialization)
 from extensions import db, login_manager, csrf # Assuming csrf is also in extensions
@@ -158,6 +166,7 @@ from modules.index import init_index
 from modules.login import init_login
 from modules.register import init_register
 from modules.change_password import init_change_password
+from modules.password_reset_requests import init_password_reset_requests
 from modules.upload import init_upload
 from modules.logout import init_logout
 from modules.login_azure import init_login_azure
@@ -186,7 +195,31 @@ def create_app():
     config_obj = get_config()
     app.config.from_object(config_obj)
     app.config.setdefault('VITE_DEV_SERVER_URL', os.getenv('VITE_DEV_SERVER_URL'))
-    #app.logger.setLevel(logging.DEBUG)
+
+    log_level_name = app.config.get('LOG_LEVEL', 'INFO').upper()
+    log_level = getattr(logging, log_level_name, logging.INFO)
+    logging.getLogger().setLevel(log_level)
+    app.logger.setLevel(log_level)
+
+    log_dir = app.config.get('LOG_DIR') or os.path.join(app.config['DATA_VOLUME_PATH'], 'logs')
+    log_file = app.config.get('APPLICATION_LOG_FILE') or os.path.join(log_dir, 'smartlib.log')
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+        should_add_handler = True
+        for handler in logging.getLogger().handlers:
+            if isinstance(handler, RotatingFileHandler) and getattr(handler, 'baseFilename', None) == log_file:
+                should_add_handler = False
+                break
+        if should_add_handler:
+            file_handler = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=5)
+            file_handler.setLevel(log_level)
+            file_handler.setFormatter(
+                logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            )
+            logging.getLogger().addHandler(file_handler)
+            app.logger.info("File logging enabled at %s", log_file)
+    except OSError as exc:
+        app.logger.warning("Unable to configure file logging at %s: %s", log_file, exc)
 
     asset_manifest_cache: Dict[str, Any] = {'data': None}
 
@@ -506,13 +539,33 @@ def create_app():
 
         app.logger.info(f"Generated about_url: {about_url}")
         app.logger.info(f"Logo URL: {logo_url}")
+
+        pending_password_reset_count = 0
+        if current_user.is_authenticated and getattr(current_user, "is_admin", False):
+            try:
+                pending_password_reset_count = count_password_reset_requests(
+                    PASSWORD_RESET_STATUS_PENDING
+                )
+                if pending_password_reset_count:
+                    app.logger.info(
+                        "Admin navigation showing %s pending password reset requests",
+                        pending_password_reset_count,
+                    )
+            except Exception as exc:
+                app.logger.warning(
+                    "Unable to count pending password reset requests: %s",
+                    exc,
+                )
+
         return dict(
             current_user=current_user,
             current_year=datetime.now().year,
             about_url=about_url,
             asset_bundle=asset_bundle,
             logo_url=logo_url,
+            pending_password_reset_count=pending_password_reset_count,
         )
+
         
     @app.errorhandler(CSRFError)
     def handle_csrf_error(e):
@@ -535,6 +588,7 @@ def create_app():
     init_login(app)
     init_register(app)
     init_change_password(app)
+    init_password_reset_requests(app)
     init_upload(app)
     init_logout(app)
     init_login_azure(app)

@@ -60,8 +60,11 @@ function escapeHtml(text) {
     return text.replace(/[&<>"']/g, (m) => map[m]);
 }
 
-// Make available globally
-if (typeof module === 'undefined') {
+// Make available globally and via modules
+if (typeof window !== 'undefined') {
   window.showToast = showToast;
-  window.escapeHtml = escapeHtml; // Make escapeHtml globally available
+  window.escapeHtml = escapeHtml;
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { showToast, escapeHtml };
 }
