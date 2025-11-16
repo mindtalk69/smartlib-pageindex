@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CSRF Error</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/darkmode.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.0/dist/cosmo/bootstrap.min.css">
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <div class="alert alert-danger mt-5">
+            <h4 class="alert-heading">Security Error: CSRF Token Missing or Invalid</h4>
+            <p>{{ reason or "Your session may have expired or the form was submitted incorrectly. Please try again." }}</p>
+            <hr>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-primary">Back to Admin Dashboard</a>
+        </div>
+    </div>
+</body>
+</html>

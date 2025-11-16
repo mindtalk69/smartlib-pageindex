@@ -53,7 +53,7 @@
     <!-- Bootstrap Navbar (Copied from base.html for consistency) -->
     <nav class="navbar navbar-expand-lg navbar-dark" style="height: 48px;">
       <div class="container">
-          <img id="img-logo" src="{{ url_for('static', filename='img/logo.png') }}" style="height: 48px; width: 48px; object-fit: contain;" class="me-2" alt="SmartLib Logo">
+          <img id="img-logo" src="{{ logo_url }}" style="height: 48px; width: 48px; object-fit: contain;" class="me-2" alt="SmartLib Logo">
           <span class="fw-semibold">Smartlib</span>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation" style="z-index: 500;">
           <span class="navbar-toggler-icon"></span>
@@ -198,7 +198,14 @@
                       <i class="fas fa-comment-dots me-2"></i>User Feedback
                     </a>
                     <a href="{{ url_for('admin.admin_reset_data') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin.admin_reset_data' %}active{% endif %}">
-                      <i class="fas fa-exclamation-triangle me-2"></i>Reset Upload/Download Logs 
+                      <i class="fas fa-exclamation-triangle me-2"></i>Reset Upload/Download Logs
+                    </a>
+                    <!-- Site Appearance / Branding Settings -->
+                    <div class="list-group-item fw-bold text-secondary small d-flex justify-content-between align-items-center mt-2">
+                      Site Appearance
+                    </div>
+                    <a href="{{ url_for('admin.logo_settings') }}" class="list-group-item list-group-item-action ps-4 {% if request.endpoint == 'admin.logo_settings' %}active{% endif %}">
+                      <i class="fas fa-image me-2"></i>Logo Settings
                     </a>
                   </div>
                 </div>

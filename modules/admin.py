@@ -364,6 +364,57 @@ def init_admin(app):
     except Exception as e:
         # If the module is missing or has errors, log and continue to avoid breaking app import
         logging.error(f"Failed to register admin_embeddings blueprint: {e}", exc_info=True)
+# --- Logo Settings Route ---
+@admin_bp.route('/logo_settings', methods=['GET', 'POST'])
+@login_required
+def logo_settings():
+    if not current_user.is_admin:
+        flash('Admin access required', 'danger')
+        return redirect(url_for('admin.dashboard'))
+
+    logo_upload_error = None
+    logo_upload_success = None
+
+    if request.method == 'POST':
+        # Handle logo removal
+        if request.form.get('remove_logo') == '1':
+            custom_logo_path = os.path.join(current_app.static_folder, 'img', 'custom_logo.png')
+            try:
+                if os.path.exists(custom_logo_path):
+                    os.remove(custom_logo_path)
+                    logo_upload_success = 'Custom logo removed. Default logo is now in use.'
+                else:
+                    logo_upload_error = 'No custom logo to remove.'
+            except Exception as e:
+                logo_upload_error = f'Error removing logo: {str(e)}'
+        else:
+            file = request.files.get('logo_file')
+            if not file or file.filename == '':
+                logo_upload_error = 'No file selected.'
+            elif not (file.filename.lower().endswith('.png') or file.filename.lower().endswith('.jpg') or file.filename.lower().endswith('.jpeg') or file.filename.lower().endswith('.svg')):
+                logo_upload_error = 'Invalid file type. Please upload a PNG, JPG, or SVG image.'
+            else:
+                # Save to static/img/custom_logo.png (overwrite)
+                save_path = os.path.join(current_app.static_folder, 'img', 'custom_logo.png')
+                try:
+                    file.save(save_path)
+                    logo_upload_success = 'Logo updated successfully.'
+                except Exception as e:
+                    logo_upload_error = f'Error saving logo: {str(e)}'
+
+    # Check if custom logo exists for preview
+    custom_logo_url = None
+    custom_logo_path = os.path.join(current_app.static_folder, 'img', 'custom_logo.png')
+    if os.path.exists(custom_logo_path):
+        mtime = int(os.path.getmtime(custom_logo_path))
+        custom_logo_url = url_for('static', filename='img/custom_logo.png') + f'?v={mtime}'
+
+    return render_template(
+        'admin/logo_settings.html',
+        custom_logo_url=custom_logo_url,
+        logo_upload_error=logo_upload_error,
+        logo_upload_success=logo_upload_success
+    )
 
 @admin_bp.route('/users/toggle_admin/<string:user_id>')
 @login_required

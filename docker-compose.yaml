@@ -20,6 +20,8 @@ services:
       - "8000:8000"
     volumes:
       - ./data:/home/data
+      - ./static/img:/app/static/img
+
     env_file:
       - .env.dev
     environment:
@@ -33,6 +35,7 @@ services:
       - GUNICORN_TIMEOUT=240
       - PYTHONPATH=/app
       - IS_ENABLED_OCR=1
+      - APP_MODULE=app:app
     command: ["web"]
     depends_on:
       redis:
@@ -57,6 +60,7 @@ services:
       - AGENT_TASK_TIMEOUT=240
       - PYTHONPATH=/app
       - IS_ENABLED_OCR=1
+      
     command: ["worker"]
     depends_on:
       redis:

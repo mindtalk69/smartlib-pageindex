@@ -246,6 +246,11 @@ def create_app():
             or manifest.get(f"static/src/{name}.js")
         )
         if not entry:
+            for candidate in manifest.values():
+                if candidate.get('name') == name:
+                    entry = candidate
+                    break
+        if not entry:
             app.logger.warning("Asset '%s' not found in manifest.", name)
             return SimpleNamespace(scripts=[], styles=[])
 
@@ -476,21 +481,37 @@ def create_app():
 
     @app.context_processor
     def inject_current_user_context():
-        """Inject current_user, current_year, and optional routes into templates."""
+        """Inject current_user, current_year, logo_url, and optional routes into templates."""
         from datetime import datetime
         from werkzeug.routing import BuildError
+        import os
 
         try:
             about_url = url_for("about.about")
         except BuildError:
             about_url = None
 
+        # Dynamic logo logic: check for custom logo, fallback to default
+        custom_logo_path = os.path.join(app.static_folder, "img", "custom_logo.png")
+        if os.path.exists(custom_logo_path):
+            logo_url = url_for("static", filename="img/custom_logo.png")
+            # Optional: add cache busting version, e.g. based on mtime
+            try:
+                mtime = int(os.path.getmtime(custom_logo_path))
+                logo_url += f"?v={mtime}"
+            except Exception:
+                pass
+        else:
+            logo_url = url_for("static", filename="img/logo.png")
+
         app.logger.info(f"Generated about_url: {about_url}")
+        app.logger.info(f"Logo URL: {logo_url}")
         return dict(
             current_user=current_user,
             current_year=datetime.now().year,
             about_url=about_url,
             asset_bundle=asset_bundle,
+            logo_url=logo_url,
         )
         
     @app.errorhandler(CSRFError)

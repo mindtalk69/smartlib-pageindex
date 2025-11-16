@@ -45,12 +45,12 @@
 }
 
 [data-bs-theme="light"] .query-form-inner {
-  background: linear-gradient(145deg, #7665b7, #6d5cae);
+  background: transparent !important;
   color: var(--custom-text-on-primary);
-  border: none;
+  border: none !important;
   border-radius: 28px;
   padding: 12px 12px; /* Reduced horizontal padding */
-  box-shadow: 0 4px 15px rgba(109, 92, 174, 0.15);
+  box-shadow: none !important;
 }
 
 [data-bs-theme="dark"] .query-form-inner {
