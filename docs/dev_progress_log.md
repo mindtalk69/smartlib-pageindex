@@ -1,5 +1,13 @@
 # SmartLib Dev Progress Log
 
+## 2025-11-16 – Password Reset & Chat Polish
+- Fixed the shared navbar stacking so brand links home, menus overlay cleanly, and light/dark themes keep mobile taps reliable.
+- Implemented the password reset request workflow with user forms, admin approvals/denials, badges, logging, and the supporting Alembic migration.
+- Expanded message history tooling with log export/purge helpers, VACUUM, retention cards, and a modal for reading full transcripts inside the admin shell.
+- Pointed vector reference logging/views to the shared `LOG_DIR`, tightened redirects, and surfaced pending counts in the admin navigation.
+- Unified rotating file logging and ensured `docker-entrypoint.sh` runs Alembic so services boot with consistent log paths before migrations.
+- Polished the chat UI spacing: sticky query form, responsive follow-up cards/citations, mobile-friendly buttons, and self-retriever panels that stay inside the bubble.
+
 ## 2025-11-15 – Self-Retriever Trigger Guard
 - Blocked initial self-retriever fetches on page load so suggested questions only appear after the user explicitly starts a new conversation, avoiding idle token usage.
 - Introduced a page-level flag to gate follow-up refreshes (knowledge/library changes) and reset it after the first user message, keeping manual triggers functional without background calls.
