@@ -19,7 +19,9 @@ from modules.index import init_index
 from modules.login import init_login
 from modules.register import init_register
 from modules.change_password import init_change_password
+from modules.password_reset_requests import init_password_reset_requests
 from modules.upload import init_upload
+
 from modules.logout import init_logout
 from modules.login_azure import init_login_azure
 from modules.admin import init_admin, admin_bp
@@ -109,7 +111,8 @@ def create_app():
             app.config.setdefault('VECTOR_STORE_MODE', 'user')
 
     # Configure Login Manager
-    login_manager.login_view = 'login_route'
+        setattr(login_manager, 'login_view', 'login_route')
+  # pyright: ignore[reportGeneralTypeIssues]
 
     @login_manager.user_loader
     def load_user(user_id):
@@ -161,6 +164,7 @@ def create_app():
     init_login(app)
     init_register(app)
     init_change_password(app)
+    init_password_reset_requests(app)
     init_upload(app)
     init_logout(app)
     init_login_azure(app)
