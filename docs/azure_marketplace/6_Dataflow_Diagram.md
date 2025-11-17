@@ -173,11 +173,11 @@ flowchart TD
 
 ## 8. Default Deployment Architecture (ChromaDB)
 
-**Note:** The default deployment provides a basic architecture. Users can optionally add Azure Front Door and Web Application Firewall for enhanced security and performance. These components are not included in the base deployment.
-
 ```mermaid
 flowchart TD
-    User[User] <--> WebApp[Web App Service]
+    User[User] <--> FD[Azure Front Door]
+    FD <--> WAF[Web Application Firewall]
+    WAF <--> WebApp[Web App Service]
     WebApp <--> KV[Key Vault]
     WebApp <--> Redis[Azure Cache for Redis]
     WebApp <--> Storage[Azure Storage]
@@ -191,14 +191,9 @@ flowchart TD
     Worker <--> KV
     Worker <--> OAI
     
-    subgraph "Optional Security Layer (Manual Setup)"
-        FD[Azure Front Door]
-        WAF[Web Application Firewall]
-        FD -.-> WAF
-        WAF -.-> WebApp
-    end
-    
     subgraph Azure Resources
+        FD
+        WAF
         WebApp
         Worker
         Redis
