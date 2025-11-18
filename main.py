@@ -128,7 +128,7 @@ def create_app():
 
     @app.context_processor
     def inject_current_user_context():
-        """Inject current_user, current_year, and optional routes into templates."""
+        """Inject current_user, current_year, logo_url, and optional routes into templates."""
         from datetime import datetime
         from werkzeug.routing import BuildError
 
@@ -137,10 +137,23 @@ def create_app():
         except BuildError:
             about_url = None
 
+        static_folder = app.static_folder or os.path.join(app.root_path, "static")
+        custom_logo_path = os.path.join(static_folder, "img", "custom_logo.png")
+        if os.path.exists(custom_logo_path):
+            logo_url = url_for("static", filename="img/custom_logo.png")
+            try:
+                mtime = int(os.path.getmtime(custom_logo_path))
+                logo_url += f"?v={mtime}"
+            except Exception:
+                pass
+        else:
+            logo_url = url_for("static", filename="img/logo.png")
+
         return dict(
             current_user=current_user,
             current_year=datetime.now().year,
             about_url=about_url,
+            logo_url=logo_url,
         )
         
     @app.errorhandler(CSRFError)

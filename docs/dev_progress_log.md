@@ -1,5 +1,10 @@
 # SmartLib Dev Progress Log
 
+## 2025-11-18 – Logo Cache Bust & SSH Review
+- Traced the missing navbar/admin logos to the `main.py` WSGI entrypoint lacking the cache-busted `logo_url` context processor that already existed in `app.py`, which meant custom uploads never served on Azure.
+- Mirrored the context processor so both entrypoints now compute `/static/img/custom_logo.png` with an mtime fallback to `/static/img/logo.png`, rebuilt the web container, and confirmed the manifest and logo assets render everywhere after clearing caches.
+- Reviewed the App Service SSH helper: left the `openssh-server` install + `start_sshd` path in place for diagnostics while documenting that access still requires the Azure remote-connection tunnel, so end users cannot read `/app` source code.
+
 ## 2025-11-16 – Password Reset & Chat Polish
 - Fixed the shared navbar stacking so brand links home, menus overlay cleanly, and light/dark themes keep mobile taps reliable.
 - Implemented the password reset request workflow with user forms, admin approvals/denials, badges, logging, and the supporting Alembic migration.

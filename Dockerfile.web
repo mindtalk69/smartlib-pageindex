@@ -35,7 +35,21 @@ RUN apt-get update \
        libxslt1-dev \
        libssl-dev \
        pkg-config \
+       openssh-server \
     && rm -rf /var/lib/apt/lists/*
+
+# Configure SSH for Azure App Service access
+ARG SSH_USERNAME=appuser
+ENV SSH_USERNAME=${SSH_USERNAME}
+RUN useradd -m -s /bin/bash ${SSH_USERNAME} \
+    && mkdir -p /var/run/sshd \
+    && sed -i 's/^#\?Port .*/Port 2222/' /etc/ssh/sshd_config \
+    && sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config \
+    && sed -i 's/^#\?PermitRootLogin .*/PermitRootLogin no/' /etc/ssh/sshd_config \
+    && echo "AllowUsers ${SSH_USERNAME}" >> /etc/ssh/sshd_config \
+    && echo "ClientAliveInterval 180" >> /etc/ssh/sshd_config \
+    && echo "ClientAliveCountMax 3" >> /etc/ssh/sshd_config \
+    && echo "UseDNS no" >> /etc/ssh/sshd_config
 
 ARG INSTALL_WEB_EXTRAS=false
 
@@ -54,7 +68,7 @@ COPY --from=assets /app/static/dist /app/static/dist
 
 RUN chmod +x docker-entrypoint.sh
 
-EXPOSE 8000
+EXPOSE 8000 2222
 
 ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["web"]

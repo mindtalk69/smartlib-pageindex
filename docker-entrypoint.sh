@@ -83,12 +83,40 @@ else:
 PY
 }
 
+start_sshd() {
+    if ! command -v /usr/sbin/sshd >/dev/null 2>&1; then
+        echo "sshd not available; skipping SSH startup."
+        return 0
+    fi
+
+    local ssh_user="${SSH_USERNAME:-appuser}"
+    local ssh_pass="${SSH_PASSWORD:-Docker!123}"
+
+    if ! id -u "$ssh_user" >/dev/null 2>&1; then
+        echo "Creating SSH user $ssh_user"
+        useradd -m -s /bin/bash "$ssh_user"
+    fi
+
+    echo "$ssh_user:$ssh_pass" | chpasswd
+    mkdir -p /var/run/sshd
+
+    if pgrep -x sshd >/dev/null 2>&1; then
+        echo "sshd already running."
+        return 0
+    fi
+
+    echo "Starting sshd on port 2222 for Azure Web App access..."
+    /usr/sbin/sshd -D &
+}
+
 
 # Check the first argument to decide which process to start
 if [ "$1" = "web" ]; then
     echo "Starting Flask web application..."
 
     check_data_mount
+
+    start_sshd
 
     # Environment detection with better Azure check
     IS_AZURE=false
@@ -212,6 +240,8 @@ elif [ "$1" = "worker" ]; then
     echo "Starting Celery worker..."
 
     check_data_mount
+
+    start_sshd
 
     # Environment detection (simplified for worker)
     if [ "$LOCAL_MODE" = "true" ] || [ "$RUNNING_LOCALLY" = "true" ]; then
