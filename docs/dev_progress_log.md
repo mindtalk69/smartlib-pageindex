@@ -1,5 +1,10 @@
 # SmartLib Dev Progress Log
 
+## 2025-11-19 – Streaming Pipeline Review
+- Investigated why `/api/query` streaming calls never triggered Celery and confirmed the web container was invoking `invoke_agent_graph` directly while non-streaming paths queued `modules.agent.invoke_agent_graph` via Celery.
+- Documented the wiring plan to push streaming chunks through Celery: introduce a Redis-backed stream bus, pass `stream_token` metadata from the web route, emit SSE payloads from the worker, and relay them in the web tier so both services share load.
+- Captured the rebuild instructions so the upcoming patch (Celery streaming bridge) can be deployed cleanly before retesting on Azure.
+
 ## 2025-11-18 – Logo Cache Bust & SSH Review
 - Traced the missing navbar/admin logos to the `main.py` WSGI entrypoint lacking the cache-busted `logo_url` context processor that already existed in `app.py`, which meant custom uploads never served on Azure.
 - Mirrored the context processor so both entrypoints now compute `/static/img/custom_logo.png` with an mtime fallback to `/static/img/logo.png`, rebuilt the web container, and confirmed the manifest and logo assets render everywhere after clearing caches.
