@@ -13,39 +13,99 @@
         "name": "identityStep",
         "label": "Identity & Authentication",
         "subLabel": {
-          "preValidation": "Configure Azure AD and authentication settings",
+          "preValidation": "Configure Azure AD authentication",
           "postValidation": "Identity configuration complete"
         },
         "elements": [
           {
+            "name": "prerequisitesInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "Before proceeding, ensure you have already created:\n\n✓ Azure OpenAI resource with deployed model\n✓ Azure Key Vault\n✓ Azure Cache for Redis\n✓ Azure Storage Account with Files share\n✓ Azure AD App Registration (instructions below)\n\nThis deployment connects to your existing resources - it does NOT create them.",
+              "uri": "https://smartlib.id/prerequisites"
+            }
+          },
+          {
+            "name": "azureAdSetupInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "SmartLib uses Azure Active Directory to authenticate users. You must create an App Registration in YOUR Azure AD tenant before deployment.\n\nQuick Setup: Azure Portal → Azure Active Directory → App registrations → New registration → Name: 'SmartLib' → Single tenant → Create\n\nAfter creation: Certificates & secrets → New client secret → Copy the VALUE (not Secret ID)\n\nFor detailed step-by-step instructions with screenshots, visit the prerequisites page.",
+              "uri": "https://smartlib.id/prerequisites#azure-ad-setup"
+            }
+          },
+          {
             "name": "tenantId",
             "type": "Microsoft.Common.TextBox",
-            "label": "Azure AD tenant ID",
-            "toolTip": "Provide the Azure Active Directory tenant ID used for authentication.",
+            "label": "Azure AD Tenant ID",
+            "toolTip": "Your organization's Azure Active Directory tenant ID (GUID). Find in Azure Portal → Azure Active Directory → Overview → Tenant ID.",
+            "placeholder": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
             "constraints": {
               "required": true,
-              "regex": "^[0-9a-fA-F-]{36}$",
-              "validationMessage": "Enter a valid tenant ID GUID."
+              "regex": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "validationMessage": "Enter a valid tenant ID GUID (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)"
+            }
+          },
+          {
+            "name": "tenantIdHelp",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "How to find: Azure Portal → Azure Active Directory → Overview → Tenant ID (copy the GUID)"
             }
           },
           {
             "name": "APP_CLIENT_ID",
             "type": "Microsoft.Common.TextBox",
-            "label": "Application (client) ID",
-            "toolTip": "Client ID for the SmartLib Azure AD application registration.",
+            "label": "Application (Client) ID",
+            "toolTip": "The Application (client) ID from your Azure AD App Registration. Find in the app registration's Overview page.",
+            "placeholder": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
             "constraints": {
               "required": true,
-              "regex": "^[0-9a-fA-F-]{36}$",
-              "validationMessage": "Enter a valid client ID GUID."
+              "regex": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "validationMessage": "Enter a valid client ID GUID (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)"
+            }
+          },
+          {
+            "name": "clientIdHelp",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "How to find: Azure Portal → Azure Active Directory → App registrations → Your SmartLib app → Overview → Application (client) ID"
             }
           },
           {
             "name": "APP_CLIENT_SECRET",
             "type": "Microsoft.Common.PasswordBox",
-            "label": "Application secret",
-            "toolTip": "Provide the Azure AD application client secret (treated securely).",
+            "label": {
+              "password": "Application Client Secret",
+              "confirmPassword": "Confirm Client Secret"
+            },
+            "toolTip": "The client secret VALUE (not the Secret ID) from your Azure AD App Registration. This is shown ONLY ONCE when you create it.",
             "constraints": {
-              "required": true
+              "required": true,
+              "regex": "^.{8,}$",
+              "validationMessage": "Client secret must be at least 8 characters"
+            },
+            "options": {
+              "hideConfirmation": false
+            }
+          },
+          {
+            "name": "clientSecretHelp",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Warning",
+              "text": "How to create: Azure AD → App registrations → Your app → Certificates & secrets → New client secret → Copy VALUE immediately (not Secret ID). You cannot retrieve this later!"
+            }
+          },
+          {
+            "name": "redirectUriReminder",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Warning",
+              "text": "IMPORTANT: After deployment, update your Azure AD App Registration's Redirect URI with the actual web app URL from deployment outputs: https://{webapp-name}.azurewebsites.net/auth/callback"
             }
           }
         ]
@@ -68,6 +128,14 @@
             }
           },
           {
+            "name": "keyVaultHelp",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "How to find: Azure Portal → Key Vaults → Your Key Vault → Copy the name from Overview page"
+            }
+          },
+          {
             "name": "existingKeyVaultResourceGroup",
             "type": "Microsoft.Common.TextBox",
             "label": "Key Vault resource group",
@@ -75,27 +143,74 @@
             "toolTip": "Resource group containing the Key Vault. Defaults to the deployment resource group."
           },
           {
-            "name": "kvRoleAssignmentInfo",
+            "name": "twoStepDeploymentWarning",
             "type": "Microsoft.Common.InfoBox",
             "options": {
+              "icon": "Warning",
+              "text": "⚠️ CRITICAL: SmartLib requires a TWO-STEP DEPLOYMENT process:\n\n📝 STEP 1 (First Deployment): Select 'New Installation' below to create resources and grant Key Vault access\n\n📝 STEP 2 (Second Deployment): After Step 1 completes, immediately redeploy and select 'Update Existing Installation' to finalize configuration\n\nWhy? Azure role assignments cannot be created twice. The second deployment updates settings without recreating role assignments."
+            }
+          },
+          {
+            "name": "deploymentType",
+            "type": "Microsoft.Common.DropDown",
+            "label": "Deployment Type",
+            "defaultValue": "New Installation (Step 1)",
+            "toolTip": "Select your deployment step. First deployment: choose 'New Installation'. Second deployment: choose 'Update Existing Installation'.",
+            "constraints": {
+              "allowedValues": [
+                {
+                  "label": "New Installation (Step 1)",
+                  "value": "new"
+                },
+                {
+                  "label": "Update Existing Installation (Step 2)",
+                  "value": "update"
+                }
+              ]
+            }
+          },
+          {
+            "name": "deploymentTypeHelp",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[equals(steps('infrastructureStep').deploymentType, 'new')]",
+            "options": {
               "icon": "Info",
-              "text": "Ensure the deploying identity has Microsoft.Authorization/roleAssignments/write permission on the Key Vault resource group. If not, uncheck the option below and grant access manually after deployment."
+              "text": "✅ STEP 1 SELECTED: This is your first deployment. After this completes successfully, you MUST redeploy immediately and select 'Update Existing Installation (Step 2)' to complete the setup."
+            }
+          },
+          {
+            "name": "secondDeploymentReminder",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[equals(steps('infrastructureStep').deploymentType, 'update')]",
+            "options": {
+              "icon": "Info",
+              "text": "✅ STEP 2 SELECTED: This is your second deployment to finalize configuration. Role assignment creation is automatically disabled to prevent conflicts."
+            }
+          },
+          {
+            "name": "kvRoleAssignmentInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[equals(steps('infrastructureStep').deploymentType, 'new')]",
+            "options": {
+              "icon": "Info",
+              "text": "Ensure the deploying identity has Microsoft.Authorization/roleAssignments/write permission on the Key Vault resource group. If not, you can grant access manually after deployment."
             }
           },
           {
             "name": "createRoleAssignment",
             "type": "Microsoft.Common.CheckBox",
             "label": "Grant Key Vault access to web app",
-            "defaultValue": true,
-            "toolTip": "Creates managed identity role assignments on the Key Vault. Disable if you lack RBAC rights on that resource group or are redeploying."
+            "defaultValue": "[equals(steps('infrastructureStep').deploymentType, 'new')]",
+            "visible": "[equals(steps('infrastructureStep').deploymentType, 'new')]",
+            "toolTip": "Creates managed identity role assignments on the Key Vault. Only shown for Step 1 (New Installation)."
           },
           {
             "name": "kvCrossRgWarning",
             "type": "Microsoft.Common.InfoBox",
-            "visible": "[and(not(equals(steps('infrastructureStep').existingKeyVaultResourceGroup, resourceGroup().name)), steps('infrastructureStep').createRoleAssignment)]",
+            "visible": "[and(not(equals(steps('infrastructureStep').existingKeyVaultResourceGroup, resourceGroup().name)), equals(steps('infrastructureStep').deploymentType, 'new'), steps('infrastructureStep').createRoleAssignment)]",
             "options": {
               "icon": "Warning",
-              "text": "Key Vault resource group differs from the deployment resource group. Confirm you have RBAC rights there before keeping role assignment enabled."
+              "text": "Key Vault resource group differs from the deployment resource group. Confirm you have RBAC rights there before proceeding."
             }
           },
           {
@@ -105,6 +220,14 @@
             "toolTip": "Name of the Azure Cache for Redis instance used by SmartLib.",
             "constraints": {
               "required": true
+            }
+          },
+          {
+            "name": "redisHelp",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "How to find: Azure Portal → Azure Cache for Redis → Your Redis Cache → Copy the name from Overview page"
             }
           },
           {
@@ -124,12 +247,28 @@
             }
           },
           {
+            "name": "storageHelp",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "How to find: Azure Portal → Storage accounts → Your Storage Account → Copy the name from Overview page"
+            }
+          },
+          {
             "name": "dataShareName",
             "type": "Microsoft.Common.TextBox",
             "label": "Azure Files share name",
             "toolTip": "Name of the Azure Files share mounted at /home/data inside the containers.",
             "constraints": {
               "required": true
+            }
+          },
+          {
+            "name": "fileShareHelp",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "How to find: Azure Portal → Storage accounts → Your Storage Account → File shares → Copy the file share name"
             }
           },
           {
@@ -164,12 +303,28 @@
             }
           },
           {
+            "name": "openAIHelp",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "How to find: Azure Portal → Azure OpenAI → Your OpenAI Resource → Copy the name from Overview page"
+            }
+          },
+          {
             "name": "azureOpenAIEndpoint",
             "type": "Microsoft.Common.TextBox",
             "label": "Azure OpenAI endpoint",
             "toolTip": "Endpoint URL for Azure OpenAI (e.g., https://your-instance.openai.azure.com).",
             "constraints": {
               "required": true
+            }
+          },
+          {
+            "name": "openAIEndpointHelp",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "How to find: Azure Portal → Azure OpenAI → Your OpenAI Resource → Keys and Endpoint → Copy Endpoint URL (e.g., https://your-resource.openai.azure.com/)"
             }
           },
           {
@@ -182,13 +337,6 @@
             }
           },
           {
-            "name": "azureOpenAIAPIVersion",
-            "type": "Microsoft.Common.TextBox",
-            "label": "Azure OpenAI API version",
-            "defaultValue": "2024-10-21",
-            "toolTip": "API version string for Azure OpenAI requests."
-          },
-          {
             "name": "azureEmbeddingDeployment",
             "type": "Microsoft.Common.TextBox",
             "label": "Embedding deployment name",
@@ -197,6 +345,21 @@
             "constraints": {
               "required": true
             }
+          },
+          {
+            "name": "deploymentsHelp",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "How to find: Azure OpenAI Studio (https://oai.azure.com) → Deployments → Copy the deployment names you created for chat model and embeddings"
+            }
+          },
+          {
+            "name": "azureOpenAIAPIVersion",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Azure OpenAI API version",
+            "defaultValue": "2024-10-21",
+            "toolTip": "API version string for Azure OpenAI requests."
           },
           {
             "name": "defaultEmbeddingModel",
@@ -212,10 +375,26 @@
             "toolTip": "API key for Azure OpenAI. Leave blank when using a Key Vault secret URI."
           },
           {
+            "name": "openAIKeyHelp",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "How to find: Azure Portal → Azure OpenAI → Your OpenAI Resource → Keys and Endpoint → Copy Key 1 or Key 2"
+            }
+          },
+          {
             "name": "azureOpenAIKeySecretUri",
             "type": "Microsoft.Common.TextBox",
             "label": "Azure OpenAI key secret URI",
             "toolTip": "Key Vault secret URI containing the Azure OpenAI key (optional)."
+          },
+          {
+            "name": "docIntelligenceInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "Document Intelligence is OPTIONAL. If provided, SmartLib will use it for advanced document parsing. Otherwise, it will use local OCR for document processing."
+            }
           },
           {
             "name": "docIntelligenceEndpoint",
@@ -386,61 +565,8 @@
                 {
                   "label": "Poland Central",
                   "value": "polandcentral"
-                },
-                {
-                  "label": "Indonesia Central",
-                  "value": "indonesiacentral"
                 }
               ]
-            }
-          },
-          {
-            "name": "acrLoginServer",
-            "type": "Microsoft.Common.TextBox",
-            "label": "ACR login server",
-            "defaultValue": "smartlibregistry-a0cpeuazg3cahnbr.azurecr.io",
-            "toolTip": "Fully qualified login server for the Azure Container Registry (e.g., myregistry.azurecr.io).",
-            "constraints": {
-              "required": true
-            }
-          },
-          {
-            "name": "acrUsername",
-            "type": "Microsoft.Common.TextBox",
-            "label": "ACR username",
-            "defaultValue": "smartlibregistry",
-            "toolTip": "Username for the Azure Container Registry service principal or admin user.",
-            "constraints": {
-              "required": true
-            }
-          },
-          {
-            "name": "acrPassword",
-            "type": "Microsoft.Common.PasswordBox",
-            "label": "ACR password",
-            "toolTip": "Password or access key for the Azure Container Registry.",
-            "constraints": {
-              "required": true
-            }
-          },
-          {
-            "name": "webDockerImageName",
-            "type": "Microsoft.Common.TextBox",
-            "label": "Web container image",
-            "defaultValue": "smartlib-web:latest",
-            "toolTip": "Docker image name for the web app (e.g., smartlib-web:latest).",
-            "constraints": {
-              "required": true
-            }
-          },
-          {
-            "name": "workerDockerImageName",
-            "type": "Microsoft.Common.TextBox",
-            "label": "Worker container image",
-            "defaultValue": "smartlib-worker:latest",
-            "toolTip": "Docker image name for the worker app (e.g., smartlib-worker:latest).",
-            "constraints": {
-              "required": true
             }
           },
           {
@@ -449,6 +575,14 @@
             "label": "Application prefix",
             "defaultValue": "smartlib-basic",
             "toolTip": "Prefix for resource naming (smartlib-basic for marketplace)."
+          },
+          {
+            "name": "appPrefixHelp",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "The app prefix is used to generate unique resource names (e.g., smartlib-basic-web, smartlib-basic-worker). Use the default value unless you need to deploy multiple instances."
+            }
           },
           {
             "name": "appServicePlanSkuName",
@@ -471,6 +605,29 @@
                   "value": "P1v2"
                 }
               ]
+            }
+          },
+          {
+            "name": "skuRecommendations",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "Recommended SKUs:\n• B1: Development/testing (~$13/month)\n• S1: Small production workloads (~$70/month)\n• P1v2: Production with high availability (~$146/month)"
+            }
+          },
+          {
+            "name": "enableAutomaticUpdates",
+            "type": "Microsoft.Common.CheckBox",
+            "label": "Enable automatic updates",
+            "defaultValue": false,
+            "toolTip": "Automatically pull latest container images from SmartLib registry. When disabled, you control when to update via Azure Portal Deployment Center."
+          },
+          {
+            "name": "automaticUpdatesInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "When enabled, your SmartLib installation will automatically check for and pull the latest container images from the publisher's registry. When disabled, you can manually sync updates via Azure Portal → App Service → Deployment Center → Sync button."
             }
           },
           {
@@ -500,6 +657,14 @@
         },
         "elements": [
           {
+            "name": "adminAccountInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "This creates the initial SmartLib administrator account. After deployment, you can create additional users and change the admin password through the web interface."
+            }
+          },
+          {
             "name": "appAdminUsername",
             "type": "Microsoft.Common.TextBox",
             "label": "Admin username",
@@ -510,10 +675,29 @@
             }
           },
           {
+            "name": "passwordRequirements",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Warning",
+              "text": "Admin password requirements:\n• Minimum 8 characters\n• At least 1 uppercase letter (A-Z)\n• At least 1 lowercase letter (a-z)\n• At least 1 digit (0-9)\n• At least 1 special character (@$!%*?&#)"
+            }
+          },
+          {
             "name": "appAdminPassword",
             "type": "Microsoft.Common.PasswordBox",
-            "label": "Admin password",
-            "toolTip": "Initial password for the SmartLib admin account. Leave blank when using a Key Vault secret URI."
+            "label": {
+              "password": "Admin password",
+              "confirmPassword": "Confirm admin password"
+            },
+            "toolTip": "Initial password for the SmartLib admin account. Must meet the requirements above.",
+            "constraints": {
+              "required": true,
+              "regex": "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&#])[A-Za-z\\d@$!%*?&#]{8,}$",
+              "validationMessage": "Password must be at least 8 characters and contain: uppercase letter, lowercase letter, digit, and special character (@$!%*?&#)"
+            },
+            "options": {
+              "hideConfirmation": false
+            }
           },
           {
             "name": "appAdminPasswordSecretUri",
@@ -544,7 +728,7 @@
       "APP_CLIENT_SECRET": "[steps('identityStep').APP_CLIENT_SECRET]",
       "existingKeyVaultName": "[steps('infrastructureStep').existingKeyVaultName]",
       "existingKeyVaultResourceGroup": "[steps('infrastructureStep').existingKeyVaultResourceGroup]",
-      "createRoleAssignment": "[steps('infrastructureStep').createRoleAssignment]",
+      "createRoleAssignment": "[if(equals(steps('infrastructureStep').deploymentType, 'new'), steps('infrastructureStep').createRoleAssignment, false())]",
       "existingRedisName": "[steps('infrastructureStep').existingRedisName]",
       "existingRedisResourceGroup": "[steps('infrastructureStep').existingRedisResourceGroup]",
       "storageAccountName": "[steps('infrastructureStep').storageAccountName]",
@@ -561,13 +745,9 @@
       "azureOpenAIKeySecretUri": "[steps('aiServicesStep').azureOpenAIKeySecretUri]",
       "docIntelligenceEndpoint": "[steps('aiServicesStep').docIntelligenceEndpoint]",
       "docIntelligenceKeySecretUri": "[steps('aiServicesStep').docIntelligenceKeySecretUri]",
-      "acrLoginServer": "[steps('deploymentStep').acrLoginServer]",
-      "acrUsername": "[steps('deploymentStep').acrUsername]",
-      "acrPassword": "[steps('deploymentStep').acrPassword]",
-      "webDockerImageName": "[steps('deploymentStep').webDockerImageName]",
-      "workerDockerImageName": "[steps('deploymentStep').workerDockerImageName]",
       "appPrefix": "[steps('deploymentStep').appPrefix]",
       "appServicePlanSkuName": "[steps('deploymentStep').appServicePlanSkuName]",
+      "enableAutomaticUpdates": "[steps('deploymentStep').enableAutomaticUpdates]",
       "autoPromoteAdmin": "[steps('deploymentStep').autoPromoteAdmin]",
       "runDefaultModels": "[steps('deploymentStep').runDefaultModels]",
       "appAdminUsername": "[steps('adminStep').appAdminUsername]",

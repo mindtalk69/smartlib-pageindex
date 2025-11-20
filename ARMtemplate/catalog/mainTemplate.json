@@ -165,27 +165,7 @@
         "description": "Deployment region for all resources."
       }
     },
-    "acrLoginServer": {
-      "type": "string",
-      "defaultValue": "smartlibregistry-a0cpeuazg3cahnbr.azurecr.io",
-      "metadata": {
-        "description": "Full login server name of your existing Azure Container Registry (e.g., myregistry.azurecr.io)"
-      }
-    },
-    "acrUsername": {
-      "type": "string",
-      "defaultValue": "smartlibregistry",
-      "metadata": {
-        "description": "Username for the Azure Container Registry"
-      }
-    },
-    "acrPassword": {
-      "type": "secureString",
-      "defaultValue": "fNH1+wgA26boX9Hhu8N/UttbQwAhGvy161HapmZb3++ACRA44py/",
-      "metadata": {
-        "description": "Password for the Azure Container Registry"
-      }
-    },
+
     "webDockerImageName": {
       "type": "string",
       "defaultValue": "smartlib-web:latest",
@@ -256,7 +236,7 @@
     },
     "runDefaultModels": {
       "type": "bool",
-      "defaultValue": false,
+      "defaultValue": true,
       "metadata": {
         "description": "Set to true to run create_default_models.py during startup"
       }
@@ -272,9 +252,17 @@
       "metadata": {
         "description": "The SKU for the shared App Service Plan. Determines the pricing tier and capacity. B1=Basic, S1=Standard, P1v2=PremiumV2."
       }
+    },
+    "enableAutomaticUpdates": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable automatic updates from SmartLib container registry"
+      }
     }
   },
   "variables": {
+    "acrLoginServer": "smartlibregistry-a0cpeuazg3cahnbr.azurecr.io",
     "baseAppName": "[concat(parameters('appPrefix'), '-', uniqueString(resourceGroup().id, deployment().name))]",
     "sharedAppServicePlanName": "[concat(variables('baseAppName'), '-plan')]",
     "webAppName": "[concat(variables('baseAppName'), '-web')]",
@@ -322,7 +310,7 @@
       "properties": {
         "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('sharedAppServicePlanName'))]",
         "siteConfig": {
-          "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/', parameters('webDockerImageName'))]",
+          "linuxFxVersion": "[concat('DOCKER|', variables('acrLoginServer'), '/', parameters('webDockerImageName'))]",
           "appCommandLine": "./docker-entrypoint.sh web",
           "alwaysOn": true,
           "azureStorageAccounts": {
@@ -376,20 +364,8 @@
               "value": "true"
             },
             {
-              "name": "DOCKER_REGISTRY_SERVER_URL",
-              "value": "[concat('https://', parameters('acrLoginServer'))]"
-            },
-            {
-              "name": "DOCKER_REGISTRY_SERVER_USERNAME",
-              "value": "[parameters('acrUsername')]"
-            },
-            {
-              "name": "DOCKER_REGISTRY_SERVER_PASSWORD",
-              "value": "[parameters('acrPassword')]"
-            },
-            {
               "name": "DOCKER_ENABLE_CI",
-              "value": "true"
+              "value": "[if(parameters('enableAutomaticUpdates'), 'true', 'false')]"
             },
             {
               "name": "KEY_VAULT_NAME",
@@ -486,7 +462,7 @@
       "properties": {
         "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('sharedAppServicePlanName'))]",
         "siteConfig": {
-          "linuxFxVersion": "[concat('DOCKER|', parameters('acrLoginServer'), '/', parameters('workerDockerImageName'))]",
+          "linuxFxVersion": "[concat('DOCKER|', variables('acrLoginServer'), '/', parameters('workerDockerImageName'))]",
           "appCommandLine": "./docker-entrypoint.sh worker",
           "alwaysOn": true,
           "azureStorageAccounts": {
@@ -536,20 +512,8 @@
               "value": "true"
             },
             {
-              "name": "DOCKER_REGISTRY_SERVER_URL",
-              "value": "[concat('https://', parameters('acrLoginServer'))]"
-            },
-            {
-              "name": "DOCKER_REGISTRY_SERVER_USERNAME",
-              "value": "[parameters('acrUsername')]"
-            },
-            {
-              "name": "DOCKER_REGISTRY_SERVER_PASSWORD",
-              "value": "[parameters('acrPassword')]"
-            },
-            {
               "name": "DOCKER_ENABLE_CI",
-              "value": "true"
+              "value": "[if(parameters('enableAutomaticUpdates'), 'true', 'false')]"
             },
             {
               "name": "KEY_VAULT_NAME",
@@ -638,10 +602,6 @@
             {
               "name": "RUN_DEFAULT_MODELS",
               "value": "[if(parameters('runDefaultModels'), 'true', 'false')]"
-            },
-            {
-              "name": "WEBSITE_HOSTNAME",
-              "value": "[concat('https://', variables('webAppName'), '.azurewebsites.net','/login_azure')]"
             }
           ]
         }
@@ -699,10 +659,7 @@
       "type": "string",
       "value": "[variables('sharedAppServicePlanName')]"
     },
-    "acrLoginServer": {
-      "type": "string",
-      "value": "[parameters('acrLoginServer')]"
-    },
+
     "keyVaultName": {
     "type": "string",
     "value": "[parameters('existingKeyVaultName')]"

@@ -45,7 +45,7 @@ def _ensure_multimodal_assignment(default_model_id: int | None) -> None:
 
 
 def create_or_update_default_model():
-    default_deployment_name = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4.1-mini")
+    default_deployment_name = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4.1-mini")
 
     flask_app = create_app()
     with flask_app.app_context():

@@ -164,6 +164,29 @@ class Config:
     except ValueError:
         MESSAGE_CLEANUP_INTERVAL_HOURS = 24
 
+    STREAM_BUS_URL = os.environ.get('STREAM_BUS_URL')
+    STREAM_QUEUE_PREFIX = os.environ.get('STREAM_QUEUE_PREFIX', 'smartlib:stream:')
+    try:
+        STREAM_QUEUE_TTL = int(os.environ.get('STREAM_QUEUE_TTL', '600'))
+    except ValueError:
+        STREAM_QUEUE_TTL = 600
+    try:
+        STREAM_BLOCK_TIMEOUT_SECONDS = int(
+            os.environ.get('STREAM_BLOCK_TIMEOUT_SECONDS', '5')
+        )
+    except ValueError:
+        STREAM_BLOCK_TIMEOUT_SECONDS = 5
+    try:
+        STREAM_HEARTBEAT_SECONDS = int(os.environ.get('STREAM_HEARTBEAT_SECONDS', '15'))
+    except ValueError:
+        STREAM_HEARTBEAT_SECONDS = 15
+    try:
+        STREAM_IDLE_TIMEOUT_SECONDS = int(
+            os.environ.get('STREAM_IDLE_TIMEOUT_SECONDS', '300')
+        )
+    except ValueError:
+        STREAM_IDLE_TIMEOUT_SECONDS = 300
+
     EMBEDDING_WARMUP_ENABLED = os.environ.get('EMBEDDING_WARMUP_ENABLED', 'true').lower() in ('true', '1', 'yes')
     EMBEDDING_WARMUP_TEXT = os.environ.get('EMBEDDING_WARMUP_TEXT', 'SmartLib warmup prompt for embeddings')
 
