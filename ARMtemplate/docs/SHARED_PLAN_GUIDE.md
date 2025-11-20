@@ -137,12 +137,22 @@ az appservice plan show \
 
 ### Resource Naming
 
-| Resource | Name Pattern | Example |
-|----------|-------------|---------|
-| App Service Plan | `{appPrefix}-plan` | `smartlib-basic-plan` |
-| Web App | `{appPrefix}-web` | `smartlib-basic-web` |
-| Worker App | `{appPrefix}-worker` | `smartlib-basic-worker` |
-| App Insights | `{appPrefix}-web-ai` | `smartlib-basic-web-ai` |
+SmartLib uses a user-specified prefix for all resource names, allowing predictable and idempotent deployments.
+
+| Resource | Name Pattern | Example with prefix "smartlib-acme" |
+|----------|-------------|-------------------------------------|
+| App Service Plan | `{appPrefix}-plan` | `smartlib-acme-plan` |
+| Web App | `{appPrefix}-web` | `smartlib-acme-web` |
+| Worker App | `{appPrefix}-worker` | `smartlib-acme-worker` |
+| App Insights | `{appPrefix}-web-ai` | `smartlib-acme-web-ai` |
+
+**Important**:
+- Choose a unique prefix during deployment (e.g., `smartlib-acme`, `smartlib-contoso`)
+- Using the **same prefix** on redeployment will **UPDATE** existing resources (idempotent)
+- Using a **different prefix** will **CREATE** new resources (avoid accidental duplicates)
+- Prefix must be 3-40 characters, lowercase letters/numbers/hyphens only
+
+📖 **Detailed Naming Guide**: See [RESOURCE_NAMING_GUIDE.md](RESOURCE_NAMING_GUIDE.md) for best practices, validation rules, and troubleshooting.
 
 ### Shared Resources
 

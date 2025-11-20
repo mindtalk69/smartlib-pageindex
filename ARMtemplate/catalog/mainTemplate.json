@@ -15,17 +15,18 @@
         "description": "The Azure AD tenant ID (required)"
       }
     },
-    "existingRedisName": {
-      "type": "string",
+    "redisConnectionString": {
+      "type": "secureString",
+      "defaultValue": "",
       "metadata": {
-        "description": "The name of the existing Azure Cache for Redis instance."
+        "description": "Redis connection string (format: rediss://:password@hostname:6380?ssl_cert_reqs=none). Required if redisConnectionStringSecretUri is not provided."
       }
     },
-    "existingRedisResourceGroup": {
+    "redisConnectionStringSecretUri": {
       "type": "string",
-      "defaultValue": "[resourceGroup().name]",
+      "defaultValue": "",
       "metadata": {
-        "description": "The resource group of the existing Azure Cache for Redis instance. Defaults to the current resource group."
+        "description": "Optional: Key Vault secret URI containing the Redis connection string. Takes precedence over redisConnectionString parameter."
       }
     },
     "existingKeyVaultName": {
@@ -48,12 +49,19 @@
         "description": "If true, a role assignment will be created to grant the web app access to the Key Vault. Set to false on subsequent deployments to avoid errors."
       }
     },
+    "createStorageRoleAssignment": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "If true, role assignments will be created to grant the apps identity-based access to Storage Account. Set to false on subsequent deployments."
+      }
+    },
   "azureOpenAIKey": {
     "type": "secureString",
-    "defaultValue": "[reference(resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults/secrets', parameters('existingKeyVaultName'), 'AZURE_OPENAI_API_KEY')).value]",
+    "defaultValue": "",
     "metadata": {
       "displayName": "Azure Open AI Key",
-      "description": "Azure OpenAI API Key sourced from Key Vault"
+      "description": "Your Azure OpenAI API Key"
     }
   },
   "azureOpenAIKeySecretUri": {
@@ -135,6 +143,13 @@
         "description": "Azure Files share name mounted at /home/data."
       }
     },
+    "storageAccountResourceGroup": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().name]",
+      "metadata": {
+        "description": "Resource group containing the storage account. Defaults to the current resource group."
+      }
+    },
     "azureEmbeddingDeployment": {
       "type": "string",
       "defaultValue": "text-embedding-3-small",
@@ -154,8 +169,10 @@
     "appPrefix": {
       "type": "string",
       "defaultValue": "smartlib-basic",
+      "minLength": 3,
+      "maxLength": 40,
       "metadata": {
-        "description": "Prefix for resource naming (smartlib-basic for marketplace)"
+        "description": "Unique prefix for resource naming. Must be unique within your Azure subscription. Resources will be named: {prefix}-web, {prefix}-worker, {prefix}-plan. Example: smartlib-acme"
       }
     },
     "location": {
@@ -263,7 +280,7 @@
   },
   "variables": {
     "acrLoginServer": "smartlibregistry-a0cpeuazg3cahnbr.azurecr.io",
-    "baseAppName": "[concat(parameters('appPrefix'), '-', uniqueString(resourceGroup().id, deployment().name))]",
+    "baseAppName": "[parameters('appPrefix')]",
     "sharedAppServicePlanName": "[concat(variables('baseAppName'), '-plan')]",
     "webAppName": "[concat(variables('baseAppName'), '-web')]",
     "workerAppName": "[concat(variables('baseAppName'), '-worker')]",
@@ -325,11 +342,11 @@
           "appSettings": [
             {
               "name": "CELERY_BROKER_URL",
-              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380, '?ssl_cert_reqs=none')]"
+              "value": "[if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString'))]"
             },
             {
               "name": "CELERY_RESULT_BACKEND",
-              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380, '?ssl_cert_reqs=none')]"
+              "value": "[if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString'))]"
             },
             {
               "name": "AZURE_OPENAI_API_KEY",
@@ -477,11 +494,11 @@
           "appSettings": [
             {
               "name": "CELERY_BROKER_URL",
-              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380, '?ssl_cert_reqs=none')]"
+              "value": "[if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString'))]"
             },
             {
               "name": "CELERY_RESULT_BACKEND",
-              "value": "[concat('rediss://:', listKeys(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').primaryKey, '@', reference(resourceId(parameters('existingRedisResourceGroup'), 'Microsoft.Cache/Redis', parameters('existingRedisName')), '2023-08-01').hostName, ':', 6380, '?ssl_cert_reqs=none')]"
+              "value": "[if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString'))]"
             },
             {
               "name": "AZURE_OPENAI_API_KEY",
@@ -627,7 +644,8 @@
       ],
       "scope": "[resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName'))]",
       "properties": {
-                "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')]",         "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2022-03-01', 'Full').identity.principalId]",
+        "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '4633458b-17de-408a-b874-0445c86b69e6')]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2022-03-01', 'Full').identity.principalId]",
         "principalType": "ServicePrincipal"
       }
     },
@@ -641,7 +659,38 @@
       ],
       "scope": "[resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName'))]",
       "properties": {
-                "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')]",         "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2022-03-01', 'Full').identity.principalId]",
+        "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '4633458b-17de-408a-b874-0445c86b69e6')]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2022-03-01', 'Full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      }
+    },
+    {
+      "condition": "[parameters('createStorageRoleAssignment')]",
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(resourceId('Microsoft.Web/sites', variables('webAppName')), resourceId(parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName')), 'web-storage')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', variables('webAppName'))]"
+      ],
+      "scope": "[resourceId(parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
+      "properties": {
+        "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '0c867c2a-1d8c-454a-a3db-ab2ea1bdc8bb')]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2022-03-01', 'Full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      }
+    },
+    {
+      "condition": "[parameters('createStorageRoleAssignment')]",
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(resourceId('Microsoft.Web/sites', variables('workerAppName')), resourceId(parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName')), 'worker-storage')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', variables('workerAppName'))]"
+      ],
+      "scope": "[resourceId(parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
+      "properties": {
+        "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '0c867c2a-1d8c-454a-a3db-ab2ea1bdc8bb')]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2022-03-01', 'Full').identity.principalId]",
         "principalType": "ServicePrincipal"
       }
     }
@@ -651,6 +700,10 @@
       "type": "string",
       "value": "[concat('https://', variables('webAppName'), '.azurewebsites.net')]"
     },
+    "webAppName": {
+      "type": "string",
+      "value": "[variables('webAppName')]"
+    },
     "workerAppName": {
       "type": "string",
       "value": "[variables('workerAppName')]"
@@ -659,11 +712,14 @@
       "type": "string",
       "value": "[variables('sharedAppServicePlanName')]"
     },
-
+    "redirectUri": {
+      "type": "string",
+      "value": "[concat('https://', variables('webAppName'), '.azurewebsites.net/auth/callback')]"
+    },
     "keyVaultName": {
-    "type": "string",
-    "value": "[parameters('existingKeyVaultName')]"
-  },
+      "type": "string",
+      "value": "[parameters('existingKeyVaultName')]"
+    },
   "costSavings": {
     "type": "object",
     "value": {

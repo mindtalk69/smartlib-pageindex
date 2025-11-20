@@ -214,28 +214,51 @@
             }
           },
           {
-            "name": "existingRedisName",
-            "type": "Microsoft.Common.TextBox",
-            "label": "Redis cache name",
-            "toolTip": "Name of the Azure Cache for Redis instance used by SmartLib.",
+            "name": "redisConnectionString",
+            "type": "Microsoft.Common.PasswordBox",
+            "label": "Redis connection string",
+            "toolTip": "Redis connection string in format: rediss://:password@hostname:6380?ssl_cert_reqs=none. Required if Secret URI not provided.",
             "constraints": {
-              "required": true
+              "required": false,
+              "regex": "^rediss://:.*@.*:6380\\?ssl_cert_reqs=none$",
+              "validationMessage": "Connection string must match: rediss://:PASSWORD@HOSTNAME:6380?ssl_cert_reqs=none"
             }
           },
           {
-            "name": "redisHelp",
+            "name": "redisConnectionStringHelp",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Warning",
+              "text": "⚠️ IMPORTANT: You must modify Azure's default connection string!\n\nHow to get Redis connection string:\n\n1. Azure Portal → Azure Cache for Redis → Your Redis Cache\n2. Click 'Access keys' (left sidebar)\n3. Copy 'Primary connection string (StackExchange.Redis)'\n\n4. MODIFY THE FORMAT (Azure's format won't work):\n\n   Azure gives you:\n   smartlib-redis.redis.cache.windows.net:6380,password=ABC123xyz==,ssl=True,abortConnect=False\n\n   You MUST change to:\n   rediss://:ABC123xyz==@smartlib-redis.redis.cache.windows.net:6380?ssl_cert_reqs=none\n\n   Pattern: rediss://:PASSWORD@HOSTNAME:6380?ssl_cert_reqs=none\n\n⚠️ Don't forget: ?ssl_cert_reqs=none at the end!\n\n💡 RECOMMENDED: Store in Key Vault (see Secret URI field below)"
+            }
+          },
+          {
+            "name": "redisConnectionStringSecretUri",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Redis connection string secret URI (RECOMMENDED)",
+            "toolTip": "Key Vault secret URI containing Redis connection string. This is more secure than providing the string directly above.",
+            "constraints": {
+              "required": false,
+              "regex": "^https://.*\\.vault\\.azure\\.net/secrets/.*$",
+              "validationMessage": "Must be a valid Azure Key Vault secret URI"
+            }
+          },
+          {
+            "name": "redisConnectionValidation",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(equals(steps('infrastructureStep').redisConnectionString, ''), equals(steps('infrastructureStep').redisConnectionStringSecretUri, ''))]",
+            "options": {
+              "icon": "Warning",
+              "text": "⚠️ WARNING: You must provide either a Redis connection string or a Key Vault secret URI containing the connection string."
+            }
+          },
+          {
+            "name": "redisSecretUriHelp",
             "type": "Microsoft.Common.InfoBox",
             "options": {
               "icon": "Info",
-              "text": "How to find: Azure Portal → Azure Cache for Redis → Your Redis Cache → Copy the name from Overview page"
+              "text": "How to store Redis connection in Key Vault (RECOMMENDED):\n\n1. Get connection string from Azure (see above)\n2. Convert to SmartLib format (see example above)\n   ⚠️ Make sure it ends with: ?ssl_cert_reqs=none\n\n3. Azure Portal → Key Vault → Secrets → + Generate/Import\n4. Name: REDIS-CONNECTION-STRING\n5. Value: rediss://:PASSWORD@HOSTNAME:6380?ssl_cert_reqs=none\n6. Click 'Create'\n7. Click on the secret name\n8. Copy 'Secret Identifier' (full URL)\n9. Paste here\n\nExample Secret URI:\nhttps://your-keyvault.vault.azure.net/secrets/REDIS-CONNECTION-STRING/abc123def456"
             }
-          },
-          {
-            "name": "existingRedisResourceGroup",
-            "type": "Microsoft.Common.TextBox",
-            "label": "Redis resource group",
-            "defaultValue": "[resourceGroup().name]",
-            "toolTip": "Resource group containing the Redis cache. Defaults to the deployment resource group."
           },
           {
             "name": "storageAccountName",
@@ -282,6 +305,30 @@
             "type": "Microsoft.Common.TextBox",
             "label": "Storage account key secret URI",
             "toolTip": "Optional Key Vault secret URI that contains the storage account key."
+          },
+          {
+            "name": "storageAccountResourceGroup",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Storage account resource group",
+            "defaultValue": "[resourceGroup().name]",
+            "toolTip": "Resource group containing the storage account. Defaults to the deployment resource group."
+          },
+          {
+            "name": "createStorageRoleAssignment",
+            "type": "Microsoft.Common.CheckBox",
+            "label": "Grant Storage access to web/worker apps",
+            "defaultValue": "[equals(steps('infrastructureStep').deploymentType, 'new')]",
+            "visible": "[equals(steps('infrastructureStep').deploymentType, 'new')]",
+            "toolTip": "Creates managed identity role assignments on the Storage Account. Only shown for Step 1 (New Installation)."
+          },
+          {
+            "name": "storageRoleInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[steps('infrastructureStep').createStorageRoleAssignment]",
+            "options": {
+              "icon": "Info",
+              "text": "Identity-based Storage access provides enhanced security. Access keys will still work as fallback."
+            }
           }
         ]
       },
@@ -570,18 +617,40 @@
             }
           },
           {
-            "name": "appPrefix",
-            "type": "Microsoft.Common.TextBox",
-            "label": "Application prefix",
-            "defaultValue": "smartlib-basic",
-            "toolTip": "Prefix for resource naming (smartlib-basic for marketplace)."
-          },
-          {
-            "name": "appPrefixHelp",
+            "name": "resourceNamingInfo",
             "type": "Microsoft.Common.InfoBox",
             "options": {
               "icon": "Info",
-              "text": "The app prefix is used to generate unique resource names (e.g., smartlib-basic-web, smartlib-basic-worker). Use the default value unless you need to deploy multiple instances."
+              "text": "SmartLib creates three main resources:\n• App Service Plan: {prefix}-plan\n• Web Application: {prefix}-web\n• Worker Application: {prefix}-worker\n\nChoose a unique prefix to avoid naming conflicts."
+            }
+          },
+          {
+            "name": "appPrefix",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Resource name prefix",
+            "defaultValue": "smartlib-basic",
+            "placeholder": "e.g., smartlib-acme",
+            "toolTip": "Unique prefix for resource naming. Must be unique within your Azure subscription. Resources will be named: {prefix}-web, {prefix}-worker, {prefix}-plan",
+            "constraints": {
+              "required": true,
+              "regex": "^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$",
+              "validationMessage": "Prefix must be 3-40 characters, start/end with lowercase alphanumeric, contain only lowercase letters, numbers, and hyphens."
+            }
+          },
+          {
+            "name": "namingGuidance",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Warning",
+              "text": "⚠️ IMPORTANT: Choose a unique prefix to prevent deployment conflicts.\n\n✅ Good examples:\n• smartlib-acme\n• smartlib-contoso\n• smartlib-dev-001\n\n❌ Avoid:\n• smartlib-basic (default, may conflict)\n• Names with uppercase or special characters\n• Names over 40 characters\n\n💡 TIP: Use your company name or project identifier"
+            }
+          },
+          {
+            "name": "redeploymentInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "🔄 REDEPLOYMENT: Using the same prefix will UPDATE existing resources instead of creating new ones. This ensures idempotent deployments and prevents duplicate resources."
             }
           },
           {
@@ -731,10 +800,14 @@
       "createRoleAssignment": "[if(equals(steps('infrastructureStep').deploymentType, 'new'), steps('infrastructureStep').createRoleAssignment, false())]",
       "existingRedisName": "[steps('infrastructureStep').existingRedisName]",
       "existingRedisResourceGroup": "[steps('infrastructureStep').existingRedisResourceGroup]",
+      "redisConnectionString": "[steps('infrastructureStep').redisConnectionString]",
+      "redisConnectionStringSecretUri": "[steps('infrastructureStep').redisConnectionStringSecretUri]",
       "storageAccountName": "[steps('infrastructureStep').storageAccountName]",
       "storageAccountKey": "[steps('infrastructureStep').storageAccountKey]",
       "storageAccountKeySecretUri": "[steps('infrastructureStep').storageAccountKeySecretUri]",
+      "storageAccountResourceGroup": "[steps('infrastructureStep').storageAccountResourceGroup]",
       "dataShareName": "[steps('infrastructureStep').dataShareName]",
+      "createStorageRoleAssignment": "[if(equals(steps('infrastructureStep').deploymentType, 'new'), steps('infrastructureStep').createStorageRoleAssignment, false())]",
       "openAIAzureName": "[steps('aiServicesStep').openAIAzureName]",
       "azureOpenAIEndpoint": "[steps('aiServicesStep').azureOpenAIEndpoint]",
       "azureOpenAIDeployment": "[steps('aiServicesStep').azureOpenAIDeployment]",
