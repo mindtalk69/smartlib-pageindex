@@ -29,6 +29,20 @@
         "description": "Optional: Key Vault secret URI containing the Redis connection string. Takes precedence over redisConnectionString parameter."
       }
     },
+    "CELERY_BROKER_URL": {
+      "type": "secureString",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Celery broker URL. If empty, will use Redis connection string."
+      }
+    },
+    "CELERY_RESULT_BACKEND": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Celery result backend. If empty, will use Redis connection string."
+      }
+    },
     "existingKeyVaultName": {
       "type": "string",
       "metadata": {
@@ -56,67 +70,67 @@
         "description": "If true, role assignments will be created to grant the apps identity-based access to Storage Account. Set to false on subsequent deployments."
       }
     },
-  "azureOpenAIKey": {
-    "type": "secureString",
-    "defaultValue": "",
-    "metadata": {
-      "displayName": "Azure Open AI Key",
-      "description": "Your Azure OpenAI API Key"
-    }
-  },
-  "azureOpenAIKeySecretUri": {
-    "type": "string",
-    "defaultValue": "",
-    "metadata": {
-      "displayName": "Azure Open AI Key Secret URI",
-      "description": "Optional Key Vault secret URI containing the Azure OpenAI API key."
-    }
-  },
-  "openAIAzureName": {
-    "type": "string",
-    "metadata": {
-      "displayName": "Azure Open AI Name",
-      "description": "Name of the existing Azure OpenAI resource that must exist prior to deployment."
-    }
-  },
-  "azureOpenAIEndpoint": {
-    "type": "string",
-    "defaultValue": "",
-    "metadata": {
-      "displayName": "Azure Open AI Endpoint",
-      "description": "Fill with: [reference(resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults/secrets', parameters('existingKeyVaultName'), 'AZURE_OPENAI_ENDPOINT')).value]"
-    }
-  },
-  "azureOpenAIDeployment": {
-    "type": "string",
-    "defaultValue": "",
-    "metadata": {
-      "displayName": "Azure Open AI Deployment Model",
-      "description": "Fill with: [reference(resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults/secrets', parameters('existingKeyVaultName'), 'AZURE_OPENAI_DEPLOYMENT')).value]"
-    }
-  },
-  "azureOpenAIAPIVersion": {
-    "type": "string",
-    "defaultValue": "2024-10-21",
-    "metadata": {
-      "displayName": "Azure Open AI API Version",
-      "description": "Fill with: [reference(resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults/secrets', parameters('existingKeyVaultName'), 'AZURE_OPENAI_API_VERSION')).value]"
-    }
-  },
-  "docIntelligenceEndpoint": {
-    "type": "string",
-    "defaultValue": "",
-    "metadata": {
-      "description": "Azure Document Intelligence endpoint URL (e.g., https://<resource>.cognitiveservices.azure.com/)"
-    }
-  },
-  "docIntelligenceKeySecretUri": {
-    "type": "string",
-    "defaultValue": "",
-    "metadata": {
-      "description": "Key Vault secret URI containing the Azure Document Intelligence key"
-    }
-  },
+    "azureOpenAIKey": {
+      "type": "secureString",
+      "defaultValue": "",
+      "metadata": {
+        "displayName": "Azure Open AI Key",
+        "description": "Your Azure OpenAI API Key"
+      }
+    },
+    "azureOpenAIKeySecretUri": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "displayName": "Azure Open AI Key Secret URI",
+        "description": "Optional Key Vault secret URI containing the Azure OpenAI API key."
+      }
+    },
+    "openAIAzureName": {
+      "type": "string",
+      "metadata": {
+        "displayName": "Azure Open AI Name",
+        "description": "Name of the existing Azure OpenAI resource that must exist prior to deployment."
+      }
+    },
+    "azureOpenAIEndpoint": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "displayName": "Azure Open AI Endpoint",
+        "description": "Fill with: [reference(resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults/secrets', parameters('existingKeyVaultName'), 'AZURE_OPENAI_ENDPOINT')).value]"
+      }
+    },
+    "azureOpenAIDeployment": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "displayName": "Azure Open AI Deployment Model",
+        "description": "Fill with: [reference(resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults/secrets', parameters('existingKeyVaultName'), 'AZURE_OPENAI_DEPLOYMENT')).value]"
+      }
+    },
+    "azureOpenAIAPIVersion": {
+      "type": "string",
+      "defaultValue": "2024-10-21",
+      "metadata": {
+        "displayName": "Azure Open AI API Version",
+        "description": "Fill with: [reference(resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults/secrets', parameters('existingKeyVaultName'), 'AZURE_OPENAI_API_VERSION')).value]"
+      }
+    },
+    "docIntelligenceEndpoint": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure Document Intelligence endpoint URL (e.g., https://<resource>.cognitiveservices.azure.com/)"
+      }
+    },
+    "docIntelligenceKeySecretUri": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Key Vault secret URI containing the Azure Document Intelligence key"
+      }
+    },
     "storageAccountName": {
       "type": "string",
       "metadata": {
@@ -182,7 +196,6 @@
         "description": "Deployment region for all resources."
       }
     },
-
     "webDockerImageName": {
       "type": "string",
       "defaultValue": "smartlib-web:latest",
@@ -243,7 +256,7 @@
       "metadata": {
         "description": "Optional: Key Vault secret URI for the admin email (overrides appAdminEmail when provided)"
       }
-    },    
+    },
     "autoPromoteAdmin": {
       "type": "bool",
       "defaultValue": true,
@@ -262,7 +275,7 @@
       "type": "string",
       "defaultValue": "B1",
       "allowedValues": [
-        "B1",        
+        "B1",
         "S1",
         "P1v2"
       ],
@@ -720,13 +733,13 @@
       "type": "string",
       "value": "[parameters('existingKeyVaultName')]"
     },
-  "costSavings": {
-    "type": "object",
-    "value": {
-      "monthlyCost": "~$30",
-      "savings": "~$13 (30%)",
-      "description": "Shared App Service Plan reduces costs compared to separate plans"
+    "costSavings": {
+      "type": "object",
+      "value": {
+        "monthlyCost": "~$30",
+        "savings": "~$13 (30%)",
+        "description": "Shared App Service Plan reduces costs compared to separate plans"
+      }
     }
-  }
   }
 }
