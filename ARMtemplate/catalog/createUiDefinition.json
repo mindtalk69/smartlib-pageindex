@@ -119,6 +119,17 @@
         },
         "elements": [
           {
+            "name": "existingKeyVaultResourceGroup",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Key Vault resource group",
+            "placeholder": "e.g., smarteams",
+            "toolTip": "Enter the resource group where your Key Vault exists (typically the same as your deployment resource group, NOT the managed resource group).",
+            "constraints": {
+              "required": true,
+              "validationMessage": "You must specify the resource group containing your Key Vault"
+            }
+          },
+          {
             "name": "existingKeyVaultName",
             "type": "Microsoft.Common.TextBox",
             "label": "Key Vault name",
@@ -136,11 +147,32 @@
             }
           },
           {
-            "name": "existingKeyVaultResourceGroup",
-            "type": "Microsoft.Common.TextBox",
-            "label": "Key Vault resource group",
-            "defaultValue": "[resourceGroup().name]",
-            "toolTip": "Resource group containing the Key Vault. Defaults to the deployment resource group."
+            "name": "keyVaultExistsApi",
+            "type": "Microsoft.Solutions.ArmApiControl",
+            "request": {
+              "method": "GET",
+              "path": "[concat(subscription().id, '/resourceGroups/', steps('infrastructureStep').existingKeyVaultResourceGroup, '/providers/Microsoft.KeyVault/vaults/', steps('infrastructureStep').existingKeyVaultName, '?api-version=2023-07-01')]"
+            }
+          },
+          {
+            "name": "keyVaultExistsSuccess",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(not(equals(steps('infrastructureStep').existingKeyVaultName, '')), not(equals(steps('infrastructureStep').existingKeyVaultResourceGroup, '')), equals(string(steps('infrastructureStep').keyVaultExistsApi.name), steps('infrastructureStep').existingKeyVaultName))]",
+            "options": {
+              "icon": "Info",
+              "text": "[concat('✅ Key Vault verified\n📍 Name: ', steps('infrastructureStep').keyVaultExistsApi.name, '\n📍 Location: ', steps('infrastructureStep').keyVaultExistsApi.location, '\n🔗 Vault URI: ', steps('infrastructureStep').keyVaultExistsApi.properties.vaultUri)]",
+              "style": "Success"
+            }
+          },
+          {
+            "name": "keyVaultNotFoundError",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(not(equals(steps('infrastructureStep').existingKeyVaultName, '')), not(equals(steps('infrastructureStep').existingKeyVaultResourceGroup, '')), not(equals(string(steps('infrastructureStep').keyVaultExistsApi.name), steps('infrastructureStep').existingKeyVaultName)))]",
+            "options": {
+              "icon": "Error",
+              "text": "[concat('❌ Key Vault NOT FOUND\n\nLooking for: ', steps('infrastructureStep').existingKeyVaultName, '\nIn Resource Group: ', steps('infrastructureStep').existingKeyVaultResourceGroup, '\n\n⚠️ Please verify:\n• Key Vault name is correct\n• Resource Group name is correct\n• Key Vault exists in your subscription\n• You have Reader permissions on the resource')]",
+              "style": "Error"
+            }
           },
           {
             "name": "twoStepDeploymentWarning",
@@ -281,6 +313,25 @@
         },
         "elements": [
           {
+            "name": "storageAccountResourceGroup",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Storage account resource group",
+            "placeholder": "e.g., smarteams",
+            "toolTip": "Enter the resource group where your storage account exists (typically the same as your deployment resource group, NOT the managed resource group).",
+            "constraints": {
+              "required": true,
+              "validationMessage": "You must specify the resource group containing your storage account"
+            }
+          },
+          {
+            "name": "storageRgWarning",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Warning",
+              "text": "⚠️ If your storage account is in the SAME resource group you selected at the beginning (e.g., 'smarteams'), enter that name here."
+            }
+          },
+          {
             "name": "storageAccountName",
             "type": "Microsoft.Common.TextBox",
             "label": "Storage account name",
@@ -295,6 +346,34 @@
             "options": {
               "icon": "Info",
               "text": "How to find: Azure Portal → Storage accounts → Your Storage Account → Copy the name from Overview page"
+            }
+          },
+          {
+            "name": "storageAccountExistsApi",
+            "type": "Microsoft.Solutions.ArmApiControl",
+            "request": {
+              "method": "GET",
+              "path": "[concat(subscription().id, '/resourceGroups/', steps('storageServicesStep').storageAccountResourceGroup, '/providers/Microsoft.Storage/storageAccounts/', steps('storageServicesStep').storageAccountName, '?api-version=2023-01-01')]"
+            }
+          },
+          {
+            "name": "storageAccountExistsSuccess",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(not(equals(steps('storageServicesStep').storageAccountName, '')), not(equals(steps('storageServicesStep').storageAccountResourceGroup, '')), equals(string(steps('storageServicesStep').storageAccountExistsApi.name), steps('storageServicesStep').storageAccountName))]",
+            "options": {
+              "icon": "Info",
+              "text": "[concat('✅ Storage Account verified\n📍 Name: ', steps('storageServicesStep').storageAccountExistsApi.name, '\n📍 Location: ', steps('storageServicesStep').storageAccountExistsApi.location, '\n📦 SKU: ', steps('storageServicesStep').storageAccountExistsApi.sku.name, '\n🔒 Primary Endpoint: ', steps('storageServicesStep').storageAccountExistsApi.properties.primaryEndpoints.file)]",
+              "style": "Success"
+            }
+          },
+          {
+            "name": "storageAccountNotFoundError",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(not(equals(steps('storageServicesStep').storageAccountName, '')), not(equals(steps('storageServicesStep').storageAccountResourceGroup, '')), not(equals(string(steps('storageServicesStep').storageAccountExistsApi.name), steps('storageServicesStep').storageAccountName)))]",
+            "options": {
+              "icon": "Error",
+              "text": "[concat('❌ Storage Account NOT FOUND\n\nLooking for: ', steps('storageServicesStep').storageAccountName, '\nIn Resource Group: ', steps('storageServicesStep').storageAccountResourceGroup, '\n\n⚠️ Please verify:\n• Storage Account name is correct\n• Resource Group name is correct\n• Storage Account exists in your subscription\n• You have Reader permissions on the resource')]",
+              "style": "Error"
             }
           },
           {
@@ -325,13 +404,6 @@
             "type": "Microsoft.Common.TextBox",
             "label": "Storage account key secret URI",
             "toolTip": "Optional Key Vault secret URI that contains the storage account key."
-          },
-          {
-            "name": "storageAccountResourceGroup",
-            "type": "Microsoft.Common.TextBox",
-            "label": "Storage account resource group",
-            "defaultValue": "[resourceGroup().name]",
-            "toolTip": "Resource group containing the storage account. Defaults to the deployment resource group."
           },
           {
             "name": "createStorageRoleAssignment",
@@ -375,6 +447,47 @@
             "options": {
               "icon": "Info",
               "text": "How to find: Azure Portal → Azure OpenAI → Your OpenAI Resource → Copy the name from Overview page"
+            }
+          },
+          {
+            "name": "openAIResourceExistsApi",
+            "type": "Microsoft.Solutions.ArmApiControl",
+            "request": {
+              "method": "GET",
+              "path": "[concat(subscription().id, '/providers/Microsoft.CognitiveServices/accounts?api-version=2023-05-01')]"
+            }
+          },
+          {
+            "name": "azureOpenAIEndpointComputed",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Azure OpenAI Endpoint (auto-generated)",
+            "defaultValue": "[concat('https://', steps('aiServicesStep').openAIAzureName, '.openai.azure.com')]",
+            "toolTip": "Automatically constructed from the resource name above. This is your Azure OpenAI endpoint.",
+            "constraints": {
+              "required": true,
+              "regex": "^https://.*\\.openai\\.azure\\.com$",
+              "validationMessage": "Must be a valid Azure OpenAI endpoint"
+            },
+            "visible": true
+          },
+          {
+            "name": "openAIResourceFound",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(not(equals(steps('aiServicesStep').openAIAzureName, '')), contains(string(steps('aiServicesStep').openAIResourceExistsApi), steps('aiServicesStep').openAIAzureName))]",
+            "options": {
+              "icon": "Info",
+              "text": "[concat('✅ Azure OpenAI resource verified\n📍 Resource Name: ', steps('aiServicesStep').openAIAzureName, '\n🔗 Endpoint: https://', steps('aiServicesStep').openAIAzureName, '.openai.azure.com')]",
+              "style": "Success"
+            }
+          },
+          {
+            "name": "openAIResourceNotFound",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(not(equals(steps('aiServicesStep').openAIAzureName, '')), not(contains(string(steps('aiServicesStep').openAIResourceExistsApi), steps('aiServicesStep').openAIAzureName)))]",
+            "options": {
+              "icon": "Error",
+              "text": "[concat('❌ Azure OpenAI resource NOT FOUND\n\nLooking for: ', steps('aiServicesStep').openAIAzureName, '\n\n⚠️ Please verify:\n• Resource name is correct\n• Azure OpenAI resource exists in your subscription\n• You have Reader permissions on the resource\n• The resource kind is OpenAI (not other Cognitive Services)')]",
+              "style": "Error"
             }
           },
           {
@@ -431,7 +544,48 @@
             "name": "docIntelligenceEndpoint",
             "type": "Microsoft.Common.TextBox",
             "label": "Document Intelligence endpoint",
-            "toolTip": "Endpoint URL for Azure Document Intelligence (optional)."
+            "placeholder": "https://your-resource.cognitiveservices.azure.com/",
+            "toolTip": "Endpoint URL for Azure Document Intelligence (optional). Format: https://name.cognitiveservices.azure.com/",
+            "constraints": {
+              "regex": "^(https://[a-z0-9-]+\\.cognitiveservices\\.azure\\.com/?)?$",
+              "validationMessage": "Must be a valid Document Intelligence endpoint (https://name.cognitiveservices.azure.com/) or empty"
+            }
+          },
+          {
+            "name": "docIntelligenceResourceName",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Document Intelligence resource name (extracted)",
+            "defaultValue": "[if(not(equals(steps('aiServicesStep').docIntelligenceEndpoint, '')), first(split(split(steps('aiServicesStep').docIntelligenceEndpoint, '//')[1], '.')), '')]",
+            "toolTip": "Resource name extracted from endpoint URL",
+            "visible": false
+          },
+          {
+            "name": "docIntelligenceExistsApi",
+            "type": "Microsoft.Solutions.ArmApiControl",
+            "request": {
+              "method": "GET",
+              "path": "[if(not(equals(steps('aiServicesStep').docIntelligenceResourceName, '')), concat(subscription().id, '/providers/Microsoft.CognitiveServices/accounts/', steps('aiServicesStep').docIntelligenceResourceName, '?api-version=2023-05-01'), concat(subscription().id, '/providers/Microsoft.CognitiveServices/accounts?api-version=2023-05-01'))]"
+            }
+          },
+          {
+            "name": "docIntelligenceFound",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(not(equals(steps('aiServicesStep').docIntelligenceEndpoint, '')), or(contains(string(steps('aiServicesStep').docIntelligenceExistsApi.kind), 'FormRecognizer'), contains(string(steps('aiServicesStep').docIntelligenceExistsApi.kind), 'CognitiveServices')))]",
+            "options": {
+              "icon": "Info",
+              "text": "[concat('✅ Document Intelligence resource verified\n📍 Resource Name: ', steps('aiServicesStep').docIntelligenceResourceName, '\n🔗 Endpoint: ', steps('aiServicesStep').docIntelligenceEndpoint, '\n📊 Kind: ', steps('aiServicesStep').docIntelligenceExistsApi.kind)]",
+              "style": "Success"
+            }
+          },
+          {
+            "name": "docIntelligenceNotFound",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(not(equals(steps('aiServicesStep').docIntelligenceEndpoint, '')), not(or(contains(string(steps('aiServicesStep').docIntelligenceExistsApi.kind), 'FormRecognizer'), contains(string(steps('aiServicesStep').docIntelligenceExistsApi.kind), 'CognitiveServices'))))]",
+            "options": {
+              "icon": "Error",
+              "text": "[concat('❌ Document Intelligence resource NOT FOUND\n\nEndpoint provided: ', steps('aiServicesStep').docIntelligenceEndpoint, '\nExtracted name: ', steps('aiServicesStep').docIntelligenceResourceName, '\n\n⚠️ Please verify:\n• Endpoint URL is correct\n• Resource exists in your subscription\n• You have Reader permissions\n• Resource kind is FormRecognizer or CognitiveServices')]",
+              "style": "Error"
+            }
           },
           {
             "name": "docIntelligenceKeySecretUri",
@@ -619,6 +773,56 @@
               "required": true,
               "regex": "^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$",
               "validationMessage": "Prefix must be 3-40 characters, start/end with lowercase alphanumeric, contain only lowercase letters, numbers, and hyphens."
+            },
+            "validations": [
+              {
+                "isValid": "[and(steps('deploymentStep').webAppAvailabilityApi.nameAvailable, steps('deploymentStep').workerAppAvailabilityApi.nameAvailable)]",
+                "message": "Resource names conflict with existing App Services. Choose a different prefix to avoid deployment errors."
+              }
+            ]
+          },
+          {
+            "name": "webAppAvailabilityApi",
+            "type": "Microsoft.Solutions.ArmApiControl",
+            "request": {
+              "method": "POST",
+              "path": "[concat(subscription().id, '/providers/Microsoft.Web/checknameavailability?api-version=2023-01-01')]",
+              "body": {
+                "name": "[concat(steps('deploymentStep').appPrefix, '-web')]",
+                "type": "Microsoft.Web/sites"
+              }
+            }
+          },
+          {
+            "name": "workerAppAvailabilityApi",
+            "type": "Microsoft.Solutions.ArmApiControl",
+            "request": {
+              "method": "POST",
+              "path": "[concat(subscription().id, '/providers/Microsoft.Web/checknameavailability?api-version=2023-01-01')]",
+              "body": {
+                "name": "[concat(steps('deploymentStep').appPrefix, '-worker')]",
+                "type": "Microsoft.Web/sites"
+              }
+            }
+          },
+          {
+            "name": "nameAvailabilitySuccess",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(steps('deploymentStep').webAppAvailabilityApi.nameAvailable, steps('deploymentStep').workerAppAvailabilityApi.nameAvailable)]",
+            "options": {
+              "icon": "Info",
+              "text": "[concat('✅ Resource names are available:\n• Web App: ', steps('deploymentStep').appPrefix, '-web\n• Worker App: ', steps('deploymentStep').appPrefix, '-worker')]",
+              "style": "Success"
+            }
+          },
+          {
+            "name": "nameAvailabilityConflict",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[or(not(steps('deploymentStep').webAppAvailabilityApi.nameAvailable), not(steps('deploymentStep').workerAppAvailabilityApi.nameAvailable))]",
+            "options": {
+              "icon": "Error",
+              "text": "[concat('❌ DEPLOYMENT WILL FAIL - Resource name conflicts detected:\n\n', if(not(steps('deploymentStep').webAppAvailabilityApi.nameAvailable), concat('• Web App: ', steps('deploymentStep').appPrefix, '-web (Already exists)\n'), ''), if(not(steps('deploymentStep').workerAppAvailabilityApi.nameAvailable), concat('• Worker App: ', steps('deploymentStep').appPrefix, '-worker (Already exists)'), ''), '\n\n⚠️ Choose a different prefix to proceed.')]",
+              "style": "Error"
             }
           },
           {
@@ -791,9 +995,9 @@
       "storageAccountKeySecretUri": "[steps('storageServicesStep').storageAccountKeySecretUri]",
       "storageAccountResourceGroup": "[steps('storageServicesStep').storageAccountResourceGroup]",
       "dataShareName": "[steps('storageServicesStep').dataShareName]",
-      "createStorageRoleAssignment": "[if(equals(steps('infrastructureStep').deploymentType, 'new'), steps('infrastructureStep').createStorageRoleAssignment, false())]",
+      "createStorageRoleAssignment": "[if(equals(steps('infrastructureStep').deploymentType, 'new'), steps('storageServicesStep').createStorageRoleAssignment, false())]",
       "openAIAzureName": "[steps('aiServicesStep').openAIAzureName]",
-      "azureOpenAIEndpoint": "[steps('aiServicesStep').azureOpenAIEndpoint]",
+      "azureOpenAIEndpoint": "[steps('aiServicesStep').azureOpenAIEndpointComputed]",
       "azureOpenAIDeployment": "[steps('aiServicesStep').azureOpenAIDeployment]",
       "azureOpenAIAPIVersion": "[steps('aiServicesStep').azureOpenAIAPIVersion]",
       "azureEmbeddingDeployment": "[steps('aiServicesStep').azureEmbeddingDeployment]",

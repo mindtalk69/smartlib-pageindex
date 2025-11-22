@@ -681,11 +681,11 @@
       "condition": "[parameters('createStorageRoleAssignment')]",
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
-      "name": "[guid(resourceId('Microsoft.Web/sites', variables('webAppName')), resourceId(parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName')), 'web-storage')]",
+      "name": "[guid(resourceId('Microsoft.Web/sites', variables('webAppName')), resourceId(subscription().subscriptionId, parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName')), 'web-storage')]",
       "dependsOn": [
         "[resourceId('Microsoft.Web/sites', variables('webAppName'))]"
       ],
-      "scope": "[resourceId(parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
+      "scope": "[resourceId(subscription().subscriptionId, parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
       "properties": {
         "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '0c867c2a-1d8c-454a-a3db-ab2ea1bdc8bb')]",
         "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2022-03-01', 'Full').identity.principalId]",
@@ -696,11 +696,11 @@
       "condition": "[parameters('createStorageRoleAssignment')]",
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
-      "name": "[guid(resourceId('Microsoft.Web/sites', variables('workerAppName')), resourceId(parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName')), 'worker-storage')]",
+      "name": "[guid(resourceId('Microsoft.Web/sites', variables('workerAppName')), resourceId(subscription().subscriptionId, parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName')), 'worker-storage')]",
       "dependsOn": [
         "[resourceId('Microsoft.Web/sites', variables('workerAppName'))]"
       ],
-      "scope": "[resourceId(parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
+      "scope": "[resourceId(subscription().subscriptionId, parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
       "properties": {
         "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '0c867c2a-1d8c-454a-a3db-ab2ea1bdc8bb')]",
         "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2022-03-01', 'Full').identity.principalId]",
