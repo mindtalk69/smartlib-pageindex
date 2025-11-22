@@ -212,7 +212,17 @@
               "icon": "Warning",
               "text": "Key Vault resource group differs from the deployment resource group. Confirm you have RBAC rights there before proceeding."
             }
-          },
+          }
+        ]
+      },
+      {
+        "name": "redisConnectivityStep",
+        "label": "Redis Connectivity",
+        "subLabel": {
+          "preValidation": "Configure Redis connection settings",
+          "postValidation": "Redis configuration complete"
+        },
+        "elements": [
           {
             "name": "redisConnectionString",
             "type": "Microsoft.Common.PasswordBox",
@@ -246,7 +256,7 @@
           {
             "name": "redisConnectionValidation",
             "type": "Microsoft.Common.InfoBox",
-            "visible": "[and(equals(steps('infrastructureStep').redisConnectionString, ''), equals(steps('infrastructureStep').redisConnectionStringSecretUri, ''))]",
+            "visible": "[and(equals(steps('redisConnectivityStep').redisConnectionString, ''), equals(steps('redisConnectivityStep').redisConnectionStringSecretUri, ''))]",
             "options": {
               "icon": "Warning",
               "text": "⚠️ WARNING: You must provide either a Redis connection string or a Key Vault secret URI containing the connection string."
@@ -259,7 +269,17 @@
               "icon": "Info",
               "text": "How to store Redis connection in Key Vault (RECOMMENDED):\n\n1. Get connection string from Azure (see above)\n2. Convert to SmartLib format (see example above)\n   ⚠️ Make sure it ends with: ?ssl_cert_reqs=none\n\n3. Azure Portal → Key Vault → Secrets → + Generate/Import\n4. Name: REDIS-CONNECTION-STRING\n5. Value: rediss://:PASSWORD@HOSTNAME:6380?ssl_cert_reqs=none\n6. Click 'Create'\n7. Click on the secret name\n8. Copy 'Secret Identifier' (full URL)\n9. Paste here\n\nExample Secret URI:\nhttps://your-keyvault.vault.azure.net/secrets/REDIS-CONNECTION-STRING/abc123def456"
             }
-          },
+          }
+        ]
+      },
+      {
+        "name": "storageServicesStep",
+        "label": "Storage Services",
+        "subLabel": {
+          "preValidation": "Configure Azure Storage settings",
+          "postValidation": "Storage configuration complete"
+        },
+        "elements": [
           {
             "name": "storageAccountName",
             "type": "Microsoft.Common.TextBox",
@@ -324,67 +344,10 @@
           {
             "name": "storageRoleInfo",
             "type": "Microsoft.Common.InfoBox",
-            "visible": "[steps('infrastructureStep').createStorageRoleAssignment]",
+            "visible": "[steps('storageServicesStep').createStorageRoleAssignment]",
             "options": {
               "icon": "Info",
               "text": "Identity-based Storage access provides enhanced security. Access keys will still work as fallback."
-            }
-          }
-        ]
-      },
-      {
-        "name": "redisConnectivityStep",
-        "label": "Redis Connectivity",
-        "subLabel": {
-          "preValidation": "Configure Redis connection settings",
-          "postValidation": "Redis configuration complete"
-        },
-        "elements": [
-          {
-            "name": "redisConnectionString",
-            "type": "Microsoft.Common.PasswordBox",
-            "label": "Redis connection string",
-            "toolTip": "Redis connection string in format: rediss://:password@hostname:6380?ssl_cert_reqs=none. Required if Secret URI not provided.",
-            "constraints": {
-              "required": false,
-              "regex": "^rediss://:.*@.*:6380\\?ssl_cert_reqs=none$",
-              "validationMessage": "Connection string must match: rediss://:PASSWORD@HOSTNAME:6380?ssl_cert_reqs=none"
-            }
-          },
-          {
-            "name": "redisConnectionStringHelp",
-            "type": "Microsoft.Common.InfoBox",
-            "options": {
-              "icon": "Warning",
-              "text": "⚠️ IMPORTANT: You must modify Azure's default connection string!\n\nHow to get Redis connection string:\n\n1. Azure Portal → Azure Cache for Redis → Your Redis Cache\n2. Click 'Access keys' (left sidebar)\n3. Copy 'Primary connection string (StackExchange.Redis)'\n\n4. MODIFY THE FORMAT (Azure's format won't work):\n\n   Azure gives you:\n   smartlib-redis.redis.cache.windows.net:6380,password=[YOUR_PASSWORD],ssl=True,abortConnect=False\n\n   You MUST change to:\n   rediss://:[YOUR_PASSWORD]@smartlib-redis.redis.cache.windows.net:6380?ssl_cert_reqs=none\n\n   Pattern: rediss://:PASSWORD@HOSTNAME:6380?ssl_cert_reqs=none\n\n⚠️ Don't forget: ?ssl_cert_reqs=none at the end!\n\n💡 RECOMMENDED: Store in Key Vault (see Secret URI field below)"
-            }
-          },
-          {
-            "name": "redisConnectionStringSecretUri",
-            "type": "Microsoft.Common.TextBox",
-            "label": "Redis connection string secret URI (RECOMMENDED)",
-            "toolTip": "Key Vault secret URI containing Redis connection string. This is more secure than providing the string directly above.",
-            "constraints": {
-              "required": false,
-              "regex": "^https://.*\\.vault\\.azure\\.net/secrets/.*$",
-              "validationMessage": "Must be a valid Azure Key Vault secret URI"
-            }
-          },
-          {
-            "name": "redisConnectionValidation",
-            "type": "Microsoft.Common.InfoBox",
-            "visible": "[and(equals(steps('redisConnectivityStep').redisConnectionString, ''), equals(steps('redisConnectivityStep').redisConnectionStringSecretUri, ''))]",
-            "options": {
-              "icon": "Warning",
-              "text": "⚠️ WARNING: You must provide either a Redis connection string or a Key Vault secret URI containing the connection string."
-            }
-          },
-          {
-            "name": "redisSecretUriHelp",
-            "type": "Microsoft.Common.InfoBox",
-            "options": {
-              "icon": "Info",
-              "text": "How to store Redis connection in Key Vault (RECOMMENDED):\n\n1. Get connection string from Azure (see above)\n2. Convert to SmartLib format (see example above)\n   ⚠️ Make sure it ends with: ?ssl_cert_reqs=none\n\n3. Azure Portal → Key Vault → Secrets → + Generate/Import\n4. Name: REDIS-CONNECTION-STRING\n5. Value: rediss://:PASSWORD@HOSTNAME:6380?ssl_cert_reqs=none\n6. Click 'Create'\n7. Click on the secret name\n8. Copy 'Secret Identifier' (full URL)\n9. Paste here\n\nExample Secret URI:\nhttps://your-keyvault.vault.azure.net/secrets/REDIS-CONNECTION-STRING/abc123def456"
             }
           }
         ]
@@ -823,11 +786,11 @@
       "redisConnectionStringSecretUri": "[steps('redisConnectivityStep').redisConnectionStringSecretUri]",
       "CELERY_BROKER_URL": "[steps('redisConnectivityStep').redisConnectionString]",
       "CELERY_RESULT_BACKEND": "[steps('redisConnectivityStep').redisConnectionStringSecretUri]",
-      "storageAccountName": "[steps('infrastructureStep').storageAccountName]",
-      "storageAccountKey": "[steps('infrastructureStep').storageAccountKey]",
-      "storageAccountKeySecretUri": "[steps('infrastructureStep').storageAccountKeySecretUri]",
-      "storageAccountResourceGroup": "[steps('infrastructureStep').storageAccountResourceGroup]",
-      "dataShareName": "[steps('infrastructureStep').dataShareName]",
+      "storageAccountName": "[steps('storageServicesStep').storageAccountName]",
+      "storageAccountKey": "[steps('storageServicesStep').storageAccountKey]",
+      "storageAccountKeySecretUri": "[steps('storageServicesStep').storageAccountKeySecretUri]",
+      "storageAccountResourceGroup": "[steps('storageServicesStep').storageAccountResourceGroup]",
+      "dataShareName": "[steps('storageServicesStep').dataShareName]",
       "createStorageRoleAssignment": "[if(equals(steps('infrastructureStep').deploymentType, 'new'), steps('infrastructureStep').createStorageRoleAssignment, false())]",
       "openAIAzureName": "[steps('aiServicesStep').openAIAzureName]",
       "azureOpenAIEndpoint": "[steps('aiServicesStep').azureOpenAIEndpoint]",
