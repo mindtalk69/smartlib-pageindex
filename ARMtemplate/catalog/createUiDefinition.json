@@ -479,11 +479,19 @@
             }
           },
           {
+            "name": "embeddingModelRequirement",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Warning",
+              "text": "⚠️ PREREQUISITE: You must deploy 'text-embedding-3-small' model in Azure OpenAI Studio BEFORE proceeding.\n\nWhy? SmartLib is pre-configured to work with this specific embedding model for document search."
+            }
+          },
+          {
             "name": "azureEmbeddingDeployment",
             "type": "Microsoft.Common.TextBox",
             "label": "Embedding model deployment name",
-            "placeholder": "e.g., text-embedding-3-small, text-embedding-ada-002",
-            "toolTip": "The deployment name for your embedding model in Azure OpenAI Studio. Required for document search functionality.",
+            "placeholder": "e.g., my-embedding-prod, smartlib-embedding",
+            "toolTip": "The CUSTOM NAME you gave when deploying the embedding model in Azure OpenAI Studio. This can be any name you chose.",
             "constraints": {
               "required": true,
               "regex": "^[a-zA-Z0-9][a-zA-Z0-9-_.]{0,62}[a-zA-Z0-9]$",
@@ -491,11 +499,11 @@
             }
           },
           {
-            "name": "deploymentNamesHelp",
+            "name": "embeddingDeploymentHelp",
             "type": "Microsoft.Common.InfoBox",
             "options": {
               "icon": "Info",
-              "text": "📍 How to find deployment names:\n\n1. Go to Azure OpenAI Studio (https://oai.azure.com)\n2. Select your resource\n3. Click 'Deployments' in left menu\n4. Copy the 'Deployment name' column values\n\n⚠️ IMPORTANT: Use the DEPLOYMENT NAME you created, NOT the base model name.\n\nExample:\n• Your deployment name: 'my-gpt4-deployment' ✅\n• Base model name: 'gpt-4' ❌"
+              "text": "📍 How to create the embedding deployment:\n\n1. Go to Azure OpenAI Studio (https://oai.azure.com)\n2. Select your resource → Deployments → Create new deployment\n3. Model: Select 'text-embedding-3-small'\n4. Deployment name: Enter YOUR custom name (e.g., 'smartlib-embedding')\n5. Click 'Create'\n6. Copy YOUR deployment name and paste it above\n\n⚠️ IMPORTANT: Enter the DEPLOYMENT NAME you created (can be anything), NOT 'text-embedding-3-small'"
             }
           },
           {
@@ -508,9 +516,28 @@
           {
             "name": "defaultEmbeddingModel",
             "type": "Microsoft.Common.TextBox",
-            "label": "Default embedding model identifier",
+            "label": "Base embedding model identifier",
             "defaultValue": "text-embedding-3-small",
-            "toolTip": "Model identifier SmartLib loads on startup (matches embedding deployment by default)."
+            "toolTip": "The base OpenAI model name (not your deployment name). SmartLib is pre-configured for 'text-embedding-3-small'.",
+            "constraints": {
+              "required": true
+            }
+          },
+          {
+            "name": "embeddingModelIdentifierHelp",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "ℹ️ This must match the base model you deployed in Azure OpenAI Studio.\n\n✅ If you deployed 'text-embedding-3-small' → Keep default value\n⚠️ If you deployed a different model → Update this field to match\n\nSupported models:\n• text-embedding-3-small (Recommended - pre-configured)\n• text-embedding-3-large\n• text-embedding-ada-002"
+            }
+          },
+          {
+            "name": "deploymentNamesHelp",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "📋 SUMMARY - Understanding the difference:\n\n1️⃣ DEPLOYMENT NAME (field above 'Embedding model deployment name'):\n   • YOUR custom name when you created the deployment\n   • Examples: 'my-embedding', 'smartlib-embed', 'prod-embedding'\n   • Can be ANYTHING you want\n\n2️⃣ BASE MODEL IDENTIFIER (field above 'Base embedding model identifier'):\n   • The actual OpenAI model name\n   • Must be: 'text-embedding-3-small' (recommended)\n   • SmartLib uses this to know which model you're using\n\nExample:\n• You deployed model: 'text-embedding-3-small'\n• You named your deployment: 'my-company-embedding'\n• Deployment name field: 'my-company-embedding' ← YOUR name\n• Model identifier field: 'text-embedding-3-small' ← OpenAI's model name"
+            }
           },
           {
             "name": "azureOpenAIKey",
@@ -615,154 +642,11 @@
         },
         "elements": [
           {
-            "name": "deploymentRegion",
-            "type": "Microsoft.Common.DropDown",
-            "label": "Deployment region",
-            "defaultValue": "resourceGroup",
-            "toolTip": "Pick a target Azure region or use the deployment resource group's region.",
-            "constraints": {
-              "allowedValues": [
-                {
-                  "label": "Use resource group's region",
-                  "value": "resourceGroup"
-                },
-                {
-                  "label": "East US",
-                  "value": "eastus"
-                },
-                {
-                  "label": "East US 2",
-                  "value": "eastus2"
-                },
-                {
-                  "label": "West US",
-                  "value": "westus"
-                },
-                {
-                  "label": "West US 2",
-                  "value": "westus2"
-                },
-                {
-                  "label": "West US 3",
-                  "value": "westus3"
-                },
-                {
-                  "label": "Central US",
-                  "value": "centralus"
-                },
-                {
-                  "label": "South Central US",
-                  "value": "southcentralus"
-                },
-                {
-                  "label": "North Central US",
-                  "value": "northcentralus"
-                },
-                {
-                  "label": "Canada Central",
-                  "value": "canadacentral"
-                },
-                {
-                  "label": "Canada East",
-                  "value": "canadaeast"
-                },
-                {
-                  "label": "Brazil South",
-                  "value": "brazilsouth"
-                },
-                {
-                  "label": "North Europe",
-                  "value": "northeurope"
-                },
-                {
-                  "label": "West Europe",
-                  "value": "westeurope"
-                },
-                {
-                  "label": "Sweden Central",
-                  "value": "swedencentral"
-                },
-                {
-                  "label": "UK South",
-                  "value": "uksouth"
-                },
-                {
-                  "label": "UK West",
-                  "value": "ukwest"
-                },
-                {
-                  "label": "France Central",
-                  "value": "francecentral"
-                },
-                {
-                  "label": "Germany West Central",
-                  "value": "germanywestcentral"
-                },
-                {
-                  "label": "Italy North",
-                  "value": "italynorth"
-                },
-                {
-                  "label": "Norway East",
-                  "value": "norwayeast"
-                },
-                {
-                  "label": "East Asia",
-                  "value": "eastasia"
-                },
-                {
-                  "label": "Southeast Asia",
-                  "value": "southeastasia"
-                },
-                {
-                  "label": "Australia East",
-                  "value": "australiaeast"
-                },
-                {
-                  "label": "Australia Southeast",
-                  "value": "australiasoutheast"
-                },
-                {
-                  "label": "Japan East",
-                  "value": "japaneast"
-                },
-                {
-                  "label": "Japan West",
-                  "value": "japanwest"
-                },
-                {
-                  "label": "Korea Central",
-                  "value": "koreacentral"
-                },
-                {
-                  "label": "South India",
-                  "value": "southindia"
-                },
-                {
-                  "label": "Central India",
-                  "value": "centralindia"
-                },
-                {
-                  "label": "West India",
-                  "value": "westindia"
-                },
-                {
-                  "label": "UAE North",
-                  "value": "uaenorth"
-                },
-                {
-                  "label": "South Africa North",
-                  "value": "southafricanorth"
-                },
-                {
-                  "label": "Switzerland North",
-                  "value": "switzerlandnorth"
-                },
-                {
-                  "label": "Poland Central",
-                  "value": "polandcentral"
-                }
-              ]
+            "name": "deploymentRegionInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "ℹ️ SmartLib resources will be deployed to the same region as your resource group for optimal performance and cost efficiency."
             }
           },
           {
@@ -989,7 +873,7 @@
       }
     ],
     "outputs": {
-      "location": "[if(equals(steps('deploymentStep').deploymentRegion, 'resourceGroup'), location(), steps('deploymentStep').deploymentRegion)]",
+      "location": "[location()]",
       "resourceGroup": "[resourceGroup().name]",
       "tenantId": "[steps('identityStep').tenantId]",
       "APP_CLIENT_ID": "[steps('identityStep').APP_CLIENT_ID]",
@@ -1007,15 +891,15 @@
       "storageAccountResourceGroup": "[steps('storageServicesStep').storageAccountResourceGroup]",
       "dataShareName": "[steps('storageServicesStep').dataShareName]",
       "createStorageRoleAssignment": "[if(equals(steps('infrastructureStep').deploymentType, 'new'), steps('storageServicesStep').createStorageRoleAssignment, false())]",
-      "openAIAzureName": "[steps('aiServicesStep').openAIResourceSelector.name]",
-      "azureOpenAIEndpoint": "[steps('aiServicesStep').openAIResourceSelector.properties.endpoint]",
+      "openAIAzureName": "[steps('aiServicesStep').openAIAzureName]",
+      "azureOpenAIEndpoint": "[steps('aiServicesStep').azureOpenAIEndpointComputed]",
       "azureOpenAIDeployment": "[steps('aiServicesStep').azureOpenAIDeployment]",
       "azureOpenAIAPIVersion": "[steps('aiServicesStep').azureOpenAIAPIVersion]",
       "azureEmbeddingDeployment": "[steps('aiServicesStep').azureEmbeddingDeployment]",
       "defaultEmbeddingModel": "[steps('aiServicesStep').defaultEmbeddingModel]",
       "azureOpenAIKey": "[steps('aiServicesStep').azureOpenAIKey]",
       "azureOpenAIKeySecretUri": "[steps('aiServicesStep').azureOpenAIKeySecretUri]",
-      "docIntelligenceEndpoint": "[if(steps('aiServicesStep').useDocIntelligence, steps('aiServicesStep').docIntelligenceSelector.properties.endpoint, '')]",
+      "docIntelligenceEndpoint": "[steps('aiServicesStep').docIntelligenceEndpoint]",
       "docIntelligenceKeySecretUri": "[steps('aiServicesStep').docIntelligenceKeySecretUri]",
       "appPrefix": "[steps('deploymentStep').appPrefix]",
       "appServicePlanSkuName": "[steps('deploymentStep').appServicePlanSkuName]",
