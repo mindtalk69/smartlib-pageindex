@@ -221,3 +221,33 @@ Since it works on local each azure web apps, user can copy each database since i
 This solution architecture provides a robust, scalable, and secure foundation for deploying the SmartLib application to the Azure Marketplace. The architecture leverages Azure's native services to ensure optimal performance, security, and reliability while providing customers with flexibility in deployment options based on their specific requirements.
 
 By default, SmartLib uses SQLite for the application database and ChromaDB for vector storage, both stored on Azure Files. This provides a simple, cost-effective solution that works well for most deployments. For users with specific requirements, the architecture supports optional PGVector deployment using Azure Database for PostgreSQL (Not applicable in this version) and Azure Document Intelligence for advanced document processing capabilities.
+
+# DISCLAIMER
+
+## Terms of Use
+
+The documentation is provided "as-is" without warranties of any kind, express or implied, and users access and use the information at their own risk.
+
+## Copyright Notices
+
+All products, services, technologies, software, frameworks, libraries, tools, platforms, and trademarks mentioned throughout this documentation are the exclusive property of their respective owners, holders, and copyright claimants, and no ownership or affiliation is claimed or implied by this documentation.
+
+## Patent Information
+
+Mentioned products and technologies may be protected by patents, pending patents, trademarks, trade secrets, or other intellectual property rights held by their respective owners.
+
+## Copyright Usage Guidelines
+
+Any references to third-party products, services, or technologies are made for informational and educational purposes only, and users must obtain proper licenses, permissions, or authorizations directly from the rights holders before using any copyrighted materials, proprietary software, or protected technologies.
+
+## Pricing and Cost Information
+
+Any pricing information, cost estimates, subscription fees, or financial figures mentioned in this documentation may be inaccurate, outdated, or subject to change without notice, and users must verify current pricing directly with the official vendors, service providers, or product websites before making any purchasing decisions or financial commitments.
+
+## Verification Requirements
+
+Readers must visit the official websites, documentation repositories, legal pages, and licensing portals of each mentioned product, service, or technology to obtain accurate, current, and authoritative information regarding copyright details, licensing terms, patent information, usage restrictions, pricing structures, terms of service, privacy policies, and any other legal requirements specific to those products or services.
+
+## User Responsibility
+
+The content provided is for informational, educational, and reference purposes only, and users bear sole responsibility for independently verifying all information, conducting due diligence, ensuring compliance with all applicable intellectual property rights, adhering to terms of service, respecting licensing agreements, observing usage restrictions, and meeting all legal, regulatory, and contractual requirements associated with any third-party products, services, technologies, or materials referenced in or accessed through this documentation.
