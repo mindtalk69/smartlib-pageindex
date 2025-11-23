@@ -433,10 +433,47 @@
         },
         "elements": [
           {
+            "name": "openAIResourceSelector",
+            "type": "Microsoft.Solutions.ResourceSelector",
+            "label": "Select Azure OpenAI resource",
+            "resourceType": "Microsoft.CognitiveServices/accounts",
+            "options": {
+              "filter": {
+                "kind": "OpenAI"
+              }
+            },
+            "constraints": {
+              "required": true
+            }
+          },
+          {
+            "name": "openAIResourceFound",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[not(equals(steps('aiServicesStep').openAIResourceSelector.name, ''))]",
+            "options": {
+              "icon": "Info",
+              "text": "[concat('✅ Azure OpenAI resource selected\n📍 Name: ', steps('aiServicesStep').openAIResourceSelector.name, '\n📍 Location: ', steps('aiServicesStep').openAIResourceSelector.location, '\n🔗 Endpoint: ', steps('aiServicesStep').openAIResourceSelector.properties.endpoint)]",
+              "style": "Success"
+            }
+          },
+          {
             "name": "openAIAzureName",
             "type": "Microsoft.Common.TextBox",
-            "label": "Azure OpenAI resource name",
-            "toolTip": "Name of the existing Azure OpenAI resource backing SmartLib.",
+            "label": "Azure OpenAI resource name (auto-detected)",
+            "defaultValue": "[steps('aiServicesStep').openAIResourceSelector.name]",
+            "toolTip": "Resource name from selected Azure OpenAI resource",
+            "visible": false,
+            "constraints": {
+              "required": true
+            }
+          },
+          {
+            "name": "azureOpenAIEndpointComputed",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Azure OpenAI Endpoint (auto-detected)",
+            "defaultValue": "[coalesce(steps('aiServicesStep').openAIResourceSelector.properties.endpoint, '')]",
+            "toolTip": "Endpoint automatically populated from the selected Azure OpenAI resource.",
+            "visible": false,
             "constraints": {
               "required": true
             }
@@ -446,56 +483,39 @@
             "type": "Microsoft.Common.InfoBox",
             "options": {
               "icon": "Info",
-              "text": "How to find: Azure Portal → Azure OpenAI → Your OpenAI Resource → Copy the name from Overview page"
+              "text": "Select your Azure OpenAI resource from the dropdown above. The endpoint will be automatically populated."
             }
           },
           {
-            "name": "openAIResourceExistsApi",
-            "type": "Microsoft.Solutions.ArmApiControl",
-            "request": {
-              "method": "GET",
-              "path": "[concat(subscription().id, '/providers/Microsoft.CognitiveServices/accounts?api-version=2023-05-01')]"
-            }
-          },
-          {
-            "name": "azureOpenAIEndpointComputed",
+            "name": "azureOpenAIDeployment",
             "type": "Microsoft.Common.TextBox",
-            "label": "Azure OpenAI Endpoint (auto-generated)",
-            "defaultValue": "[concat('https://', steps('aiServicesStep').openAIAzureName, '.openai.azure.com')]",
-            "toolTip": "Automatically constructed from the resource name above. This is your Azure OpenAI endpoint.",
+            "label": "Chat model deployment name",
+            "placeholder": "e.g., gpt-4, gpt-35-turbo, gpt-4o",
+            "toolTip": "The deployment name for your chat/completion model in Azure OpenAI Studio. This is the name YOU chose when creating the deployment, not the base model name.",
             "constraints": {
               "required": true,
-              "regex": "^https://.*\\.openai\\.azure\\.com$",
-              "validationMessage": "Must be a valid Azure OpenAI endpoint"
-            },
-            "visible": true
-          },
-          {
-            "name": "openAIResourceFound",
-            "type": "Microsoft.Common.InfoBox",
-            "visible": "[and(not(equals(steps('aiServicesStep').openAIAzureName, '')), contains(string(steps('aiServicesStep').openAIResourceExistsApi), steps('aiServicesStep').openAIAzureName))]",
-            "options": {
-              "icon": "Info",
-              "text": "[concat('✅ Azure OpenAI resource verified\n📍 Resource Name: ', steps('aiServicesStep').openAIAzureName, '\n🔗 Endpoint: https://', steps('aiServicesStep').openAIAzureName, '.openai.azure.com')]",
-              "style": "Success"
+              "regex": "^[a-zA-Z0-9][a-zA-Z0-9-_.]{0,62}[a-zA-Z0-9]$",
+              "validationMessage": "Deployment name must be 1-64 characters, start and end with alphanumeric, and contain only letters, numbers, hyphens, underscores, and periods."
             }
           },
           {
-            "name": "openAIResourceNotFound",
-            "type": "Microsoft.Common.InfoBox",
-            "visible": "[and(not(equals(steps('aiServicesStep').openAIAzureName, '')), not(contains(string(steps('aiServicesStep').openAIResourceExistsApi), steps('aiServicesStep').openAIAzureName)))]",
-            "options": {
-              "icon": "Error",
-              "text": "[concat('❌ Azure OpenAI resource NOT FOUND\n\nLooking for: ', steps('aiServicesStep').openAIAzureName, '\n\n⚠️ Please verify:\n• Resource name is correct\n• Azure OpenAI resource exists in your subscription\n• You have Reader permissions on the resource\n• The resource kind is OpenAI (not other Cognitive Services)')]",
-              "style": "Error"
+            "name": "azureEmbeddingDeployment",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Embedding model deployment name",
+            "placeholder": "e.g., text-embedding-3-small, text-embedding-ada-002",
+            "toolTip": "The deployment name for your embedding model in Azure OpenAI Studio. Required for document search functionality.",
+            "constraints": {
+              "required": true,
+              "regex": "^[a-zA-Z0-9][a-zA-Z0-9-_.]{0,62}[a-zA-Z0-9]$",
+              "validationMessage": "Deployment name must be 1-64 characters, start and end with alphanumeric, and contain only letters, numbers, hyphens, underscores, and periods."
             }
           },
           {
-            "name": "openAIEndpointHelp",
+            "name": "deploymentNamesHelp",
             "type": "Microsoft.Common.InfoBox",
             "options": {
               "icon": "Info",
-              "text": "How to find: Azure OpenAI Studio (https://oai.azure.com) → Deployments → Copy the deployment names you created for chat model and embeddings"
+              "text": "📍 How to find deployment names:\n\n1. Go to Azure OpenAI Studio (https://oai.azure.com)\n2. Select your resource\n3. Click 'Deployments' in left menu\n4. Copy the 'Deployment name' column values\n\n⚠️ IMPORTANT: Use the DEPLOYMENT NAME you created, NOT the base model name.\n\nExample:\n• Your deployment name: 'my-gpt4-deployment' ✅\n• Base model name: 'gpt-4' ❌"
             }
           },
           {
@@ -537,61 +557,72 @@
             "type": "Microsoft.Common.InfoBox",
             "options": {
               "icon": "Info",
-              "text": "Document Intelligence is OPTIONAL. If provided, SmartLib will use it for advanced document parsing. Otherwise, it will use local OCR for document processing."
+              "text": "📄 Document Intelligence is OPTIONAL\n\nIf enabled, SmartLib uses Azure Document Intelligence for advanced document parsing (tables, forms, complex layouts).\n\nIf disabled, SmartLib uses built-in OCR for basic document processing."
+            }
+          },
+          {
+            "name": "useDocIntelligence",
+            "type": "Microsoft.Common.CheckBox",
+            "label": "Enable Azure Document Intelligence (optional)",
+            "defaultValue": false,
+            "toolTip": "Check this box if you want to use Azure Document Intelligence for enhanced document processing capabilities."
+          },
+          {
+            "name": "docIntelligenceSelector",
+            "type": "Microsoft.Solutions.ResourceSelector",
+            "label": "Select Document Intelligence resource",
+            "resourceType": "Microsoft.CognitiveServices/accounts",
+            "visible": "[steps('aiServicesStep').useDocIntelligence]",
+            "options": {
+              "filter": {
+                "kind": "FormRecognizer"
+              }
+            },
+            "constraints": {
+              "required": "[steps('aiServicesStep').useDocIntelligence]"
+            }
+          },
+          {
+            "name": "docIntelligenceResourceFound",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(steps('aiServicesStep').useDocIntelligence, not(equals(steps('aiServicesStep').docIntelligenceSelector.name, '')))]",
+            "options": {
+              "icon": "Info",
+              "text": "[concat('✅ Document Intelligence resource selected\n📍 Name: ', steps('aiServicesStep').docIntelligenceSelector.name, '\n📍 Location: ', steps('aiServicesStep').docIntelligenceSelector.location, '\n🔗 Endpoint: ', steps('aiServicesStep').docIntelligenceSelector.properties.endpoint)]",
+              "style": "Success"
             }
           },
           {
             "name": "docIntelligenceEndpoint",
             "type": "Microsoft.Common.TextBox",
-            "label": "Document Intelligence endpoint",
-            "placeholder": "https://your-resource.cognitiveservices.azure.com/",
-            "toolTip": "Endpoint URL for Azure Document Intelligence (optional). Format: https://name.cognitiveservices.azure.com/",
+            "label": "Document Intelligence endpoint (auto-detected)",
+            "defaultValue": "[if(steps('aiServicesStep').useDocIntelligence, coalesce(steps('aiServicesStep').docIntelligenceSelector.properties.endpoint, ''), '')]",
+            "toolTip": "Endpoint URL automatically populated from the selected resource.",
+            "visible": false,
             "constraints": {
-              "regex": "^(https://[a-z0-9-]+\\.cognitiveservices\\.azure\\.com/?)?$",
-              "validationMessage": "Must be a valid Document Intelligence endpoint (https://name.cognitiveservices.azure.com/) or empty"
+              "required": false
             }
           },
           {
-            "name": "docIntelligenceResourceName",
-            "type": "Microsoft.Common.TextBox",
-            "label": "Document Intelligence resource name (extracted)",
-            "defaultValue": "[if(not(equals(steps('aiServicesStep').docIntelligenceEndpoint, '')), first(split(split(steps('aiServicesStep').docIntelligenceEndpoint, '//')[1], '.')), '')]",
-            "toolTip": "Resource name extracted from endpoint URL",
-            "visible": false
-          },
-          {
-            "name": "docIntelligenceExistsApi",
-            "type": "Microsoft.Solutions.ArmApiControl",
-            "request": {
-              "method": "GET",
-              "path": "[if(not(equals(steps('aiServicesStep').docIntelligenceResourceName, '')), concat(subscription().id, '/providers/Microsoft.CognitiveServices/accounts/', steps('aiServicesStep').docIntelligenceResourceName, '?api-version=2023-05-01'), concat(subscription().id, '/providers/Microsoft.CognitiveServices/accounts?api-version=2023-05-01'))]"
-            }
-          },
-          {
-            "name": "docIntelligenceFound",
+            "name": "docIntelligenceKeyInfo",
             "type": "Microsoft.Common.InfoBox",
-            "visible": "[and(not(equals(steps('aiServicesStep').docIntelligenceEndpoint, '')), or(contains(string(steps('aiServicesStep').docIntelligenceExistsApi.kind), 'FormRecognizer'), contains(string(steps('aiServicesStep').docIntelligenceExistsApi.kind), 'CognitiveServices')))]",
+            "visible": "[steps('aiServicesStep').useDocIntelligence]",
             "options": {
               "icon": "Info",
-              "text": "[concat('✅ Document Intelligence resource verified\n📍 Resource Name: ', steps('aiServicesStep').docIntelligenceResourceName, '\n🔗 Endpoint: ', steps('aiServicesStep').docIntelligenceEndpoint, '\n📊 Kind: ', steps('aiServicesStep').docIntelligenceExistsApi.kind)]",
-              "style": "Success"
-            }
-          },
-          {
-            "name": "docIntelligenceNotFound",
-            "type": "Microsoft.Common.InfoBox",
-            "visible": "[and(not(equals(steps('aiServicesStep').docIntelligenceEndpoint, '')), not(or(contains(string(steps('aiServicesStep').docIntelligenceExistsApi.kind), 'FormRecognizer'), contains(string(steps('aiServicesStep').docIntelligenceExistsApi.kind), 'CognitiveServices'))))]",
-            "options": {
-              "icon": "Error",
-              "text": "[concat('❌ Document Intelligence resource NOT FOUND\n\nEndpoint provided: ', steps('aiServicesStep').docIntelligenceEndpoint, '\nExtracted name: ', steps('aiServicesStep').docIntelligenceResourceName, '\n\n⚠️ Please verify:\n• Endpoint URL is correct\n• Resource exists in your subscription\n• You have Reader permissions\n• Resource kind is FormRecognizer or CognitiveServices')]",
-              "style": "Error"
+              "text": "💡 IMPORTANT: Store your Document Intelligence API key in Key Vault and provide the secret URI below.\n\nHow to get the key:\n1. Azure Portal → Document Intelligence resource\n2. Keys and Endpoint\n3. Copy Key 1 or Key 2\n4. Store in Key Vault as a secret\n5. Paste the secret URI here"
             }
           },
           {
             "name": "docIntelligenceKeySecretUri",
             "type": "Microsoft.Common.TextBox",
             "label": "Document Intelligence key secret URI",
-            "toolTip": "Key Vault secret URI containing the Azure Document Intelligence key (optional)."
+            "visible": "[steps('aiServicesStep').useDocIntelligence]",
+            "toolTip": "Key Vault secret URI containing the Azure Document Intelligence API key.",
+            "constraints": {
+              "required": "[steps('aiServicesStep').useDocIntelligence]",
+              "regex": "^https://[a-zA-Z0-9-]+\\.vault\\.azure\\.net/secrets/[a-zA-Z0-9-]+(/[a-zA-Z0-9]+)?$",
+              "validationMessage": "Must be a valid Azure Key Vault secret URI (format: https://{vault}.vault.azure.net/secrets/{secret-name})"
+            }
           }
         ]
       },
@@ -996,15 +1027,15 @@
       "storageAccountResourceGroup": "[steps('storageServicesStep').storageAccountResourceGroup]",
       "dataShareName": "[steps('storageServicesStep').dataShareName]",
       "createStorageRoleAssignment": "[if(equals(steps('infrastructureStep').deploymentType, 'new'), steps('storageServicesStep').createStorageRoleAssignment, false())]",
-      "openAIAzureName": "[steps('aiServicesStep').openAIAzureName]",
-      "azureOpenAIEndpoint": "[steps('aiServicesStep').azureOpenAIEndpointComputed]",
+      "openAIAzureName": "[steps('aiServicesStep').openAIResourceSelector.name]",
+      "azureOpenAIEndpoint": "[steps('aiServicesStep').openAIResourceSelector.properties.endpoint]",
       "azureOpenAIDeployment": "[steps('aiServicesStep').azureOpenAIDeployment]",
       "azureOpenAIAPIVersion": "[steps('aiServicesStep').azureOpenAIAPIVersion]",
       "azureEmbeddingDeployment": "[steps('aiServicesStep').azureEmbeddingDeployment]",
       "defaultEmbeddingModel": "[steps('aiServicesStep').defaultEmbeddingModel]",
       "azureOpenAIKey": "[steps('aiServicesStep').azureOpenAIKey]",
       "azureOpenAIKeySecretUri": "[steps('aiServicesStep').azureOpenAIKeySecretUri]",
-      "docIntelligenceEndpoint": "[steps('aiServicesStep').docIntelligenceEndpoint]",
+      "docIntelligenceEndpoint": "[if(steps('aiServicesStep').useDocIntelligence, steps('aiServicesStep').docIntelligenceSelector.properties.endpoint, '')]",
       "docIntelligenceKeySecretUri": "[steps('aiServicesStep').docIntelligenceKeySecretUri]",
       "appPrefix": "[steps('deploymentStep').appPrefix]",
       "appServicePlanSkuName": "[steps('deploymentStep').appServicePlanSkuName]",
