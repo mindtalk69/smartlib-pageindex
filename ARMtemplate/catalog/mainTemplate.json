@@ -141,14 +141,7 @@
       "type": "securestring",
       "defaultValue": "",
       "metadata": {
-        "description": "Access key for the storage account used to mount shared storage (used when no Key Vault secret URI provided)."
-      }
-    },
-    "storageAccountKeySecretUri": {
-      "type": "string",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Optional Key Vault secret URI containing the storage account key."
+        "description": "DEPRECATED: Storage key is now auto-fetched from the storage account using listKeys(). This parameter is kept for backward compatibility only."
       }
     },
     "dataShareName": {
@@ -311,7 +304,8 @@
         "tier": "PremiumV2"
       }
     },
-    "selectedSku": "[variables('skuMap')[parameters('appServicePlanSkuName')]]"
+    "selectedSku": "[variables('skuMap')[parameters('appServicePlanSkuName')]]",
+    "storageAccountKeyValue": "[if(equals(parameters('storageAccountKey'), ''), listKeys(resourceId(parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2023-01-01').keys[0].value, parameters('storageAccountKey'))]"
   },
   "resources": [
     {
@@ -348,7 +342,7 @@
               "type": "AzureFiles",
               "accountName": "[parameters('storageAccountName')]",
               "shareName": "[parameters('dataShareName')]",
-              "accessKey": "[if(equals(parameters('storageAccountKeySecretUri'), ''), parameters('storageAccountKey'), concat('@Microsoft.KeyVault(SecretUri=', parameters('storageAccountKeySecretUri'), ')'))]",
+              "accessKey": "[variables('storageAccountKeyValue')]",
               "mountPath": "/home/data"
             }
           },
@@ -500,7 +494,7 @@
               "type": "AzureFiles",
               "accountName": "[parameters('storageAccountName')]",
               "shareName": "[parameters('dataShareName')]",
-              "accessKey": "[if(equals(parameters('storageAccountKeySecretUri'), ''), parameters('storageAccountKey'), concat('@Microsoft.KeyVault(SecretUri=', parameters('storageAccountKeySecretUri'), ')'))]",
+              "accessKey": "[variables('storageAccountKeyValue')]",
               "mountPath": "/home/data"
             }
           },

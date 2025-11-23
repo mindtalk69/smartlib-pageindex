@@ -169,74 +169,36 @@
             }
           },
           {
-            "name": "twoStepDeploymentWarning",
+            "name": "singleDeploymentInfo",
             "type": "Microsoft.Common.InfoBox",
-            "options": {
-              "icon": "Warning",
-              "text": "⚠️ CRITICAL: SmartLib requires a TWO-STEP DEPLOYMENT process:\n\n📝 STEP 1 (First Deployment): Select 'New Installation' below to create resources and grant Key Vault access\n\n📝 STEP 2 (Second Deployment): After Step 1 completes, immediately redeploy and select 'Update Existing Installation' to finalize configuration\n\nWhy? Azure role assignments cannot be created twice. The second deployment updates settings without recreating role assignments."
-            }
-          },
-          {
-            "name": "deploymentType",
-            "type": "Microsoft.Common.DropDown",
-            "label": "Deployment Type",
-            "defaultValue": "New Installation (Step 1)",
-            "toolTip": "Select your deployment step. First deployment: choose 'New Installation'. Second deployment: choose 'Update Existing Installation'.",
-            "constraints": {
-              "allowedValues": [
-                {
-                  "label": "New Installation (Step 1)",
-                  "value": "new"
-                },
-                {
-                  "label": "Update Existing Installation (Step 2)",
-                  "value": "update"
-                }
-              ]
-            }
-          },
-          {
-            "name": "deploymentTypeHelp",
-            "type": "Microsoft.Common.InfoBox",
-            "visible": "[equals(steps('infrastructureStep').deploymentType, 'new')]",
             "options": {
               "icon": "Info",
-              "text": "✅ STEP 1 SELECTED: This is your first deployment. After this completes successfully, you MUST redeploy immediately and select 'Update Existing Installation (Step 2)' to complete the setup."
-            }
-          },
-          {
-            "name": "secondDeploymentReminder",
-            "type": "Microsoft.Common.InfoBox",
-            "visible": "[equals(steps('infrastructureStep').deploymentType, 'update')]",
-            "options": {
-              "icon": "Info",
-              "text": "✅ STEP 2 SELECTED: This is your second deployment to finalize configuration. Role assignment creation is automatically disabled to prevent conflicts."
-            }
-          },
-          {
-            "name": "kvRoleAssignmentInfo",
-            "type": "Microsoft.Common.InfoBox",
-            "visible": "[equals(steps('infrastructureStep').deploymentType, 'new')]",
-            "options": {
-              "icon": "Info",
-              "text": "Ensure the deploying identity has Microsoft.Authorization/roleAssignments/write permission on the Key Vault resource group. If not, you can grant access manually after deployment."
+              "text": "✅ SINGLE-STEP DEPLOYMENT: SmartLib now deploys in one step with automatic configuration.\n\n🔐 Storage mount uses direct storage key (auto-fetched)\n🔑 App secrets use Key Vault references (with auto-retry)\n\nNo manual intervention required after deployment!"
             }
           },
           {
             "name": "createRoleAssignment",
             "type": "Microsoft.Common.CheckBox",
-            "label": "Grant Key Vault access to web app",
-            "defaultValue": "[equals(steps('infrastructureStep').deploymentType, 'new')]",
-            "visible": "[equals(steps('infrastructureStep').deploymentType, 'new')]",
-            "toolTip": "Creates managed identity role assignments on the Key Vault. Only shown for Step 1 (New Installation)."
+            "label": "Grant Key Vault access to apps (for app settings secrets)",
+            "defaultValue": true,
+            "toolTip": "Creates managed identity role assignments on Key Vault for accessing secrets in app settings (OpenAI keys, Redis, etc.). Recommended for production."
+          },
+          {
+            "name": "roleAssignmentInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[steps('infrastructureStep').createRoleAssignment]",
+            "options": {
+              "icon": "Info",
+              "text": "✅ Role assignments will be created for:\n• Azure OpenAI key (from Key Vault)\n• Redis connection string (from Key Vault)\n• Other app settings secrets\n\n⚠️ Storage mount uses direct key (not affected by role assignments)"
+            }
           },
           {
             "name": "kvCrossRgWarning",
             "type": "Microsoft.Common.InfoBox",
-            "visible": "[and(not(equals(last(split(steps('infrastructureStep').keyVaultSelector.id, '/resourceGroups/')), resourceGroup().name)), equals(steps('infrastructureStep').deploymentType, 'new'), steps('infrastructureStep').createRoleAssignment)]",
+            "visible": "[and(not(equals(first(split(last(split(steps('infrastructureStep').keyVaultSelector.id, '/resourceGroups/')), '/providers/')), resourceGroup().name)), steps('infrastructureStep').createRoleAssignment)]",
             "options": {
               "icon": "Warning",
-              "text": "Key Vault resource group differs from the deployment resource group. Confirm you have RBAC rights there before proceeding."
+              "text": "⚠️ CROSS-RESOURCE-GROUP DEPLOYMENT DETECTED\n\nKey Vault is in a different resource group. Ensure you have 'Microsoft.Authorization/roleAssignments/write' permission on the Key Vault resource group.\n\nIf deployment fails with authorization error, you can:\n1. Deploy without role assignments (uncheck above)\n2. Manually add role assignments after deployment\n3. Request permissions from your Azure admin"
             }
           }
         ]
@@ -374,32 +336,11 @@
             }
           },
           {
-            "name": "storageAccountKey",
-            "type": "Microsoft.Common.PasswordBox",
-            "label": "Storage account key",
-            "toolTip": "Primary or secondary storage account key. Leave blank when using a Key Vault secret URI."
-          },
-          {
-            "name": "storageAccountKeySecretUri",
-            "type": "Microsoft.Common.TextBox",
-            "label": "Storage account key secret URI",
-            "toolTip": "Optional Key Vault secret URI that contains the storage account key."
-          },
-          {
-            "name": "createStorageRoleAssignment",
-            "type": "Microsoft.Common.CheckBox",
-            "label": "Grant Storage access to web/worker apps",
-            "defaultValue": "[equals(steps('infrastructureStep').deploymentType, 'new')]",
-            "visible": "[equals(steps('infrastructureStep').deploymentType, 'new')]",
-            "toolTip": "Creates managed identity role assignments on the Storage Account. Only shown for Step 1 (New Installation)."
-          },
-          {
-            "name": "storageRoleInfo",
+            "name": "storageKeyAutoFetchInfo",
             "type": "Microsoft.Common.InfoBox",
-            "visible": "[steps('storageServicesStep').createStorageRoleAssignment]",
             "options": {
               "icon": "Info",
-              "text": "Identity-based Storage access provides enhanced security. Access keys will still work as fallback."
+              "text": "✅ AUTOMATIC CONFIGURATION: Storage account key is automatically retrieved during deployment using Azure Resource Manager.\n\n🔐 Security: The key is securely fetched and used only for mounting the Azure Files share. It is not stored in plain text.\n\n📌 No manual copy/paste required!"
             }
           }
         ]
@@ -880,17 +821,16 @@
       "APP_CLIENT_SECRET": "[steps('identityStep').APP_CLIENT_SECRET]",
       "existingKeyVaultName": "[steps('infrastructureStep').keyVaultSelector.name]",
       "existingKeyVaultResourceGroup": "[first(split(last(split(steps('infrastructureStep').keyVaultSelector.id, '/resourceGroups/')), '/providers/'))]",
-      "createRoleAssignment": "[if(equals(steps('infrastructureStep').deploymentType, 'new'), steps('infrastructureStep').createRoleAssignment, false())]",
+      "createRoleAssignment": "[steps('infrastructureStep').createRoleAssignment]",
       "redisConnectionString": "[steps('redisConnectivityStep').redisConnectionString]",
       "redisConnectionStringSecretUri": "[steps('redisConnectivityStep').redisConnectionStringSecretUri]",
       "CELERY_BROKER_URL": "[steps('redisConnectivityStep').redisConnectionString]",
       "CELERY_RESULT_BACKEND": "[steps('redisConnectivityStep').redisConnectionStringSecretUri]",
       "storageAccountName": "[steps('storageServicesStep').storageAccountSelector.name]",
-      "storageAccountKey": "[steps('storageServicesStep').storageAccountKey]",
-      "storageAccountKeySecretUri": "[steps('storageServicesStep').storageAccountKeySecretUri]",
+      "storageAccountKey": "",
       "storageAccountResourceGroup": "[first(split(last(split(steps('storageServicesStep').storageAccountSelector.id, '/resourceGroups/')), '/providers/'))]",
       "dataShareName": "[steps('storageServicesStep').dataShareName]",
-      "createStorageRoleAssignment": "[if(equals(steps('infrastructureStep').deploymentType, 'new'), steps('storageServicesStep').createStorageRoleAssignment, false())]",
+      "createStorageRoleAssignment": false,
       "openAIAzureName": "[steps('aiServicesStep').openAIResourceSelector.name]",
       "azureOpenAIEndpoint": "[coalesce(steps('aiServicesStep').openAIResourceSelector.properties.endpoint, '')]",
       "azureOpenAIDeployment": "[steps('aiServicesStep').azureOpenAIDeployment]",
