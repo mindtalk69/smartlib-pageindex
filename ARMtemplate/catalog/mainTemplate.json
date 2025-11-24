@@ -58,9 +58,9 @@
     },
     "createRoleAssignment": {
       "type": "bool",
-      "defaultValue": true,
+      "defaultValue": false,
       "metadata": {
-        "description": "If true, a role assignment will be created to grant the web app access to the Key Vault. Set to false on subsequent deployments to avoid errors."
+        "description": "Automatic role assignment creation. Default is false due to Azure limitations with cross-resource-group deployments. Create role assignments manually after deployment for production use."
       }
     },
     "createStorageRoleAssignment": {
@@ -304,7 +304,7 @@
       }
     },
     "selectedSku": "[variables('skuMap')[parameters('appServicePlanSkuName')]]",
-    "storageAccountKeyValue": "[if(equals(parameters('storageAccountKey'), ''), listKeys(resourceId(parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2023-01-01').keys[0].value, parameters('storageAccountKey'))]"
+    "storageAccountKeyValue": "[if(equals(parameters('storageAccountKey'), ''), listKeys(resourceId(subscription().subscriptionId, parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2023-01-01').keys[0].value, parameters('storageAccountKey'))]"
   },
   "resources": [
     {
@@ -644,11 +644,11 @@
       "condition": "[parameters('createRoleAssignment')]",
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
-      "name": "[guid(resourceId('Microsoft.Web/sites', variables('webAppName')), resourceId(subscription().subscriptionId, parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName')))]",
+      "name": "[guid(parameters('existingKeyVaultName'), resourceId('Microsoft.Web/sites', variables('webAppName')))]",
       "dependsOn": [
         "[resourceId('Microsoft.Web/sites', variables('webAppName'))]"
       ],
-      "scope": "[resourceId(subscription().subscriptionId, parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName'))]",
+      "scope": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('existingKeyVaultResourceGroup'), '/providers/Microsoft.KeyVault/vaults/', parameters('existingKeyVaultName'))]",
       "properties": {
         "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '4633458b-17de-408a-b874-0445c86b69e6')]",
         "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2022-03-01', 'Full').identity.principalId]",
@@ -659,11 +659,11 @@
       "condition": "[parameters('createRoleAssignment')]",
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
-      "name": "[guid(resourceId('Microsoft.Web/sites', variables('workerAppName')), resourceId(subscription().subscriptionId, parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName')))]",
+      "name": "[guid(parameters('existingKeyVaultName'), resourceId('Microsoft.Web/sites', variables('workerAppName')))]",
       "dependsOn": [
         "[resourceId('Microsoft.Web/sites', variables('workerAppName'))]"
       ],
-      "scope": "[resourceId(subscription().subscriptionId, parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName'))]",
+      "scope": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('existingKeyVaultResourceGroup'), '/providers/Microsoft.KeyVault/vaults/', parameters('existingKeyVaultName'))]",
       "properties": {
         "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '4633458b-17de-408a-b874-0445c86b69e6')]",
         "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2022-03-01', 'Full').identity.principalId]",
@@ -674,11 +674,11 @@
       "condition": "[parameters('createStorageRoleAssignment')]",
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
-      "name": "[guid(resourceId('Microsoft.Web/sites', variables('webAppName')), resourceId(subscription().subscriptionId, parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName')), 'web-storage')]",
+      "name": "[guid(parameters('storageAccountName'), resourceId('Microsoft.Web/sites', variables('webAppName')), 'web-storage')]",
       "dependsOn": [
         "[resourceId('Microsoft.Web/sites', variables('webAppName'))]"
       ],
-      "scope": "[resourceId(subscription().subscriptionId, parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
+      "scope": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('storageAccountResourceGroup'), '/providers/Microsoft.Storage/storageAccounts/', parameters('storageAccountName'))]",
       "properties": {
         "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '0c867c2a-1d8c-454a-a3db-ab2ea1bdc8bb')]",
         "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2022-03-01', 'Full').identity.principalId]",
@@ -689,11 +689,11 @@
       "condition": "[parameters('createStorageRoleAssignment')]",
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
-      "name": "[guid(resourceId('Microsoft.Web/sites', variables('workerAppName')), resourceId(subscription().subscriptionId, parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName')), 'worker-storage')]",
+      "name": "[guid(parameters('storageAccountName'), resourceId('Microsoft.Web/sites', variables('workerAppName')), 'worker-storage')]",
       "dependsOn": [
         "[resourceId('Microsoft.Web/sites', variables('workerAppName'))]"
       ],
-      "scope": "[resourceId(subscription().subscriptionId, parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
+      "scope": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('storageAccountResourceGroup'), '/providers/Microsoft.Storage/storageAccounts/', parameters('storageAccountName'))]",
       "properties": {
         "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '0c867c2a-1d8c-454a-a3db-ab2ea1bdc8bb')]",
         "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2022-03-01', 'Full').identity.principalId]",
@@ -732,6 +732,24 @@
         "monthlyCost": "~$30",
         "savings": "~$13 (30%)",
         "description": "Shared App Service Plan reduces costs compared to separate plans"
+      }
+    },
+    "webAppPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2022-03-01', 'Full').identity.principalId]"
+    },
+    "workerAppPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2022-03-01', 'Full').identity.principalId]"
+    },
+    "postDeploymentInstructions": {
+      "type": "object",
+      "value": {
+        "step1": "Grant Key Vault access to apps (required for Key Vault references in app settings)",
+        "webAppCommand": "[concat('az role assignment create --assignee ', reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2022-03-01', 'Full').identity.principalId, ' --role \"Key Vault Secrets User\" --scope /subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('existingKeyVaultResourceGroup'), '/providers/Microsoft.KeyVault/vaults/', parameters('existingKeyVaultName'))]",
+        "workerAppCommand": "[concat('az role assignment create --assignee ', reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2022-03-01', 'Full').identity.principalId, ' --role \"Key Vault Secrets User\" --scope /subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('existingKeyVaultResourceGroup'), '/providers/Microsoft.KeyVault/vaults/', parameters('existingKeyVaultName'))]",
+        "step2": "Wait 5-10 minutes for Azure RBAC propagation",
+        "step3": "[concat('Restart apps: az webapp restart --name ', variables('webAppName'), ' --resource-group ', resourceGroup().name, ' && az webapp restart --name ', variables('workerAppName'), ' --resource-group ', resourceGroup().name)]"
       }
     }
   }

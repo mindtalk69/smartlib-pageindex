@@ -1,0 +1,29 @@
+ {
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "existingKeyVaultName": { "value": "kv-malkysma756652505612" },
+      "existingKeyVaultResourceGroup": { "value": "smarteams" },
+      "storageAccountName": { "value": "smarteamsb88f" },
+      "storageAccountResourceGroup": { "value": "smarteams" },
+      "storageAccountKey": { "value": "DRVW7JzPcZb1fZN/sc/WWCDqh0i7HKebR9wGs08o3w5QRnxETgjTg6+JcQQvylVie76Kl6A5zWPD+AStayvR1Q==" },
+      "dataShareName": { "value": "smartlib-data" },
+      "appPrefix": { "value": "smartlib-concat-test" },
+      "openAIAzureName": { "value": "atgopenai2" },
+      "azureOpenAIEndpoint": { "value": "https://atgopenai2.services.ai.azure.com/" },
+      "azureOpenAIDeployment": { "value": "gpt-4.1-mini" },
+      "azureOpenAIKey": { "value": "0e5e8b056e6f4af897ef313306965f9e" },
+      "azureEmbeddingDeployment": { "value": "text-embedding-3-small" },
+      "APP_CLIENT_ID": { "value": "03b2d25d-887e-4644-89d4-d8ab50bef0f9" },
+      "APP_CLIENT_SECRET": { "value": "tyP8Q~poXP8X8Dj59IAcw_H01WIYHE1sNlGmqdeo" },
+      "tenantId": { "value": "69a01d04-ea91-4c91-b46e-8369667541c0" },
+      "redisConnectionString": { "value": "smarteams.redis.cache.windows.net:6380,password=u9k1OxflzaFg36KWST6BxcAzgqVYUeMdxAzCaDYbrXM=,ssl=True,abortConnect=False?ssl_cert_reqs=none"
+  },
+      "appAdminUsername": { "value": "admin" },
+      "appAdminPassword": { "value": "P@ssword0!" },
+      "appAdminEmail": { "value": "admin@example.com" },
+      "autoPromoteAdmin": { "value": true },
+      "createRoleAssignment": { "value": true },
+      "createStorageRoleAssignment": { "value": false }
+    }
+  }

@@ -179,17 +179,17 @@
           {
             "name": "createRoleAssignment",
             "type": "Microsoft.Common.CheckBox",
-            "label": "Grant Key Vault access to apps (for app settings secrets)",
-            "defaultValue": true,
-            "toolTip": "Creates managed identity role assignments on Key Vault for accessing secrets in app settings (OpenAI keys, Redis, etc.). Recommended for production."
+            "label": "Attempt automatic Key Vault role assignments (may fail for cross-RG deployments)",
+            "defaultValue": false,
+            "toolTip": "Automatic role assignment creation may fail if Key Vault is in a different resource group. If disabled or fails, create role assignments manually after deployment."
           },
           {
             "name": "roleAssignmentInfo",
             "type": "Microsoft.Common.InfoBox",
-            "visible": "[steps('infrastructureStep').createRoleAssignment]",
+            "visible": "[not(steps('infrastructureStep').createRoleAssignment)]",
             "options": {
-              "icon": "Info",
-              "text": "✅ Role assignments will be created for:\n• Azure OpenAI key (from Key Vault)\n• Redis connection string (from Key Vault)\n• Other app settings secrets\n\n⚠️ Storage mount uses direct key (not affected by role assignments)"
+              "icon": "Warning",
+              "text": "⚠️ MANUAL ROLE ASSIGNMENT REQUIRED\n\nAfter deployment completes, grant Key Vault access to the app identities:\n\n1. Get app principal IDs from deployment outputs\n2. Run: az role assignment create --assignee <principal-id> --role 'Key Vault Secrets User' --scope <vault-id>\n\nDetailed instructions provided in deployment outputs."
             }
           },
           {
