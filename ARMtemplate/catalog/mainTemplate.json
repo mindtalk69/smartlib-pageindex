@@ -139,9 +139,8 @@
     },
     "storageAccountKey": {
       "type": "securestring",
-      "defaultValue": "",
       "metadata": {
-        "description": "DEPRECATED: Storage key is now auto-fetched from the storage account using listKeys(). This parameter is kept for backward compatibility only."
+        "description": "Storage account access key for mounting Azure Files share. Required for marketplace deployments where auto-fetch may fail due to permissions."
       }
     },
     "dataShareName": {
@@ -645,11 +644,11 @@
       "condition": "[parameters('createRoleAssignment')]",
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
-      "name": "[guid(resourceId('Microsoft.Web/sites', variables('webAppName')), resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName')))]",
+      "name": "[guid(resourceId('Microsoft.Web/sites', variables('webAppName')), resourceId(subscription().subscriptionId, parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName')))]",
       "dependsOn": [
         "[resourceId('Microsoft.Web/sites', variables('webAppName'))]"
       ],
-      "scope": "[resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName'))]",
+      "scope": "[resourceId(subscription().subscriptionId, parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName'))]",
       "properties": {
         "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '4633458b-17de-408a-b874-0445c86b69e6')]",
         "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2022-03-01', 'Full').identity.principalId]",
@@ -660,11 +659,11 @@
       "condition": "[parameters('createRoleAssignment')]",
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
-      "name": "[guid(resourceId('Microsoft.Web/sites', variables('workerAppName')), resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName')))]",
+      "name": "[guid(resourceId('Microsoft.Web/sites', variables('workerAppName')), resourceId(subscription().subscriptionId, parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName')))]",
       "dependsOn": [
         "[resourceId('Microsoft.Web/sites', variables('workerAppName'))]"
       ],
-      "scope": "[resourceId(parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName'))]",
+      "scope": "[resourceId(subscription().subscriptionId, parameters('existingKeyVaultResourceGroup'), 'Microsoft.KeyVault/vaults', parameters('existingKeyVaultName'))]",
       "properties": {
         "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '4633458b-17de-408a-b874-0445c86b69e6')]",
         "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2022-03-01', 'Full').identity.principalId]",

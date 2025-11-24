@@ -336,11 +336,44 @@
             }
           },
           {
-            "name": "storageKeyAutoFetchInfo",
+            "name": "storageAccountKey",
+            "type": "Microsoft.Common.PasswordBox",
+            "label": {
+              "password": "Storage account access key",
+              "confirmPassword": "Confirm storage key"
+            },
+            "toolTip": "Access key for the storage account. Required for mounting Azure Files share. Copy from: Azure Portal → Storage Account → Access keys → key1 → Copy",
+            "constraints": {
+              "required": true,
+              "regex": "^.{44,}$",
+              "validationMessage": "Storage account key must be at least 44 characters (Base64 encoded)"
+            },
+            "options": {
+              "hideConfirmation": false
+            }
+          },
+          {
+            "name": "storageKeyHelp",
             "type": "Microsoft.Common.InfoBox",
             "options": {
               "icon": "Info",
-              "text": "✅ AUTOMATIC CONFIGURATION: Storage account key is automatically retrieved during deployment using Azure Resource Manager.\n\n🔐 Security: The key is securely fetched and used only for mounting the Azure Files share. It is not stored in plain text.\n\n📌 No manual copy/paste required!"
+              "text": "📋 How to get your storage account access key:\n\n1. Azure Portal → Storage accounts → Your Storage Account\n2. Click 'Access keys' in the left sidebar\n3. Under 'key1', click 'Show' button\n4. Click the copy icon next to the key value\n5. Paste the key in the field above\n\n🔐 The key is used to mount the Azure Files share and is stored securely."
+            }
+          },
+          {
+            "name": "createStorageRoleAssignment",
+            "type": "Microsoft.Common.CheckBox",
+            "label": "Grant identity-based storage access (optional)",
+            "defaultValue": false,
+            "toolTip": "Creates managed identity role assignments for Storage Blob Data Contributor. Enable if you plan to use blob storage features."
+          },
+          {
+            "name": "storageRoleInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[steps('storageServicesStep').createStorageRoleAssignment]",
+            "options": {
+              "icon": "Info",
+              "text": "ℹ️ Identity-based access is for additional storage features (blobs, queues). The storage key is still required for mounting Azure Files share."
             }
           }
         ]
@@ -824,13 +857,13 @@
       "createRoleAssignment": "[steps('infrastructureStep').createRoleAssignment]",
       "redisConnectionString": "[steps('redisConnectivityStep').redisConnectionString]",
       "redisConnectionStringSecretUri": "[steps('redisConnectivityStep').redisConnectionStringSecretUri]",
-      "CELERY_BROKER_URL": "[steps('redisConnectivityStep').redisConnectionString]",
-      "CELERY_RESULT_BACKEND": "[steps('redisConnectivityStep').redisConnectionStringSecretUri]",
+      "CELERY_BROKER_URL": "[if(not(equals(steps('redisConnectivityStep').redisConnectionStringSecretUri, '')), steps('redisConnectivityStep').redisConnectionStringSecretUri, steps('redisConnectivityStep').redisConnectionString)]",
+      "CELERY_RESULT_BACKEND": "[if(not(equals(steps('redisConnectivityStep').redisConnectionStringSecretUri, '')), steps('redisConnectivityStep').redisConnectionStringSecretUri, steps('redisConnectivityStep').redisConnectionString)]",
       "storageAccountName": "[steps('storageServicesStep').storageAccountSelector.name]",
-      "storageAccountKey": "",
+      "storageAccountKey": "[steps('storageServicesStep').storageAccountKey]",
       "storageAccountResourceGroup": "[first(split(last(split(steps('storageServicesStep').storageAccountSelector.id, '/resourceGroups/')), '/providers/'))]",
       "dataShareName": "[steps('storageServicesStep').dataShareName]",
-      "createStorageRoleAssignment": false,
+      "createStorageRoleAssignment": "[steps('storageServicesStep').createStorageRoleAssignment]",
       "openAIAzureName": "[steps('aiServicesStep').openAIResourceSelector.name]",
       "azureOpenAIEndpoint": "[coalesce(steps('aiServicesStep').openAIResourceSelector.properties.endpoint, '')]",
       "azureOpenAIDeployment": "[steps('aiServicesStep').azureOpenAIDeployment]",

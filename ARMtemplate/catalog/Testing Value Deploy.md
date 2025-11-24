@@ -33,6 +33,8 @@ Storage account name : smarteamsb88f
 
 Azure Files share name : smartlib-data
 
+Storage account access key : DRVW7JzPcZb1fZN/sc/WWCDqh0i7HKebR9wGs08o3w5QRnxETgjTg6+JcQQvylVie76Kl6A5zWPD+AStayvR1Q==
+
 Storage account key secret URI https://kv-malkysma756652505612.vault.azure.net/secrets/STORAGE-ACCOUNT-KEY/
 
 
@@ -48,8 +50,6 @@ Default embedding model identifier
 
 text-embedding-3-small
 
-Password
--
 Azure OpenAI key secret URI  : https://kv-malkysma756652505612.vault.azure.net/secrets/OPENAI-API-KEY/
 
 Document Intelligence endpoint : https://atg-smarteam.cognitiveservices.azure.com/
