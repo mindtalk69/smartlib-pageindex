@@ -27,6 +27,23 @@ if (typeof window !== 'undefined') {
     window.TYPEWRITER_STATES = TYPEWRITER_STATES;
 }
 
+// Performance optimization: Always use instant render mode when streaming
+// Typewriter effect is deprecated for better performance
+const INSTANT_MODE = true;
+
+// Throttle helper to reduce DOM update frequency
+function throttle(func, wait) {
+    let timeout;
+    return function(...args) {
+        if (!timeout) {
+            timeout = setTimeout(() => {
+                func.apply(this, args);
+                timeout = null;
+            }, wait);
+        }
+    };
+}
+
 function getConversationId() {
     let convId = localStorage.getItem('chatConversationId');
     // console.log('[QueryFormJS] getConversationId: Tried loading from localStorage, found:', convId);
@@ -1232,6 +1249,10 @@ function initializeTypewriterState(messageId) {
         return;
     }
     if (!TYPEWRITER_STATES.has(messageId)) {
+        // Cache bubble element to avoid repeated DOM queries
+        const bubbleElement = document.getElementById(messageId)
+            || document.querySelector(`[data-message-id="${messageId}"]`);
+
         TYPEWRITER_STATES.set(messageId, {
             displayedText: '',
             targetText: '',
@@ -1241,10 +1262,14 @@ function initializeTypewriterState(messageId) {
             streamComplete: false,
             finalContent: null,
             chunkCount: 0,
-            chunkTotal: null
+            chunkTotal: null,
+            bubbleElement: bubbleElement  // Cache DOM reference
         });
     }
 }
+
+// Throttled version for better performance (updates max every 100ms)
+const updateChunkProgressUIThrottled = throttle(updateChunkProgressUI, 100);
 
 function registerChunkProgress(messageId, chunkMeta = {}) {
     initializeTypewriterState(messageId);
@@ -1260,19 +1285,20 @@ function registerChunkProgress(messageId, chunkMeta = {}) {
     if (typeof chunkMeta.total_chunks === 'number') {
         state.chunkTotal = chunkMeta.total_chunks;
     }
-    updateChunkProgressUI(messageId);
-    triggerChunkPulse(messageId);
+    // Use throttled version to reduce DOM updates
+    updateChunkProgressUIThrottled(messageId);
+    // Only pulse every 5 chunks to reduce animation overhead
+    if (state.chunkCount % 5 === 0) {
+        triggerChunkPulse(messageId);
+    }
 }
 
 function triggerChunkPulse(messageId) {
+    const state = TYPEWRITER_STATES.get(messageId);
+    if (!state?.bubbleElement) return;
+
     window.requestAnimationFrame(() => {
-        let bubble = document.getElementById(messageId);
-        if (!bubble) {
-            bubble = document.querySelector(`[data-message-id="${messageId}"]`);
-        }
-        if (!bubble) {
-            return;
-        }
+        const bubble = state.bubbleElement;
         bubble.classList.remove('chunk-pulse');
         // Force reflow to restart animation
         void bubble.offsetWidth;
@@ -1283,14 +1309,13 @@ function triggerChunkPulse(messageId) {
 
 function updateChunkProgressUI(messageId, options = {}) {
     const state = TYPEWRITER_STATES.get(messageId);
+    if (!state?.bubbleElement) return;
+
     const chunkCount = options.chunkCount ?? state?.chunkCount ?? 0;
     const chunkTotal = options.chunkTotal ?? state?.chunkTotal ?? null;
 
     window.requestAnimationFrame(() => {
-        let bubble = document.getElementById(messageId);
-        if (!bubble) {
-            bubble = document.querySelector(`[data-message-id="${messageId}"]`);
-        }
+        const bubble = state.bubbleElement;
         if (!bubble) {
             return;
         }
@@ -1483,6 +1508,19 @@ function typewriterStep(messageId) {
     if (!state) {
         return;
     }
+
+    // INSTANT MODE: Render all queued text immediately (10x faster)
+    if (INSTANT_MODE && state.queue.length > 0) {
+        state.displayedText += state.queue;
+        state.queue = '';
+        renderTypewriterFrame(messageId, state.displayedText, false);
+        state.timer = null;
+        if (state.streamComplete) {
+            finalizeTypewriter(messageId);
+        }
+        return;
+    }
+
     if (state.streamComplete) {
         if (state.queue.length > 0) {
             state.displayedText += state.queue;
