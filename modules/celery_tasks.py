@@ -22,6 +22,7 @@ except ImportError as e:
 
 FILE_PROCESS_TASK = "modules.upload_processing.async_process_single_file"
 AGENT_TASK = "modules.agent.invoke_agent_graph"
+AGENT_STREAMING_TASK = "modules.agent.invoke_agent_graph_streaming"
 DOCUMENT_CHUNKS_TASK = "modules.vector_tasks.fetch_document_chunks"
 LIST_CHROMA_STORES_TASK = "modules.vector_tasks.list_chroma_stores"
 DELETE_CHROMA_COLLECTION_TASK = "modules.vector_tasks.delete_chroma_collection"
@@ -213,5 +214,53 @@ def delete_chroma_collection_via_worker(persist_directory: str, collection_name:
         },
     )
     return bool(result)
+
+
+def offload_streaming_agent_task(
+    stream_id: str,
+    query: str,
+    chat_history: Optional[List[BaseMessage]],
+    vector_store_config: Optional[Dict[str, Any]] = None,
+    image_base64: Optional[str] = None,
+    image_mime_type: Optional[str] = None,
+    uploaded_file_content: Optional[str] = None,
+    uploaded_file_type: Optional[str] = None,
+    uploaded_file_name: Optional[str] = None,
+    conversation_id: Optional[str] = None,
+    extra_kwargs: Optional[Dict[str, Any]] = None,
+) -> Optional[str]:
+    """
+    Fire-and-forget submission of a streaming agent task to Celery worker.
+    The task will publish results to Redis stream identified by stream_id.
+
+    Returns:
+        task_id if successfully submitted, None if Celery unavailable
+    """
+    if not CELERY_AVAILABLE or celery is None:
+        logger.warning("Celery not available - cannot offload streaming agent task")
+        return None
+
+    payload: Dict[str, Any] = {
+        "stream_id": stream_id,
+        "query": query,
+        "chat_history": _serialize_chat_history(chat_history),
+        "vector_store_config": vector_store_config or {},
+        "image_base64": image_base64,
+        "image_mime_type": image_mime_type,
+        "uploaded_file_content": uploaded_file_content,
+        "uploaded_file_type": uploaded_file_type,
+        "uploaded_file_name": uploaded_file_name,
+        "conversation_id": conversation_id,
+    }
+    if extra_kwargs:
+        payload.update(extra_kwargs)
+
+    try:
+        task = celery.send_task(AGENT_STREAMING_TASK, kwargs=payload)
+        logger.info(f"Offloaded streaming agent task {task.id} for stream_id={stream_id}")
+        return task.id
+    except Exception as exc:
+        logger.error(f"Failed to offload streaming agent task: {exc}", exc_info=True)
+        return None
 
 

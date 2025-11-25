@@ -1,4 +1,5 @@
 import logging
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -11,6 +12,7 @@ from extensions import db
 from modules.agent import invoke_agent_graph, resume_agent_graph
 from modules.database import MessageFeedback, MessageHistory
 from modules.map_utils import purge_map_assets
+from modules.stream_bus import RedisStreamBus, STREAM_CLOSE_SENTINEL
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +104,104 @@ def resume_agent_graph_task(
         conversation_id=conversation_id,
         **kwargs,
     )
+
+
+@celery.task(name="modules.agent.invoke_agent_graph_streaming")
+def invoke_agent_graph_streaming_task(
+    stream_id: str,
+    query: str,
+    chat_history: Optional[List[Dict[str, Any]]] = None,
+    vector_store_config: Optional[Dict[str, Any]] = None,
+    image_base64: Optional[str] = None,
+    image_mime_type: Optional[str] = None,
+    uploaded_file_content: Optional[str] = None,
+    uploaded_file_type: Optional[str] = None,
+    uploaded_file_name: Optional[str] = None,
+    conversation_id: Optional[str] = None,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    """
+    Celery task that invokes the agent graph in streaming mode and publishes
+    chunks to Redis via RedisStreamBus for the web worker to consume.
+    """
+    bus = None
+    try:
+        # Initialize Redis stream bus
+        bus = RedisStreamBus()
+        logger.info(f"[Streaming Task] Started for stream_id={stream_id}, query preview: '{query[:50]}...'")
+
+        # Deserialize chat history
+        chat_history_messages = _deserialize_chat_history(chat_history)
+
+        # Invoke agent in streaming mode
+        streaming_result = invoke_agent_graph(
+            query=query,
+            chat_history=chat_history_messages,
+            vector_store_config=vector_store_config or {},
+            stream=True,
+            image_base64=image_base64,
+            image_mime_type=image_mime_type,
+            uploaded_file_content=uploaded_file_content,
+            uploaded_file_type=uploaded_file_type,
+            uploaded_file_name=uploaded_file_name,
+            conversation_id=conversation_id,
+            **kwargs,
+        )
+
+        # Check if result is an async generator
+        import inspect
+        if inspect.isasyncgen(streaming_result):
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                async def consume_stream():
+                    chunk_count = 0
+                    async for chunk in streaming_result:
+                        if chunk:
+                            chunk_str = chunk if isinstance(chunk, str) else str(chunk)
+                            bus.publish(stream_id, chunk_str)
+                            chunk_count += 1
+                    return chunk_count
+
+                chunk_count = loop.run_until_complete(consume_stream())
+                logger.info(f"[Streaming Task] Published {chunk_count} chunks for stream_id={stream_id}")
+
+            finally:
+                asyncio.set_event_loop(None)
+                loop.close()
+
+        elif isinstance(streaming_result, dict):
+            # Non-streaming result, publish as single chunk
+            chunk_str = json.dumps(streaming_result)
+            bus.publish(stream_id, chunk_str)
+            logger.info(f"[Streaming Task] Published single result for stream_id={stream_id}")
+
+        else:
+            # Unknown result type
+            error_msg = f"Unexpected result type: {type(streaming_result)}"
+            logger.error(f"[Streaming Task] {error_msg}")
+            error_event = json.dumps({"type": "error", "message": error_msg})
+            bus.publish(stream_id, error_event)
+
+        # Close the stream
+        bus.close(stream_id)
+        return {"status": "completed", "stream_id": stream_id}
+
+    except Exception as exc:
+        logger.error(f"[Streaming Task] Error in stream_id={stream_id}: {exc}", exc_info=True)
+        if bus:
+            try:
+                error_event = json.dumps({
+                    "type": "error",
+                    "message": f"Streaming task failed: {str(exc)}",
+                    "status_code": 500
+                })
+                bus.publish(stream_id, error_event)
+                bus.close(stream_id)
+            except Exception as pub_exc:
+                logger.error(f"[Streaming Task] Failed to publish error: {pub_exc}")
+        return {"status": "error", "stream_id": stream_id, "error": str(exc)}
 
 
 @celery.task(name="modules.agent.cleanup_generated_maps")

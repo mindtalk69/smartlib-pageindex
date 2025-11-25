@@ -465,6 +465,10 @@
             {
               "name": "RUN_DEFAULT_MODELS",
               "value": "[if(parameters('runDefaultModels'), 'true', 'false')]"
+            },
+            {
+              "name": "GUNICORN_TIMEOUT",
+              "value": "300"
             }
           ]
         }
