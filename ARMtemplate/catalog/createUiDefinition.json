@@ -871,7 +871,7 @@
       "dataShareName": "[steps('storageServicesStep').dataShareName]",
       "createStorageRoleAssignment": "[steps('storageServicesStep').createStorageRoleAssignment]",
       "openAIAzureName": "[steps('aiServicesStep').openAIResourceSelector.name]",
-      "azureOpenAIEndpoint": "[if(equals(steps('aiServicesStep').azureOpenAIEndpointComputed, ''), concat('https://', steps('aiServicesStep').openAIResourceSelector.name, '.openai.azure.com/'), steps('aiServicesStep').azureOpenAIEndpointComputed)]",
+      "azureOpenAIEndpoint": "[concat('https://', steps('aiServicesStep').openAIResourceSelector.name, '.openai.azure.com/')]",
       "azureOpenAIDeployment": "[steps('aiServicesStep').azureOpenAIDeployment]",
       "azureOpenAIAPIVersion": "[steps('aiServicesStep').azureOpenAIAPIVersion]",
       "azureEmbeddingDeployment": "[steps('aiServicesStep').azureEmbeddingDeployment]",
