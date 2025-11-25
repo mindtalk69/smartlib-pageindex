@@ -181,15 +181,15 @@
             "type": "Microsoft.Common.CheckBox",
             "label": "Attempt automatic Key Vault role assignments (may fail for cross-RG deployments)",
             "defaultValue": false,
-            "toolTip": "Automatic role assignment creation may fail if Key Vault is in a different resource group. If disabled or fails, create role assignments manually after deployment."
+            "toolTip": "Automatic role assignment creation may fail if Key Vault is in a different resource group. If disabled or fails, create role assignments manually after deployment.",
+            "visible": false
           },
           {
             "name": "roleAssignmentInfo",
             "type": "Microsoft.Common.InfoBox",
-            "visible": "[not(steps('infrastructureStep').createRoleAssignment)]",
             "options": {
               "icon": "Warning",
-              "text": "⚠️ MANUAL ROLE ASSIGNMENT REQUIRED\n\nAfter deployment completes, grant Key Vault access to the app identities:\n\n1. Get app principal IDs from deployment outputs\n2. Run: az role assignment create --assignee <principal-id> --role 'Key Vault Secrets User' --scope <vault-id>\n\nDetailed instructions provided in deployment outputs."
+              "text": "⚠️ MANUAL ROLE ASSIGNMENT REQUIRED\n\nAfter deployment completes, grant Key Vault access to the app identities:\n\n1. Copy the az commands from deployment outputs\n2. Run both commands to create role assignments\n3. Wait 5-10 minutes for Azure RBAC propagation\n4. Restart both web and worker apps\n\nNote: Key Vault references will show red/error until role assignments complete and propagate."
             }
           },
           {
@@ -835,7 +835,13 @@
             "name": "appAdminEmail",
             "type": "Microsoft.Common.TextBox",
             "label": "Admin email",
-            "toolTip": "Contact email for the SmartLib admin account (optional)."
+            "placeholder": "admin@example.com",
+            "toolTip": "Contact email for the SmartLib admin account. Required for admin account creation.",
+            "constraints": {
+              "required": true,
+              "regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+              "validationMessage": "Enter a valid email address (e.g., admin@example.com)"
+            }
           },
           {
             "name": "appAdminEmailSecretUri",
@@ -865,7 +871,7 @@
       "dataShareName": "[steps('storageServicesStep').dataShareName]",
       "createStorageRoleAssignment": "[steps('storageServicesStep').createStorageRoleAssignment]",
       "openAIAzureName": "[steps('aiServicesStep').openAIResourceSelector.name]",
-      "azureOpenAIEndpoint": "[coalesce(steps('aiServicesStep').openAIResourceSelector.properties.endpoint, '')]",
+      "azureOpenAIEndpoint": "[if(equals(steps('aiServicesStep').azureOpenAIEndpointComputed, ''), concat('https://', steps('aiServicesStep').openAIResourceSelector.name, '.openai.azure.com/'), steps('aiServicesStep').azureOpenAIEndpointComputed)]",
       "azureOpenAIDeployment": "[steps('aiServicesStep').azureOpenAIDeployment]",
       "azureOpenAIAPIVersion": "[steps('aiServicesStep').azureOpenAIAPIVersion]",
       "azureEmbeddingDeployment": "[steps('aiServicesStep').azureEmbeddingDeployment]",
