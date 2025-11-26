@@ -303,12 +303,12 @@
       }
     },
     "selectedSku": "[variables('skuMap')[parameters('appServicePlanSkuName')]]",
-    "storageAccountKeyValue": "[if(equals(parameters('storageAccountKey'), ''), listKeys(resourceId(subscription().subscriptionId, parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2023-01-01').keys[0].value, parameters('storageAccountKey'))]"
+    "storageAccountKeyValue": "[if(equals(parameters('storageAccountKey'), ''), listKeys(resourceId(parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2023-04-01').keys[0].value, parameters('storageAccountKey'))]"
   },
   "resources": [
     {
       "type": "Microsoft.Web/serverfarms",
-      "apiVersion": "2022-03-01",
+      "apiVersion": "2023-01-01",
       "name": "[variables('sharedAppServicePlanName')]",
       "location": "[parameters('location')]",
       "sku": "[variables('selectedSku')]",
@@ -319,7 +319,7 @@
     },
     {
       "type": "Microsoft.Web/sites",
-      "apiVersion": "2022-03-01",
+      "apiVersion": "2023-01-01",
       "name": "[variables('webAppName')]",
       "location": "[parameters('location')]",
       "kind": "app,linux",
@@ -347,11 +347,11 @@
           "appSettings": [
             {
               "name": "CELERY_BROKER_URL",
-              "value": "[if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString'))]"
+              "value": "[if(not(equals(parameters('CELERY_BROKER_URL'), '')), parameters('CELERY_BROKER_URL'), if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString')))]"
             },
             {
               "name": "CELERY_RESULT_BACKEND",
-              "value": "[if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString'))]"
+              "value": "[if(not(equals(parameters('CELERY_RESULT_BACKEND'), '')), parameters('CELERY_RESULT_BACKEND'), if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString')))]"
             },
             {
               "name": "AZURE_OPENAI_API_KEY",
@@ -406,6 +406,10 @@
               "value": "[parameters('APP_CLIENT_SECRET')]"
             },
             {
+              "name": "APP_TENANT_ID",
+              "value": "[parameters('tenantId')]"
+            },
+            {
               "name": "APP_ADMIN_USERNAME",
               "value": "[parameters('appAdminUsername')]"
             },
@@ -435,11 +439,15 @@
             },
             {
               "name": "DEFAULT_EMBEDDING_MODEL",
-              "value": "[parameters('azureEmbeddingDeployment')]"
+              "value": "[parameters('defaultEmbeddingModel')]"
             },
             {
               "name": "AZURE_EMBEDDING_DEPLOYMENT",
               "value": "[parameters('azureEmbeddingDeployment')]"
+            },
+            {
+              "name": "AZURE_OPENAI_RESOURCE_NAME",
+              "value": "[parameters('openAIAzureName')]"
             },
             {
               "name": "DATA_VOLUME_PATH",
@@ -479,7 +487,7 @@
     },
     {
       "type": "Microsoft.Web/sites",
-      "apiVersion": "2022-03-01",
+      "apiVersion": "2023-01-01",
       "name": "[variables('workerAppName')]",
       "location": "[parameters('location')]",
       "kind": "app,linux",
@@ -507,11 +515,11 @@
           "appSettings": [
             {
               "name": "CELERY_BROKER_URL",
-              "value": "[if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString'))]"
+              "value": "[if(not(equals(parameters('CELERY_BROKER_URL'), '')), parameters('CELERY_BROKER_URL'), if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString')))]"
             },
             {
               "name": "CELERY_RESULT_BACKEND",
-              "value": "[if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString'))]"
+              "value": "[if(not(equals(parameters('CELERY_RESULT_BACKEND'), '')), parameters('CELERY_RESULT_BACKEND'), if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString')))]"
             },
             {
               "name": "AZURE_OPENAI_API_KEY",
@@ -558,6 +566,10 @@
               "value": "[parameters('APP_CLIENT_SECRET')]"
             },
             {
+              "name": "APP_TENANT_ID",
+              "value": "[parameters('tenantId')]"
+            },
+            {
               "name": "APP_ADMIN_USERNAME",
               "value": "[parameters('appAdminUsername')]"
             },
@@ -587,11 +599,15 @@
             },
             {
               "name": "DEFAULT_EMBEDDING_MODEL",
-              "value": "[parameters('azureEmbeddingDeployment')]"
+              "value": "[parameters('defaultEmbeddingModel')]"
             },
             {
               "name": "AZURE_EMBEDDING_DEPLOYMENT",
               "value": "[parameters('azureEmbeddingDeployment')]"
+            },
+            {
+              "name": "AZURE_OPENAI_RESOURCE_NAME",
+              "value": "[parameters('openAIAzureName')]"
             },
             {
               "name": "DATA_VOLUME_PATH",
@@ -658,7 +674,7 @@
       "scope": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('existingKeyVaultResourceGroup'), '/providers/Microsoft.KeyVault/vaults/', parameters('existingKeyVaultName'))]",
       "properties": {
         "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '4633458b-17de-408a-b874-0445c86b69e6')]",
-        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2022-03-01', 'Full').identity.principalId]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2023-01-01', 'Full').identity.principalId]",
         "principalType": "ServicePrincipal"
       }
     },
@@ -673,7 +689,7 @@
       "scope": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('existingKeyVaultResourceGroup'), '/providers/Microsoft.KeyVault/vaults/', parameters('existingKeyVaultName'))]",
       "properties": {
         "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '4633458b-17de-408a-b874-0445c86b69e6')]",
-        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2022-03-01', 'Full').identity.principalId]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2023-01-01', 'Full').identity.principalId]",
         "principalType": "ServicePrincipal"
       }
     },
@@ -688,7 +704,7 @@
       "scope": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('storageAccountResourceGroup'), '/providers/Microsoft.Storage/storageAccounts/', parameters('storageAccountName'))]",
       "properties": {
         "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '0c867c2a-1d8c-454a-a3db-ab2ea1bdc8bb')]",
-        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2022-03-01', 'Full').identity.principalId]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2023-01-01', 'Full').identity.principalId]",
         "principalType": "ServicePrincipal"
       }
     },
@@ -703,7 +719,7 @@
       "scope": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('storageAccountResourceGroup'), '/providers/Microsoft.Storage/storageAccounts/', parameters('storageAccountName'))]",
       "properties": {
         "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '0c867c2a-1d8c-454a-a3db-ab2ea1bdc8bb')]",
-        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2022-03-01', 'Full').identity.principalId]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2023-01-01', 'Full').identity.principalId]",
         "principalType": "ServicePrincipal"
       }
     }
@@ -711,7 +727,7 @@
   "outputs": {
     "webAppUrl": {
       "type": "string",
-      "value": "[concat('https://', variables('webAppName'), '.azurewebsites.net')]"
+      "value": "[uri(format('https://{0}.azurewebsites.net', variables('webAppName')), '')]"
     },
     "webAppName": {
       "type": "string",
@@ -727,7 +743,7 @@
     },
     "redirectUri": {
       "type": "string",
-      "value": "[concat('https://', variables('webAppName'), '.azurewebsites.net/auth/callback')]"
+      "value": "[uri(format('https://{0}.azurewebsites.net', variables('webAppName')), '/auth/callback')]"
     },
     "keyVaultName": {
       "type": "string",
@@ -743,21 +759,25 @@
     },
     "webAppPrincipalId": {
       "type": "string",
-      "value": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2022-03-01', 'Full').identity.principalId]"
+      "value": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2023-01-01', 'Full').identity.principalId]"
     },
     "workerAppPrincipalId": {
       "type": "string",
-      "value": "[reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2022-03-01', 'Full').identity.principalId]"
+      "value": "[reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2023-01-01', 'Full').identity.principalId]"
     },
     "postDeploymentInstructions": {
       "type": "object",
       "value": {
         "step1": "Grant Key Vault access to apps (required for Key Vault references in app settings)",
-        "webAppCommand": "[concat('az role assignment create --assignee ', reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2022-03-01', 'Full').identity.principalId, ' --role \"Key Vault Secrets User\" --scope /subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('existingKeyVaultResourceGroup'), '/providers/Microsoft.KeyVault/vaults/', parameters('existingKeyVaultName'))]",
-        "workerAppCommand": "[concat('az role assignment create --assignee ', reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2022-03-01', 'Full').identity.principalId, ' --role \"Key Vault Secrets User\" --scope /subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('existingKeyVaultResourceGroup'), '/providers/Microsoft.KeyVault/vaults/', parameters('existingKeyVaultName'))]",
+        "webAppCommand": "[concat('az role assignment create --assignee ', reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2023-01-01', 'Full').identity.principalId, ' --role \"Key Vault Secrets User\" --scope /subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('existingKeyVaultResourceGroup'), '/providers/Microsoft.KeyVault/vaults/', parameters('existingKeyVaultName'))]",
+        "workerAppCommand": "[concat('az role assignment create --assignee ', reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2023-01-01', 'Full').identity.principalId, ' --role \"Key Vault Secrets User\" --scope /subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('existingKeyVaultResourceGroup'), '/providers/Microsoft.KeyVault/vaults/', parameters('existingKeyVaultName'))]",
         "step2": "Wait 5-10 minutes for Azure RBAC propagation",
         "step3": "[concat('Restart apps: az webapp restart --name ', variables('webAppName'), ' --resource-group ', resourceGroup().name, ' && az webapp restart --name ', variables('workerAppName'), ' --resource-group ', resourceGroup().name)]"
       }
+    },
+    "deployedResourceGroup": {
+      "type": "string",
+      "value": "[parameters('resourceGroup')]"
     }
   }
 }
