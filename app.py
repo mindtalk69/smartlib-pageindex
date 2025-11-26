@@ -610,9 +610,7 @@ def create_app():
     from modules.admin_folder_upload import admin_folder_upload_bp
     app.register_blueprint(admin_folder_upload_bp)
 
-    # Register admin settings blueprint
-    from modules.admin_settings import settings_bp
-    app.register_blueprint(settings_bp)
+
 
     # Register selfquery API blueprint
     from modules.selfquery import selfquery_bp

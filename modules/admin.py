@@ -364,6 +364,13 @@ def init_admin(app):
     except Exception as e:
         # If the module is missing or has errors, log and continue to avoid breaking app import
         logging.error(f"Failed to register admin_embeddings blueprint: {e}", exc_info=True)
+
+    # Register admin settings blueprint
+    try:
+        from modules.admin_settings import settings_bp
+        app.register_blueprint(settings_bp)
+    except Exception as e:
+        logging.error(f"Failed to register admin_settings blueprint: {e}", exc_info=True)
 # --- Logo Settings Route ---
 @admin_bp.route('/logo_settings', methods=['GET', 'POST'])
 @login_required
