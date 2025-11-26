@@ -190,6 +190,12 @@ class Config:
     EMBEDDING_WARMUP_ENABLED = os.environ.get('EMBEDDING_WARMUP_ENABLED', 'true').lower() in ('true', '1', 'yes')
     EMBEDDING_WARMUP_TEXT = os.environ.get('EMBEDDING_WARMUP_TEXT', 'SmartLib warmup prompt for embeddings')
 
+    # --- User Limits (Small Business Tier) ---
+    try:
+        MAX_ACTIVE_USERS = int(os.environ.get('MAX_ACTIVE_USERS', '10'))
+    except ValueError:
+        MAX_ACTIVE_USERS = 10
+
 
 class DevelopmentConfig(Config):
 

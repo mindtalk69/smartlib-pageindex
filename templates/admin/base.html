@@ -254,6 +254,9 @@
                     <a href="{{ url_for('admin.admin_reset_data') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin.admin_reset_data' %}active{% endif %}">
                       <i class="fas fa-exclamation-triangle me-2"></i>Reset Upload/Download Logs
                     </a>
+                    <a href="{{ url_for('admin_settings.settings_page') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'admin_settings.settings_page' %}active{% endif %}">
+                      <i class="fas fa-cog me-2"></i>Application Settings
+                    </a>
                     <!-- Site Appearance / Branding Settings -->
                     <div class="list-group-item fw-bold text-secondary small d-flex justify-content-between align-items-center mt-2">
                       Site Appearance

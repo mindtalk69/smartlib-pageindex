@@ -610,9 +610,22 @@ def create_app():
     from modules.admin_folder_upload import admin_folder_upload_bp
     app.register_blueprint(admin_folder_upload_bp)
 
+    # Register admin settings blueprint
+    from modules.admin_settings import settings_bp
+    app.register_blueprint(settings_bp)
+
     # Register selfquery API blueprint
     from modules.selfquery import selfquery_bp
     app.register_blueprint(selfquery_bp)
+
+    # Initialize default app settings
+    with app.app_context():
+        try:
+            from modules.database import initialize_default_settings
+            initialize_default_settings()
+            app.logger.info("Default app settings initialized")
+        except Exception as init_exc:
+            app.logger.warning("Failed to initialize default settings: %s", init_exc, exc_info=True)
 
     if app.config.get('EMBEDDING_WARMUP_ENABLED', False):
         try:

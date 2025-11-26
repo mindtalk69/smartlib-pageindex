@@ -94,7 +94,7 @@ def toggle_user_status(user_id):
         flash("You cannot disable your own account.", 'danger')
         return redirect(url_for('admin_users.user_management'))
     try:
-        success = toggle_user_disabled_status(user_id)
+        success, error_message = toggle_user_disabled_status(user_id)
         if success:
             user = get_user_by_id(user_id)
             if user:
@@ -103,7 +103,7 @@ def toggle_user_status(user_id):
             else:
                 flash('User status updated, but could not fetch current status.', 'warning')
         else:
-            flash('Failed to update user status (User not found?).', 'danger')
+            flash(error_message or 'Failed to update user status.', 'warning')
     except Exception as e:
         logging.error(f"Error in toggle_user_status route: {e}")
         flash('An unexpected error occurred while toggling user status.', 'danger')

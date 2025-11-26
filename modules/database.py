@@ -607,19 +607,52 @@ def get_user_by_id(user_id):
     # db.session.get is efficient for PK lookups
     return db.session.get(User, user_id)
 
+
+def count_active_users():
+    """Count the number of active (not disabled) users."""
+    return User.query.filter_by(is_disabled=False).count()
+
+
 def toggle_user_disabled_status(user_id):
-    """Toggle the is_disabled status for a user using SQLAlchemy."""
+    """Toggle the is_disabled status for a user using SQLAlchemy.
+
+    Args:
+        user_id: The user ID to toggle
+
+    Returns:
+        tuple: (success: bool, error_message: str or None)
+               - (True, None) if successful
+               - (False, error_message) if failed
+    """
     user = db.session.get(User, user_id)
     if not user:
         logging.error(f"User with ID {user_id} not found for toggling disabled status.")
-        return False # Indicate user not found
+        return (False, "User not found")
 
     try:
         new_status = not user.is_disabled
+
+        # If enabling a user (is_disabled: True -> False), check active user limit
+        if user.is_disabled and not new_status:  # Currently disabled, will be enabled
+            # Get max active users from app settings (with fallback to config)
+            from flask import current_app
+            max_active = get_app_setting(
+                'max_active_users',
+                default=current_app.config.get('MAX_ACTIVE_USERS', 10)
+            )
+
+            current_active = count_active_users()
+
+            if current_active >= max_active:
+                logging.warning(
+                    f"Cannot enable user {user_id}: active user limit reached ({current_active}/{max_active})"
+                )
+                return (False, f"Active user limit reached ({current_active}/{max_active}). Please disable another user first or increase the limit in settings.")
+
         user.is_disabled = new_status
         db.session.commit()
         logging.info(f"Toggled is_disabled status for user {user_id} to {new_status}.")
-        return True # Indicate success
+        return (True, None)
     except Exception as e:
         db.session.rollback()
         logging.error(f"Error toggling disabled status for user {user_id}: {e}")
@@ -845,6 +878,109 @@ def resolve_password_reset_request(
             exc,
         )
         raise
+
+
+# --- App Settings Functions ---
+
+def get_app_setting(key: str, default=None):
+    """Get an application setting value with type conversion.
+
+    Args:
+        key: Setting key to retrieve
+        default: Default value if setting doesn't exist
+
+    Returns:
+        Typed value (int, bool, float, or string) or default if not found
+
+    Note:
+        Values are stored with type prefix: "int:10", "bool:true", "float:1.5", or plain string
+    """
+    setting = db.session.get(AppSettings, key)
+    if not setting:
+        return default
+
+    # Type conversion based on value prefix
+    value = setting.value
+    try:
+        if value.startswith('int:'):
+            return int(value.split(':', 1)[1])
+        elif value.startswith('bool:'):
+            return value.split(':', 1)[1].lower() in ('true', '1', 't', 'yes')
+        elif value.startswith('float:'):
+            return float(value.split(':', 1)[1])
+        else:
+            # Plain string or no prefix
+            return value
+    except (ValueError, AttributeError, IndexError):
+        logging.warning(f"Failed to convert app setting {key}, returning raw value")
+        return value
+
+
+def set_app_setting(key: str, value, value_type: str = 'string'):
+    """Set an application setting value.
+
+    Args:
+        key: Setting key
+        value: Value to store
+        value_type: Type of value ('string', 'int', 'bool', 'float')
+
+    Note:
+        Values are stored with type prefix for proper conversion on retrieval
+    """
+    setting = db.session.get(AppSettings, key)
+
+    # Format value with type prefix
+    if value_type == 'int':
+        formatted_value = f"int:{int(value)}"
+    elif value_type == 'bool':
+        formatted_value = f"bool:{str(value).lower()}"
+    elif value_type == 'float':
+        formatted_value = f"float:{float(value)}"
+    else:
+        formatted_value = str(value)
+
+    if setting:
+        # Update existing setting
+        setting.value = formatted_value
+    else:
+        # Create new setting
+        setting = AppSettings(
+            key=key,
+            value=formatted_value
+        )
+        db.session.add(setting)
+
+    try:
+        db.session.commit()
+        return True
+    except Exception as exc:
+        db.session.rollback()
+        logging.error(f"Error setting app setting {key}: {exc}")
+        return False
+
+
+def get_all_app_settings():
+    """Get all application settings as a dictionary with typed values."""
+    settings = AppSettings.query.all()
+    return {s.key: get_app_setting(s.key) for s in settings}
+
+
+def initialize_default_settings():
+    """Initialize default app settings if they don't exist."""
+    from flask import current_app
+
+    defaults = {
+        'max_active_users': {
+            'value': current_app.config.get('MAX_ACTIVE_USERS', 10),
+            'type': 'int'
+        }
+    }
+
+    for key, config in defaults.items():
+        existing = db.session.get(AppSettings, key)
+        if not existing:
+            set_app_setting(key, config['value'], config['type'])
+            logging.info(f"Initialized default app setting: {key} = {config['value']}")
 
 
 # --- Rewritten URL Download Functions using SQLAlchemy ---

@@ -469,6 +469,10 @@
             {
               "name": "GUNICORN_TIMEOUT",
               "value": "300"
+            },
+            {
+              "name": "MAX_ACTIVE_USERS",
+              "value": "10"
             }
           ]
         }

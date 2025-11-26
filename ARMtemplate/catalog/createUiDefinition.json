@@ -793,11 +793,13 @@
           {
             "name": "appAdminUsername",
             "type": "Microsoft.Common.TextBox",
-            "label": "Admin username",
+            "label": "Admin username (locked)",
             "defaultValue": "admin",
-            "toolTip": "Username for the bootstrap SmartLib admin account.",
+            "toolTip": "Admin username is locked to 'admin' for consistency. You can create additional admin users with different names after deployment.",
             "constraints": {
-              "required": true
+              "required": true,
+              "regex": "^admin$",
+              "validationMessage": "Admin username must be 'admin' and cannot be changed during deployment."
             }
           },
           {
