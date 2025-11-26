@@ -223,9 +223,8 @@
     },
     "appAdminPassword": {
       "type": "secureString",
-      "defaultValue": "admin",
       "metadata": {
-        "description": "Admin password for the application"
+        "description": "Admin password for the application (minimum 8 characters)"
       }
     },
     "appAdminPasswordSecretUri": {
