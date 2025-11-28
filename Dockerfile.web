@@ -57,6 +57,8 @@ COPY requirements-web.txt /tmp/requirements.txt
 COPY requirements-web-extras.txt /tmp/requirements-extras.txt
 
 RUN pip install --upgrade pip \
+    && echo "Installing optimized HNSW (compiled for CPU)..." \
+    && pip install --no-binary chroma-hnswlib chroma-hnswlib \
     && pip install --no-cache-dir -r /tmp/requirements.txt \
     && if [ "$INSTALL_WEB_EXTRAS" = "true" ]; then \
         pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu -r /tmp/requirements-extras.txt; \

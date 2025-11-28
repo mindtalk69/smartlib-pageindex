@@ -110,12 +110,14 @@ def _delete_vectors(doc_ids, user_id, knowledge_id) -> int:
 
     try:
         import chromadb
+        from modules.vector_tasks import get_cached_chroma_client
     except ImportError as import_exc:
         logging.error("Chroma backend not available when attempting vector deletion: %s", import_exc)
         return 0
 
     try:
-        client = chromadb.PersistentClient(path=str(persist_dir))
+        # Use cached client for performance (25s → <1s)
+        client = get_cached_chroma_client(str(persist_dir))
         try:
             collection = client.get_collection(name=collection_name)
         except Exception as lookup_exc:

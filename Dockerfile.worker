@@ -41,6 +41,8 @@ RUN apt-get update \
 COPY requirements-worker.txt /tmp/requirements.txt
 
 RUN pip install --upgrade pip \
+    && echo "Installing optimized HNSW (compiled for CPU)..." \
+    && pip install --no-binary chroma-hnswlib chroma-hnswlib \
     && pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY . /app
