@@ -3,14 +3,17 @@ from logging.config import fileConfig
 import os
 
 # --- Load environment variables from .env.dev if present ---
+# Only load .env.dev if SQLALCHEMY_DATABASE_URI is not already set
+# This allows docker-compose to override with runtime environment variables
 from pathlib import Path
-try:
-    from dotenv import load_dotenv
-    env_path = Path(__file__).parent.parent / ".env.dev"
-    if env_path.exists():
-        load_dotenv(dotenv_path=env_path)
-except ImportError:
-    pass  # If python-dotenv is not installed, skip loading .env.dev
+if not os.environ.get("SQLALCHEMY_DATABASE_URI"):
+    try:
+        from dotenv import load_dotenv
+        env_path = Path(__file__).parent.parent / ".env.dev"
+        if env_path.exists():
+            load_dotenv(dotenv_path=env_path)
+    except ImportError:
+        pass  # If python-dotenv is not installed, skip loading .env.dev
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool

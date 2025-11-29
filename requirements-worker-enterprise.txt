@@ -1,0 +1,99 @@
+# ============================================================================
+# WORKER ENTERPRISE REQUIREMENTS.TXT - Target: ~500-600MB for Azure deployment
+# ML and document processing container for Enterprise edition with PostgreSQL/pgvector
+# ============================================================================
+
+# Core Web Framework (needed for task processing)
+Flask==3.1.0
+Flask-Login==0.6.3
+Flask-Migrate==4.1.0
+Flask-SQLAlchemy==3.1.1
+Flask-WTF==1.2.1
+gunicorn>=20.1.0
+Werkzeug==3.1.3
+
+# Celery Task Queue (full worker)
+celery==5.5.2
+redis==5.0.1
+
+# Database (PostgreSQL for Enterprise)
+SQLAlchemy==2.0.39
+alembic==1.15.2
+psycopg[binary]==3.1.18
+
+# OpenAI (core AI) - keep for API fallback
+openai==1.100.2
+tiktoken==0.9.0
+langchain-openai==0.2.10
+langchain>=0.3.18
+langchain-community>=0.3.17
+langchain-postgres>=0.0.6
+langgraph>=0.2.35
+langchain-experimental>=0.0.65
+langgraph-prebuilt>=0.1.8
+langgraph-checkpoint>=2.0.25
+langgraph-supervisor>=0.0.19
+langgraph-sdk>=0.1.66
+langchain-huggingface>=0.1.2
+lark
+pgvector>=0.2.5
+
+
+# Essential ML (CPU-only) - for HuggingFace embeddings
+torch>=2.2.2,<3.0.0
+sentence-transformers>=2.6.0,<2.7.0
+numpy<2.0.0
+scipy>=1.14.1,<2.0.0
+scikit-learn<1.5.0
+
+# HTTP & Utilities (minimal)
+httpx==0.28.1
+requests==2.32.3
+python-dotenv==1.0.1
+pydantic==2.11.4
+
+# Document Processing (optimized for worker)
+# Using compatible versions with focus on RapidOCR support
+docling-core~=2.29
+docling~=2.12
+langchain-docling
+rapidocr-onnxruntime
+PyMuPDF
+pdfminer.six
+numpy<2.0.0
+
+# Agent tooling
+selenium
+webdriver-manager
+folium
+geopy
+matplotlib
+pandas==2.2.3
+
+# AZURE INTEGRATIONS (if needed) , /admin/ocr
+azure-ai-documentintelligence
+msal
+
+# ============================================================================
+# ENTERPRISE EDITION CHANGES:
+# ============================================================================
+# - Removed chromadb and langchain-chroma (uses pgvector instead)
+# - Added psycopg for PostgreSQL connectivity
+# - Faster build time (no ChromaDB HNSW compilation)
+# - All vector operations use PostgreSQL with pgvector extension
+# - CPU-only PyTorch (no CUDA) - ~400MB vs 800MB
+# - Optimized sentence-transformers version (smaller dependencies)
+# - Docling with RapidOCR focus (lighter than EasyOCR)
+#
+# Expected size: ~500-600MB (100MB smaller than Basic due to no ChromaDB)
+# - Supports: all-MiniLM-L6-v2 (90MB) + text-embedding-3-small (API)
+# - Supports: BAAI/bge-m3 (1.5GB) - full PyTorch ecosystem
+# - Supports: Document processing with OCR
+# - Supports: Full RAG pipeline
+#
+# Worker-only responsibilities:
+# - Document ingestion and processing
+# - Local embedding generation (HuggingFace models)
+# - Background task processing
+# - Vector store operations with pgvector
+# ============================================================================

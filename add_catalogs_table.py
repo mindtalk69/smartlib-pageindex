@@ -1,32 +1,8 @@
 import os
-import sqlite3
-from sqlalchemy.engine import make_url
-
-
-def resolve_db_path() -> str:
-    uri = os.environ.get("SQLALCHEMY_DATABASE_URI")
-    if uri:
-        try:
-            url = make_url(uri)
-        except Exception as exc:  # pragma: no cover - defensive logging
-            print(
-                f"Warning: unable to parse SQLALCHEMY_DATABASE_URI '{uri}': {exc}"
-            )
-        else:
-            if url.get_backend_name() == "sqlite":
-                database = url.database or ""
-                if database == ":memory:":
-                    return database
-                if not os.path.isabs(database):
-                    return os.path.abspath(os.path.join(os.getcwd(), database))
-                return database
-    data_root = os.environ.get("DATA_VOLUME_PATH")
-    if data_root:
-        return os.path.join(data_root, "app.db")
-    return os.path.abspath(os.path.join(os.getcwd(), "data", "app.db"))
-
-
-DB_PATH = resolve_db_path()
+from flask import Flask
+from extensions import db
+from modules.database import Catalog, User
+from app import create_app
 
 DEFAULT_CATALOGS = [
     ('Contracts', 'A contract is a legally binding agreement between two or more parties. These parties may include a business, employees, third parties, and other entities. It is a document which states the nature and terms of collaboration between those involved.'),
@@ -51,63 +27,34 @@ DEFAULT_CATALOGS = [
     ('Sample Catalog', '')
 ]
 
-def create_connection(db_file):
-    conn = None
-    try:
-        conn = sqlite3.connect(db_file)
-        return conn
-    except sqlite3.Error as e:
-        print(f"Error connecting to database: {e}")
-    return conn
-
-def create_table(conn):
-    sql = """
-    CREATE TABLE IF NOT EXISTS catalogs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE,
-        description TEXT,
-        created_by_user_id TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (created_by_user_id) REFERENCES users(user_id)
-    );"""
-    try:
-        c = conn.cursor()
-        c.execute(sql)
-        print("Table 'catalogs' checked/created.")
-    except sqlite3.Error as e:
-        print(f"Error creating table: {e}")
-
-def insert_default_catalogs(conn, catalogs):
-    # First, ensure a sample user exists (assuming table has basic columns)
-    sql_user = "INSERT OR IGNORE INTO users (user_id, username, auth_provider, is_admin) VALUES (?, ?, ?, ?);"
-    sql_catalogs = "INSERT OR IGNORE INTO catalogs (name, description, created_by_user_id) VALUES (?, ?, ?);"
-    
-    try:
-        c = conn.cursor()
-        # Insert sample user if not exists
-        c.execute(sql_user, ('admin@smarthing.com', 'admin', 'local', 1))
+def seed_catalogs():
+    """Seed default catalogs using SQLAlchemy."""
+    flask_app = create_app()
+    with flask_app.app_context():
+        # Find or create a system user for seeding
+        system_user = User.query.filter_by(username='admin').first()
+        if not system_user:
+            # If no admin user exists yet, use a placeholder
+            # This will be replaced when the actual admin user is created
+            print("Warning: No admin user found. Catalogs will be created without a creator.")
+            print("Run promote_admin_sqlalchemy.py first to create an admin user.")
+            return
         
         inserted_count = 0
-        for catalog in catalogs:
-            c.execute(sql_catalogs, (*catalog, 'admin@smarthing.com'))
-            if c.rowcount > 0: 
+        for name, description in DEFAULT_CATALOGS:
+            # Check if catalog already exists
+            existing = Catalog.query.filter_by(name=name).first()
+            if not existing:
+                new_catalog = Catalog(
+                    name=name,
+                    description=description,
+                    created_by_user_id=system_user.user_id
+                )
+                db.session.add(new_catalog)
                 inserted_count += 1
-        conn.commit()
+        
+        db.session.commit()
         print(f"Inserted {inserted_count} new default catalogs.")
-    except sqlite3.Error as e:
-        print(f"Error inserting catalogs: {e}")
-
-def main():
-    print(f"Using database path: {DB_PATH}")
-    if DB_PATH != ":memory:":
-        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = create_connection(DB_PATH)
-    if conn:
-        create_table(conn)
-        insert_default_catalogs(conn, DEFAULT_CATALOGS)
-        conn.close()
-    else:
-        print("DB connection failed.")
 
 if __name__ == '__main__':
-    main()
+    seed_catalogs()

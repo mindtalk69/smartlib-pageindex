@@ -129,10 +129,10 @@ class UploadedFile(db.Model):
     # Add overlaps to silence SAWarning about conflicting relationships managing the same column
     library_references = db.relationship(
         'LibraryReference',
-        backref='uploaded_file_source',
+        backref=db.backref('uploaded_file_source', overlaps="url_download_source,library_references"),
         lazy=True,
         primaryjoin="and_(LibraryReference.reference_type=='file', foreign(LibraryReference.source_id)==UploadedFile.file_id)",
-        overlaps="library,url_download_source,uploaded_file_source" # Explicitly declare overlaps
+        overlaps="url_download_source,library_references" # Explicitly declare overlaps
     )
 
 
@@ -288,10 +288,10 @@ class UrlDownload(db.Model):
     # Add overlaps to silence SAWarning about conflicting relationships managing the same column
     library_references = db.relationship(
         'LibraryReference',
-        backref='url_download_source',
+        backref=db.backref('url_download_source', overlaps="uploaded_file_source,library_references"),
         lazy=True,
         primaryjoin="and_(LibraryReference.reference_type=='url_download', foreign(LibraryReference.source_id)==UrlDownload.download_id)",
-        overlaps="library,uploaded_file_source,url_download_source" # Explicitly declare overlaps
+        overlaps="uploaded_file_source,library_references" # Explicitly declare overlaps
     )
 
 

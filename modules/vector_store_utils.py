@@ -2,8 +2,7 @@ from flask import current_app
 import logging
 import os
 import re
-# PGVector disabled for micro deployment - SQLite/ChromaDB only
-# from langchain_postgres import PGVector
+from langchain_postgres import PGVector
 
 from langchain_community.vectorstores.utils import filter_complex_metadata
 from modules.llm_utils import get_lc_store_path, get_embedding_function
@@ -87,11 +86,6 @@ def process_and_store_chunks(splits, user_id, embedding_function, logger, file_i
 
         # --- PGVector ---
         if vector_provider == 'pgvector':
-            # PGVector disabled for micro deployment - SQLite/ChromaDB only
-            logger.error("PGVector is not supported in micro deployment. Use ChromaDB instead.")
-            raise ValueError("PGVector is not supported in micro deployment. Use ChromaDB instead.")
-            # Original PGVector code commented out for micro deployment
-            """
             try:
                 connection_string = current_app.config.get('PGVECTOR_CONNECTION_STRING')
                 collection_name = current_app.config.get('PGVECTOR_COLLECTION_NAME')
@@ -129,7 +123,6 @@ def process_and_store_chunks(splits, user_id, embedding_function, logger, file_i
                 logger.error(f"Error processing/storing chunks for PGVector: {e}", exc_info=True)
                 # Re-raise the exception so the calling function can handle rollback etc.
                 raise
-            """
 
         # --- ChromaDB ---
         elif vector_provider == 'chromadb':

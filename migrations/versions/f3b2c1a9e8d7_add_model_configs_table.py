@@ -24,9 +24,9 @@ def upgrade():
         sa.Column('deployment_name', sa.String(length=256), nullable=False),
         sa.Column('provider', sa.String(length=64), nullable=False, server_default='azure_openai'),
         sa.Column('temperature', sa.Float(), nullable=True),
-        sa.Column('streaming', sa.Boolean(), nullable=False, server_default=sa.text('0')),
+        sa.Column('streaming', sa.Boolean(), nullable=False, server_default=sa.text('FALSE')),
         sa.Column('description', sa.Text(), nullable=True),
-        sa.Column('is_default', sa.Boolean(), nullable=False, server_default=sa.text('0')),
+        sa.Column('is_default', sa.Boolean(), nullable=False, server_default=sa.text('FALSE')),
         sa.Column('created_by', sa.String(), sa.ForeignKey('users.user_id'), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
         sa.UniqueConstraint('name', name='uq_model_configs_name')

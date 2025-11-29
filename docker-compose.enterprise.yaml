@@ -28,13 +28,25 @@ services:
       service: redis
 
   web:
-    # Inherit from base docker-compose.yaml
-    extends:
-      file: docker-compose.yaml
-      service: web
+    # Use Enterprise Dockerfile (no ChromaDB)
+    image: smartlib-web-enterprise:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.web.enterprise
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/home/data
+      - ./logs:/home/logs
+    env_file:
+      - .env.dev
     environment:
+      - LOCAL_MODE=true
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
       # Override to use Enterprise tier
       - APP_EDITION=ENT
+      - AUTO_PROMOTE_ADMIN=true
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_USER=smartlib_admin
@@ -42,6 +54,7 @@ services:
       - POSTGRES_DATABASE=smartlibdb
       - POSTGRES_SSL_MODE=disable
       - VECTOR_STORE_MODE=knowledge
+      - VECTOR_STORE_PROVIDER=pgvector
       - PGVECTOR_COLLECTION_NAME=documents_vectors
     depends_on:
       postgres:
@@ -50,11 +63,20 @@ services:
         condition: service_healthy
 
   worker:
-    # Inherit from base docker-compose.yaml
-    extends:
-      file: docker-compose.yaml
-      service: worker
+    # Use Enterprise Dockerfile (no ChromaDB)
+    image: smartlib-worker-enterprise:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.worker.enterprise
+    volumes:
+      - ./data:/home/data
+      - ./logs:/home/logs
+    env_file:
+      - .env.dev
     environment:
+      - LOCAL_MODE=true
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
       # Override to use Enterprise tier
       - APP_EDITION=ENT
       - POSTGRES_HOST=postgres
@@ -64,6 +86,7 @@ services:
       - POSTGRES_DATABASE=smartlibdb
       - POSTGRES_SSL_MODE=disable
       - VECTOR_STORE_MODE=knowledge
+      - VECTOR_STORE_PROVIDER=pgvector
       - PGVECTOR_COLLECTION_NAME=documents_vectors
     depends_on:
       postgres:

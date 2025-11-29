@@ -1,0 +1,77 @@
+# syntax=docker/dockerfile:1.5
+# Enterprise Edition Web Container - PostgreSQL/pgvector (no ChromaDB)
+
+FROM node:20-alpine AS assets
+WORKDIR /app
+COPY package.json ./
+RUN npm install --silent
+COPY vite.config.js ./
+COPY static ./static
+RUN npm run build
+
+FROM python:3.11-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PYTHONPATH=/app
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       build-essential \
+       git \
+       curl \
+       libffi-dev \
+       libpq-dev \
+       libjpeg-dev \
+       zlib1g-dev \
+       libpng-dev \
+       libfreetype6-dev \
+       liblcms2-dev \
+       libtiff-dev \
+       libwebp-dev \
+       libxml2-dev \
+       libxslt1-dev \
+       libssl-dev \
+       pkg-config \
+       openssh-server \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configure SSH for Azure App Service access
+ARG SSH_USERNAME=appuser
+ENV SSH_USERNAME=${SSH_USERNAME}
+RUN useradd -m -s /bin/bash ${SSH_USERNAME} \
+    && mkdir -p /var/run/sshd \
+    && sed -i 's/^#\?Port .*/Port 2222/' /etc/ssh/sshd_config \
+    && sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config \
+    && sed -i 's/^#\?PermitRootLogin .*/PermitRootLogin no/' /etc/ssh/sshd_config \
+    && echo "AllowUsers ${SSH_USERNAME}" >> /etc/ssh/sshd_config \
+    && echo "ClientAliveInterval 180" >> /etc/ssh/sshd_config \
+    && echo "ClientAliveCountMax 3" >> /etc/ssh/sshd_config \
+    && echo "UseDNS no" >> /etc/ssh/sshd_config
+
+ARG INSTALL_WEB_EXTRAS=false
+
+# Enterprise edition uses different requirements file (no ChromaDB)
+COPY requirements-web-enterprise.txt /tmp/requirements.txt
+COPY requirements-web-extras.txt /tmp/requirements-extras.txt
+
+RUN pip install --upgrade pip \
+    && echo "Installing Enterprise dependencies (no ChromaDB HNSW)..." \
+    && pip install --no-cache-dir -r /tmp/requirements.txt \
+    && if [ "$INSTALL_WEB_EXTRAS" = "true" ]; then \
+        pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu -r /tmp/requirements-extras.txt; \
+    fi \
+    && pip cache purge >/dev/null 2>&1 || true
+
+COPY . /app
+COPY --from=assets /app/static/dist /app/static/dist
+
+RUN chmod +x docker-entrypoint.sh
+
+EXPOSE 8000 2222
+
+ENTRYPOINT ["./docker-entrypoint.sh"]
+CMD ["web"]

@@ -21,14 +21,15 @@ def upgrade():
     # postgre
     #op.add_column('folder_upload_jobs', sa.Column('enable_visual_grounding_for_job', sa.Boolean(), server_default=sa.false(), nullable=False))
     # sqlite
-    op.add_column('folder_upload_jobs', sa.Column('enable_visual_grounding_for_job', sa.Boolean(), server_default=sa.text('0'), nullable=False))
+    op.add_column('folder_upload_jobs', sa.Column('enable_visual_grounding_for_job', sa.Boolean(), server_default=sa.text('FALSE'), nullable=False))
     
     with op.batch_alter_table('documents', schema=None) as batch_op:
         batch_op.alter_column('id',
-                              existing_type=sa.String(),  # Assuming previous type was INTEGER
+                              existing_type=sa.String(),  # Assuming previous type was String
                               type_=postgresql.UUID(as_uuid=True),
                               existing_nullable=False,
-                              nullable=False) # Explicitly set nullable for the new type if it's a PK
+                              nullable=False,
+                              postgresql_using='id::uuid')  # Tell PostgreSQL how to cast
     # ### end Alembic commands ###
 
 
