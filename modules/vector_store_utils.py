@@ -12,6 +12,47 @@ import json
 
 logger = logging.getLogger(__name__)
 
+# Attempt to import tenacity for retry logic
+try:
+    from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+    from sqlalchemy.exc import OperationalError
+    HAS_TENACITY = True
+except ImportError:
+    logger.warning("Tenacity or SQLAlchemy not found. Retry logic for PGVector will be disabled.")
+    HAS_TENACITY = False
+
+def _init_pgvector_with_retry(embedding_function, documents, collection_name, connection_string, ids):
+    """
+    Helper function to initialize PGVector with retry logic.
+    """
+    if HAS_TENACITY:
+        # Define the retry decorator dynamically to capture the logger
+        @retry(
+            stop=stop_after_attempt(5),
+            wait=wait_exponential(multiplier=1, min=2, max=30),
+            retry=retry_if_exception_type(OperationalError),
+            reraise=True
+        )
+        def _create_store():
+            logger.info(f"Attempting to connect to PGVector (Collection: {collection_name})...")
+            return PGVector.from_documents(
+                embedding=embedding_function,
+                documents=documents,
+                collection_name=collection_name,
+                connection=connection_string,
+                ids=ids,
+            )
+        return _create_store()
+    else:
+        # Fallback without retry
+        return PGVector.from_documents(
+            embedding=embedding_function,
+            documents=documents,
+            collection_name=collection_name,
+            connection=connection_string,
+            ids=ids,
+        )
+
 def log_vector_reference(file_id, url_download_id, chunk_index):
     """
     Logs vector reference information to a file instead of the database.
@@ -96,14 +137,13 @@ def process_and_store_chunks(splits, user_id, embedding_function, logger, file_i
 
                 logger.info(f"Initializing PGVector store instance. Collection: '{collection_name}'")
 
-                # Use from_documents to create the collection and add documents in one go
-                pgvector_store = PGVector.from_documents(
-                    embedding=embedding_function,
+                # Use helper with retry logic to create the collection and add documents
+                pgvector_store = _init_pgvector_with_retry(
+                    embedding_function=embedding_function,
                     documents=splits,
                     collection_name=collection_name,
                     connection=connection_string,
-                    ids=new_uuid_indexes, # Pass the UUIDs here
-                    # distance_strategy=DistanceStrategy.COSINE # Optional: Specify distance if needed
+                    ids=new_uuid_indexes,
                 )
                 logger.info(f"PGVector instance created and documents added.")
 
