@@ -280,6 +280,56 @@
       "metadata": {
         "description": "Enable automatic updates from SmartLib container registry"
       }
+    },
+    "postgresServerName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the existing PostgreSQL Flexible Server (from resource selector)"
+      }
+    },
+    "postgresServerFqdn": {
+      "type": "string",
+      "metadata": {
+        "description": "Fully qualified domain name of the existing PostgreSQL server (e.g., myserver.postgres.database.azure.com)"
+      }
+    },
+    "postgresServerResourceGroup": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource group containing the existing PostgreSQL server"
+      }
+    },
+    "postgresServerVersion": {
+      "type": "string",
+      "metadata": {
+        "description": "PostgreSQL server version (from resource selector)"
+      }
+    },
+    "postgresDatabaseName": {
+      "type": "string",
+      "metadata": {
+        "description": "Database name within the PostgreSQL server (must have pgvector extension enabled)"
+      }
+    },
+    "postgresAdminUser": {
+      "type": "string",
+      "metadata": {
+        "description": "PostgreSQL administrator username for database connection"
+      }
+    },
+    "postgresAdminPassword": {
+      "type": "secureString",
+      "defaultValue": "",
+      "metadata": {
+        "description": "PostgreSQL administrator password (direct entry). Used if postgresPasswordSecretUri is empty."
+      }
+    },
+    "postgresPasswordSecretUri": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional: Key Vault secret URI containing PostgreSQL password. Takes precedence over postgresAdminPassword."
+      }
     }
   },
   "variables": {
@@ -303,7 +353,8 @@
       }
     },
     "selectedSku": "[variables('skuMap')[parameters('appServicePlanSkuName')]]",
-    "storageAccountKeyValue": "[if(equals(parameters('storageAccountKey'), ''), listKeys(resourceId(parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2023-04-01').keys[0].value, parameters('storageAccountKey'))]"
+    "storageAccountKeyValue": "[if(equals(parameters('storageAccountKey'), ''), listKeys(resourceId(parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2023-04-01').keys[0].value, parameters('storageAccountKey'))]",
+    "postgresPasswordValue": "[if(not(equals(parameters('postgresPasswordSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('postgresPasswordSecretUri'), ')'), parameters('postgresAdminPassword'))]"
   },
   "resources": [
     {
@@ -467,11 +518,47 @@
             },
             {
               "name": "APP_EDITION",
-              "value": "BASIC"
+              "value": "ENT"
+            },
+            {
+              "name": "VECTOR_STORE_MODE",
+              "value": "knowledge"
+            },
+            {
+              "name": "PGVECTOR_COLLECTION_NAME",
+              "value": "documents_vectors"
+            },
+            {
+              "name": "POSTGRES_HOST",
+              "value": "[parameters('postgresServerFqdn')]"
+            },
+            {
+              "name": "POSTGRES_PORT",
+              "value": "5432"
+            },
+            {
+              "name": "POSTGRES_USER",
+              "value": "[parameters('postgresAdminUser')]"
+            },
+            {
+              "name": "POSTGRES_PASSWORD",
+              "value": "[variables('postgresPasswordValue')]"
+            },
+            {
+              "name": "POSTGRES_DATABASE",
+              "value": "[parameters('postgresDatabaseName')]"
+            },
+            {
+              "name": "POSTGRES_SSL_MODE",
+              "value": "require"
             },
             {
               "name": "SQLALCHEMY_DATABASE_URI",
-              "value": "sqlite:////home/data/app.db"
+              "value": "placeholder-will-be-built-from-components"
+            },
+            {
+              "name": "PGVECTOR_CONNECTION_STRING",
+              "value": "placeholder-will-be-built-from-components"
             },
             {
               "name": "RUN_DEFAULT_MODELS",
@@ -631,11 +718,47 @@
             },
             {
               "name": "APP_EDITION",
-              "value": "BASIC"
+              "value": "ENT"
+            },
+            {
+              "name": "VECTOR_STORE_MODE",
+              "value": "knowledge"
+            },
+            {
+              "name": "PGVECTOR_COLLECTION_NAME",
+              "value": "documents_vectors"
+            },
+            {
+              "name": "POSTGRES_HOST",
+              "value": "[parameters('postgresServerFqdn')]"
+            },
+            {
+              "name": "POSTGRES_PORT",
+              "value": "5432"
+            },
+            {
+              "name": "POSTGRES_USER",
+              "value": "[parameters('postgresAdminUser')]"
+            },
+            {
+              "name": "POSTGRES_PASSWORD",
+              "value": "[variables('postgresPasswordValue')]"
+            },
+            {
+              "name": "POSTGRES_DATABASE",
+              "value": "[parameters('postgresDatabaseName')]"
+            },
+            {
+              "name": "POSTGRES_SSL_MODE",
+              "value": "require"
             },
             {
               "name": "SQLALCHEMY_DATABASE_URI",
-              "value": "sqlite:////home/data/app.db"
+              "value": "placeholder-will-be-built-from-components"
+            },
+            {
+              "name": "PGVECTOR_CONNECTION_STRING",
+              "value": "placeholder-will-be-built-from-components"
             },
             {
               "name": "WEBSITES_PORT",

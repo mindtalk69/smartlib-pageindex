@@ -28,7 +28,7 @@ services:
       - LOCAL_MODE=true
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - VECTOR_STORE_PROVIDER=chromadb
+      - APP_EDITION=${APP_EDITION:-BASIC}
       - DEFAULT_EMBEDDING_MODEL=text-embedding-3-small
       - EMBEDDING_WARMUP_ENABLED=false
       - AGENT_TASK_TIMEOUT=240
@@ -54,7 +54,7 @@ services:
       - LOCAL_MODE=true
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - VECTOR_STORE_PROVIDER=chromadb
+      - APP_EDITION=${APP_EDITION:-BASIC}
       - DEFAULT_EMBEDDING_MODEL=text-embedding-3-small
       - EMBEDDING_WARMUP_ENABLED=false
       - AGENT_TASK_TIMEOUT=240

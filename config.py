@@ -59,13 +59,43 @@ class Config:
     MAP_PUBLIC_DIR = map_public_dir
     print(f"DEBUG: Ensured map public directory exists: {MAP_PUBLIC_DIR}")
 
-    VECTOR_STORE_PROVIDER = os.environ.get('VECTOR_STORE_PROVIDER', 'pgvector')
+    # --- Tier/Edition Configuration ---
+    # APP_EDITION is the primary discriminator for tier-specific behavior
+    # Valid values: 'BASIC', 'ENT' (Enterprise)
+    # Default to 'BASIC' for backward compatibility with existing deployments
+    APP_EDITION = os.environ.get('APP_EDITION', 'BASIC').upper()
+    print(f"DEBUG [config.py]: APP_EDITION set to: {APP_EDITION}")
 
-    print(f"DEBUG [config.py]: Config.VECTOR_STORE_PROVIDER set to: {VECTOR_STORE_PROVIDER}") # Check value assigned in class
-
-    if VECTOR_STORE_PROVIDER == 'pgvector':
-        SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI')
+    # Derive VECTOR_STORE_PROVIDER based on APP_EDITION
+    # Allow override via VECTOR_STORE_PROVIDER env var for advanced use cases
+    if APP_EDITION == 'ENT':
+        VECTOR_STORE_PROVIDER = os.environ.get('VECTOR_STORE_PROVIDER', 'pgvector')
     else:
+        VECTOR_STORE_PROVIDER = os.environ.get('VECTOR_STORE_PROVIDER', 'chromadb')
+
+    print(f"DEBUG [config.py]: VECTOR_STORE_PROVIDER set to: {VECTOR_STORE_PROVIDER}")
+
+    # --- Database Configuration ---
+    if VECTOR_STORE_PROVIDER == 'pgvector':
+        # PostgreSQL / PGVector mode (Enterprise tier)
+        # Check if PostgreSQL connection components are available (Azure deployment pattern)
+        postgres_host = os.environ.get('POSTGRES_HOST')
+        postgres_port = os.environ.get('POSTGRES_PORT', '5432')
+        postgres_user = os.environ.get('POSTGRES_USER')
+        postgres_password = os.environ.get('POSTGRES_PASSWORD')
+        postgres_database = os.environ.get('POSTGRES_DATABASE')
+        postgres_ssl_mode = os.environ.get('POSTGRES_SSL_MODE', 'require')
+
+        if postgres_host and postgres_user and postgres_password and postgres_database:
+            # Build connection string from components (supports Azure Key Vault password references)
+            SQLALCHEMY_DATABASE_URI = f"postgresql+psycopg://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_database}?sslmode={postgres_ssl_mode}"
+            print(f"DEBUG [config.py]: Built PostgreSQL connection string from components (host: {postgres_host}, db: {postgres_database})")
+        else:
+            # Fallback to SQLALCHEMY_DATABASE_URI environment variable (backward compatibility)
+            SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI')
+            print(f"DEBUG [config.py]: Using SQLALCHEMY_DATABASE_URI from environment variable")
+    else:
+        # SQLite / ChromaDB mode (Basic tier)
         sqlite_path = os.path.join(DATA_VOLUME_PATH, 'app.db')
         uri_env = os.environ.get('SQLALCHEMY_DATABASE_URI')
         if uri_env and uri_env.startswith('sqlite:///'):
@@ -135,7 +165,8 @@ class Config:
     CHROMA_COLLECTION_NAME = os.environ.get('CHROMA_COLLECTION_NAME', 'documents-vectors') # Default collection name
 
     # PGVector specific settings (keep these)
-    PGVECTOR_CONNECTION_STRING = os.environ.get('PGVECTOR_CONNECTION_STRING',SQLALCHEMY_DATABASE_URI)
+    # Use the same connection string as SQLALCHEMY_DATABASE_URI for pgvector, or allow override
+    PGVECTOR_CONNECTION_STRING = os.environ.get('PGVECTOR_CONNECTION_STRING', SQLALCHEMY_DATABASE_URI)
     PGVECTOR_COLLECTION_NAME = os.environ.get('PGVECTOR_COLLECTION_NAME', 'documents_vectors')
 
     # Keep VECTOR_STORE_MODE for structuring local paths (ChromaDB)

@@ -1,0 +1,76 @@
+# Docker Compose configuration for testing SmartLib Enterprise tier locally
+# Usage: docker compose -f docker-compose.yaml -f docker-compose.enterprise.yaml up
+
+services:
+  # PostgreSQL with pgvector extension
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: smartlib_admin
+      POSTGRES_PASSWORD: smartlib_dev_password
+      POSTGRES_DB: smartlibdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    command: >
+      postgres -c shared_preload_libraries=vector
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartlib_admin -d smartlibdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    # Inherit from base docker-compose.yaml
+    extends:
+      file: docker-compose.yaml
+      service: redis
+
+  web:
+    # Inherit from base docker-compose.yaml
+    extends:
+      file: docker-compose.yaml
+      service: web
+    environment:
+      # Override to use Enterprise tier
+      - APP_EDITION=ENT
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=smartlib_admin
+      - POSTGRES_PASSWORD=smartlib_dev_password
+      - POSTGRES_DATABASE=smartlibdb
+      - POSTGRES_SSL_MODE=disable
+      - VECTOR_STORE_MODE=knowledge
+      - PGVECTOR_COLLECTION_NAME=documents_vectors
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    # Inherit from base docker-compose.yaml
+    extends:
+      file: docker-compose.yaml
+      service: worker
+    environment:
+      # Override to use Enterprise tier
+      - APP_EDITION=ENT
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=smartlib_admin
+      - POSTGRES_PASSWORD=smartlib_dev_password
+      - POSTGRES_DATABASE=smartlibdb
+      - POSTGRES_SSL_MODE=disable
+      - VECTOR_STORE_MODE=knowledge
+      - PGVECTOR_COLLECTION_NAME=documents_vectors
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
