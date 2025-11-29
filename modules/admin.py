@@ -1664,8 +1664,9 @@ def vector_store_settings():
         settings.setdefault('VECTOR_STORE_MODE', 'knowledge')
         settings.setdefault('vector_store_mode', 'knowledge')
         settings.setdefault('CHROMA_COLLECTION_NAME', 'documents-vectors')
-        settings.setdefault('PGVECTOR_CONNECTION_STRING', '')
-        settings.setdefault('PGVECTOR_COLLECTION_NAME', 'langchain_vectors')
+        # Default to the active config (env var) if not set in DB
+        settings.setdefault('PGVECTOR_CONNECTION_STRING', current_app.config.get('PGVECTOR_CONNECTION_STRING', ''))
+        settings.setdefault('PGVECTOR_COLLECTION_NAME', 'documents-vectors')
 
     except Exception as e:
         logging.error(f"Error fetching vector store settings: {traceback.format_exc()}")
@@ -1676,9 +1677,12 @@ def vector_store_settings():
             'VECTOR_STORE_MODE': 'knowledge',
             'vector_store_mode': 'knowledge',
             'CHROMA_COLLECTION_NAME': 'documents-vectors',
-            'PGVECTOR_CONNECTION_STRING': '', 
-            'PGVECTOR_COLLECTION_NAME': 'langchain_vectors'
+            'PGVECTOR_CONNECTION_STRING': current_app.config.get('PGVECTOR_CONNECTION_STRING', ''), 
+            'PGVECTOR_COLLECTION_NAME': 'documents-vectors'
         }
+
+    # Get App Edition
+    app_edition = current_app.config.get('APP_EDITION', 'BASIC')
 
     # --- ChromaDB Inspection (if provider is chromadb) ---
     current_embedding = None
@@ -1803,6 +1807,7 @@ def vector_store_settings():
         chroma_stores_info=chroma_stores_info,
         chroma_base_path=chroma_base_path,
         current_embedding=current_embedding,
+        app_edition=app_edition,
     )
 
 
