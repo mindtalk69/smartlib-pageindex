@@ -31,14 +31,16 @@
       <td>{{ m.temperature if m.temperature is not none else '' }}</td>
       <td>{{ 'Yes' if m.streaming else 'No' }}</td>
       <td>{% if m.is_default %}<span class="badge bg-success">Default</span>{% endif %}</td>
-      <td>{% if current_multimodal_id and m.id == current_multimodal_id %}<span class="badge bg-info text-dark">Multimodal</span>{% endif %}</td>
+      <td>{% if current_multimodal_id and m.id == current_multimodal_id %}<span
+          class="badge bg-info text-dark">Multimodal</span>{% endif %}</td>
       <td>
         <button class="btn btn-sm btn-secondary btn-edit">Edit</button>
         <button class="btn btn-sm btn-danger btn-delete">Delete</button>
         {% if not m.is_default %}
         <button class="btn btn-sm btn-outline-primary btn-set-default">Set Default</button>
         {% endif %}
-        <button class="btn btn-sm btn-outline-info btn-set-multimodal" {% if current_multimodal_id and m.id == current_multimodal_id %}disabled{% endif %}>Set Multimodal</button>
+        <button class="btn btn-sm btn-outline-info btn-set-multimodal" {% if current_multimodal_id and
+          m.id==current_multimodal_id %}disabled{% endif %}>Set Multimodal</button>
       </td>
     </tr>
     {% endfor %}
@@ -47,7 +49,7 @@
 
 <!-- Modal: Add / Edit -->
 <div class="modal fade" id="modelModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
     <form id="modelForm" class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">Model</h5>
@@ -70,7 +72,8 @@
         <div class="mb-3">
           <label class="form-label">Deployment Name / Model Alias</label>
           <input name="deployment_name" id="model-deployment" class="form-control" required />
-          <div class="form-text">For Azure use the deployment name; for other providers use appropriate identifier.</div>
+          <div class="form-text">For Azure use the deployment name; for other providers use appropriate identifier.
+          </div>
         </div>
         <div class="mb-3 row">
           <div class="col">
@@ -109,120 +112,120 @@
 
 {% block admin_scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  // Initialize DataTable (if admin-datatables is present it may auto-init; keep safe init)
-  if (window.jQuery && $.fn.DataTable) {
-    $('#models-table').DataTable();
-  }
+  document.addEventListener('DOMContentLoaded', function () {
+    // Initialize DataTable (if admin-datatables is present it may auto-init; keep safe init)
+    if (window.jQuery && $.fn.DataTable) {
+      $('#models-table').DataTable();
+    }
 
-  const modalEl = document.getElementById('modelModal');
-  const modal = new bootstrap.Modal(modalEl);
-  const form = document.getElementById('modelForm');
+    const modalEl = document.getElementById('modelModal');
+    const modal = new bootstrap.Modal(modalEl);
+    const form = document.getElementById('modelForm');
 
-  // Add model
-  document.getElementById('btn-add-model').addEventListener('click', () => {
-    form.reset();
-    document.getElementById('model-id').value = '';
-    modal.show();
-  });
-
-  // Edit handlers
-  document.querySelectorAll('.btn-edit').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const tr = e.target.closest('tr');
-      const id = tr.dataset.id;
-      fetch(`/admin/models/data/${id}`)
-        .then(r => r.json())
-        .then(res => {
-          if (res.status === 'success') {
-            const m = res.model;
-            document.getElementById('model-id').value = m.id;
-            document.getElementById('model-name').value = m.name;
-            document.getElementById('model-provider').value = m.provider || 'azure_openai';
-            document.getElementById('model-deployment').value = m.deployment_name;
-            document.getElementById('model-temperature').value = m.temperature || '';
-            document.getElementById('model-streaming').value = m.streaming ? 'true' : 'false';
-            document.getElementById('model-default').value = m.is_default ? 'true' : 'false';
-            document.getElementById('model-description').value = m.description || '';
-            modal.show();
-          } else {
-            alert('Failed to load model data: ' + res.message);
-          }
-        })
-        .catch(err => alert('Error loading model data: ' + err));
+    // Add model
+    document.getElementById('btn-add-model').addEventListener('click', () => {
+      form.reset();
+      document.getElementById('model-id').value = '';
+      modal.show();
     });
-  });
 
-  // Delete handlers
-  document.querySelectorAll('.btn-delete').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const tr = e.target.closest('tr');
-      const id = tr.dataset.id;
-      if (!confirm('Delete this model?')) return;
-      fetch(`/admin/models/delete/${id}`, {method: 'POST', headers: {'Content-Type':'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')}})
-        .then(r=>r.json()).then(res=>{
-          if (res.status === 'success') location.reload();
-          else alert('Failed to delete: ' + res.message);
-        }).catch(err=>alert('Error: '+err));
+    // Edit handlers
+    document.querySelectorAll('.btn-edit').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const tr = e.target.closest('tr');
+        const id = tr.dataset.id;
+        fetch(`/admin/models/data/${id}`)
+          .then(r => r.json())
+          .then(res => {
+            if (res.status === 'success') {
+              const m = res.model;
+              document.getElementById('model-id').value = m.id;
+              document.getElementById('model-name').value = m.name;
+              document.getElementById('model-provider').value = m.provider || 'azure_openai';
+              document.getElementById('model-deployment').value = m.deployment_name;
+              document.getElementById('model-temperature').value = m.temperature || '';
+              document.getElementById('model-streaming').value = m.streaming ? 'true' : 'false';
+              document.getElementById('model-default').value = m.is_default ? 'true' : 'false';
+              document.getElementById('model-description').value = m.description || '';
+              modal.show();
+            } else {
+              alert('Failed to load model data: ' + res.message);
+            }
+          })
+          .catch(err => alert('Error loading model data: ' + err));
+      });
     });
-  });
 
-  // Set default handlers
-  document.querySelectorAll('.btn-set-default').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const tr = e.target.closest('tr');
-      const id = tr.dataset.id;
-      if (!confirm('Set this model as the global default?')) return;
-      fetch(`/admin/models/set-default/${id}`, {method: 'POST', headers: {'Content-Type':'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')}})
-        .then(r=>r.json()).then(res=>{
-          if (res.status === 'success') location.reload();
-          else alert('Failed to set default: ' + res.message);
-        }).catch(err=>alert('Error: '+err));
+    // Delete handlers
+    document.querySelectorAll('.btn-delete').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const tr = e.target.closest('tr');
+        const id = tr.dataset.id;
+        if (!confirm('Delete this model?')) return;
+        fetch(`/admin/models/delete/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content') } })
+          .then(r => r.json()).then(res => {
+            if (res.status === 'success') location.reload();
+            else alert('Failed to delete: ' + res.message);
+          }).catch(err => alert('Error: ' + err));
+      });
     });
-  });
 
-  // Set multimodal handlers
-  document.querySelectorAll('.btn-set-multimodal').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const tr = e.target.closest('tr');
-      const id = tr.dataset.id;
-      if (!confirm('Set this model as the multimodal default?')) return;
-      fetch(`/admin/models/set-multimodal/${id}`, {method: 'POST', headers: {'Content-Type':'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')}})
-        .then(r=>r.json()).then(res=>{
-          if (res.status === 'success') location.reload();
-          else alert('Failed to set multimodal model: ' + res.message);
-        }).catch(err=>alert('Error: '+err));
+    // Set default handlers
+    document.querySelectorAll('.btn-set-default').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const tr = e.target.closest('tr');
+        const id = tr.dataset.id;
+        if (!confirm('Set this model as the global default?')) return;
+        fetch(`/admin/models/set-default/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content') } })
+          .then(r => r.json()).then(res => {
+            if (res.status === 'success') location.reload();
+            else alert('Failed to set default: ' + res.message);
+          }).catch(err => alert('Error: ' + err));
+      });
     });
-  });
 
-  // Submit add/edit
-  form.addEventListener('submit', (ev) => {
-    ev.preventDefault();
-    const id = document.getElementById('model-id').value;
-    const payload = {
-      name: document.getElementById('model-name').value,
-      provider: document.getElementById('model-provider').value,
-      deployment_name: document.getElementById('model-deployment').value,
-      temperature: document.getElementById('model-temperature').value || null,
-      streaming: document.getElementById('model-streaming').value === 'true',
-      description: document.getElementById('model-description').value,
-      is_default: document.getElementById('model-default').value === 'true'
-    };
-    const url = id ? `/admin/models/edit/${id}` : `/admin/models/add`;
-    fetch(url, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
-      body: JSON.stringify(payload)
-    }).then(r=>r.json()).then(res=>{
-      if (res.status === 'success') {
-        modal.hide();
-        location.reload();
-      } else {
-        alert('Error saving model: ' + res.message);
-      }
-    }).catch(err=>alert('Error: '+err));
-  });
+    // Set multimodal handlers
+    document.querySelectorAll('.btn-set-multimodal').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const tr = e.target.closest('tr');
+        const id = tr.dataset.id;
+        if (!confirm('Set this model as the multimodal default?')) return;
+        fetch(`/admin/models/set-multimodal/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content') } })
+          .then(r => r.json()).then(res => {
+            if (res.status === 'success') location.reload();
+            else alert('Failed to set multimodal model: ' + res.message);
+          }).catch(err => alert('Error: ' + err));
+      });
+    });
 
-});
+    // Submit add/edit
+    form.addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      const id = document.getElementById('model-id').value;
+      const payload = {
+        name: document.getElementById('model-name').value,
+        provider: document.getElementById('model-provider').value,
+        deployment_name: document.getElementById('model-deployment').value,
+        temperature: document.getElementById('model-temperature').value || null,
+        streaming: document.getElementById('model-streaming').value === 'true',
+        description: document.getElementById('model-description').value,
+        is_default: document.getElementById('model-default').value === 'true'
+      };
+      const url = id ? `/admin/models/edit/${id}` : `/admin/models/add`;
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content') },
+        body: JSON.stringify(payload)
+      }).then(r => r.json()).then(res => {
+        if (res.status === 'success') {
+          modal.hide();
+          location.reload();
+        } else {
+          alert('Error saving model: ' + res.message);
+        }
+      }).catch(err => alert('Error: ' + err));
+    });
+
+  });
 </script>
 {% endblock %}
