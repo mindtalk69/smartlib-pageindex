@@ -347,8 +347,8 @@
     window.knowledges = {{ knowledges|tojson|safe }};
     window.__FLASK_KNOWLEDGE_LIBRARIES_MAP = {{ knowledge_libraries_map|default({})|tojson|safe }};
     window.APP_CONFIG = {
-        VECTOR_STORE_MODE: {{ vector_store_mode | default('user') | tojson|safe }}
-        // Add VECTOR_STORE_PROVIDER here if needed by JS in the future
+        VECTOR_STORE_MODE: {{ vector_store_mode | default('user') | tojson|safe }},
+        VECTOR_STORE_PROVIDER: {{ vector_store_provider | default('chromadb') | tojson|safe }}
     };
     window.active_language = {{ active_language|tojson|safe }};
 </script>

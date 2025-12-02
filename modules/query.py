@@ -1219,7 +1219,18 @@ def init_query(app):
                 logging.error(f"Invalid relative path detected: {docling_json_path_rel}")
                 return jsonify({"error": "Invalid document path."}), 400
 
+            # Resolve relative paths using DATA_VOLUME_PATH
             doc_json_path = Path(docling_json_path_rel)
+            if not doc_json_path.is_absolute():
+                # Check if path starts with "data/" - if so, replace with DATA_VOLUME_PATH
+                if docling_json_path_rel.startswith('data/'):
+                    # Strip "data/" prefix and prepend DATA_VOLUME_PATH
+                    relative_part = docling_json_path_rel[5:]  # Remove "data/" prefix
+                    doc_json_path = Path(current_app.config['DATA_VOLUME_PATH']) / relative_part
+                else:
+                    # Fallback: resolve relative to app root
+                    doc_json_path = Path(current_app.root_path) / docling_json_path_rel
+
             doc_json_path_str = str(doc_json_path)
 
             if not doc_json_path.exists():

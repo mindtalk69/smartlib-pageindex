@@ -56,6 +56,8 @@ services:
       - VECTOR_STORE_MODE=knowledge
       - VECTOR_STORE_PROVIDER=pgvector
       - PGVECTOR_COLLECTION_NAME=documents_vectors
+      - PGVECTOR_CONNECTION_STRING=postgresql+psycopg://smartlib_admin:smartlib_dev_password@postgres:5432/smartlibdb?sslmode=disable
+      - DATA_VOLUME_PATH=/home/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -88,6 +90,8 @@ services:
       - VECTOR_STORE_MODE=knowledge
       - VECTOR_STORE_PROVIDER=pgvector
       - PGVECTOR_COLLECTION_NAME=documents_vectors
+      - PGVECTOR_CONNECTION_STRING=postgresql+psycopg://smartlib_admin:smartlib_dev_password@postgres:5432/smartlibdb?sslmode=disable
+      - DATA_VOLUME_PATH=/home/data
     depends_on:
       postgres:
         condition: service_healthy

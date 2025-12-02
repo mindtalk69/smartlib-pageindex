@@ -55,8 +55,20 @@ def view_document(library_id, document_id):
             abort(404, description="Knowledge scope not found for this document.")
         knowledge_id = fallback_knowledge
 
-    base_collection_name = current_app.config.get('CHROMA_COLLECTION_NAME', 'documents-vectors')
+    # Get collection name based on vector store provider
+    import os
+    vector_provider = os.environ.get('VECTOR_STORE_PROVIDER', 'chromadb')
+
+    if vector_provider == 'pgvector':
+        # PGVector uses underscore (PostgreSQL convention)
+        base_collection_name = current_app.config.get('PGVECTOR_COLLECTION_NAME', 'documents_vectors')
+    else:
+        # ChromaDB uses hyphen (original convention)
+        base_collection_name = current_app.config.get('CHROMA_COLLECTION_NAME', 'documents-vectors')
+
     persist_directory = None
+
+    logging.info(f"[ViewDocument] Using vector provider: {vector_provider}, collection: {base_collection_name}")
 
     collection_candidates = []
     try:

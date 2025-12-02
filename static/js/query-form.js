@@ -944,9 +944,14 @@ async function submitQuery() {
     }
 
     // --- Validation for 'knowledge' mode ---
-    if (window.APP_CONFIG && window.APP_CONFIG.VECTOR_STORE_MODE === 'knowledge' && !window.selectedKnowledgeId) {
+    // Only validate for ChromaDB (file-based, separate directories per knowledge)
+    // PGVector stores all knowledge bases in one table, so can query across all
+    if (window.APP_CONFIG &&
+        window.APP_CONFIG.VECTOR_STORE_MODE === 'knowledge' &&
+        window.APP_CONFIG.VECTOR_STORE_PROVIDER === 'chromadb' &&  // Only enforce for ChromaDB
+        !window.selectedKnowledgeId) {
         alert("When 'Knowledge' store mode is active, please select a specific knowledge base from the dropdown before submitting your query.");
-        console.warn("[QueryFormJS] Submission blocked: In 'knowledge' mode, but no specific knowledge_id selected.");
+        console.warn("[QueryFormJS] Submission blocked: In 'knowledge' mode with ChromaDB, but no specific knowledge_id selected.");
         return; // Stop submission
     }
     // --- End Validation ---

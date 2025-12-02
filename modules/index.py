@@ -115,6 +115,9 @@ def init_index(app):
         
         active_language = get_active_language_name()
 
+        # Get vector store provider from config
+        vector_store_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb')
+
         return render_template(
             'index.html',
             conversation=conversation,
@@ -124,6 +127,7 @@ def init_index(app):
             library_options=library_options,
             history_by_date=history_by_date,
             vector_store_mode=vector_store_mode,
+            vector_store_provider=vector_store_provider,
             knowledges=knowledges_list,
             knowledge_libraries_map=knowledge_libraries_map,
             active_language=active_language,

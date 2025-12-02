@@ -1638,8 +1638,9 @@ class VectorStoreSettingsForm(FlaskForm):
     )
     pg_collection = StringField(
         'PGVector Collection/Table Name',
-        default='langchain_vectors',
-        validators=[Optional()]
+        default='documents_vectors',  # Fixed: use underscore (PostgreSQL convention)
+        validators=[Optional()],
+        description='PostgreSQL table name. Read-only for Enterprise edition.'
     )
 
 
@@ -1666,7 +1667,8 @@ def vector_store_settings():
         settings.setdefault('CHROMA_COLLECTION_NAME', 'documents-vectors')
         # Default to the active config (env var) if not set in DB
         settings.setdefault('PGVECTOR_CONNECTION_STRING', current_app.config.get('PGVECTOR_CONNECTION_STRING', ''))
-        settings.setdefault('PGVECTOR_COLLECTION_NAME', 'documents-vectors')
+        # Always use environment variable for PGVector (single source of truth)
+        settings['PGVECTOR_COLLECTION_NAME'] = current_app.config.get('PGVECTOR_COLLECTION_NAME', 'documents_vectors')
 
     except Exception as e:
         logging.error(f"Error fetching vector store settings: {traceback.format_exc()}")

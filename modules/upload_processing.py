@@ -13,6 +13,14 @@ from langchain_community.document_loaders import AzureAIDocumentIntelligenceLoad
 from langchain_docling import DoclingLoader
 from langchain_docling.loader import ExportType
 from docling.chunking import HybridChunker
+
+# Import MetaExtractor only if available (for ENT edition with visual grounding)
+try:
+    from langchain_docling.loader import MetaExtractor
+    HAS_META_EXTRACTOR = True
+except ImportError:
+    HAS_META_EXTRACTOR = False
+    logging.warning("MetaExtractor not available - visual grounding dl_meta extraction will be limited")
 from transformers import AutoTokenizer
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 # Import the correct Document class from Langchain and alias it
@@ -214,11 +222,53 @@ def process_uploaded_file(
             logger.debug(f"--- End Debugging dl_doc for {filename} (Visual Grounding) ---")
             # --- END DEBUG PRINTS ---
 
-            doc_store_base_path = Path(app_config.get('VISUAL_GROUNDING_DOC_STORE_PATH', 'data/doc_store')) if app_config else Path('data/doc_store')
-            target_dir = doc_store_base_path / str(user_id)
+            # Determine if we should use centralized storage (no user subdirs)
+            # ENT: Always centralized (PGVector, metadata-based isolation)
+            # BASIC + global mode: Centralized (shared vector store)
+            # BASIC + user/knowledge mode: User-specific subdirectories
+            app_edition = os.environ.get('APP_EDITION', 'BASIC')
+            vector_store_mode = app_config.get('VECTOR_STORE_MODE') if app_config else os.environ.get('VECTOR_STORE_MODE', 'user')
+
+            use_centralized_storage = (app_edition == 'ENT') or (vector_store_mode == 'global')
+
+            if use_centralized_storage:
+                # ENT or global mode: Use DATA_VOLUME_PATH (Azure-compatible, mounted volume)
+                # Try app_config first, then fallback to environment variable
+                data_volume_path = (app_config.get('DATA_VOLUME_PATH') if app_config else None) or os.environ.get('DATA_VOLUME_PATH', '/home/data')
+                data_volume = Path(data_volume_path)  # For path resolution later
+                doc_store_base_path = Path(data_volume_path) / 'doc_store'
+                logger.info(f"[Visual Grounding] Centralized storage (edition={app_edition}, mode={vector_store_mode}): {doc_store_base_path}")
+            else:
+                # BASIC + user/knowledge mode: Use admin setting or default with user subdirs
+                data_volume = app_config.get('DATA_VOLUME_PATH', 'data') if app_config else 'data'
+                doc_store_default = os.path.join(data_volume, 'doc_store')
+                doc_store_base_path = Path(app_config.get('VISUAL_GROUNDING_DOC_STORE_PATH', doc_store_default)) if app_config else Path(doc_store_default)
+                logger.info(f"[Visual Grounding] User-specific storage (edition={app_edition}, mode={vector_store_mode}): {doc_store_base_path}")
+
+            # Determine subdirectory based on mode
+            if use_centralized_storage:
+                # ENT or global: No subdirectory
+                target_dir = doc_store_base_path
+            elif vector_store_mode == 'knowledge' and knowledge_id:
+                # BASIC + knowledge mode: Use knowledge_id subdirectory
+                target_dir = doc_store_base_path / str(knowledge_id)
+            else:
+                # BASIC + user mode: Use user_id subdirectory
+                target_dir = doc_store_base_path / str(user_id)
+
             binary_hash = dl_doc.origin.binary_hash
             target_json_path = target_dir / f'{binary_hash}.json'
-            target_json_path_str = str(target_json_path)
+
+            # Store relative path in DB for portability (Azure vs local)
+            # Absolute path: /home/data/doc_store/xxx.json -> Relative: data/doc_store/xxx.json
+            target_json_path_abs = str(target_json_path)
+            if data_volume and target_json_path_abs.startswith(str(data_volume)):
+                # Strip DATA_VOLUME_PATH to get relative path
+                target_json_path_str = target_json_path_abs.replace(str(data_volume) + os.sep, 'data/')
+            else:
+                # Fallback to relative path
+                target_json_path_str = f"data/doc_store/{binary_hash}.json"
+
             target_dir.mkdir(parents=True, exist_ok=True)
             dl_doc.save_as_json(target_json_path)
             dl_doc_saved = True
@@ -323,6 +373,9 @@ def process_uploaded_file(
             return {'success': False, 'message': f"Failed to load tokenizer: {tokenizer_err}"}
 
         chunker = HybridChunker(tokenizer=tokenizer)
+
+        # DOC_CHUNKS export type automatically includes dl_meta in chunk metadata
+        # No need to explicitly pass meta_extractor - it's included by default
         loader = DoclingLoader(
             file_path=file_path,
             converter=converter,

@@ -81,8 +81,20 @@
             {% endif %}
         </div>
         <div class="mb-3">
-            {# Use render_field_stacked macro #}
-            {{ render_field_stacked(form.pg_collection, label_visible=true) }}
+            {# PGVector collection name - read-only for Enterprise (infrastructure-managed) #}
+            {% if app_edition == 'ENT' %}
+                {{ form.pg_collection.label(class="form-label") }}
+                <input type="text" class="form-control-plaintext" readonly
+                       value="{{ form.pg_collection.data or current_settings.PGVECTOR_COLLECTION_NAME }}"
+                       aria-describedby="pgCollectionHelp">
+                <div id="pgCollectionHelp" class="form-text">
+                    <i class="bi bi-info-circle"></i> Read-only. Collection name is managed via <code>PGVECTOR_COLLECTION_NAME</code> environment variable.
+                    <br>Current value from environment: <strong>{{ current_settings.PGVECTOR_COLLECTION_NAME }}</strong>
+                </div>
+            {% else %}
+                {# Editable for BASIC edition #}
+                {{ render_field_stacked(form.pg_collection, label_visible=true) }}
+            {% endif %}
         </div>
     </div>
     {% endif %}

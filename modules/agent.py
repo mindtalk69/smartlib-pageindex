@@ -31,12 +31,26 @@ from langchain.chains.query_constructor.schema import AttributeInfo
 #import pandas as pd # For type hinting active_dataframe
 from langchain.retrievers.self_query.base import SelfQueryRetriever
 from langchain_openai import AzureChatOpenAI
-from langchain_chroma import Chroma
 
+# Conditional import: ChromaDB only needed for BASIC edition or when VECTOR_STORE_PROVIDER=chromadb
 try:
+    from langchain_chroma import Chroma
     from chromadb.errors import InternalError as ChromaInternalError
-except ImportError:  # pragma: no cover - optional dependency guard
+    CHROMA_AVAILABLE = True
+except ImportError:  # pragma: no cover - optional dependency for Enterprise edition
+    Chroma = None
     ChromaInternalError = None
+    CHROMA_AVAILABLE = False
+    # Only log warning if chromadb is actually needed
+    app_edition = os.environ.get('APP_EDITION', 'BASIC')
+    vector_store_provider = os.environ.get('VECTOR_STORE_PROVIDER', 'chromadb')
+    if app_edition == 'BASIC' or vector_store_provider == 'chromadb':
+        import logging
+        logging.getLogger(__name__).warning(
+            "ChromaDB not available but APP_EDITION=%s or VECTOR_STORE_PROVIDER=%s. "
+            "Install with: pip install chromadb langchain-chroma",
+            app_edition, vector_store_provider
+        )
 
 agent_db_session = db.session
 
@@ -484,7 +498,7 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
         logging.info(f"[PGVector DEBUG] Using connection: {connection_string[:30]}..., collection: {collection_name}")
         try:
             store = PGVector(
-                connection_string=connection_string,
+                connection=connection_string,  # Correct parameter name
                 embeddings=embed_func,
                 collection_name=collection_name,
                 use_jsonb=True,
@@ -494,6 +508,19 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
             logging.error(f"[PGVector DEBUG] Error initializing PGVector: {e}")
             return {"documents": [], "structured_query": "Error initializing PGVector.", "error": str(e)}
     elif vector_provider == 'chromadb':
+        # Runtime check: Ensure ChromaDB is available
+        if not CHROMA_AVAILABLE:
+            error_msg = (
+                f"ChromaDB not installed but VECTOR_STORE_PROVIDER={vector_provider}. "
+                f"Install with: pip install chromadb langchain-chroma"
+            )
+            logging.error(error_msg)
+            return {
+                "documents": [],
+                "structured_query": "ChromaDB not available",
+                "error": error_msg
+            }
+
         requested_mode = mode_for_operation or app_default_vector_store_mode
 
         if requested_mode not in {'global', 'knowledge', 'user'}:
@@ -633,10 +660,17 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
                     )
 
         else:
-            chosen_strategy = (search_strategy or "self_query").lower()
+            # For PGVector, default to similarity search instead of self_query when no filters
+            # (PGVector SelfQueryRetriever needs special handling not yet implemented)
+            if vector_provider == 'pgvector':
+                chosen_strategy = (search_strategy or "similarity").lower()
+            else:
+                chosen_strategy = (search_strategy or "self_query").lower()
+
             logging.info(
-                "[RAG] No explicit filters provided. Applying search strategy '%s'.",
+                "[RAG] No explicit filters provided. Applying search strategy '%s' (provider: %s).",
                 chosen_strategy,
+                vector_provider,
             )
 
             if chosen_strategy in {"similarity", "cosine"}:
@@ -1489,12 +1523,19 @@ Answer:"""
                     if 0 <= original_doc_idx < len(retrieved_docs):
                         doc = retrieved_docs[original_doc_idx]
                         doc_metadata = doc.metadata or {}
+
+                        # DEBUG: Log all metadata keys to check if docling_json_path is present
+                        logging.info(f"[AgentPy DEBUG] Citation {new_num} metadata keys: {list(doc_metadata.keys())}")
+
                         source_filename = doc_metadata.get("source", "Unknown")
                         page_number_meta = doc_metadata.get("page_number")
                         text_snippet = doc.page_content[:300] + "..."
                         library_id_from_meta = doc_metadata.get("library_id")
                         document_id_str = doc_metadata.get("doc_id")
                         docling_json_path = doc_metadata.get("docling_json_path")
+
+                        # DEBUG: Log if docling_json_path is present
+                        logging.info(f"[AgentPy DEBUG] Citation {new_num} docling_json_path: {docling_json_path}")
                         api_bbox_list = None
                         raw_bbox_obj = None
 

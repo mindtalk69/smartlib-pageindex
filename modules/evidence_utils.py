@@ -37,7 +37,24 @@ def get_visual_info_for_chunk(chunk_id_str: str, page_no_1_indexed: int):
             # 1. Get page height from the docling_json_path (path to original document's page info)
             if db_chunk_row.docling_json_path:
                 try:
-                    with open(db_chunk_row.docling_json_path, 'r') as f:
+                    # Resolve relative paths: stored paths are relative to project root (e.g., "data/doc_store/...")
+                    # Azure: /home/data is mounted, path should resolve to /home/data/doc_store/...
+                    # Local: ./data exists, path should resolve to <project>/data/doc_store/...
+                    from flask import current_app
+                    import os
+                    docling_path = db_chunk_row.docling_json_path
+
+                    if not os.path.isabs(docling_path):
+                        # Check if path starts with "data/" - if so, replace with DATA_VOLUME_PATH
+                        if docling_path.startswith('data/'):
+                            # Strip "data/" prefix and prepend DATA_VOLUME_PATH
+                            relative_part = docling_path[5:]  # Remove "data/" prefix
+                            docling_path = os.path.join(current_app.config['DATA_VOLUME_PATH'], relative_part)
+                        else:
+                            # Fallback: resolve relative to app root
+                            docling_path = os.path.join(current_app.root_path, docling_path)
+
+                    with open(docling_path, 'r') as f:
                         doc_page_data = json.load(f)
 
                     pages_obj = doc_page_data.get('pages')
@@ -119,6 +136,14 @@ def get_visual_info_for_chunk(chunk_id_str: str, page_no_1_indexed: int):
             
             # 2. Get bbox from the chunk-specific dl_meta
             chunk_dl_meta = db_chunk_row.dl_meta
+            # Parse JSON string if needed (dl_meta is stored as TEXT in database)
+            if chunk_dl_meta and isinstance(chunk_dl_meta, str):
+                try:
+                    chunk_dl_meta = json.loads(chunk_dl_meta)
+                except (json.JSONDecodeError, TypeError) as e:
+                    logging.warning(f"[EvidenceUtils] Failed to parse dl_meta JSON for chunk {chunk_id_str}: {e}")
+                    chunk_dl_meta = None
+
             if chunk_dl_meta and isinstance(chunk_dl_meta, dict) and \
                chunk_dl_meta.get('doc_items') and isinstance(chunk_dl_meta['doc_items'], list) and \
                len(chunk_dl_meta['doc_items']) > 0:

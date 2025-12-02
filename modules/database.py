@@ -1785,7 +1785,8 @@ def add_document(id, source, library_id, knowledge_id, dl_meta, content_preview,
         raise
 
 def get_document_for_citations(id):
-    """ Get dl_meta and docling_json_path column from Document for citations"""    
+    """ Get dl_meta and docling_json_path column from Document for citations"""
+    # dl_meta is stored in the documents table for both BASIC and ENT editions
     return Document.query.filter_by(id=id).first()
 
     

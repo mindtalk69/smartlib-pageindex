@@ -66,65 +66,135 @@ def retrieve_context_task(query: str, tool_call_config: Optional[Dict[str, Any]]
 
 
 @celery.task(name="modules.vector_tasks.fetch_document_chunks")
-def fetch_document_chunks(persist_directory: str, collection_name: str, document_id: str) -> Dict[str, object]:
-    """Fetch document chunks from a Chroma collection.
+def fetch_document_chunks(persist_directory: str, collection_name: str, document_id: str, vector_provider: Optional[str] = None) -> Dict[str, object]:
+    """Fetch document chunks from vector store (ChromaDB or PGVector).
 
     Args:
-        persist_directory: Path where the Chroma collection is persisted.
-        collection_name: Name of the Chroma collection.
+        persist_directory: Path where the Chroma collection is persisted (ChromaDB only).
+        collection_name: Name of the vector store collection.
         document_id: UUID string of the document to retrieve.
+        vector_provider: 'chromadb' or 'pgvector'. Auto-detected from env if not provided.
 
     Returns:
         Dictionary containing documents and metadatas lists.
     """
-    try:
-        import chromadb
-        from chromadb.errors import NotFoundError
-    except ImportError as exc:
-        logger.error("ChromaDB is not installed in this environment: %s", exc)
-        raise
+    import os
 
-    try:
-        # Use cached client for performance (25s → <1s)
-        client = get_cached_chroma_client(persist_directory)
+    # Auto-detect provider if not specified
+    if vector_provider is None:
+        vector_provider = os.environ.get('VECTOR_STORE_PROVIDER', 'chromadb')
+
+    logger.info(f"[FetchChunks] Using vector provider: {vector_provider}")
+
+    # === PGVector Backend ===
+    if vector_provider == 'pgvector':
         try:
-            collection = client.get_collection(name=collection_name)
-        except NotFoundError as missing_collection:
-            logger.info(
-                "Chroma collection '%s' not found at '%s': %s",
-                collection_name,
-                persist_directory,
-                missing_collection,
+            from langchain_postgres import PGVector
+            from modules.llm_utils import get_embedding_function
+        except ImportError as exc:
+            logger.error("PGVector dependencies not installed: %s", exc)
+            raise
+
+        try:
+            connection_string = os.environ.get('PGVECTOR_CONNECTION_STRING')
+            if not connection_string:
+                logger.error("PGVECTOR_CONNECTION_STRING not set")
+                return {"documents": [], "metadatas": []}
+
+            embed_func = get_embedding_function()
+
+            # Initialize PGVector store
+            store = PGVector(
+                connection=connection_string,
+                embeddings=embed_func,
+                collection_name=collection_name,
+                use_jsonb=True
             )
+
+            # Query by metadata filter
+            # Try multiple field names in priority order
+            from langchain_core.documents import Document
+            results = []
+
+            for field in ["doc_id", "document_id", "source", "file_id"]:
+                try:
+                    results = store.similarity_search(
+                        query="",  # Empty query, we just want metadata matches
+                        k=100,  # Get many chunks from this document
+                        filter={field: document_id}
+                    )
+                    if results:
+                        logger.info(f"[PGVectorFetch] Found {len(results)} chunks using metadata field '{field}'")
+                        break
+                except Exception as e:
+                    logger.debug(f"[PGVectorFetch] Failed to query with field '{field}': {e}")
+                    continue
+
+            documents = [doc.page_content for doc in results]
+            metadatas = [doc.metadata for doc in results]
+
+            logger.info(f"[PGVectorFetch] Retrieved {len(documents)} chunks for document {document_id}")
+            return {"documents": documents, "metadatas": metadatas}
+
+        except Exception as exc:
+            logger.exception("Failed to fetch document chunks from PGVector for %s", document_id)
+            raise
+
+    # === ChromaDB Backend ===
+    elif vector_provider == 'chromadb':
+        try:
+            import chromadb
+            from chromadb.errors import NotFoundError
+        except ImportError as exc:
+            logger.error("ChromaDB is not installed in this environment: %s", exc)
+            # Return empty instead of raising for Enterprise compatibility
             return {"documents": [], "metadatas": []}
 
-        result = collection.get(ids=[document_id])
-        documents = list(result.get("documents") or [])
-        metadatas = list(result.get("metadatas") or [])
-        logger.info("[ChromaFetch] lookup by id %s returned %d docs", document_id, len(documents))
+        try:
+            # Use cached client for performance (25s → <1s)
+            client = get_cached_chroma_client(persist_directory)
+            try:
+                collection = client.get_collection(name=collection_name)
+            except NotFoundError as missing_collection:
+                logger.info(
+                    "Chroma collection '%s' not found at '%s': %s",
+                    collection_name,
+                    persist_directory,
+                    missing_collection,
+                )
+                return {"documents": [], "metadatas": []}
 
-        if not documents and document_id:
-            compact_id = document_id.replace('-', '')
-            if compact_id != document_id:
-                result = collection.get(ids=[compact_id])
-                documents = list(result.get("documents") or [])
-                metadatas = list(result.get("metadatas") or [])
-                logger.info("[ChromaFetch] lookup by compact id %s returned %d docs", compact_id, len(documents))
-
-        if not documents:
-            result = collection.get(where={"doc_id": document_id})
+            result = collection.get(ids=[document_id])
             documents = list(result.get("documents") or [])
             metadatas = list(result.get("metadatas") or [])
-            logger.info(
-                "[ChromaFetch] lookup by metadata doc_id=%s returned %d docs",
-                document_id,
-                len(documents),
-            )
+            logger.info("[ChromaFetch] lookup by id %s returned %d docs", document_id, len(documents))
 
-        return {"documents": documents, "metadatas": metadatas}
-    except Exception as exc:
-        logger.exception("Failed to fetch document chunks for %s from %s", document_id, collection_name)
-        raise
+            if not documents and document_id:
+                compact_id = document_id.replace('-', '')
+                if compact_id != document_id:
+                    result = collection.get(ids=[compact_id])
+                    documents = list(result.get("documents") or [])
+                    metadatas = list(result.get("metadatas") or [])
+                    logger.info("[ChromaFetch] lookup by compact id %s returned %d docs", compact_id, len(documents))
+
+            if not documents:
+                result = collection.get(where={"doc_id": document_id})
+                documents = list(result.get("documents") or [])
+                metadatas = list(result.get("metadatas") or [])
+                logger.info(
+                    "[ChromaFetch] lookup by metadata doc_id=%s returned %d docs",
+                    document_id,
+                    len(documents),
+                )
+
+            return {"documents": documents, "metadatas": metadatas}
+        except Exception as exc:
+            logger.exception("Failed to fetch document chunks for %s from %s", document_id, collection_name)
+            raise
+
+    else:
+        logger.error(f"Unsupported vector provider: {vector_provider}")
+        return {"documents": [], "metadatas": []}
 
 
 @celery.task(name="modules.vector_tasks.list_chroma_stores")

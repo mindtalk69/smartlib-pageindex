@@ -41,6 +41,7 @@ def _init_pgvector_with_retry(embedding_function, documents, collection_name, co
                 collection_name=collection_name,
                 connection=connection_string,
                 ids=ids,
+                use_jsonb=True,  # Store metadata as JSONB (supports all fields including docling_json_path)
             )
         return _create_store()
     else:
@@ -51,6 +52,7 @@ def _init_pgvector_with_retry(embedding_function, documents, collection_name, co
             collection_name=collection_name,
             connection=connection_string,
             ids=ids,
+            use_jsonb=True,  # Store metadata as JSONB (supports all fields including docling_json_path)
         )
 
 def log_vector_reference(file_id, url_download_id, chunk_index):
@@ -142,7 +144,7 @@ def process_and_store_chunks(splits, user_id, embedding_function, logger, file_i
                     embedding_function=embedding_function,
                     documents=splits,
                     collection_name=collection_name,
-                    connection=connection_string,
+                    connection_string=connection_string,
                     ids=new_uuid_indexes,
                 )
                 logger.info(f"PGVector instance created and documents added.")
