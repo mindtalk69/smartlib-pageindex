@@ -105,7 +105,7 @@
             "type": "Microsoft.Common.InfoBox",
             "options": {
               "icon": "Warning",
-              "text": "IMPORTANT: After deployment, update your Azure AD App Registration's Redirect URI with the actual web app URL from deployment outputs: https://{webapp-name}.azurewebsites.net/auth/callback"
+              "text": "IMPORTANT: After deployment, update your Azure AD App Registration's Redirect URI with the actual web app URL from deployment outputs: https://{webapp-name}.azurewebsites.net/login_azure"
             }
           }
         ]

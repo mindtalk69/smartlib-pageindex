@@ -240,6 +240,21 @@ def init_upload(app):
                 
                 if task_id:
                     logger.info(f"Submitted Celery task {task_id} for processing {filename}")
+
+                    # Register task in Redis for status tracking
+                    try:
+                        import redis
+                        broker_url = os.environ.get('CELERY_BROKER_URL')
+                        if broker_url:
+                            redis_client = redis.from_url(broker_url)
+                            task_key = f"user:{current_user.user_id}:upload_tasks"
+                            redis_client.rpush(task_key, task_id)
+                            redis_client.expire(task_key, 86400)  # 24 hours
+                            logger.debug(f"Registered task {task_id} for user {current_user.user_id}")
+                        else:
+                            logger.warning("CELERY_BROKER_URL not set, skipping task registration")
+                    except Exception as e:
+                        logger.error(f"Failed to register task in Redis: {e}")
                 else:
                     logger.warning("Celery task not available - file uploaded but processing disabled")
                     task_id = 'processing_disabled'
@@ -435,6 +450,22 @@ def init_upload(app):
                 )
                 task_scheduled = bool(task_id)
 
+                # Register task in Redis for status tracking
+                if task_id:
+                    try:
+                        import redis
+                        broker_url = os.environ.get('CELERY_BROKER_URL')
+                        if broker_url:
+                            redis_client = redis.from_url(broker_url)
+                            task_key = f"user:{current_user.user_id}:upload_tasks"
+                            redis_client.rpush(task_key, task_id)
+                            redis_client.expire(task_key, 86400)  # 24 hours
+                            logger.debug(f"Registered URL download task {task_id} for user {current_user.user_id}")
+                        else:
+                            logger.warning("CELERY_BROKER_URL not set, skipping task registration")
+                    except Exception as e:
+                        logger.error(f"Failed to register task in Redis: {e}")
+
             if not task_scheduled:
                 from modules.upload_processing import process_uploaded_file
                 result = process_uploaded_file(
@@ -493,6 +524,114 @@ def init_upload(app):
             }
 
         return jsonify(response_payload)
+
+    @app.route('/api/upload-status', methods=['GET'])
+    @login_required
+    def upload_status_api():
+        """Get status of all upload tasks for current user."""
+        from celery.result import AsyncResult
+        from celery_app import celery
+        import redis
+
+        try:
+            broker_url = os.environ.get('CELERY_BROKER_URL')
+            if not broker_url:
+                logger.warning("CELERY_BROKER_URL not set")
+                return jsonify({'tasks': []})
+            redis_client = redis.from_url(broker_url)
+        except Exception as e:
+            logger.error(f"Failed to connect to Redis: {e}")
+            return jsonify({'tasks': []})
+
+        # Get task IDs from Redis for this user
+        task_key = f"user:{current_user.user_id}:upload_tasks"
+        try:
+            task_ids = redis_client.lrange(task_key, 0, -1)
+            logger.info(f"[UploadStatus] Found {len(task_ids)} task IDs in Redis for user {current_user.user_id}")
+        except Exception as e:
+            logger.error(f"Failed to get task list from Redis: {e}")
+            return jsonify({'tasks': []})
+
+        tasks = []
+        tasks_to_remove = []
+
+        for task_id in task_ids:
+            task_id_str = task_id.decode('utf-8') if isinstance(task_id, bytes) else task_id
+            logger.info(f"[UploadStatus] Processing task_id: {task_id_str}")
+
+            try:
+                result = AsyncResult(task_id_str, app=celery)
+                logger.info(f"[UploadStatus] Task {task_id_str} - State: {result.state}, Info: {result.info}, Info is None: {result.info is None}")
+
+                # Remove orphaned PENDING tasks (no worker processing)
+                if result.state == 'PENDING' and result.info is None:
+                    logger.warning(f"Removing orphaned PENDING task {task_id_str}")
+                    tasks_to_remove.append(task_id_str)
+                    continue  # Skip adding to tasks list
+
+                # Build task info
+                task_info = {
+                    'task_id': task_id_str,
+                    'status': result.state,
+                    'filename': 'Unknown',
+                    'info': {}
+                }
+
+                # Extract info from result
+                if isinstance(result.info, dict):
+                    task_info['filename'] = result.info.get('filename', 'Unknown')
+                    task_info['info'] = {
+                        'stage': result.info.get('stage'),
+                        'progress': result.info.get('progress'),
+                        'error': result.info.get('error') or result.info.get('message')
+                    }
+
+                tasks.append(task_info)
+
+                # Mark old completed tasks for removal (older than 1 hour)
+                if result.state in ['SUCCESS', 'FAILURE']:
+                    # Get result timestamp if available
+                    if hasattr(result, 'date_done') and result.date_done:
+                        from datetime import datetime, timezone
+                        age = datetime.now(timezone.utc) - result.date_done
+                        if age.total_seconds() > 3600:  # 1 hour
+                            tasks_to_remove.append(task_id_str)
+
+            except Exception as e:
+                logger.error(f"Failed to get status for task {task_id_str}: {e}")
+                # Remove invalid task IDs
+                tasks_to_remove.append(task_id_str)
+
+        # Clean up old/invalid tasks
+        logger.info(f"[UploadStatus] Cleaning up {len(tasks_to_remove)} tasks from Redis")
+        for task_id_str in tasks_to_remove:
+            try:
+                redis_client.lrem(task_key, 0, task_id_str)
+                logger.info(f"[UploadStatus] Removed task {task_id_str} from Redis")
+            except Exception as e:
+                logger.error(f"Failed to remove task {task_id_str}: {e}")
+
+        logger.info(f"[UploadStatus] Returning {len(tasks)} tasks to client")
+        return jsonify({'tasks': tasks})
+
+    @app.route('/api/upload-status/<task_id>/dismiss', methods=['POST'])
+    @login_required
+    def dismiss_upload_task(task_id):
+        """Dismiss a completed task from the user's task list."""
+        import redis
+
+        try:
+            broker_url = os.environ.get('CELERY_BROKER_URL')
+            if not broker_url:
+                return jsonify({'success': False, 'error': 'CELERY_BROKER_URL not set'}), 500
+            redis_client = redis.from_url(broker_url)
+            task_key = f"user:{current_user.user_id}:upload_tasks"
+            redis_client.lrem(task_key, 0, task_id)
+            logger.info(f"User {current_user.user_id} dismissed task {task_id}")
+            return jsonify({'success': True})
+        except Exception as e:
+            logger.error(f"Failed to dismiss task {task_id}: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
 
 
 def allowed_file(filename):

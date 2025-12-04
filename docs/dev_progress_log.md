@@ -1,5 +1,28 @@
 # SmartLib Dev Progress Log
 
+## 2025-12-04 – Upload Status Tracker with Navbar Badge
+- Implemented real-time upload status tracking system with navbar badge indicator to provide visibility into background file ingestion processing by Celery workers.
+- Added Redis-based task tracking: file uploads and URL downloads now register their Celery task IDs in user-specific Redis lists (`user:{user_id}:upload_tasks`) with 24-hour expiry for automatic cleanup.
+- Created `/api/upload-status` endpoint that polls Celery AsyncResult for each task, returns status (PENDING/PROGRESS/SUCCESS/FAILURE), filename, and progress metadata, and automatically removes orphaned PENDING tasks (no worker processing) and old completed tasks (>1 hour).
+- Built client-side polling system in `static/js/upload-status.js` with 5-second refresh intervals, dropdown menu showing active/completed tasks, progress bars for in-progress uploads, toast notifications on completion, and automatic badge updates.
+- Added Celery task progress updates in `modules/upload_processing.py`: tasks now report their state with `self.update_state()` including filename, processing stage, and percentage progress at key milestones (Starting 0%, Processing 10%, Completed 100%).
+- Integrated upload status badge into navbar (`templates/base.html`) with dropdown menu (max 320px width, 300px height, scrollable), positioned 8px from top to avoid browser chrome cutoff, shows active task count, and includes manual refresh button and per-task dismiss action.
+- Fixed CSRF token reading in JavaScript: changed from form field selector `document.querySelector('[name="csrf_token"]')?.value` to meta tag `document.querySelector('meta[name="csrf-token"]')?.content` to match base template implementation.
+- Fixed task registration using `os.environ.get('CELERY_BROKER_URL')` instead of `current_app.config.get()` to ensure Redis client connects properly, and corrected User model attribute from `current_user.id` to `current_user.user_id` throughout `modules/upload.py`.
+- Implemented automatic cleanup logic: orphaned PENDING tasks (state='PENDING', info=None) are immediately removed from Redis, completed tasks (SUCCESS/FAILURE) older than 1 hour are auto-cleaned, and users can manually dismiss completed tasks via dismiss button.
+- Added comprehensive debug logging with `[UploadStatus]` prefix showing task counts, state transitions, cleanup operations, and API response sizes for troubleshooting and monitoring.
+- Current behavior: badge appears automatically within 5 seconds after upload (next polling cycle), updates every 5 seconds with real-time progress, shows animated progress bars during processing, displays toast notifications on completion/failure, and stops polling when no active tasks remain (after 10-second grace period).
+- Files modified: `templates/base.html` (navbar badge, toast container, script loading), `static/js/upload-status.js` (NEW - polling and UI logic), `modules/upload.py` (API endpoints, task registration), `modules/upload_processing.py` (Celery progress updates).
+
+## 2025-12-02 – Visual Grounding ENT Edition Fixes
+- Fixed visual grounding icon not displaying in ENT edition (PGVector/PostgreSQL) despite backend successfully fetching `docling_json_path` and `page_height` from the database.
+- Identified that `dl_meta` bounding box metadata is stored in the `documents` table as TEXT (JSON string) for both BASIC and ENT editions, not in PGVector's `langchain_pg_embedding.cmetadata` JSONB column.
+- Reverted `get_document_for_citations()` in `modules/database.py` to query the `documents` table instead of PGVector, ensuring both editions use the same data source for visual grounding metadata.
+- Added JSON parsing in `modules/evidence_utils.py` to handle `dl_meta` TEXT column: added `json.loads()` conversion when `dl_meta` is a string before extracting bounding box coordinates.
+- Fixed path resolution in `/api/visual_evidence` endpoint (`modules/query.py`) to resolve relative paths like `data/doc_store/...` using `DATA_VOLUME_PATH`, matching the logic in `evidence_utils.py` for both Azure (`/home/data`) and local (`./data`) deployments.
+- Confirmed visual grounding (icon display + bounding box image overlay) now works correctly in ENT edition without breaking BASIC edition compatibility.
+- Verified `ExportType.DOC_CHUNKS` in DoclingLoader automatically includes `dl_meta` in chunk metadata by default, no explicit MetaExtractor configuration needed.
+
 ## 2025-11-19 – Streaming Pipeline Review
 - Investigated why `/api/query` streaming calls never triggered Celery and confirmed the web container was invoking `invoke_agent_graph` directly while non-streaming paths queued `modules.agent.invoke_agent_graph` via Celery.
 - Documented the wiring plan to push streaming chunks through Celery: introduce a Redis-backed stream bus, pass `stream_token` metadata from the web route, emit SSE payloads from the worker, and relay them in the web tier so both services share load.

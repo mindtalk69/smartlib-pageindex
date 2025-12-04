@@ -398,6 +398,10 @@
               "value": "[variables('webAppName')]"
             },
             {
+              "name": "REDIRECT_URI",
+              "value": "[concat('https://', variables('webAppName'), '.azurewebsites.net/login_azure')]"
+            },
+            {
               "name": "APP_CLIENT_ID",
               "value": "[parameters('APP_CLIENT_ID')]"
             },
@@ -751,7 +755,10 @@
     },
     "redirectUri": {
       "type": "string",
-      "value": "[uri(format('https://{0}.azurewebsites.net', variables('webAppName')), '/auth/callback')]"
+      "value": "[concat('https://', variables('webAppName'), '.azurewebsites.net/login_azure')]",
+      "metadata": {
+        "description": "Add this URL to your Azure AD App Registration Redirect URIs"
+      }
     },
     "keyVaultName": {
       "type": "string",

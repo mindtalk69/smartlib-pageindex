@@ -354,7 +354,8 @@
     },
     "selectedSku": "[variables('skuMap')[parameters('appServicePlanSkuName')]]",
     "storageAccountKeyValue": "[if(equals(parameters('storageAccountKey'), ''), listKeys(resourceId(parameters('storageAccountResourceGroup'), 'Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2023-04-01').keys[0].value, parameters('storageAccountKey'))]",
-    "postgresPasswordValue": "[if(not(equals(parameters('postgresPasswordSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('postgresPasswordSecretUri'), ')'), parameters('postgresAdminPassword'))]"
+    "postgresPasswordValue": "[if(not(equals(parameters('postgresPasswordSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('postgresPasswordSecretUri'), ')'), parameters('postgresAdminPassword'))]",
+    "postgresConnectionString": "[concat('postgresql+psycopg://', parameters('postgresAdminUser'), ':', variables('postgresPasswordValue'), '@', parameters('postgresServerFqdn'), ':5432/', parameters('postgresDatabaseName'), '?sslmode=require')]"
   },
   "resources": [
     {
@@ -449,6 +450,10 @@
               "value": "[variables('webAppName')]"
             },
             {
+              "name": "REDIRECT_URI",
+              "value": "[concat('https://', variables('webAppName'), '.azurewebsites.net/login_azure')]"
+            },
+            {
               "name": "APP_CLIENT_ID",
               "value": "[parameters('APP_CLIENT_ID')]"
             },
@@ -521,6 +526,10 @@
               "value": "ENT"
             },
             {
+              "name": "VECTOR_STORE_PROVIDER",
+              "value": "pgvector"
+            },
+            {
               "name": "VECTOR_STORE_MODE",
               "value": "knowledge"
             },
@@ -554,11 +563,11 @@
             },
             {
               "name": "SQLALCHEMY_DATABASE_URI",
-              "value": "placeholder-will-be-built-from-components"
+              "value": "[variables('postgresConnectionString')]"
             },
             {
               "name": "PGVECTOR_CONNECTION_STRING",
-              "value": "placeholder-will-be-built-from-components"
+              "value": "[variables('postgresConnectionString')]"
             },
             {
               "name": "RUN_DEFAULT_MODELS",
@@ -721,6 +730,10 @@
               "value": "ENT"
             },
             {
+              "name": "VECTOR_STORE_PROVIDER",
+              "value": "pgvector"
+            },
+            {
               "name": "VECTOR_STORE_MODE",
               "value": "knowledge"
             },
@@ -754,11 +767,11 @@
             },
             {
               "name": "SQLALCHEMY_DATABASE_URI",
-              "value": "placeholder-will-be-built-from-components"
+              "value": "[variables('postgresConnectionString')]"
             },
             {
               "name": "PGVECTOR_CONNECTION_STRING",
-              "value": "placeholder-will-be-built-from-components"
+              "value": "[variables('postgresConnectionString')]"
             },
             {
               "name": "WEBSITES_PORT",
@@ -874,19 +887,14 @@
     },
     "redirectUri": {
       "type": "string",
-      "value": "[uri(format('https://{0}.azurewebsites.net', variables('webAppName')), '/auth/callback')]"
+      "value": "[concat('https://', variables('webAppName'), '.azurewebsites.net/login_azure')]",
+      "metadata": {
+        "description": "Add this URL to your Azure AD App Registration Redirect URIs"
+      }
     },
     "keyVaultName": {
       "type": "string",
       "value": "[parameters('existingKeyVaultName')]"
-    },
-    "costSavings": {
-      "type": "object",
-      "value": {
-        "monthlyCost": "~$30",
-        "savings": "~$13 (30%)",
-        "description": "Shared App Service Plan reduces costs compared to separate plans"
-      }
     },
     "webAppPrincipalId": {
       "type": "string",
@@ -909,6 +917,34 @@
     "deployedResourceGroup": {
       "type": "string",
       "value": "[parameters('resourceGroup')]"
+    },
+    "postgresServerInfo": {
+      "type": "object",
+      "value": {
+        "serverName": "[parameters('postgresServerName')]",
+        "serverFqdn": "[parameters('postgresServerFqdn')]",
+        "databaseName": "[parameters('postgresDatabaseName')]",
+        "resourceGroup": "[parameters('postgresServerResourceGroup')]",
+        "version": "[parameters('postgresServerVersion')]",
+        "connectionStringFormat": "postgresql+psycopg://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require"
+      }
+    },
+    "enterpriseFeatures": {
+      "type": "object",
+      "value": {
+        "tier": "ENTERPRISE",
+        "vectorStore": "PGVector (PostgreSQL extension)",
+        "database": "PostgreSQL Flexible Server",
+        "vectorStoreMode": "knowledge (per-knowledge isolation)",
+        "maxConcurrentUsers": "10+",
+        "features": [
+          "PostgreSQL database with pgvector extension",
+          "Scalable vector search",
+          "Production-grade data persistence",
+          "Per-knowledge collection isolation",
+          "Advanced access control"
+        ]
+      }
     }
   }
 }

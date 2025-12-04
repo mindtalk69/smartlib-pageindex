@@ -105,7 +105,23 @@
   outline: none !important;
   overflow-y: hidden;
   display: block;
-  color: inherit;
+  color: #212529; /* Dark text for light mode */
+}
+
+/* Dark mode textarea text color */
+[data-bs-theme="dark"] .query-input-wrapper .query-input-area {
+  color: #e1e1e1; /* Light text for dark mode */
+}
+
+/* Placeholder color for better visibility */
+.query-input-wrapper .query-input-area::placeholder {
+  color: #6c757d;
+  opacity: 0.6;
+}
+
+[data-bs-theme="dark"] .query-input-wrapper .query-input-area::placeholder {
+  color: #adb5bd;
+  opacity: 0.6;
 }
 
 /* Button sizing and alignment */

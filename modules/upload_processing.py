@@ -858,6 +858,12 @@ def async_process_single_file(self, temp_file_path_from_route, original_filename
     task_logger = logging.getLogger(f"celery.task.{self.name}")
     task_logger.info(f"Celery task started for: {original_filename}, temp path: {temp_file_path_from_route}")
 
+    # Update state: Starting
+    self.update_state(
+        state='PROGRESS',
+        meta={'filename': original_filename, 'stage': 'Starting...', 'progress': 0}
+    )
+
     if url_download_id:
         update_url_download(url_download_id, status='processing')
 
@@ -874,6 +880,12 @@ def async_process_single_file(self, temp_file_path_from_route, original_filename
 
     result = {}
     try:
+        # Update state: Processing document
+        self.update_state(
+            state='PROGRESS',
+            meta={'filename': original_filename, 'stage': 'Processing document...', 'progress': 10}
+        )
+
         result = process_uploaded_file(
             file_path=temp_file_path_from_route,
             filename=original_filename,
@@ -888,17 +900,47 @@ def async_process_single_file(self, temp_file_path_from_route, original_filename
             url_download_id=url_download_id,
             source_url=source_url,
         )
+
         if result.get('success'):
             task_logger.info(f"Async processing successful for {original_filename}: {result.get('message')}")
+
+            # Update state: Completed
+            self.update_state(
+                state='SUCCESS',
+                meta={'filename': original_filename, 'stage': 'Completed', 'progress': 100}
+            )
+
             if url_download_id:
                 update_url_download(url_download_id, status='success', content_type=content_type)
         else:
             task_logger.error(f"Async processing failed for {original_filename}: {result.get('message')}")
+
+            # Update state: Failed
+            self.update_state(
+                state='FAILURE',
+                meta={
+                    'filename': original_filename,
+                    'error': result.get('message', 'Processing failed'),
+                    'progress': 0
+                }
+            )
+
             if url_download_id:
                 update_url_download(url_download_id, status='failed', error_message=result.get('message'))
     except Exception as e:
         task_logger.error(f"Exception in async_process_single_file for {original_filename}: {e}", exc_info=True)
         result = {'success': False, 'message': f"Celery task exception: {str(e)}", 'filename': original_filename}
+
+        # Update state: Failed with exception
+        self.update_state(
+            state='FAILURE',
+            meta={
+                'filename': original_filename,
+                'error': str(e),
+                'progress': 0
+            }
+        )
+
         if url_download_id:
             update_url_download(url_download_id, status='failed', error_message=str(e))
     finally:
