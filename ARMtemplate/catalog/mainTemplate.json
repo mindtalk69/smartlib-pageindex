@@ -29,18 +29,25 @@
         "description": "Optional: Key Vault secret URI containing the Redis connection string. Takes precedence over redisConnectionString parameter."
       }
     },
-    "CELERY_BROKER_URL": {
-      "type": "secureString",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Celery broker URL. If empty, will use Redis connection string."
-      }
-    },
-    "CELERY_RESULT_BACKEND": {
+    "redisName": {
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "Celery result backend. If empty, will use Redis connection string."
+        "description": "Name of the Azure Redis Cache instance (required if configureRedisFirewall is true)."
+      }
+    },
+    "redisResourceGroup": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().name]",
+      "metadata": {
+        "description": "Resource group containing the Azure Redis Cache. Defaults to the current resource group."
+      }
+    },
+    "configureRedisFirewall": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "If true, outputs commands to configure Redis firewall rules for App Service access. Requires redisName parameter."
       }
     },
     "existingKeyVaultName": {
@@ -56,18 +63,11 @@
         "description": "The resource group of the existing Azure Key Vault instance. Defaults to the current resource group."
       }
     },
-    "createRoleAssignment": {
+    "createStorageRoleAssignment": {
       "type": "bool",
       "defaultValue": false,
       "metadata": {
-        "description": "Automatic role assignment creation. Default is false due to Azure limitations with cross-resource-group deployments. Create role assignments manually after deployment for production use."
-      }
-    },
-    "createStorageRoleAssignment": {
-      "type": "bool",
-      "defaultValue": true,
-      "metadata": {
-        "description": "If true, role assignments will be created to grant the apps identity-based access to Storage Account. Set to false on subsequent deployments."
+        "description": "If true, attempts automatic Storage Account role assignment creation. Default is false due to Azure limitations with cross-resource-group deployments. Create role assignments manually after deployment for production use."
       }
     },
     "azureOpenAIKey": {
@@ -190,16 +190,22 @@
     },
     "webDockerImageName": {
       "type": "string",
-      "defaultValue": "smartlib-web:latest",
+      "defaultValue": "smartlib-web-basic:latest",
       "metadata": {
-        "description": "Docker image name for the web app (e.g., smartlib-web:latest)"
+        "description": "Docker image name for the web app - Basic edition (e.g., smartlib-web-basic:latest)"
       }
     },
     "workerDockerImageName": {
       "type": "string",
-      "defaultValue": "smartlib-worker:latest",
+      "defaultValue": "smartlib-worker-basic:latest",
       "metadata": {
-        "description": "Docker image name for the worker app (e.g., smartlib-worker:latest)"
+        "description": "Docker image name for the worker app - Basic edition (e.g., smartlib-worker-basic:latest)"
+      }
+    },
+    "acrPassword": {
+      "type": "secureString",
+      "metadata": {
+        "description": "Azure Container Registry password for smartlibdev.azurecr.io"
       }
     },
     "APP_CLIENT_ID": {
@@ -264,14 +270,18 @@
     },
     "appServicePlanSkuName": {
       "type": "string",
-      "defaultValue": "B1",
+      "defaultValue": "B2",
       "allowedValues": [
         "B1",
+        "B2",
+        "B3",
         "S1",
+        "S2",
+        "S3",
         "P1v2"
       ],
       "metadata": {
-        "description": "The SKU for the shared App Service Plan. Determines the pricing tier and capacity. B1=Basic, S1=Standard, P1v2=PremiumV2."
+        "description": "The SKU for the shared App Service Plan. B1/B2/B3=Basic tier, S1/S2/S3=Standard tier, P1v2=PremiumV2 tier. Minimum B2 (3.5GB RAM) recommended for stable operation."
       }
     },
     "enableAutomaticUpdates": {
@@ -283,7 +293,8 @@
     }
   },
   "variables": {
-    "acrLoginServer": "smartlibregistry-a0cpeuazg3cahnbr.azurecr.io",
+    "acrLoginServer": "smartlibdev.azurecr.io",
+    "acrUsername": "smartlibdev",
     "baseAppName": "[parameters('appPrefix')]",
     "sharedAppServicePlanName": "[concat(variables('baseAppName'), '-plan')]",
     "webAppName": "[concat(variables('baseAppName'), '-web')]",
@@ -293,8 +304,24 @@
         "name": "B1",
         "tier": "Basic"
       },
+      "B2": {
+        "name": "B2",
+        "tier": "Basic"
+      },
+      "B3": {
+        "name": "B3",
+        "tier": "Basic"
+      },
       "S1": {
         "name": "S1",
+        "tier": "Standard"
+      },
+      "S2": {
+        "name": "S2",
+        "tier": "Standard"
+      },
+      "S3": {
+        "name": "S3",
         "tier": "Standard"
       },
       "P1v2": {
@@ -347,11 +374,11 @@
           "appSettings": [
             {
               "name": "CELERY_BROKER_URL",
-              "value": "[if(not(equals(parameters('CELERY_BROKER_URL'), '')), parameters('CELERY_BROKER_URL'), if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString')))]"
+              "value": "[if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString'))]"
             },
             {
               "name": "CELERY_RESULT_BACKEND",
-              "value": "[if(not(equals(parameters('CELERY_RESULT_BACKEND'), '')), parameters('CELERY_RESULT_BACKEND'), if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString')))]"
+              "value": "[if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString'))]"
             },
             {
               "name": "AZURE_OPENAI_API_KEY",
@@ -388,6 +415,18 @@
             {
               "name": "DOCKER_ENABLE_CI",
               "value": "[if(parameters('enableAutomaticUpdates'), 'true', 'false')]"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_URL",
+              "value": "[concat('https://', variables('acrLoginServer'))]"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_USERNAME",
+              "value": "[variables('acrUsername')]"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_PASSWORD",
+              "value": "[parameters('acrPassword')]"
             },
             {
               "name": "KEY_VAULT_NAME",
@@ -523,11 +562,11 @@
           "appSettings": [
             {
               "name": "CELERY_BROKER_URL",
-              "value": "[if(not(equals(parameters('CELERY_BROKER_URL'), '')), parameters('CELERY_BROKER_URL'), if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString')))]"
+              "value": "[if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString'))]"
             },
             {
               "name": "CELERY_RESULT_BACKEND",
-              "value": "[if(not(equals(parameters('CELERY_RESULT_BACKEND'), '')), parameters('CELERY_RESULT_BACKEND'), if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString')))]"
+              "value": "[if(not(equals(parameters('redisConnectionStringSecretUri'), '')), concat('@Microsoft.KeyVault(SecretUri=', parameters('redisConnectionStringSecretUri'), ')'), parameters('redisConnectionString'))]"
             },
             {
               "name": "AZURE_OPENAI_API_KEY",
@@ -560,6 +599,18 @@
             {
               "name": "DOCKER_ENABLE_CI",
               "value": "[if(parameters('enableAutomaticUpdates'), 'true', 'false')]"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_URL",
+              "value": "[concat('https://', variables('acrLoginServer'))]"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_USERNAME",
+              "value": "[variables('acrUsername')]"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_PASSWORD",
+              "value": "[parameters('acrPassword')]"
             },
             {
               "name": "KEY_VAULT_NAME",
@@ -676,36 +727,6 @@
       }
     },
     {
-      "condition": "[parameters('createRoleAssignment')]",
-      "type": "Microsoft.Authorization/roleAssignments",
-      "apiVersion": "2022-04-01",
-      "name": "[guid(parameters('existingKeyVaultName'), resourceId('Microsoft.Web/sites', variables('webAppName')))]",
-      "dependsOn": [
-        "[resourceId('Microsoft.Web/sites', variables('webAppName'))]"
-      ],
-      "scope": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('existingKeyVaultResourceGroup'), '/providers/Microsoft.KeyVault/vaults/', parameters('existingKeyVaultName'))]",
-      "properties": {
-        "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '4633458b-17de-408a-b874-0445c86b69e6')]",
-        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2023-01-01', 'Full').identity.principalId]",
-        "principalType": "ServicePrincipal"
-      }
-    },
-    {
-      "condition": "[parameters('createRoleAssignment')]",
-      "type": "Microsoft.Authorization/roleAssignments",
-      "apiVersion": "2022-04-01",
-      "name": "[guid(parameters('existingKeyVaultName'), resourceId('Microsoft.Web/sites', variables('workerAppName')))]",
-      "dependsOn": [
-        "[resourceId('Microsoft.Web/sites', variables('workerAppName'))]"
-      ],
-      "scope": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('existingKeyVaultResourceGroup'), '/providers/Microsoft.KeyVault/vaults/', parameters('existingKeyVaultName'))]",
-      "properties": {
-        "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '4633458b-17de-408a-b874-0445c86b69e6')]",
-        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2023-01-01', 'Full').identity.principalId]",
-        "principalType": "ServicePrincipal"
-      }
-    },
-    {
       "condition": "[parameters('createStorageRoleAssignment')]",
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
@@ -739,7 +760,7 @@
   "outputs": {
     "webAppUrl": {
       "type": "string",
-      "value": "[uri(format('https://{0}.azurewebsites.net', variables('webAppName')), '')]"
+      "value": "[concat('https://', variables('webAppName'), '.azurewebsites.net')]"
     },
     "webAppName": {
       "type": "string",
@@ -780,15 +801,37 @@
       "type": "string",
       "value": "[reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2023-01-01', 'Full').identity.principalId]"
     },
-    "postDeploymentInstructions": {
-      "type": "object",
-      "value": {
-        "step1": "Grant Key Vault access to apps (required for Key Vault references in app settings)",
-        "webAppCommand": "[concat('az role assignment create --assignee ', reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2023-01-01', 'Full').identity.principalId, ' --role \"Key Vault Secrets User\" --scope /subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('existingKeyVaultResourceGroup'), '/providers/Microsoft.KeyVault/vaults/', parameters('existingKeyVaultName'))]",
-        "workerAppCommand": "[concat('az role assignment create --assignee ', reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2023-01-01', 'Full').identity.principalId, ' --role \"Key Vault Secrets User\" --scope /subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('existingKeyVaultResourceGroup'), '/providers/Microsoft.KeyVault/vaults/', parameters('existingKeyVaultName'))]",
-        "step2": "Wait 5-10 minutes for Azure RBAC propagation",
-        "step3": "[concat('Restart apps: az webapp restart --name ', variables('webAppName'), ' --resource-group ', resourceGroup().name, ' && az webapp restart --name ', variables('workerAppName'), ' --resource-group ', resourceGroup().name)]"
-      }
+    "step1_KeyVault_WebApp": {
+      "type": "string",
+      "value": "[concat('az role assignment create --assignee ', reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2023-01-01', 'Full').identity.principalId, ' --role \"Key Vault Secrets User\" --scope /subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('existingKeyVaultResourceGroup'), '/providers/Microsoft.KeyVault/vaults/', parameters('existingKeyVaultName'))]"
+    },
+    "step2_KeyVault_Worker": {
+      "type": "string",
+      "value": "[concat('az role assignment create --assignee ', reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2023-01-01', 'Full').identity.principalId, ' --role \"Key Vault Secrets User\" --scope /subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('existingKeyVaultResourceGroup'), '/providers/Microsoft.KeyVault/vaults/', parameters('existingKeyVaultName'))]"
+    },
+    "step3_Storage_WebApp": {
+      "type": "string",
+      "value": "[concat('az role assignment create --assignee ', reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2023-01-01', 'Full').identity.principalId, ' --role \"Storage Blob Data Contributor\" --scope /subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('storageAccountResourceGroup'), '/providers/Microsoft.Storage/storageAccounts/', parameters('storageAccountName'))]"
+    },
+    "step4_Storage_Worker": {
+      "type": "string",
+      "value": "[concat('az role assignment create --assignee ', reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2023-01-01', 'Full').identity.principalId, ' --role \"Storage Blob Data Contributor\" --scope /subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('storageAccountResourceGroup'), '/providers/Microsoft.Storage/storageAccounts/', parameters('storageAccountName'))]"
+    },
+    "step5_RestartApps": {
+      "type": "string",
+      "value": "[concat('az webapp restart --name ', variables('webAppName'), ' --resource-group ', resourceGroup().name, ' && az webapp restart --name ', variables('workerAppName'), ' --resource-group ', resourceGroup().name)]"
+    },
+    "step6_Redis_WebApp_IPs": {
+      "type": "string",
+      "value": "[if(parameters('configureRedisFirewall'), concat('# Web App outbound IPs (add firewall rules for each):\n# ', replace(reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2023-01-01').outboundIpAddresses, ',', '\n# ')), 'Redis firewall not configured (configureRedisFirewall=false)')]"
+    },
+    "step7_Redis_Worker_IPs": {
+      "type": "string",
+      "value": "[if(parameters('configureRedisFirewall'), concat('# Worker App outbound IPs (add firewall rules for each):\n# ', replace(reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2023-01-01').outboundIpAddresses, ',', '\n# ')), 'Redis firewall not configured (configureRedisFirewall=false)')]"
+    },
+    "step8_Redis_Firewall_Command": {
+      "type": "string",
+      "value": "[if(parameters('configureRedisFirewall'), concat('# Run this command for EACH IP address listed above:\naz redis firewall-rules create --resource-group ', parameters('redisResourceGroup'), ' --name ', parameters('redisName'), ' --rule-name AllowAppService-<IP> --start-ip <IP> --end-ip <IP>\n\n# Example:\n# az redis firewall-rules create --resource-group ', parameters('redisResourceGroup'), ' --name ', parameters('redisName'), ' --rule-name AllowWebApp-1 --start-ip 1.2.3.4 --end-ip 1.2.3.4'), 'Redis firewall not configured (configureRedisFirewall=false)')]"
     },
     "deployedResourceGroup": {
       "type": "string",

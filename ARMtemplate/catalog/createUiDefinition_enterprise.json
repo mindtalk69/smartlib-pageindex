@@ -376,28 +376,11 @@
             }
           },
           {
-            "name": "createRoleAssignment",
-            "type": "Microsoft.Common.CheckBox",
-            "label": "Attempt automatic Key Vault role assignments (may fail for cross-RG deployments)",
-            "defaultValue": false,
-            "toolTip": "Automatic role assignment creation may fail if Key Vault is in a different resource group. If disabled or fails, create role assignments manually after deployment.",
-            "visible": false
-          },
-          {
             "name": "roleAssignmentInfo",
             "type": "Microsoft.Common.InfoBox",
             "options": {
               "icon": "Warning",
               "text": "⚠️ MANUAL ROLE ASSIGNMENT REQUIRED\n\nAfter deployment completes, grant Key Vault access to the app identities:\n\n1. Copy the az commands from deployment outputs\n2. Run both commands to create role assignments\n3. Wait 5-10 minutes for Azure RBAC propagation\n4. Restart both web and worker apps\n\nNote: Key Vault references will show red/error until role assignments complete and propagate."
-            }
-          },
-          {
-            "name": "kvCrossRgWarning",
-            "type": "Microsoft.Common.InfoBox",
-            "visible": "[and(not(equals(first(split(last(split(steps('infrastructureStep').keyVaultSelector.id, '/resourceGroups/')), '/providers/')), resourceGroup().name)), steps('infrastructureStep').createRoleAssignment)]",
-            "options": {
-              "icon": "Warning",
-              "text": "⚠️ CROSS-RESOURCE-GROUP DEPLOYMENT DETECTED\n\nKey Vault is in a different resource group. Ensure you have 'Microsoft.Authorization/roleAssignments/write' permission on the Key Vault resource group.\n\nIf deployment fails with authorization error, you can:\n1. Deploy without role assignments (uncheck above)\n2. Manually add role assignments after deployment\n3. Request permissions from your Azure admin"
             }
           }
         ]
@@ -455,6 +438,43 @@
             "options": {
               "icon": "Info",
               "text": "How to store Redis connection in Key Vault (RECOMMENDED):\n\n1. Get connection string from Azure (see above)\n2. Convert to SmartLib format (see example above)\n   ⚠️ Make sure it ends with: ?ssl_cert_reqs=none\n\n3. Azure Portal → Key Vault → Secrets → + Generate/Import\n4. Name: REDIS-CONNECTION-STRING\n5. Value: rediss://:PASSWORD@HOSTNAME:6380?ssl_cert_reqs=none\n6. Click 'Create'\n7. Click on the secret name\n8. Copy 'Secret Identifier' (full URL)\n9. Paste here\n\nExample Secret URI:\nhttps://your-keyvault.vault.azure.net/secrets/REDIS-CONNECTION-STRING/abc123def456"
+            }
+          },
+          {
+            "name": "configureRedisFirewall",
+            "type": "Microsoft.Common.CheckBox",
+            "label": "Configure Redis firewall rules",
+            "toolTip": "Enable to receive commands for configuring Redis firewall rules to allow App Service access",
+            "defaultValue": false
+          },
+          {
+            "name": "redisSelector",
+            "type": "Microsoft.Solutions.ResourceSelector",
+            "label": "Select Redis Cache",
+            "resourceType": "Microsoft.Cache/redis",
+            "toolTip": "Select your existing Azure Cache for Redis from the dropdown",
+            "visible": "[steps('redisConnectivityStep').configureRedisFirewall]",
+            "constraints": {
+              "required": "[steps('redisConnectivityStep').configureRedisFirewall]"
+            }
+          },
+          {
+            "name": "redisResourceFound",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(steps('redisConnectivityStep').configureRedisFirewall, not(equals(steps('redisConnectivityStep').redisSelector.name, '')))]",
+            "options": {
+              "icon": "Info",
+              "text": "[concat('✅ Redis Cache selected\n📍 Name: ', steps('redisConnectivityStep').redisSelector.name, '\n📍 Location: ', steps('redisConnectivityStep').redisSelector.location, '\n📍 Resource Group: ', first(split(last(split(steps('redisConnectivityStep').redisSelector.id, '/resourceGroups/')), '/providers/')), '\n\n💡 Firewall rules will be configured for this Redis instance.')]",
+              "style": "Success"
+            }
+          },
+          {
+            "name": "redisFirewallHelp",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[steps('redisConnectivityStep').configureRedisFirewall]",
+            "options": {
+              "icon": "Info",
+              "text": "Redis Firewall Configuration:\n\nWhen enabled, the deployment will output commands to configure Redis firewall rules. This is necessary because Azure Redis Cache with Basic/Standard SKU (without VNet) requires firewall rules to allow App Service connections.\n\nAfter deployment, you'll receive:\n• List of App Service outbound IP addresses\n• Ready-to-use commands to create firewall rules\n\nNote: Premium SKU with VNet integration doesn't need firewall rules."
             }
           }
         ]
@@ -913,20 +933,36 @@
             "name": "appServicePlanSkuName",
             "type": "Microsoft.Common.DropDown",
             "label": "App Service plan SKU",
-            "defaultValue": "B1",
-            "toolTip": "Select the pricing tier for the SmartLib App Service plan.",
+            "defaultValue": "B2",
+            "toolTip": "Select the pricing tier for the SmartLib App Service plan. B2 or higher recommended for Enterprise edition.",
             "constraints": {
               "allowedValues": [
                 {
-                  "label": "B1 - Basic",
+                  "label": "B1 - Basic (1.75 GB RAM, 1 vCPU) - Not Recommended",
                   "value": "B1"
                 },
                 {
-                  "label": "S1 - Standard",
+                  "label": "B2 - Basic (3.5 GB RAM, 2 vCPU) - Recommended Minimum",
+                  "value": "B2"
+                },
+                {
+                  "label": "B3 - Basic (7 GB RAM, 4 vCPU) - Best for Development",
+                  "value": "B3"
+                },
+                {
+                  "label": "S1 - Standard (1.75 GB RAM, 1 vCPU)",
                   "value": "S1"
                 },
                 {
-                  "label": "P1v2 - Premium v2",
+                  "label": "S2 - Standard (3.5 GB RAM, 2 vCPU) - Recommended for Production",
+                  "value": "S2"
+                },
+                {
+                  "label": "S3 - Standard (7 GB RAM, 4 vCPU) - High Performance",
+                  "value": "S3"
+                },
+                {
+                  "label": "P1v2 - Premium v2 (3.5 GB RAM, 1 vCPU)",
                   "value": "P1v2"
                 }
               ]
@@ -936,8 +972,8 @@
             "name": "skuRecommendations",
             "type": "Microsoft.Common.InfoBox",
             "options": {
-              "icon": "Info",
-              "text": "Recommended SKUs:\n• B1: Development/testing (~$13/month)\n• S1: Small production workloads (~$70/month)\n• P1v2: Production with high availability (~$146/month)"
+              "icon": "Warning",
+              "text": "⚠️ MEMORY REQUIREMENTS (Enterprise Edition):\n\n• B1 (1.75 GB RAM, 1 vCPU): Will cause startup failures - NOT recommended\n• B2 (3.5 GB RAM, 2 vCPU): Minimum recommended for stable operation\n• B3 (7 GB RAM, 4 vCPU): Best for development/testing with PostgreSQL + PGVector\n• S2 (3.5 GB RAM, 2 vCPU): Production with auto-scaling and deployment slots\n• S3 (7 GB RAM, 4 vCPU): High-performance production workloads\n\nEnterprise edition with PostgreSQL requires minimum 3.5 GB RAM for reliable operation."
             }
           },
           {
@@ -953,6 +989,30 @@
             "options": {
               "icon": "Info",
               "text": "When enabled, your SmartLib installation will automatically check for and pull the latest container images from the publisher's registry. When disabled, you can manually sync updates via Azure Portal → App Service → Deployment Center → Sync button."
+            }
+          },
+          {
+            "name": "acrPassword",
+            "type": "Microsoft.Common.PasswordBox",
+            "label": {
+              "password": "Container Registry Password",
+              "confirmPassword": "Confirm password"
+            },
+            "defaultValue": "2UmHhHHxyWxPqkfjpe6uTLW+Z0lglz77B7ZQv49KHb+ACRCq/n7M",
+            "toolTip": "Password for smartlibdev.azurecr.io (pre-filled). To get latest: az acr credential show --name smartlibdev",
+            "constraints": {
+              "required": true
+            },
+            "options": {
+              "hideConfirmation": true
+            }
+          },
+          {
+            "name": "acrPasswordInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "📦 Container Registry: smartlibdev.azurecr.io\n👤 Username: smartlibdev (auto-configured)\n🔑 Password: Pre-filled above\n\nThe password is already filled in. You can proceed with deployment or update it if needed."
             }
           },
           {
@@ -1069,11 +1129,11 @@
       "postgresPasswordSecretUri": "[if(equals(steps('databaseStep').postgresPasswordOption, 'KeyVault'), steps('databaseStep').postgresPasswordSecretUri, '')]",
       "existingKeyVaultName": "[steps('infrastructureStep').keyVaultSelector.name]",
       "existingKeyVaultResourceGroup": "[first(split(last(split(steps('infrastructureStep').keyVaultSelector.id, '/resourceGroups/')), '/providers/'))]",
-      "createRoleAssignment": "[steps('infrastructureStep').createRoleAssignment]",
       "redisConnectionString": "[steps('redisConnectivityStep').redisConnectionString]",
       "redisConnectionStringSecretUri": "[steps('redisConnectivityStep').redisConnectionStringSecretUri]",
-      "CELERY_BROKER_URL": "[if(not(equals(steps('redisConnectivityStep').redisConnectionStringSecretUri, '')), steps('redisConnectivityStep').redisConnectionStringSecretUri, steps('redisConnectivityStep').redisConnectionString)]",
-      "CELERY_RESULT_BACKEND": "[if(not(equals(steps('redisConnectivityStep').redisConnectionStringSecretUri, '')), steps('redisConnectivityStep').redisConnectionStringSecretUri, steps('redisConnectivityStep').redisConnectionString)]",
+      "redisName": "[if(steps('redisConnectivityStep').configureRedisFirewall, steps('redisConnectivityStep').redisSelector.name, '')]",
+      "redisResourceGroup": "[if(steps('redisConnectivityStep').configureRedisFirewall, first(split(last(split(steps('redisConnectivityStep').redisSelector.id, '/resourceGroups/')), '/providers/')), '')]",
+      "configureRedisFirewall": "[steps('redisConnectivityStep').configureRedisFirewall]",
       "storageAccountName": "[steps('storageServicesStep').storageAccountSelector.name]",
       "storageAccountKey": "[steps('storageServicesStep').storageAccountKey]",
       "storageAccountResourceGroup": "[first(split(last(split(steps('storageServicesStep').storageAccountSelector.id, '/resourceGroups/')), '/providers/'))]",
@@ -1092,6 +1152,7 @@
       "appPrefix": "[steps('deploymentStep').appPrefix]",
       "appServicePlanSkuName": "[steps('deploymentStep').appServicePlanSkuName]",
       "enableAutomaticUpdates": "[steps('deploymentStep').enableAutomaticUpdates]",
+      "acrPassword": "[steps('deploymentStep').acrPassword]",
       "autoPromoteAdmin": "[steps('deploymentStep').autoPromoteAdmin]",
       "runDefaultModels": "[steps('deploymentStep').runDefaultModels]",
       "appAdminUsername": "[steps('adminStep').appAdminUsername]",
