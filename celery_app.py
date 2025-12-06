@@ -32,7 +32,11 @@ def _register_task_modules():
             __import__(module)
             logger.info("Registered Celery tasks from %s", module)
         except ImportError as exc:
-            logger.debug("Skipping Celery task module %s: %s", module, exc)
+            if "docling" in str(exc) or "No module named 'docling'" in str(exc):
+                # Web container does not have docling, this is expected.
+                logger.info(f"Skipping worker-only task module {module} (missing dependency: {exc})")
+            else:
+                logger.error(f"Failed to import Celery task module {module}", exc_info=True)
 
 
 _register_task_modules()
