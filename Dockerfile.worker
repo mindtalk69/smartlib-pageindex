@@ -36,6 +36,7 @@ RUN apt-get update \
        tesseract-ocr \
        pkg-config \
        ffmpeg \
+       openssh-server \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements-worker.txt /tmp/requirements.txt
@@ -48,6 +49,12 @@ RUN pip install --upgrade pip \
 COPY . /app
 
 RUN chmod +x docker-entrypoint.sh
+
+# Configure SSH for Azure App Service
+COPY sshd_config /etc/ssh/sshd_config
+RUN mkdir -p /var/run/sshd
+
+EXPOSE 2222
 
 ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["worker"]

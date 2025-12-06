@@ -481,7 +481,7 @@ def create_app():
             )
             # Apply defaults explicitly in case of error
             app.config.setdefault('VISUAL_GROUNDING_ENABLED', False)
-            app.config.setdefault('VISUAL_GROUNDING_DOC_STORE_PATH', 'data/doc_store')
+            app.config.setdefault('VISUAL_GROUNDING_DOC_STORE_PATH', '/home/data/doc_store')
             app.config.setdefault('VECTOR_STORE_MODE', 'user')
             app.config.setdefault(
                 'IS_ENABLED_OCR',

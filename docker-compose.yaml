@@ -36,6 +36,8 @@ services:
       - GUNICORN_TIMEOUT=300
       - PYTHONPATH=/app
       - IS_ENABLED_OCR=1
+      - IS_OCR_LOCAL=false
+      - DOCLING_EXPORT_TYPE=MARKDOWN
       - APP_MODULE=app:app
     command: ["web"]
     depends_on:
@@ -62,7 +64,9 @@ services:
       - AGENT_TASK_TIMEOUT=240
       - PYTHONPATH=/app
       - IS_ENABLED_OCR=1
-      
+      - IS_OCR_LOCAL=false
+      - DOCLING_EXPORT_TYPE=MARKDOWN
+
     command: ["worker"]
     depends_on:
       redis:

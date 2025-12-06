@@ -63,13 +63,13 @@ def visual_grounding_settings():
         ])).all()
         settings = {s.key: s.value for s in settings_query}
         settings.setdefault('visual_grounding_enabled', 'false')
-        settings.setdefault('visual_grounding_doc_store_path', 'data/doc_store')
+        settings.setdefault('visual_grounding_doc_store_path', '/home/data/doc_store')
     except Exception as e:
         logging.error(f"Error fetching visual grounding settings: {traceback.format_exc()}")
         flash('Error loading settings.', 'danger')
         settings = {
             'visual_grounding_enabled': 'false',
-            'visual_grounding_doc_store_path': 'data/doc_store'
+            'visual_grounding_doc_store_path': '/home/data/doc_store'
         }
 
     try:

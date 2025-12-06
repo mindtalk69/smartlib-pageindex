@@ -229,21 +229,23 @@ def process_uploaded_file(
             app_edition = os.environ.get('APP_EDITION', 'BASIC')
             vector_store_mode = app_config.get('VECTOR_STORE_MODE') if app_config else os.environ.get('VECTOR_STORE_MODE', 'user')
 
-            use_centralized_storage = (app_edition == 'ENT') or (vector_store_mode == 'global')
+            # Use centralized storage (no subdirectories) for both ENT and BASIC editions
+            # This simplifies visual grounding file management across all editions
+            use_centralized_storage = (app_edition == 'ENT') or (app_edition == 'BASIC')
 
             if use_centralized_storage:
-                # ENT or global mode: Use DATA_VOLUME_PATH (Azure-compatible, mounted volume)
-                # Try app_config first, then fallback to environment variable
+                # ENT or BASIC: Use DATA_VOLUME_PATH (Azure-compatible, mounted volume)
+                # Centralized storage with no user/knowledge subdirectories for simpler management
                 data_volume_path = (app_config.get('DATA_VOLUME_PATH') if app_config else None) or os.environ.get('DATA_VOLUME_PATH', '/home/data')
                 data_volume = Path(data_volume_path)  # For path resolution later
                 doc_store_base_path = Path(data_volume_path) / 'doc_store'
-                logger.info(f"[Visual Grounding] Centralized storage (edition={app_edition}, mode={vector_store_mode}): {doc_store_base_path}")
+                logger.info(f"[Visual Grounding] Centralized storage (edition={app_edition}): {doc_store_base_path}")
             else:
-                # BASIC + user/knowledge mode: Use admin setting or default with user subdirs
+                # Fallback for custom configurations (shouldn't reach here for standard BASIC/ENT)
                 data_volume = app_config.get('DATA_VOLUME_PATH', 'data') if app_config else 'data'
                 doc_store_default = os.path.join(data_volume, 'doc_store')
                 doc_store_base_path = Path(app_config.get('VISUAL_GROUNDING_DOC_STORE_PATH', doc_store_default)) if app_config else Path(doc_store_default)
-                logger.info(f"[Visual Grounding] User-specific storage (edition={app_edition}, mode={vector_store_mode}): {doc_store_base_path}")
+                logger.info(f"[Visual Grounding] Custom storage (edition={app_edition}, mode={vector_store_mode}): {doc_store_base_path}")
 
             # Determine subdirectory based on mode
             if use_centralized_storage:

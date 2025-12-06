@@ -25,12 +25,35 @@ check_data_mount() {
         return 0
     fi
 
+    # Retry configuration
+    local max_retries="${MOUNT_CHECK_RETRIES:-5}"
+    local retry_delay="${MOUNT_CHECK_DELAY:-2}"
+    local attempt=1
+
     echo "Validating data directory mount at ${target_dir}..."
-    if ! python scripts/check_data_mount.py --path "${target_dir}"; then
-        echo "ERROR: Data directory ${target_dir} failed mount validation." >&2
-        echo "Set SKIP_DATA_MOUNT_CHECK=true to bypass (not recommended)." >&2
-        exit 1
-    fi
+    echo "Will retry up to ${max_retries} times with ${retry_delay}s initial delay..."
+
+    while [ $attempt -le $max_retries ]; do
+        echo "Mount check attempt ${attempt}/${max_retries}..."
+
+        if python scripts/check_data_mount.py --path "${target_dir}"; then
+            echo "✓ Mount validation successful on attempt ${attempt}"
+            return 0
+        fi
+
+        if [ $attempt -lt $max_retries ]; then
+            local wait_time=$((retry_delay * attempt))
+            echo "Mount not ready yet. Waiting ${wait_time}s before retry ${attempt}/${max_retries}..."
+            sleep $wait_time
+        fi
+
+        attempt=$((attempt + 1))
+    done
+
+    echo "ERROR: Data directory ${target_dir} failed mount validation after ${max_retries} attempts." >&2
+    echo "Set SKIP_DATA_MOUNT_CHECK=true to bypass (not recommended)." >&2
+    echo "Or increase MOUNT_CHECK_RETRIES/MOUNT_CHECK_DELAY environment variables." >&2
+    exit 1
 }
 
 prepare_sqlite_db() {

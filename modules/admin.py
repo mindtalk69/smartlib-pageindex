@@ -1221,7 +1221,7 @@ def visual_grounding_settings():
         settings = {s.key: s.value for s in settings_query}
         # Ensure defaults if not found
         settings.setdefault('visual_grounding_enabled', 'false')
-        settings.setdefault('visual_grounding_doc_store_path', 'data/doc_store')
+        settings.setdefault('visual_grounding_doc_store_path', '/home/data/doc_store')
         logging.debug(f"Settings loaded/defaulted: {settings}") # Add log
 
     except Exception as e:
@@ -1230,7 +1230,7 @@ def visual_grounding_settings():
         flash('Error loading settings.', 'danger')
         settings = {
             'visual_grounding_enabled': 'false',
-            'visual_grounding_doc_store_path': 'data/doc_store'
+            'visual_grounding_doc_store_path': '/home/data/doc_store'
         } # Provide defaults on error
 
     # No longer need DummyForm

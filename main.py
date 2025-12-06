@@ -107,7 +107,7 @@ def create_app():
             app.logger.error(f"Error loading AppSettings from database: {e}. Using default values.")
             # Apply defaults explicitly in case of error
             app.config.setdefault('VISUAL_GROUNDING_ENABLED', False)
-            app.config.setdefault('VISUAL_GROUNDING_DOC_STORE_PATH', 'data/doc_store')
+            app.config.setdefault('VISUAL_GROUNDING_DOC_STORE_PATH', '/home/data/doc_store')
             app.config.setdefault('VECTOR_STORE_MODE', 'user')
 
     # Configure Login Manager
