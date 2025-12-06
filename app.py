@@ -132,11 +132,13 @@ def _handle_sigterm(signum, frame):
         logging.warning(f"Error during shutdown children: {e}")
     raise SystemExit
 
-# Register handlers
-signal.signal(signal.SIGINT, _handle_sigint)
-signal.signal(signal.SIGTERM, _handle_sigterm)
-atexit.register(cleanup_orphaned_processes)  # Clean orphaned processes on exit
-atexit.register(_shutdown_children)
+# Register handlers only in main thread (Celery worker threads can't register signal handlers)
+import threading
+if threading.current_thread() is threading.main_thread():
+    signal.signal(signal.SIGINT, _handle_sigint)
+    signal.signal(signal.SIGTERM, _handle_sigterm)
+    atexit.register(cleanup_orphaned_processes)  # Clean orphaned processes on exit
+    atexit.register(_shutdown_children)
 
 # Note: load_dotenv is now handled within config.py
 import os

@@ -376,7 +376,9 @@ elif [ "$1" = "worker" ]; then
     fi
 
     # Start the Celery worker
-    exec celery -A celery_app.celery worker --loglevel=info
+    CELERY_POOL=${CELERY_POOL:-prefork}
+    echo "Starting Celery worker with pool type: ${CELERY_POOL}..."
+    exec celery -A celery_app.celery worker --loglevel=info --pool="${CELERY_POOL}"
 
 else
     echo "Error: Must specify 'web' or 'worker' as the first argument."
