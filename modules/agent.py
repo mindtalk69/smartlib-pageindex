@@ -665,7 +665,8 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
             if vector_provider == 'pgvector':
                 chosen_strategy = (search_strategy or "similarity").lower()
             else:
-                chosen_strategy = (search_strategy or "self_query").lower()
+                # Default to similarity for Chroma as well to avoid brittle metadata filtering
+                chosen_strategy = (search_strategy or "similarity").lower()
 
             logging.info(
                 "[RAG] No explicit filters provided. Applying search strategy '%s' (provider: %s).",
@@ -746,6 +747,16 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
 
                 retrieved_docs = retriever.invoke(query)
                 logging.info("[RAG] SelfQueryRetriever retrieved %d documents", len(retrieved_docs))
+
+                # --- Fallback to similarity search if SelfQuery returns nothing ---
+                if not retrieved_docs:
+                    logging.warning("[RAG] SelfQueryRetriever returned 0 documents. Falling back to direct similarity search.")
+                    try:
+                        retrieved_docs = store.similarity_search(query, k=k_docs)
+                        retrieval_mode += " + fallback_similarity"
+                        logging.info("[RAG] Fallback similarity search retrieved %d documents", len(retrieved_docs))
+                    except Exception as fallback_err:
+                        logging.error("[RAG] Fallback similarity search failed: %s", fallback_err)
 
         if retrieved_docs:
             reranked_docs = _rerank_documents_by_query_terms(query, retrieved_docs)

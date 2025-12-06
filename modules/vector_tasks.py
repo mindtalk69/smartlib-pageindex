@@ -167,6 +167,24 @@ def fetch_document_chunks(persist_directory: str, collection_name: str, document
             result = collection.get(ids=[document_id])
             documents = list(result.get("documents") or [])
             metadatas = list(result.get("metadatas") or [])
+            
+            # --- Azure Files Fix: Retry with fresh client if empty (stale cache check) ---
+            if not documents:
+                logger.info("[ChromaFetch] No docs found with cached client. refreshing client to check for stale cache...")
+                # Invalidate cache
+                normalized_path = str(Path(persist_directory).resolve())
+                if normalized_path in _chroma_client_cache:
+                    del _chroma_client_cache[normalized_path]
+                
+                # Get fresh client and retry
+                client = get_cached_chroma_client(persist_directory)
+                collection = client.get_collection(name=collection_name)
+                result = collection.get(ids=[document_id])
+                documents = list(result.get("documents") or [])
+                metadatas = list(result.get("metadatas") or [])
+                logger.info("[ChromaFetch] Retry result: %d docs", len(documents))
+            # -----------------------------------------------------------------------------
+
             logger.info("[ChromaFetch] lookup by id %s returned %d docs", document_id, len(documents))
 
             if not documents and document_id:
@@ -239,8 +257,9 @@ def list_chroma_stores(base_path: Optional[str] = None) -> Dict[str, object]:
         collections: List[Dict[str, object]] = []
 
         try:
-            # Use cached client for performance (25s → <1s)
-            client = get_cached_chroma_client(str(store_dir))
+            # Use FRESH client for listing to ensure accuracy on Azure Files (bypass cache)
+            # client = get_cached_chroma_client(str(store_dir)) 
+            client = chromadb.PersistentClient(path=str(store_dir))
             for coll in client.list_collections():
                 try:
                     count = coll.count()
