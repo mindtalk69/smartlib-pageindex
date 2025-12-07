@@ -16,9 +16,8 @@
       <select class="form-select" id="library-knowledge-select" required>
         <option value="">-- Select Library — Knowledge --</option>
         {% for pair in library_knowledge_pairs %}
-        <option value="{{ pair.library_id }}|{{ pair.knowledge_id }}"
-                data-library-id="{{ pair.library_id }}"
-                data-knowledge-id="{{ pair.knowledge_id }}">
+        <option value="{{ pair.library_id }}|{{ pair.knowledge_id }}" data-library-id="{{ pair.library_id }}"
+          data-knowledge-id="{{ pair.knowledge_id }}">
           {{ pair.library_name }} — {{ pair.knowledge_name }}
         </option>
         {% endfor %}
@@ -26,7 +25,8 @@
     </div>
     <div class="mb-3">
       <label for="folder-input" class="form-label">Select Folder or Files</label>
-      <input class="form-control" id="folder-input" name="folder_files" type="file" webkitdirectory directory multiple required>
+      <input class="form-control" id="folder-input" name="folder_files" type="file" webkitdirectory directory multiple
+        required>
       <div class="form-text">You can select an entire folder or multiple files.</div>
     </div>
     <div class="mb-3">
@@ -80,13 +80,31 @@
         <label class="form-check-label" for="type-bmp">BMP</label>
       </div>
     </div>
+
+    {# Visual Grounding Checkbox - only shown if globally enabled #}
+    {% if visual_grounding_enabled %}
+    <div class="mb-3 form-check">
+      <input class="form-check-input" type="checkbox" id="enable-visual-grounding-admin"
+        name="enable_visual_grounding_admin" data-ocr-mode="{{ ocr_mode }}">
+      <label class="form-check-label" for="enable-visual-grounding-admin">Enable Visual Grounding</label>
+      <small class="form-text text-muted d-block">Links answers to document locations. Slower processing.</small>
+      {# OCR Mode Warning #}
+      <div id="visualGroundingOcrWarningAdmin" class="alert alert-warning mt-2 py-2 px-3 d-none" role="alert">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <strong>Warning:</strong> Requires <strong>Local OCR (Docling)</strong> mode.
+        <a href="{{ url_for('admin.ocr_settings') }}">Change OCR settings</a>.
+      </div>
+    </div>
+    {% endif %}
+
     <div class="mb-3 form-check">
       <input class="form-check-input" type="checkbox" id="background-enabled" name="background_enabled" checked>
       <label class="form-check-label" for="background-enabled">Enable Background Processing</label>
     </div>
     <div class="mb-3" id="schedule-time-group">
       <label for="scheduled-time" class="form-label">Schedule Processing Time</label>
-      <input type="text" class="form-control" id="scheduled-time" name="scheduled_time" placeholder="Select date and time">
+      <input type="text" class="form-control" id="scheduled-time" name="scheduled_time"
+        placeholder="Select date and time">
       <div class="form-text">Leave blank to process immediately.</div>
     </div>
     <button type="submit" class="btn btn-primary">Upload & Schedule</button>

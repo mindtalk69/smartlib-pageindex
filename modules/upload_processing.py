@@ -947,20 +947,41 @@ def async_process_single_file(self, temp_file_path_from_route, original_filename
         )
 
         # Azure Files sync fix: Wait for file to be visible to worker instance
-        # In Azure Web Apps, files saved by web instance may take a moment to sync via Azure Files
+        # In Azure Web Apps, files saved by web instance may take time to sync via Azure Files
         temp_file_path_obj = Path(temp_file_path_from_route)
-        max_wait_seconds = 30
-        wait_interval = 0.5
+        max_wait_seconds = 90  # Increased from 30s to handle slow Azure Files sync
+        wait_interval = 2.0    # Increased from 0.5s to reduce log spam
         elapsed = 0
         
+        # Try to trigger Azure Files sync by listing the parent directory
+        parent_dir = temp_file_path_obj.parent
+        
         while not temp_file_path_obj.exists() and elapsed < max_wait_seconds:
+            # Update progress state so UI shows waiting
+            self.update_state(
+                state='PROGRESS',
+                meta={'filename': original_filename, 'stage': f'Waiting for file sync ({int(elapsed)}s)...', 'progress': 5}
+            )
+            
+            # List parent directory to potentially trigger Azure Files cache refresh
+            try:
+                if parent_dir.exists():
+                    list(parent_dir.iterdir())  # Force directory read
+                    task_logger.debug(f"[Azure Files Sync] Listed parent dir: {parent_dir}")
+            except Exception as dir_err:
+                task_logger.debug(f"[Azure Files Sync] Could not list parent dir: {dir_err}")
+            
             task_logger.warning(
                 f"[Azure Files Sync] File not yet visible: {temp_file_path_from_route}. "
-                f"Waiting {wait_interval}s (elapsed: {elapsed}s/{max_wait_seconds}s)..."
+                f"Waiting {wait_interval}s (elapsed: {elapsed:.0f}s/{max_wait_seconds}s)..."
             )
             import time
             time.sleep(wait_interval)
             elapsed += wait_interval
+            
+            # Exponential backoff after 30 seconds
+            if elapsed >= 30 and wait_interval < 5:
+                wait_interval = 5.0
         
         if not temp_file_path_obj.exists():
             error_msg = (

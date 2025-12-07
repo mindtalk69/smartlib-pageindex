@@ -16,6 +16,28 @@ document.addEventListener("DOMContentLoaded", function () {
   // Set initial state
   scheduleTimeGroup.style.display = backgroundEnabled.checked ? "block" : "none";
 
+  // Visual Grounding OCR Mode Warning Handler
+  const visualGroundingCheckbox = document.getElementById("enable-visual-grounding-admin");
+  const visualGroundingOcrWarning = document.getElementById("visualGroundingOcrWarningAdmin");
+
+  if (visualGroundingCheckbox && visualGroundingOcrWarning) {
+    const ocrMode = visualGroundingCheckbox.dataset.ocrMode || "default";
+    const isOcrLocal = ocrMode === "default";
+
+    function updateVisualGroundingWarning() {
+      if (visualGroundingCheckbox.checked && !isOcrLocal) {
+        visualGroundingOcrWarning.classList.remove("d-none");
+      } else {
+        visualGroundingOcrWarning.classList.add("d-none");
+      }
+    }
+
+    visualGroundingCheckbox.addEventListener("change", updateVisualGroundingWarning);
+    updateVisualGroundingWarning(); // Check initial state
+
+    console.log("[AdminFolderUpload] Visual Grounding OCR check initialized. OCR mode:", ocrMode);
+  }
+
   function escapeHtml(value) {
     if (typeof value !== "string") {
       return "";

@@ -43,9 +43,11 @@ RUN apt-get update \
 # Enterprise edition uses different requirements file (no ChromaDB)
 COPY requirements-worker-enterprise.txt /tmp/requirements.txt
 
-RUN pip install --upgrade pip \
+# Use BuildKit cache mount for pip to speed up rebuilds
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip \
     && echo "Installing Enterprise dependencies (no ChromaDB HNSW)..." \
-    && pip install --no-cache-dir -r /tmp/requirements.txt
+    && pip install -r /tmp/requirements.txt
 
 COPY . /app
 

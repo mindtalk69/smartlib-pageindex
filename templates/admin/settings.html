@@ -7,14 +7,14 @@
     <div class="col-lg-8">
         {# Display flashed messages #}
         {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for category, message in messages %}
-              <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-              </div>
-            {% endfor %}
-          {% endif %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
         {% endwith %}
 
         {# User Limits Section #}
@@ -29,18 +29,12 @@
                             Maximum Active Users
                             <span class="text-muted small">(Currently: {{ active_user_count }} active)</span>
                         </label>
-                        <input
-                            type="number"
-                            class="form-control"
-                            id="max_active_users"
-                            name="max_active_users"
-                            value="{{ max_active_users }}"
-                            min="1"
-                            max="1000"
-                            required>
+                        <input type="number" class="form-control" id="max_active_users" name="max_active_users"
+                            value="{{ max_active_users }}" min="1" max="1000" required>
                         <div class="form-text">
                             Maximum number of users that can be enabled at the same time.
-                            Recommended: 10-20 for small business deployments. Contact support@smartlib.id for more information.
+                            Recommended: 10-20 for small business deployments. Contact support@smartlib.id for more
+                            information.
                         </div>
 
                         {# Visual indicator #}
@@ -52,18 +46,15 @@
                             <div class="progress" style="height: 20px;">
                                 {% set usage_percent = (active_user_count / max_active_users * 100) | int %}
                                 {% if usage_percent >= 90 %}
-                                    {% set bar_class = 'bg-danger' %}
+                                {% set bar_class = 'bg-danger' %}
                                 {% elif usage_percent >= 75 %}
-                                    {% set bar_class = 'bg-warning' %}
+                                {% set bar_class = 'bg-warning' %}
                                 {% else %}
-                                    {% set bar_class = 'bg-success' %}
+                                {% set bar_class = 'bg-success' %}
                                 {% endif %}
-                                <div class="progress-bar {{ bar_class }}"
-                                     role="progressbar"
-                                     style="width: {{ usage_percent }}%;"
-                                     aria-valuenow="{{ active_user_count }}"
-                                     aria-valuemin="0"
-                                     aria-valuemax="{{ max_active_users }}">
+                                <div class="progress-bar {{ bar_class }}" role="progressbar"
+                                    style="width: {{ usage_percent }}%;" aria-valuenow="{{ active_user_count }}"
+                                    aria-valuemin="0" aria-valuemax="{{ max_active_users }}">
                                     {{ usage_percent }}%
                                 </div>
                             </div>
@@ -99,20 +90,20 @@
                     </thead>
                     <tbody>
                         {% if all_settings %}
-                            {% for setting in all_settings %}
-                            <tr>
-                                <td><code>{{ setting.key }}</code></td>
-                                <td class="fw-bold">{{ setting.value }}</td>
-                                <td class="text-muted small">{{ setting.description or 'N/A' }}</td>
-                                <td class="text-muted small">
-                                    {{ setting.updated_at.strftime('%Y-%m-%d %H:%M') if setting.updated_at else 'N/A' }}
-                                </td>
-                            </tr>
-                            {% endfor %}
+                        {% for setting in all_settings %}
+                        <tr>
+                            <td><code>{{ setting.key }}</code></td>
+                            <td class="fw-bold">{{ setting.value }}</td>
+                            <td class="text-muted small">{{ setting.description or 'N/A' }}</td>
+                            <td class="text-muted small">
+                                {{ setting.updated_at.strftime('%Y-%m-%d %H:%M') if setting.updated_at else 'N/A' }}
+                            </td>
+                        </tr>
+                        {% endfor %}
                         {% else %}
-                            <tr>
-                                <td colspan="4" class="text-center text-muted">No settings configured yet.</td>
-                            </tr>
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">No settings configured yet.</td>
+                        </tr>
                         {% endif %}
                     </tbody>
                 </table>
@@ -135,6 +126,13 @@
                     <li>Administrators are included in the count</li>
                     <li>Disabled users do not count toward the limit</li>
                 </ul>
+                <hr>
+                <h6 class="fw-bold"><i class="bi bi-info-circle me-1"></i>Build Information</h6>
+                <ul class="small mb-0">
+                    <li><strong>Version:</strong> {{ config.BUILD_VERSION }}</li>
+                    <li><strong>Build Date:</strong> {{ config.BUILD_DATE }}</li>
+                    <li><strong>Edition:</strong> {{ config.APP_EDITION }}</li>
+                </ul>
             </div>
         </div>
     </div>
@@ -145,13 +143,14 @@
 {{ super() }}
 <script>
     // Client-side validation
-    document.getElementById('max_active_users').addEventListener('change', function() {
+    document.getElementById('max_active_users').addEventListener('change', function () {
         const newLimit = parseInt(this.value);
-        const currentActive = {{ active_user_count }};
+        const currentActive = {{ active_user_count }
+    };
 
-        if (newLimit < currentActive) {
-            alert(`Warning: New limit (${newLimit}) is lower than current active users (${currentActive}). You must disable ${currentActive - newLimit} user(s) first.`);
-        }
+    if (newLimit < currentActive) {
+        alert(`Warning: New limit (${newLimit}) is lower than current active users (${currentActive}). You must disable ${currentActive - newLimit} user(s) first.`);
+    }
     });
 </script>
 {% endblock %}

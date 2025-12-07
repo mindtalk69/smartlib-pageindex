@@ -83,6 +83,18 @@ def init_upload(app):
             categories = get_categories()
             catalogs = get_catalogs()
             groups = Group.query.order_by(Group.name).all()
+        
+        # Get OCR mode setting for visual grounding validation
+        # 'default' = local OCR (Docling), 'azure' = Azure Document Intelligence
+        ocr_mode = 'default'
+        try:
+            from modules.database import AppSettings
+            ocr_setting = AppSettings.query.filter_by(key='ocr_mode').first()
+            if ocr_setting and ocr_setting.value:
+                ocr_mode = ocr_setting.value
+        except Exception as e:
+            logger.warning(f"Could not get OCR mode setting: {e}")
+        
         return render_template(
             'upload.html',
             form=form,
@@ -91,6 +103,7 @@ def init_upload(app):
             categories=categories,
             catalogs=catalogs,
             groups=groups,
+            ocr_mode=ocr_mode,
         )
 
     @app.route('/upload', methods=['POST'])

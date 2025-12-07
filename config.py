@@ -23,6 +23,10 @@ else:
 
 class Config:
     """Base configuration."""
+    # Internal build version - update this when deploying new builds
+    BUILD_VERSION = "1.0.2"
+    BUILD_DATE = "2025-12-07"
+    
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
@@ -94,6 +98,19 @@ class Config:
             # Fallback to SQLALCHEMY_DATABASE_URI environment variable (backward compatibility)
             SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI')
             print(f"DEBUG [config.py]: Using SQLALCHEMY_DATABASE_URI from environment variable")
+        
+        # SAFEGUARD: Enterprise mode MUST have PostgreSQL - fail fast if not configured
+        if not SQLALCHEMY_DATABASE_URI or SQLALCHEMY_DATABASE_URI.startswith('sqlite'):
+            raise ValueError(
+                "Enterprise edition (APP_EDITION=ENT) requires PostgreSQL. "
+                "Set POSTGRES_HOST, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DATABASE environment variables, "
+                "or set SQLALCHEMY_DATABASE_URI to a PostgreSQL connection string."
+            )
+        
+        # SAFEGUARD: Warn if SQLite files exist in Enterprise mode (cleanup reminder)
+        sqlite_path = os.path.join(DATA_VOLUME_PATH, 'app.db')
+        if os.path.exists(sqlite_path):
+            print(f"WARNING [config.py]: SQLite file '{sqlite_path}' exists but Enterprise mode uses PostgreSQL. Consider deleting it.")
     else:
         # SQLite / ChromaDB mode (Basic tier)
         sqlite_path = os.path.join(DATA_VOLUME_PATH, 'app.db')

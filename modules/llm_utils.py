@@ -753,14 +753,27 @@ def classify_document_metadata(document_content_summary: str,
          effective_logger.error("Mismatch between desired_fields and json_keys length.")
          return {"error": "Configuration error: fields and keys mismatch."}
 
-    # Get the deployment name for classification (can be different from RAG)
-    # Fallback to the query deployment if a specific one isn't set
+    # Get the deployment name for classification from the admin-configured default model
     try:
-        classification_deployment = current_app.config.get(
-            "AZURE_OPENAI_DEPLOYMENT_NAME", # Specific config for this task
-            current_app.config.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o-mini") # Fallback to query model
-        )
-        effective_logger.info(f"Using deployment '{classification_deployment}' for text metadata classification.")
+        from modules.database import get_default_model
+        classification_deployment = None
+        classification_temperature = None
+        classification_streaming = None
+        
+        # First, try to get from database (admin-configured model)
+        default_model = get_default_model()
+        if default_model and default_model.get('deployment_name'):
+            classification_deployment = default_model['deployment_name']
+            classification_temperature = default_model.get('temperature')
+            classification_streaming = default_model.get('streaming')
+            effective_logger.info(f"Using admin-configured default model '{classification_deployment}' for classification")
+        else:
+            # Fallback to app config if no default model in DB
+            classification_deployment = current_app.config.get("AZURE_OPENAI_DEPLOYMENT_NAME")
+            if not classification_deployment:
+                effective_logger.error("No default model configured in database or app config for classification")
+                return {"error": "No default model configured. Please configure a model in Admin > Models."}
+            effective_logger.warning(f"No default model in DB, using app config: {classification_deployment}")
     except RuntimeError as e:
         effective_logger.error(f"Could not access Flask current_app context: {e}. Ensure this runs within a request context or app context.")
         return {"error": "Application context error."}
@@ -768,20 +781,7 @@ def classify_document_metadata(document_content_summary: str,
         effective_logger.error(f"Error getting classification deployment config: {e}")
         return {"error": "Configuration error."}
 
-    classification_temperature = None
-    classification_streaming = None
-    try:
-        from modules.database import get_model_by_deployment
-        model_config = get_model_by_deployment(classification_deployment)
-        if model_config:
-            classification_temperature = model_config.temperature
-            classification_streaming = model_config.streaming
-    except Exception as config_exc:
-        effective_logger.warning(
-            "Could not load model config for deployment %s: %s",
-            classification_deployment,
-            config_exc,
-        )
+    # Temperature and streaming are already set from get_default_model() above
 
     effective_temperature = _resolve_temperature_for_role(
         classification_deployment,

@@ -34,26 +34,31 @@ Fixed visual evidence display for BASIC mode and significantly improved upload p
 > [!IMPORTANT]
 > **Visual grounding requires local OCR mode** (not Azure Document Intelligence). Configure via `/admin/settings/ocr` or set `IS_OCR_LOCAL=true` environment variable.
 
-### Worker Reliability Improvements
+### Worker Reliability Improvements (ROOT CAUSE: Celery #8030)
+- **Celery #8030 Fix**: Added `--without-heartbeat --without-gossip --without-mingle` flags to celery worker command. This fixes the known bug where Celery workers stop consuming tasks after Redis reconnection.
 - **Auto-Retry for FileNotFoundError**: Added Celery `autoretry_for=(FileNotFoundError,)` with exponential backoff starting at 60 seconds, max 960 seconds (16 minutes), and up to 5 retries. This handles Azure Files sync delays and worker cold starts.
 - **Keep-Alive Heartbeat**: Added `worker_heartbeat` task in `celery_app.py` that runs every 5 minutes via beat scheduler to keep worker warm and prevent Azure App Service cold starts.
 - **Pre-Upload Wake-Up**: Added `wake_worker()` function in `celery_tasks.py` that sends synchronous heartbeat ping (15s timeout) before submitting upload tasks. This forces Azure App Service to wake up suspended worker pool processes.
 - **Embedded Beat Scheduler**: Added `-B` flag to celery worker command in `docker-entrypoint.sh` to run beat scheduler alongside worker for heartbeat and scheduled cleanup tasks.
-- **Configurable**: Heartbeat can be disabled with `WORKER_HEARTBEAT_ENABLED=false`, interval adjustable via `WORKER_HEARTBEAT_INTERVAL_MINUTES`.
+- **Production Celery Settings**: Added `task_acks_late=True`, `worker_prefetch_multiplier=1`, `worker_max_tasks_per_child=100`, `broker_connection_retry=True`, and `visibility_timeout=43200` (12 hours).
+- **Build Script Enhancement**: Added optional `--no-cache` flag to both `build-for-azure-basic.sh` and `build-for-azure-enterprise.sh` to force fresh Docker builds.
 
 ### Files Modified
-- `modules/upload_processing.py` - Added `progress_callback`, auto-retry with backoff, Azure Files sync fix
+- `modules/upload_processing.py` - Added `progress_callback`, auto-retry with backoff, Azure Files sync fix (30s)
 - `modules/celery_tasks.py` - Added `wake_worker()` function for pre-upload worker wake-up
+- `celery_app.py` - Added `worker_heartbeat` task, beat schedule, production settings
+- `docker-entrypoint.sh` - Added `-B` flag, `--without-heartbeat --without-gossip --without-mingle` (Celery #8030 fix)
 - `config.py` - Hardcoded `DOCLING_EXPORT_TYPE = 'DOC_CHUNKS'`
 - `requirements-worker.txt` - Updated Celery/Redis versions
 - `static/js/upload-status.js` - Added auto-dismiss, upload-complete event, enhanced toast
-- `celery_app.py` - Added `worker_heartbeat` task and beat schedule
-- `docker-entrypoint.sh` - Added `-B` flag for embedded beat scheduler
-- `config.py` - Hardcoded `DOCLING_EXPORT_TYPE = 'DOC_CHUNKS'`
-- `requirements-worker.txt` - Updated Celery/Redis versions
-- `static/js/upload-status.js` - Added auto-dismiss, upload-complete event, enhanced toast
-- `celery_app.py` - Added `worker_heartbeat` task and beat schedule
-- `docker-entrypoint.sh` - Added `-B` flag for embedded beat scheduler
+- `build-for-azure-basic.sh` - Added optional `--no-cache` flag
+- `build-for-azure-enterprise.sh` - Added optional `--no-cache` flag
+
+### Verification
+- ✅ Upload completes successfully
+- ✅ Worker receives and processes tasks immediately
+- ✅ Visual evidence displays correctly
+- ✅ Queries return results without page refresh
 
 ---
 

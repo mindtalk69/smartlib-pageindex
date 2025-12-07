@@ -18,28 +18,25 @@ celery = Celery(
 
 logger = logging.getLogger(__name__)
 
-TASK_MODULES = (
+# Log build version at startup
+try:
+    from config import Config
+    logger.info("=" * 60)
+    logger.info(f"SmartLib Worker Build: v{Config.BUILD_VERSION} ({Config.BUILD_DATE})")
+    logger.info("=" * 60)
+except ImportError:
+    logger.warning("Could not load build version from config")
+
+TASK_MODULES = [
     'modules.admin_folder_upload',
     'modules.upload_processing',
     'modules.vector_tasks',
     'modules.agent_tasks',
-)
+]
 
-
-def _register_task_modules():
-    for module in TASK_MODULES:
-        try:
-            __import__(module)
-            logger.info("Registered Celery tasks from %s", module)
-        except ImportError as exc:
-            if "docling" in str(exc) or "No module named 'docling'" in str(exc):
-                # Web container does not have docling, this is expected.
-                logger.info(f"Skipping worker-only task module {module} (missing dependency: {exc})")
-            else:
-                logger.error(f"Failed to import Celery task module {module}", exc_info=True)
-
-
-_register_task_modules()
+# --- Flask App Context for Celery Tasks ---
+# IMPORTANT: This MUST be defined BEFORE importing task modules
+# so that all @celery.task decorators use ContextTask as their base class
 
 _flask_app = None
 
@@ -59,8 +56,37 @@ class ContextTask(celery.Task):
         with app.app_context():
             return self.run(*args, **kwargs)
 
-# Set the custom Task class as the default
+
+# Set the custom Task class as the default - MUST be before task imports!
 celery.Task = ContextTask
+
+
+def _register_task_modules():
+    """Import task modules to register Celery tasks. Also adds to celery.conf.include."""
+    # Add modules to Celery's include config for proper task discovery
+    celery.conf.include = list(TASK_MODULES)
+    logger.info("Celery include set to: %s", celery.conf.include)
+    
+    for module in TASK_MODULES:
+        try:
+            __import__(module)
+            logger.info("Registered Celery tasks from %s", module)
+        except ImportError as exc:
+            if "docling" in str(exc) or "No module named 'docling'" in str(exc):
+                # Web container does not have docling, this is expected.
+                logger.info(f"Skipping worker-only task module {module} (missing dependency: {exc})")
+            else:
+                logger.error(f"Failed to import Celery task module {module}", exc_info=True)
+
+
+_register_task_modules()
+
+# Log all registered tasks at startup for debugging
+logger.info("=== Registered Celery Tasks ===")
+for task_name in sorted(celery.tasks.keys()):
+    if not task_name.startswith('celery.'):  # Skip built-in celery tasks
+        logger.info("  - %s", task_name)
+logger.info("=== End Registered Tasks ===")
 
 # Production-recommended Celery configuration
 # Reference: https://medium.com/@hankehly/10-essential-lessons-for-running-celery-workloads-in-production

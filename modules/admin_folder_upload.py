@@ -67,9 +67,25 @@ def folder_upload():
                 'knowledge_id': k.id,
                 'knowledge_name': k.name
             })
+    # Get OCR mode setting for visual grounding validation
+    ocr_mode = 'default'
+    visual_grounding_enabled = False
+    try:
+        from modules.database import AppSettings
+        ocr_setting = AppSettings.query.filter_by(key='ocr_mode').first()
+        if ocr_setting and ocr_setting.value:
+            ocr_mode = ocr_setting.value
+        vg_setting = AppSettings.query.filter_by(key='visual_grounding_enabled').first()
+        if vg_setting and vg_setting.value == 'true':
+            visual_grounding_enabled = True
+    except Exception:
+        pass
+    
     return render_template(
         "admin/folder_upload.html",
-        library_knowledge_pairs=library_knowledge_pairs
+        library_knowledge_pairs=library_knowledge_pairs,
+        ocr_mode=ocr_mode,
+        visual_grounding_enabled=visual_grounding_enabled,
     )
 
 @admin_folder_upload_bp.route("/upload", methods=["POST"])

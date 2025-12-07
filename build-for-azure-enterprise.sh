@@ -19,25 +19,62 @@ echo ""
 if [ -z "$1" ]; then
     echo -e "${RED}Error: ACR name required${NC}"
     echo "Usage: $0 <acr-name> [tag] [--no-cache]"
-    echo "Example: $0 myregistry latest"
+    echo "Example: $0 myregistry"
+    echo "Example: $0 myregistry v3.2"
+    echo "Example: $0 myregistry --no-cache"
     echo "Example: $0 myregistry v3.2 --no-cache"
     exit 1
 fi
 
 ACR_NAME=$1
-TAG=${2:-latest}
 ACR_LOGIN_SERVER="${ACR_NAME}.azurecr.io"
 
-# Check for --no-cache flag
+# Parse remaining arguments - handle --no-cache in any position
+TAG="latest"
 NO_CACHE_FLAG=""
-if [ "$3" = "--no-cache" ]; then
-    NO_CACHE_FLAG="--no-cache"
-    echo -e "${YELLOW}⚠️  Building with --no-cache (slower but ensures fresh code)${NC}"
+
+for arg in "${@:2}"; do
+    if [ "$arg" = "--no-cache" ]; then
+        NO_CACHE_FLAG="--no-cache"
+        echo -e "${YELLOW}⚠️  Building with --no-cache (slower but ensures fresh code)${NC}"
+    else
+        TAG="$arg"
+    fi
+done
+
+# ----- Auto-versioning -----
+# Read current version from config.py
+CURRENT_VERSION=$(grep -oP 'BUILD_VERSION\s*=\s*"\K[^"]+' config.py 2>/dev/null || echo "1.0.0")
+echo -e "${BLUE}Current BUILD_VERSION: ${CURRENT_VERSION}${NC}"
+
+# Auto-increment patch version (1.0.X -> 1.0.X+1)
+MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+NEW_PATCH=$((PATCH + 1))
+NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+
+# Get current date for BUILD_DATE
+BUILD_DATE=$(date +%Y-%m-%d)
+
+# Update config.py with new version
+echo -e "${YELLOW}Updating BUILD_VERSION to ${NEW_VERSION}...${NC}"
+sed -i "s/BUILD_VERSION = \".*\"/BUILD_VERSION = \"${NEW_VERSION}\"/" config.py
+sed -i "s/BUILD_DATE = \".*\"/BUILD_DATE = \"${BUILD_DATE}\"/" config.py
+
+echo -e "${GREEN}✓ Version updated: ${CURRENT_VERSION} -> ${NEW_VERSION}${NC}"
+
+# Use version as tag if tag is 'latest' or 'auto'
+if [ "$TAG" = "latest" ] || [ "$TAG" = "auto" ]; then
+    TAG="v${NEW_VERSION}"
+    echo -e "${BLUE}Using version as Docker tag: ${TAG}${NC}"
 fi
+# ----- End Auto-versioning -----
 
 echo -e "${BLUE}Configuration:${NC}"
 echo "  ACR: $ACR_NAME"
 echo "  Tag: $TAG"
+echo "  Version: $NEW_VERSION"
 echo "  No-cache: ${NO_CACHE_FLAG:-disabled}"
 echo "  Edition: ENTERPRISE (PostgreSQL + pgvector)"
 echo ""

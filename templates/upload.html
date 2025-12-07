@@ -9,7 +9,8 @@
 {% block content %}
 <div class="row justify-content-center mt-5 upload-section-row"> {# ADDED custom class #}
   {# Use the new shared styled container class and a page-specific class #}
-  <div class="col-md-10 styled-form-container upload-page-container" data-vector-store-mode="{{ vector_store_setting }}"> 
+  <div class="col-md-10 styled-form-container upload-page-container"
+    data-vector-store-mode="{{ vector_store_setting }}">
     {# REMOVED unnecessary inner card and card-body divs #}
 
     <div class="d-flex justify-content-between align-items-center mb-1">
@@ -18,20 +19,20 @@
       {# Reset functionality temporarily disabled - endpoint not available in optimized web container #}
       {# To re-enable: create reset_vector_store endpoint or use admin reset functionality #}
       {% endif %}
-     </div>
+    </div>
 
     {# --- Vector Store Mode Banner REMOVED for minimal UI --- #}
 
 
-        <!-- Nav tabs -->
-        <ul class="nav nav-tabs mb-3" id="uploadTabs" role="tablist">
+    <!-- Nav tabs -->
+    <ul class="nav nav-tabs mb-3" id="uploadTabs" role="tablist">
       <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="url-tab" data-bs-toggle="tab" data-bs-target="#url-content"
-                type="button" role="tab" aria-controls="url-content" aria-selected="true">Download</button>
+        <button class="nav-link active" id="url-tab" data-bs-toggle="tab" data-bs-target="#url-content" type="button"
+          role="tab" aria-controls="url-content" aria-selected="true">Download</button>
       </li>
       <li class="nav-item" role="presentation">
-        <button class="nav-link" id="batch-tab" data-bs-toggle="tab" data-bs-target="#batch-content"
-                type="button" role="tab" aria-controls="batch-content" aria-selected="false">Upload</button>
+        <button class="nav-link" id="batch-tab" data-bs-toggle="tab" data-bs-target="#batch-content" type="button"
+          role="tab" aria-controls="batch-content" aria-selected="false">Upload</button>
       </li>
     </ul>
 
@@ -124,74 +125,66 @@
                   ">
                     <i class="bi bi-info-circle" aria-label="Info"></i>
                   </span>
-                  <button type="button"
-                          class="btn btn-light btn-sm text-dark shadow-sm fw-semibold ms-2 d-none"
-                          id="libraryMetadataInfoUrl"
-                          data-bs-toggle="popover"
-                          data-bs-trigger="focus"
-                          data-bs-placement="right"
-                          data-bs-html="true"
-                          aria-label="Show knowledge metadata">
+                  <button type="button" class="btn btn-light btn-sm text-dark shadow-sm fw-semibold ms-2 d-none"
+                    id="libraryMetadataInfoUrl" data-bs-toggle="popover" data-bs-trigger="focus"
+                    data-bs-placement="right" data-bs-html="true" aria-label="Show knowledge metadata">
                     <i class="bi bi-tags-fill me-1"></i>Metadata
                   </button>
                 </label>
                 <select class="form-select" id="librarySelectUrl" name="library_id" required>
-                    <option value="" selected disabled>Choose a library...</option>
-                    {% for library in libraries %}
-                      {% if library.knowledges %}
-                        {% for knowledge in library.knowledges %}
-                          <option value="{{ library.library_id }}"
-                                  data-knowledge-id="{{ knowledge.id }}"
-                                  data-knowledge-name="{{ knowledge.name }}"
-                                  data-categories="{{ knowledge.categories|map(attribute='name')|join(', ') if knowledge.categories else '' }}"
-                                  data-catalogs="{{ knowledge.catalogs|map(attribute='name')|join(', ') if knowledge.catalogs else '' }}"
-                                  data-category-ids="{{ knowledge.categories|map(attribute='id')|join(',') if knowledge.categories else '' }}"
-                                  data-catalog-ids="{{ knowledge.catalogs|map(attribute='id')|join(',') if knowledge.catalogs else '' }}"
-                                  data-group-ids="{{ knowledge.groups|map(attribute='group_id')|join(',') if knowledge.groups else '' }}"
-                                  data-group-names="{{ knowledge.groups|map(attribute='name')|join(', ') if knowledge.groups else '' }}">
-                              {{ library.name }} — {{ knowledge.name }}
-                          </option>
-                        {% endfor %}
-                      {% else %}
-                        <option value="{{ library.library_id }}"
-                                data-knowledge-id=""
-                                data-knowledge-name=""
-                                data-categories=""
-                                data-catalogs=""
-                                data-category-ids=""
-                                data-catalog-ids=""
-                                data-group-ids=""
-                                data-group-names="">
-                            {{ library.name }}
-                        </option>
-                      {% endif %}
-                    {% endfor %}
+                  <option value="" selected disabled>Choose a library...</option>
+                  {% for library in libraries %}
+                  {% if library.knowledges %}
+                  {% for knowledge in library.knowledges %}
+                  <option value="{{ library.library_id }}" data-knowledge-id="{{ knowledge.id }}"
+                    data-knowledge-name="{{ knowledge.name }}"
+                    data-categories="{{ knowledge.categories|map(attribute='name')|join(', ') if knowledge.categories else '' }}"
+                    data-catalogs="{{ knowledge.catalogs|map(attribute='name')|join(', ') if knowledge.catalogs else '' }}"
+                    data-category-ids="{{ knowledge.categories|map(attribute='id')|join(',') if knowledge.categories else '' }}"
+                    data-catalog-ids="{{ knowledge.catalogs|map(attribute='id')|join(',') if knowledge.catalogs else '' }}"
+                    data-group-ids="{{ knowledge.groups|map(attribute='group_id')|join(',') if knowledge.groups else '' }}"
+                    data-group-names="{{ knowledge.groups|map(attribute='name')|join(', ') if knowledge.groups else '' }}">
+                    {{ library.name }} — {{ knowledge.name }}
+                  </option>
+                  {% endfor %}
+                  {% else %}
+                  <option value="{{ library.library_id }}" data-knowledge-id="" data-knowledge-name=""
+                    data-categories="" data-catalogs="" data-category-ids="" data-catalog-ids="" data-group-ids=""
+                    data-group-names="">
+                    {{ library.name }}
+                  </option>
+                  {% endif %}
+                  {% endfor %}
                 </select>
                 <input type="hidden" name="knowledge_id" id="knowledgeIdUrl">
 
               </div>
-          <div class="mb-3">
-            <label for="url-textarea" class="form-label">Enter URLs</label>
-            <textarea class="form-control" id="url-textarea" rows="5" placeholder="Enter URLs, separated by commas or newlines..." required></textarea>
-            {# Removed invalid-feedback div as validation is now more complex #}
-          </div>
-           <div class="mb-3">
-             <button id="add-urls-btn" type="button" class="btn btn-secondary w-100">Add URLs to List</button> {# Renamed button #}
-           </div>
-           <div id="url-list-display" class="mb-3">
-             {# URL list will be populated by JS here #}
-           </div>
-          <div class="d-grid gap-2">
-                <button id="process-urls-btn" class="btn btn-custom" disabled>Download & Process URLs</button> {# Changed class back to btn-custom #}
+              <div class="mb-3">
+                <label for="url-textarea" class="form-label">Enter URLs</label>
+                <textarea class="form-control" id="url-textarea" rows="5"
+                  placeholder="Enter URLs, separated by commas or newlines..." required></textarea>
+                {# Removed invalid-feedback div as validation is now more complex #}
+              </div>
+              <div class="mb-3">
+                <button id="add-urls-btn" type="button" class="btn btn-secondary w-100">Add URLs to List</button> {#
+                Renamed button #}
+              </div>
+              <div id="url-list-display" class="mb-3">
+                {# URL list will be populated by JS here #}
+              </div>
+              <div class="d-grid gap-2">
+                <button id="process-urls-btn" class="btn btn-custom" disabled>Download & Process URLs</button> {#
+                Changed class back to btn-custom #}
               </div>
               {# Progress bar for URL processing - Initially hidden #}
               <div class="progress mt-3" id="url-progress-bar" style="display: none;">
-                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%">Processing...</div>
+                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
+                  aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%">Processing...</div>
               </div>
               <div id="url-status" class="mt-2"></div> {# Status area remains #}
             </div>
-          <!- /REMOVED inner card-body ->
-        <!- /REMOVED inner card ->
+            <!- /REMOVED inner card-body ->
+              <!- /REMOVED inner card ->
       </div>
 
       <!-- Batch Upload Tab -->
@@ -214,85 +207,89 @@
                   ">
                     <i class="bi bi-info-circle" aria-label="Info"></i>
                   </span>
-                  <button type="button"
-                          class="btn btn-light btn-sm text-dark shadow-sm fw-semibold ms-2 d-none"
-                          id="libraryMetadataInfoBatch"
-                          data-bs-toggle="popover"
-                          data-bs-trigger="focus"
-                          data-bs-placement="right"
-                          data-bs-html="true"
-                          aria-label="Show knowledge metadata">
+                  <button type="button" class="btn btn-light btn-sm text-dark shadow-sm fw-semibold ms-2 d-none"
+                    id="libraryMetadataInfoBatch" data-bs-toggle="popover" data-bs-trigger="focus"
+                    data-bs-placement="right" data-bs-html="true" aria-label="Show knowledge metadata">
                     <i class="bi bi-tags-fill me-1"></i>Metadata
                   </button>
                 </label>
                 <select class="form-select" id="librarySelectBatch" name="library_id" required>
-                    <option value="" selected disabled>Choose a library...</option>
-                    {% for library in libraries %}
-                      {% if library.knowledges %}
-                        {% for knowledge in library.knowledges %}
-                          <option value="{{ library.library_id }}"
-                                  data-knowledge-id="{{ knowledge.id }}"
-                                  data-knowledge-name="{{ knowledge.name }}"
-                                  data-categories="{{ knowledge.categories|map(attribute='name')|join(', ') if knowledge.categories else '' }}"
-                                  data-catalogs="{{ knowledge.catalogs|map(attribute='name')|join(', ') if knowledge.catalogs else '' }}"
-                                  data-category-ids="{{ knowledge.categories|map(attribute='id')|join(',') if knowledge.categories else '' }}"
-                                  data-catalog-ids="{{ knowledge.catalogs|map(attribute='id')|join(',') if knowledge.catalogs else '' }}"
-                                  data-group-ids="{{ knowledge.groups|map(attribute='group_id')|join(',') if knowledge.groups else '' }}"
-                                  data-group-names="{{ knowledge.groups|map(attribute='name')|join(', ') if knowledge.groups else '' }}">
-                              {{ library.name }} — {{ knowledge.name }}
-                          </option>
-                        {% endfor %}
-                      {% else %}
-                        <option value="{{ library.library_id }}"
-                                data-knowledge-id=""
-                                data-knowledge-name=""
-                                data-categories=""
-                                data-catalogs=""
-                                data-category-ids=""
-                                data-catalog-ids=""
-                                data-group-ids=""
-                                data-group-names="">
-                            {{ library.name }}
-                        </option>
-                      {% endif %}
-                    {% endfor %}
+                  <option value="" selected disabled>Choose a library...</option>
+                  {% for library in libraries %}
+                  {% if library.knowledges %}
+                  {% for knowledge in library.knowledges %}
+                  <option value="{{ library.library_id }}" data-knowledge-id="{{ knowledge.id }}"
+                    data-knowledge-name="{{ knowledge.name }}"
+                    data-categories="{{ knowledge.categories|map(attribute='name')|join(', ') if knowledge.categories else '' }}"
+                    data-catalogs="{{ knowledge.catalogs|map(attribute='name')|join(', ') if knowledge.catalogs else '' }}"
+                    data-category-ids="{{ knowledge.categories|map(attribute='id')|join(',') if knowledge.categories else '' }}"
+                    data-catalog-ids="{{ knowledge.catalogs|map(attribute='id')|join(',') if knowledge.catalogs else '' }}"
+                    data-group-ids="{{ knowledge.groups|map(attribute='group_id')|join(',') if knowledge.groups else '' }}"
+                    data-group-names="{{ knowledge.groups|map(attribute='name')|join(', ') if knowledge.groups else '' }}">
+                    {{ library.name }} — {{ knowledge.name }}
+                  </option>
+                  {% endfor %}
+                  {% else %}
+                  <option value="{{ library.library_id }}" data-knowledge-id="" data-knowledge-name=""
+                    data-categories="" data-catalogs="" data-category-ids="" data-catalog-ids="" data-group-ids=""
+                    data-group-names="">
+                    {{ library.name }}
+                  </option>
+                  {% endif %}
+                  {% endfor %}
                 </select>
                 <input type="hidden" name="knowledge_id" id="knowledgeIdBatch">
 
               </div>
-          <div class="mb-3">
-            <label for="batchFileInput" class="form-label">Select Files for Batch Upload</label>
-            <input type="file" class="form-control" id="batchFileInput" name="batchFiles" required accept=".pdf,.docx,.xlsx,.pptx,.md,.adoc,.asciidoc,.html,.xhtml,.csv,.png,.jpeg,.jpg,.tiff,.tif,.bmp,.txt,.odt" multiple>
-            <div id="batch-file-list" class="mt-2 small"></div> {# Area to list selected files #}
-          </div>
+              <div class="mb-3">
+                <label for="batchFileInput" class="form-label">Select Files for Batch Upload</label>
+                <input type="file" class="form-control" id="batchFileInput" name="batchFiles" required
+                  accept=".pdf,.docx,.xlsx,.pptx,.md,.adoc,.asciidoc,.html,.xhtml,.csv,.png,.jpeg,.jpg,.tiff,.tif,.bmp,.txt,.odt"
+                  multiple>
+                <div id="batch-file-list" class="mt-2 small"></div> {# Area to list selected files #}
+              </div>
 
-          {# --- Conditional Visual Grounding Checkbox --- #}
-          {% if config.get('VISUAL_GROUNDING_ENABLED', False) and current_user.is_admin %}
-          <div class="form-check form-switch mb-3">
-            <input class="form-check-input rounded-pill" type="checkbox" role="switch" id="enableVisualGroundingBatch" name="enable_visual_grounding"> {# Use distinct ID and name, ADDED rounded-pill #}
-            <label class="form-check-label" for="enableVisualGroundingBatch">Enable Visual Grounding (Admin Only)</label>
-            <small class="form-text text-muted d-block">Generates data to link answers to document locations. Requires more processing time/resources.</small>
-          </div>
-          {% endif %}
-          {# --- End Conditional Checkbox --- #}
+              {% if config.get('VISUAL_GROUNDING_ENABLED', False) and current_user.is_admin %}
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input rounded-pill" type="checkbox" role="switch"
+                  id="enableVisualGroundingBatch" name="enable_visual_grounding" data-ocr-mode="{{ ocr_mode }}"> {# Use
+                distinct ID and name, ADDED rounded-pill #}
+                <label class="form-check-label" for="enableVisualGroundingBatch">Enable Visual Grounding (Admin
+                  Only)</label>
+                <small class="form-text text-muted d-block">Generates data to link answers to document locations.
+                  Requires more processing time/resources.</small>
+                {# OCR Mode Warning - shown when visual grounding enabled but OCR is not local #}
+                <div id="visualGroundingOcrWarning" class="alert alert-warning mt-2 py-2 px-3 d-none" role="alert">
+                  <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                  <strong>Warning:</strong> Visual grounding requires <strong>Local OCR (Docling)</strong> mode.
+                  Current setting is <strong>Azure Document Intelligence</strong> which does not preserve document
+                  layout for visual grounding.
+                  <br><small>Please change OCR mode in <a href="{{ url_for('admin.ocr_settings') }}">Admin &gt; Settings
+                      &gt; OCR</a> to use visual grounding.</small>
+                </div>
+              </div>
+              {% endif %}
 
-          <button type="submit" class="btn btn-custom w-100" id="uploadBatchBtn">Upload Batch to Library</button>
-        </form>
-        {# Progress bar for indeterminate progress - Initially hidden, controlled by JS #}
-        <div class="progress mt-3" id="batch-progress-bar" style="display: none;">
-          <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">Processing...</div>
-        </div>
-        {# Status div for batch results - JS should update this with formatted messages #}
-        {# Expected format: <p class="small text-body-secondary mb-1">uploaded X of Y - filename</p> #}
+              <button type="submit" class="btn btn-custom w-100" id="uploadBatchBtn">Upload Batch to Library</button>
+            </form>
             {# Progress bar for indeterminate progress - Initially hidden, controlled by JS #}
             <div class="progress mt-3" id="batch-progress-bar" style="display: none;">
-              <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">Processing...</div>
+              <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
+                aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">Processing...</div>
             </div>
             {# Status div for batch results - JS should update this with formatted messages #}
             {# Expected format: <p class="small text-body-secondary mb-1">uploaded X of Y - filename</p> #}
-            <div id="batch-status" class="mt-3" style="max-height: 150px; overflow-y: auto;"></div> {# Added max-height and scroll for safety, though aiming for no scroll via JS logic #}
-          <!- /REMOVED inner card-body ->
-        <!- /REMOVED inner card ->
+            {# Progress bar for indeterminate progress - Initially hidden, controlled by JS #}
+            <div class="progress mt-3" id="batch-progress-bar" style="display: none;">
+              <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
+                aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">Processing...</div>
+            </div>
+            {# Status div for batch results - JS should update this with formatted messages #}
+            {# Expected format: <p class="small text-body-secondary mb-1">uploaded X of Y - filename</p> #}
+            <div id="batch-status" class="mt-3" style="max-height: 150px; overflow-y: auto;"></div> {# Added max-height
+            and scroll for safety, though aiming for no scroll via JS logic #}
+            <!- /REMOVED inner card-body ->
+              <!- /REMOVED inner card ->
       </div>
 
     </div> {# End tab-content #}

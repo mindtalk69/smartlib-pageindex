@@ -92,10 +92,14 @@ def wake_worker(timeout: float = 10.0) -> bool:
         logger.info(f"[WakeWorker] Worker responded: {result}")
         return True
     except CeleryTimeoutError:
-        logger.warning(f"[WakeWorker] Worker did not respond within {timeout}s timeout")
-        return False
+        logger.warning(f"[WakeWorker] Worker did not respond within {timeout}s timeout - worker may be starting up")
+        # Return True anyway - task was sent, worker might process it after timeout
+        return True
     except Exception as exc:
-        logger.warning(f"[WakeWorker] Failed to wake worker: {exc}")
+        exc_type = type(exc).__name__
+        exc_msg = str(exc)
+        logger.warning(f"[WakeWorker] Failed to wake worker ({exc_type}): {exc_msg}")
+        # Don't block upload even if wake fails - the task will be queued
         return False
 
 
