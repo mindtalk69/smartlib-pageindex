@@ -1545,8 +1545,32 @@ Answer:"""
                         document_id_str = doc_metadata.get("doc_id")
                         docling_json_path = doc_metadata.get("docling_json_path")
 
-                        # DEBUG: Log if docling_json_path is present
-                        logging.info(f"[AgentPy DEBUG] Citation {new_num} docling_json_path: {docling_json_path}")
+                        # DEBUG: Log metadata keys from vector store
+                        logging.info(f"[AgentPy DEBUG] Citation {new_num} metadata keys from vector store: {list(doc_metadata.keys())}")
+                        
+                        # Track if we got docling_json_path from vector store or database
+                        docling_json_path_source = "vector_store" if docling_json_path else None
+
+                        # Database fallback: If docling_json_path not in vector store metadata,
+                        # fetch it from the database (works for both BASIC and ENT editions)
+                        if not docling_json_path and document_id_str:
+                            try:
+                                from modules.database import get_document_for_citations
+                                from uuid import UUID
+                                db_doc = get_document_for_citations(UUID(document_id_str))
+                                if db_doc and db_doc.docling_json_path:
+                                    docling_json_path = db_doc.docling_json_path
+                                    docling_json_path_source = "database_fallback"
+                                    logging.info(f"[AgentPy] ✓ Fetched docling_json_path from DATABASE for citation {new_num}: {docling_json_path}")
+                            except Exception as e_db:
+                                logging.warning(f"[AgentPy] Failed to fetch docling_json_path from database for {document_id_str}: {e_db}")
+
+                        # DEBUG: Log final docling_json_path and its source
+                        if docling_json_path:
+                            logging.info(f"[AgentPy DEBUG] Citation {new_num} docling_json_path: {docling_json_path} (source: {docling_json_path_source})")
+                        else:
+                            logging.warning(f"[AgentPy DEBUG] Citation {new_num} has NO docling_json_path (not in vector store or database)")
+                        
                         api_bbox_list = None
                         raw_bbox_obj = None
 

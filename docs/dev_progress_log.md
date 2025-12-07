@@ -1,5 +1,62 @@
 # SmartLib Dev Progress Log
 
+## 2025-12-07 – Visual Grounding Fixes & Upload UX Improvements
+
+### Summary
+Fixed visual evidence display for BASIC mode and significantly improved upload progress tracking UX. Root cause was Azure OCR mode not including `dl_meta` bounding box metadata - only local OCR mode provides this data.
+
+### Visual Grounding Fixes
+- **Root Cause Identified**: Azure Document Intelligence OCR mode doesn't include `dl_meta` in DoclingLoader output; local OCR (RapidOCR) is required for visual grounding to work.
+- **DOC_CHUNKS Configuration**: Hardcoded `DOCLING_EXPORT_TYPE = 'DOC_CHUNKS'` in `config.py` to bypass Azure environment variable loading issues.
+- **Azure Files Sync**: Increased retry wait time from 10 to 30 seconds in `upload_processing.py` to handle Azure Files synchronization delay between web and worker containers.
+- **Celery/Redis Version Mismatch**: Updated `requirements-worker.txt` to match web container versions (Celery 5.5.2, Redis 5.0.1).
+- **Page Number Extraction**: Ensured page numbers are extracted BEFORE `filter_complex_metadata` removes `dl_meta`.
+
+### Upload Progress Improvements
+- **Granular Progress Updates**: Added 7 processing stages with progress callbacks in `process_uploaded_file()`:
+  - 5% - Initializing document processor
+  - 15% - Converting document with visual grounding
+  - 25% - Visual grounding data saved
+  - 45% - Document loaded and chunked
+  - 55% - Classifying document metadata
+  - 70% - Saving to database
+  - 85% - Storing chunks in vector database
+  - 100% - Completed
+- **Celery Integration**: Created `progress_callback` in `async_process_single_file` that updates task state with stage description and percentage.
+- **Frontend Display**: `upload-status.js` already polls every 5 seconds and displays progress bar - now shows granular updates.
+
+### Auto-Dismiss & Notifications
+- **Auto-Dismiss**: Completed uploads automatically dismissed after 30 seconds; failed uploads after 15 seconds.
+- **upload-complete Event**: Dispatched custom event when upload finishes for future UI refresh enhancements.
+- **Toast Enhancement**: Updated completion toast to show "Document is now ready for querying" message.
+
+### Configuration Requirements
+> [!IMPORTANT]
+> **Visual grounding requires local OCR mode** (not Azure Document Intelligence). Configure via `/admin/settings/ocr` or set `IS_OCR_LOCAL=true` environment variable.
+
+### Worker Reliability Improvements
+- **Auto-Retry for FileNotFoundError**: Added Celery `autoretry_for=(FileNotFoundError,)` with exponential backoff starting at 60 seconds, max 960 seconds (16 minutes), and up to 5 retries. This handles Azure Files sync delays and worker cold starts.
+- **Keep-Alive Heartbeat**: Added `worker_heartbeat` task in `celery_app.py` that runs every 5 minutes via beat scheduler to keep worker warm and prevent Azure App Service cold starts.
+- **Pre-Upload Wake-Up**: Added `wake_worker()` function in `celery_tasks.py` that sends synchronous heartbeat ping (15s timeout) before submitting upload tasks. This forces Azure App Service to wake up suspended worker pool processes.
+- **Embedded Beat Scheduler**: Added `-B` flag to celery worker command in `docker-entrypoint.sh` to run beat scheduler alongside worker for heartbeat and scheduled cleanup tasks.
+- **Configurable**: Heartbeat can be disabled with `WORKER_HEARTBEAT_ENABLED=false`, interval adjustable via `WORKER_HEARTBEAT_INTERVAL_MINUTES`.
+
+### Files Modified
+- `modules/upload_processing.py` - Added `progress_callback`, auto-retry with backoff, Azure Files sync fix
+- `modules/celery_tasks.py` - Added `wake_worker()` function for pre-upload worker wake-up
+- `config.py` - Hardcoded `DOCLING_EXPORT_TYPE = 'DOC_CHUNKS'`
+- `requirements-worker.txt` - Updated Celery/Redis versions
+- `static/js/upload-status.js` - Added auto-dismiss, upload-complete event, enhanced toast
+- `celery_app.py` - Added `worker_heartbeat` task and beat schedule
+- `docker-entrypoint.sh` - Added `-B` flag for embedded beat scheduler
+- `config.py` - Hardcoded `DOCLING_EXPORT_TYPE = 'DOC_CHUNKS'`
+- `requirements-worker.txt` - Updated Celery/Redis versions
+- `static/js/upload-status.js` - Added auto-dismiss, upload-complete event, enhanced toast
+- `celery_app.py` - Added `worker_heartbeat` task and beat schedule
+- `docker-entrypoint.sh` - Added `-B` flag for embedded beat scheduler
+
+---
+
 ## 2025-12-04 – ARM Template Cleanup: Remove createRoleAssignment and Fix URI Construction
 
 ### Summary

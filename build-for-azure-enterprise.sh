@@ -18,8 +18,9 @@ echo ""
 # Check for ACR name argument
 if [ -z "$1" ]; then
     echo -e "${RED}Error: ACR name required${NC}"
-    echo "Usage: $0 <acr-name> [tag]"
+    echo "Usage: $0 <acr-name> [tag] [--no-cache]"
     echo "Example: $0 myregistry latest"
+    echo "Example: $0 myregistry v3.2 --no-cache"
     exit 1
 fi
 
@@ -27,9 +28,17 @@ ACR_NAME=$1
 TAG=${2:-latest}
 ACR_LOGIN_SERVER="${ACR_NAME}.azurecr.io"
 
+# Check for --no-cache flag
+NO_CACHE_FLAG=""
+if [ "$3" = "--no-cache" ]; then
+    NO_CACHE_FLAG="--no-cache"
+    echo -e "${YELLOW}⚠️  Building with --no-cache (slower but ensures fresh code)${NC}"
+fi
+
 echo -e "${BLUE}Configuration:${NC}"
 echo "  ACR: $ACR_NAME"
 echo "  Tag: $TAG"
+echo "  No-cache: ${NO_CACHE_FLAG:-disabled}"
 echo "  Edition: ENTERPRISE (PostgreSQL + pgvector)"
 echo ""
 
@@ -48,6 +57,7 @@ echo "2️⃣  Building web container (Enterprise edition)..."
 echo "   Note: No ChromaDB (faster build ~40% time savings)"
 echo ""
 DOCKER_BUILDKIT=1 docker build \
+    ${NO_CACHE_FLAG} \
     -f Dockerfile.web.enterprise \
     -t "${ACR_LOGIN_SERVER}/smartlib-web-enterprise:${TAG}" \
     --progress=plain \
@@ -62,6 +72,7 @@ echo "3️⃣  Building worker container (Enterprise edition)..."
 echo "   Note: No ChromaDB (faster build ~40% time savings)"
 echo ""
 DOCKER_BUILDKIT=1 docker build \
+    ${NO_CACHE_FLAG} \
     -f Dockerfile.worker.enterprise \
     -t "${ACR_LOGIN_SERVER}/smartlib-worker-enterprise:${TAG}" \
     --progress=plain \

@@ -147,7 +147,9 @@ class Config:
     REDIRECT_URI = os.environ.get('REDIRECT_URI', _default_redirect)
 
     # --- Docling Config ---
-    DOCLING_EXPORT_TYPE = os.environ.get('DOCLING_EXPORT_TYPE', 'MARKDOWN')
+    # TEMPORARY: Hardcoded to DOC_CHUNKS to test visual evidence
+    # TODO: Fix Azure environment variable loading issue
+    DOCLING_EXPORT_TYPE = 'DOC_CHUNKS'  # os.environ.get('DOCLING_EXPORT_TYPE', 'MARKDOWN')
     HF_TOKEN = os.environ.get('HF_TOKEN')
 
     # --- LangSmith Config (Optional Tracing) ---

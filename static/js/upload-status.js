@@ -131,12 +131,27 @@ class UploadStatusTracker {
             // Show toast if task just completed
             if (task.status === 'SUCCESS' && previousStatus && previousStatus !== 'SUCCESS') {
                 this.showCompletionToast(task);
+                // Auto-dismiss successful uploads after 30 seconds
+                setTimeout(() => this.autoDismissTask(task.task_id), 30000);
             } else if (task.status === 'FAILURE' && previousStatus && previousStatus !== 'FAILURE') {
                 this.showFailureToast(task);
+                // Auto-dismiss failed uploads after 15 seconds (shorter so user notices faster)
+                setTimeout(() => this.autoDismissTask(task.task_id), 15000);
             }
 
             this.activeTasks.set(task.task_id, task.status);
         });
+    }
+
+    async autoDismissTask(taskId) {
+        // Only dismiss if still in completed/failed state
+        const item = document.querySelector(`[data-task-id="${taskId}"]`);
+        if (!item) return;
+
+        const status = item.dataset.status;
+        if (status === 'SUCCESS' || status === 'FAILURE') {
+            await dismissTask(taskId);
+        }
     }
 
     renderTask(task) {
@@ -209,6 +224,11 @@ class UploadStatusTracker {
         const toastContainer = document.getElementById('toast-container');
         if (!toastContainer) return;
 
+        // Dispatch event for other UI components to refresh (e.g., document selectors)
+        document.dispatchEvent(new CustomEvent('upload-complete', {
+            detail: { task_id: task.task_id, filename: task.filename }
+        }));
+
         const toast = document.createElement('div');
         toast.className = 'toast';
         toast.setAttribute('role', 'alert');
@@ -221,7 +241,8 @@ class UploadStatusTracker {
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
             <div class="toast-body">
-                <strong>${this.escapeHtml(task.filename)}</strong> has been processed successfully.
+                <strong>${this.escapeHtml(task.filename)}</strong> has been processed successfully.<br>
+                <small class="text-muted">Document is now ready for querying.</small>
             </div>
         `;
 

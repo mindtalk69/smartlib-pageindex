@@ -105,9 +105,28 @@ def process_and_store_chunks(splits, user_id, embedding_function, logger, file_i
     logger.info(f"Processing {len(splits)} chunks for vector store provider: {vector_provider}")
 
     try:
+        # DEBUG: Log sample metadata BEFORE filtering
+        if splits and len(splits) > 0:
+            sample_metadata_before = splits[0].metadata
+            logger.info(f"[VectorStore DEBUG] Sample metadata BEFORE filter_complex_metadata: {list(sample_metadata_before.keys())}")
+            if 'docling_json_path' in sample_metadata_before:
+                logger.info(f"[VectorStore DEBUG] docling_json_path BEFORE filtering: {sample_metadata_before['docling_json_path']}")
+            else:
+                logger.warning(f"[VectorStore DEBUG] docling_json_path NOT in metadata before filtering")
+
         # Ensure complex metadata like 'dl_meta' is filtered out before sending to vector store
         # The 'documents' table in the DB is the place for this complex metadata.
         splits = filter_complex_metadata(splits)
+
+        # DEBUG: Log sample metadata AFTER filtering
+        if splits and len(splits) > 0:
+            sample_metadata_after = splits[0].metadata
+            logger.info(f"[VectorStore DEBUG] Sample metadata AFTER filter_complex_metadata: {list(sample_metadata_after.keys())}")
+            if 'docling_json_path' in sample_metadata_after:
+                logger.info(f"[VectorStore DEBUG] ✓ docling_json_path PRESERVED after filtering: {sample_metadata_after['docling_json_path']}")
+            else:
+                logger.warning(f"[VectorStore DEBUG] ✗ docling_json_path REMOVED by filtering (this is unexpected!)")
+
 
         # --- Log Vector References ---
         if len(splits) > 0:

@@ -375,10 +375,23 @@ elif [ "$1" = "worker" ]; then
         python -c "from modules.database import init_db; init_db()"
     fi
 
-    # Start the Celery worker
+    # Start the Celery worker with embedded beat scheduler for heartbeat and scheduled tasks
+    # IMPORTANT: --without-heartbeat --without-gossip --without-mingle fixes Celery issue #8030
+    # where worker stops consuming tasks after Redis reconnection
+    # See: https://github.com/celery/celery/issues/8030
     CELERY_POOL=${CELERY_POOL:-prefork}
-    echo "Starting Celery worker with pool type: ${CELERY_POOL}..."
-    exec celery -A celery_app.celery worker --loglevel=info --pool="${CELERY_POOL}"
+    CELERY_BEAT_ENABLED=${CELERY_BEAT_ENABLED:-true}
+    echo "Starting Celery worker with pool type: ${CELERY_POOL}, beat enabled: ${CELERY_BEAT_ENABLED}..."
+    
+    # Common args to fix Redis reconnection issue (Celery #8030)
+    CELERY_WORKER_ARGS="--without-heartbeat --without-gossip --without-mingle"
+    
+    if [ "$CELERY_BEAT_ENABLED" = "true" ]; then
+        # Run worker with embedded beat scheduler (-B) for heartbeat and scheduled cleanup tasks
+        exec celery -A celery_app.celery worker --loglevel=info --pool="${CELERY_POOL}" -B ${CELERY_WORKER_ARGS}
+    else
+        exec celery -A celery_app.celery worker --loglevel=info --pool="${CELERY_POOL}" ${CELERY_WORKER_ARGS}
+    fi
 
 else
     echo "Error: Must specify 'web' or 'worker' as the first argument."

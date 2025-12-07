@@ -70,16 +70,30 @@ def process_uploaded_file(
     current_user=None,
     url_download_id=None,
     source_url=None,
+    progress_callback=None,
 ):
     """
     Process a single uploaded file for ingestion, chunking, vector store, and metadata.
     Returns a dict with result info (success, message, file_id, etc.).
+    
+    Args:
+        progress_callback: Optional callable(stage: str, progress: int) for progress updates.
+                          Progress ranges: 0-20 conversion, 20-30 grounding, 30-50 chunking,
+                          50-65 classification, 65-80 db storage, 80-100 vector store.
     """
     logger = logger or logging.getLogger(__name__)
     results = {}
     actual_file_size = os.path.getsize(file_path)
     logger.info(f"Processing file: {filename} for library_id: {library_id}, library_name: {library_name}")
     reference_type = 'url_download' if url_download_id else 'file'
+    
+    # Helper function to report progress
+    def report_progress(stage: str, progress: int):
+        if progress_callback:
+            try:
+                progress_callback(stage, progress)
+            except Exception as e:
+                logger.warning(f"Progress callback failed: {e}")
 
     # --- Visual Grounding Setup ---
     converter = None
@@ -109,6 +123,7 @@ def process_uploaded_file(
 
 
     logger.info(f"enable_visual_grounding : {enable_visual_grounding}")
+    report_progress('Initializing document processor...', 5)
 
     if enable_visual_grounding:
 
@@ -191,6 +206,7 @@ def process_uploaded_file(
     # --- Visual Grounding Save DoclingDocument ---
     IS_VISUAL_GROUNDING_COMPLETED = False
     if enable_visual_grounding and converter is not None:
+        report_progress('Converting document with visual grounding...', 15)
         try:
             #converted_result = converter.convert(source=file_path)
             dl_doc = converter.convert(source=file_path).document
@@ -280,7 +296,8 @@ def process_uploaded_file(
                 }
             }
             logger.info(f"Saved DoclingDocument for grounding to: {target_json_path_str}")
-            IS_VISUAL_GROUNDING_COMPLETED=True          
+            IS_VISUAL_GROUNDING_COMPLETED=True
+            report_progress('Visual grounding data saved', 25)
 
         except Exception as save_e:
             logger.error(f"Failed to convert/save full document for grounding ({filename}): {save_e}", exc_info=True)
@@ -289,6 +306,8 @@ def process_uploaded_file(
 
     # --- DoclingLoader Logic ---
     docling_export_type_str = app_config.get('DOCLING_EXPORT_TYPE', 'MARKDOWN').upper() if app_config else 'MARKDOWN'
+    logger.info(f"[Upload DEBUG] DOCLING_EXPORT_TYPE from app_config: {docling_export_type_str}")
+    logger.info(f"[Upload DEBUG] DOCLING_EXPORT_TYPE from os.environ: {os.environ.get('DOCLING_EXPORT_TYPE', 'NOT SET')}")
     splits = []
     loaded_docs = []
     chunker = None # Initialize chunker
@@ -386,6 +405,7 @@ def process_uploaded_file(
         )
         splits = loader.load()
         logger.info(f"Loaded {len(splits)} chunks using DoclingLoader (DOC_CHUNKS).")
+        report_progress('Document loaded and chunked', 45)
 
     elif docling_export_type_str == 'MARKDOWN':
         if api_endpoint and api_key:
@@ -585,6 +605,7 @@ def process_uploaded_file(
         # Get info about document from the first chunk's content
         if splits and hasattr(splits[0], 'page_content'):
             classified_metadata = {}
+            report_progress('Classifying document metadata...', 55)
             if base64_image:
                 # Use multimodal classifier if we have an image (i.e., for PDFs)
                 classified_metadata = classify_document_metadata_multimodal(image_base64=base64_image, logger_param=logger)
@@ -637,26 +658,49 @@ def process_uploaded_file(
               
         #--------------------------------
         # Get Page No
+        # CRITICAL: Extract page_number from dl_meta BEFORE it gets filtered out
+        # dl_meta will be removed by filter_complex_metadata(), but we need page_number
+        # in the vector store metadata for visual evidence to work
+        page_number_extracted = None
+        
+        # DEBUG: Log what metadata keys are present
+        logger.info(f"[Upload DEBUG] Chunk metadata keys for {filename}: {list(split_doc.metadata.keys()) if isinstance(split_doc.metadata, dict) else 'NOT A DICT'}")
+        if 'dl_meta' in split_doc.metadata:
+            logger.info(f"[Upload DEBUG] dl_meta structure: {type(split_doc.metadata['dl_meta'])}")
+        
         #---------------------------------
         # case from Azure Doc Intelligence
         # get page_no and save to metadata
         if 'pages' in split_doc.metadata:
-            page_no = split_doc.metadata['pages'][0]['pageNumber']
-            current_metadata['page_number'] = page_no
+            try:
+                page_no = split_doc.metadata['pages'][0]['pageNumber']
+                page_number_extracted = page_no
+                logger.debug(f"Extracted page_number {page_no} from Azure Doc Intelligence metadata")
+            except (KeyError, IndexError, TypeError) as e:
+                logger.debug(f"Could not extract page_number from 'pages' metadata: {e}")
+        
         #---------------------------------
         # case from docling
         # get page_no and save to metadata
-        if 'dl_meta' in split_doc.metadata:
+        if not page_number_extracted and 'dl_meta' in split_doc.metadata:
             try:
                 # This structure is typical for PDFs processed by Docling.
                 # Other file types like Markdown might not have it.
                 doc_item = split_doc.metadata['dl_meta']['doc_items']
                 page_no = doc_item[0]['prov'][0]['page_no']
-                current_metadata['page_number'] = page_no
+                page_number_extracted = page_no
+                logger.debug(f"Extracted page_number {page_no} from dl_meta for source {filename}")
             except (KeyError, IndexError, TypeError):
                 # Gracefully skip if the expected nested structure is not present.
                 logger.debug(f"Could not extract page_no from dl_meta for source {filename}. Structure may differ for this file type.")
                 pass
+        
+        # Save extracted page_number to metadata (will be preserved after filtering)
+        if page_number_extracted is not None:
+            current_metadata['page_number'] = page_number_extracted
+            logger.info(f"[Upload] Saved page_number={page_number_extracted} to metadata for {filename}")
+        else:
+            logger.warning(f"[Upload] No page_number found for chunk in {filename} - visual evidence will not work")
         
         #--- end Page No --
         
@@ -682,6 +726,7 @@ def process_uploaded_file(
 
 
     library_ref_id = None
+    report_progress('Saving to database...', 70)
 
     try:
         uploaded_file = UploadedFile(
@@ -796,6 +841,7 @@ def process_uploaded_file(
 
         # --- Add to Vector Store ---
         chunks_count = 0
+        report_progress('Storing chunks in vector database...', 85)
         try:
             chunks_count = process_and_store_chunks(
                 processed_splits,
@@ -850,14 +896,26 @@ print(f"[{os.getpid()}] modules.upload_processing.py: Imported celery instance. 
 # For example, if it was:
 # @celery.task
 # It becomes (combine name and base into one decorator):
-@celery.task(name="modules.upload_processing.async_process_single_file", bind=True)
+# Added auto-retry for FileNotFoundError to handle Azure Files sync and worker cold starts
+@celery.task(
+    name="modules.upload_processing.async_process_single_file",
+    bind=True,
+    autoretry_for=(FileNotFoundError,),
+    retry_backoff=60,  # Start with 60 seconds
+    retry_backoff_max=960,  # Max 16 minutes between retries
+    retry_kwargs={'max_retries': 5},
+    retry_jitter=True,  # Add randomness to prevent thundering herd
+)
 def async_process_single_file(self, temp_file_path_from_route, original_filename, user_id, library_id, library_name, knowledge_id_str, enable_visual_grounding_flag, url_download_id=None, source_url=None, content_type=None):
     """
     Celery task to process a single file upload asynchronously.
     This task runs in the background and calls the main process_uploaded_file function.
     """
-    # Use a more specific logger for Celery tasks if desired, or use the default task logger
+    # VERSION CHECK - Confirm worker is using updated code with Azure Files sync fix
     task_logger = logging.getLogger(f"celery.task.{self.name}")
+    task_logger.info("=" * 80)
+    task_logger.info("[WORKER VERSION] async_process_single_file v2.0 - WITH Azure Files Sync Fix")
+    task_logger.info("=" * 80)
     task_logger.info(f"Celery task started for: {original_filename}, temp path: {temp_file_path_from_route}")
 
     # Update state: Starting
@@ -888,6 +946,40 @@ def async_process_single_file(self, temp_file_path_from_route, original_filename
             meta={'filename': original_filename, 'stage': 'Processing document...', 'progress': 10}
         )
 
+        # Azure Files sync fix: Wait for file to be visible to worker instance
+        # In Azure Web Apps, files saved by web instance may take a moment to sync via Azure Files
+        temp_file_path_obj = Path(temp_file_path_from_route)
+        max_wait_seconds = 30
+        wait_interval = 0.5
+        elapsed = 0
+        
+        while not temp_file_path_obj.exists() and elapsed < max_wait_seconds:
+            task_logger.warning(
+                f"[Azure Files Sync] File not yet visible: {temp_file_path_from_route}. "
+                f"Waiting {wait_interval}s (elapsed: {elapsed}s/{max_wait_seconds}s)..."
+            )
+            import time
+            time.sleep(wait_interval)
+            elapsed += wait_interval
+        
+        if not temp_file_path_obj.exists():
+            error_msg = (
+                f"File not found after waiting {max_wait_seconds}s: {temp_file_path_from_route}. "
+                f"This may indicate an Azure Files sync issue or the file was deleted before processing."
+            )
+            task_logger.error(error_msg)
+            raise FileNotFoundError(error_msg)
+        
+        task_logger.info(f"[Azure Files Sync] File confirmed accessible after {elapsed}s: {temp_file_path_from_route}")
+
+        # Define progress callback to update Celery task state
+        def progress_callback(stage: str, progress: int):
+            self.update_state(
+                state='PROGRESS',
+                meta={'filename': original_filename, 'stage': stage, 'progress': progress}
+            )
+            task_logger.info(f"[Progress] {progress}% - {stage}")
+
         result = process_uploaded_file(
             file_path=temp_file_path_from_route,
             filename=original_filename,
@@ -901,6 +993,7 @@ def async_process_single_file(self, temp_file_path_from_route, original_filename
             current_user=None, # current_user is not available/needed here
             url_download_id=url_download_id,
             source_url=source_url,
+            progress_callback=progress_callback,  # Pass the progress callback
         )
 
         if result.get('success'):

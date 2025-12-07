@@ -67,6 +67,38 @@ def _send_task_and_wait(task_name: str, payload: Dict[str, Any], timeout: Option
         return None
 
 
+WORKER_HEARTBEAT_TASK = "celery_app.worker_heartbeat"
+
+
+def wake_worker(timeout: float = 10.0) -> bool:
+    """
+    Wake up the worker by calling heartbeat task synchronously.
+    This forces Azure App Service to wake up suspended worker pool processes.
+    
+    Args:
+        timeout: Maximum seconds to wait for worker response
+        
+    Returns:
+        True if worker responded, False otherwise
+    """
+    if not CELERY_AVAILABLE or celery is None:
+        logger.warning("Celery not available - cannot wake worker")
+        return False
+    
+    try:
+        logger.info("[WakeWorker] Pinging worker to ensure it's active...")
+        task = celery.send_task(WORKER_HEARTBEAT_TASK)
+        result = task.get(timeout=timeout)
+        logger.info(f"[WakeWorker] Worker responded: {result}")
+        return True
+    except CeleryTimeoutError:
+        logger.warning(f"[WakeWorker] Worker did not respond within {timeout}s timeout")
+        return False
+    except Exception as exc:
+        logger.warning(f"[WakeWorker] Failed to wake worker: {exc}")
+        return False
+
+
 def submit_file_processing_task(temp_file_path, filename, user_id, library_id, library_name, knowledge_id_str, enable_visual_grounding_flag, url_download_id=None, source_url=None, content_type=None):
     """
     Submit a file processing task to Celery worker.
@@ -75,6 +107,9 @@ def submit_file_processing_task(temp_file_path, filename, user_id, library_id, l
     if not CELERY_AVAILABLE or celery is None:
         logger.warning("Celery not available - cannot submit task")
         return None
+
+    # Wake up worker first to handle Azure App Service cold starts
+    wake_worker(timeout=15.0)
 
     try:
         task = celery.send_task(
