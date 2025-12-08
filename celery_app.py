@@ -79,14 +79,27 @@ def _register_task_modules():
                 logger.error(f"Failed to import Celery task module {module}", exc_info=True)
 
 
-_register_task_modules()
+# Only register task modules if we're being run as a Celery worker
+# This prevents heavy imports (docling etc) from blocking web container startup
+import sys
+is_celery_worker = (
+    'celery' in sys.argv[0].lower() or  # Running via celery CLI
+    os.environ.get('CELERY_WORKER') == '1' or  # Explicit worker flag
+    any('worker' in arg for arg in sys.argv)  # Worker argument passed
+)
 
-# Log all registered tasks at startup for debugging
-logger.info("=== Registered Celery Tasks ===")
-for task_name in sorted(celery.tasks.keys()):
-    if not task_name.startswith('celery.'):  # Skip built-in celery tasks
-        logger.info("  - %s", task_name)
-logger.info("=== End Registered Tasks ===")
+if is_celery_worker:
+    logger.info("Detected Celery worker context, registering task modules...")
+    _register_task_modules()
+    
+    # Log all registered tasks at startup for debugging
+    logger.info("=== Registered Celery Tasks ===")
+    for task_name in sorted(celery.tasks.keys()):
+        if not task_name.startswith('celery.'):  # Skip built-in celery tasks
+            logger.info("  - %s", task_name)
+    logger.info("=== End Registered Tasks ===")
+else:
+    logger.info("Not in Celery worker context, skipping heavy task module imports")
 
 # Production-recommended Celery configuration
 # Reference: https://medium.com/@hankehly/10-essential-lessons-for-running-celery-workloads-in-production

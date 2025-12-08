@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}SmartLib{% endblock %}</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/mazer/compiled/css/app.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/mazer/compiled/css/app-dark.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/mazer/compiled/css/iconly.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+
+    <style>
+        .layout-horizontal {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .content-wrapper {
+            flex: 1;
+            padding-top: 1.5rem;
+            padding-bottom: 1.5rem;
+        }
+
+        .navbar-logo img {
+            height: 36px;
+        }
+
+        /* Seamless header/footer */
+        .navbar.seamless-navbar {
+            background-color: transparent !important;
+            padding-top: 0.5rem !important;
+            padding-bottom: 0.5rem !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            margin-bottom: 0 !important;
+            min-height: 60px;
+            /* Force minimum height to prevent collapse shifts */
+        }
+
+        /* Force adaptive text color for navbar items */
+        .navbar.seamless-navbar .nav-link,
+        .navbar.seamless-navbar .navbar-brand {
+            color: var(--bs-body-color) !important;
+        }
+
+        .navbar.seamless-navbar .nav-link:hover,
+        .navbar.seamless-navbar .nav-link:focus {
+            color: var(--bs-primary) !important;
+        }
+
+        /* Toggler Icon Visibility Fix */
+        .navbar.seamless-navbar .navbar-toggler {
+            border-color: var(--bs-border-color);
+            color: var(--bs-body-color);
+        }
+
+        .navbar.seamless-navbar .navbar-toggler-icon {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%2833, 37, 41, 0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+            filter: none;
+            transition: filter 0.3s;
+        }
+
+        /* Dark Mode: Invert icon to white */
+        [data-bs-theme="dark"] .navbar.seamless-navbar .navbar-toggler-icon {
+            filter: invert(1) grayscale(100%) brightness(200%);
+        }
+
+        /* Light Mode: Ensure icon remains dark */
+        [data-bs-theme="light"] .navbar.seamless-navbar .navbar-toggler-icon {
+            filter: none;
+        }
+    </style>
+    {% block styles %}{% endblock %}
+</head>
+
+<body>
+    <script src="{{ url_for('static', filename='assets/mazer/static/js/initTheme.js') }}"></script>
+    <div id="app" class="layout-horizontal">
+
+        <!-- Navbar -->
+        <nav class="navbar navbar-expand-lg seamless-navbar mb-0">
+            <div class="container">
+                <a class="navbar-brand d-flex align-items-center navbar-logo" href="/">
+                    {% if logo_url %}
+                    <img src="{{ logo_url }}" alt="SmartLib Logo" class="me-2">
+                    {% else %}
+                    <span class="fs-5 fw-bold text-primary">SmartLib</span>
+                    {% endif %}
+                    {% if logo_url %}
+                    <span class="fs-5 fw-bold d-none d-sm-block">SmartLib</span>
+                    {% endif %}
+                </a>
+
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
+                    aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
+                        {% if current_user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="/">Home</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('upload_page') }}">Upload</a>
+                        </li>
+                        {% if current_user.is_admin %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('admin.dashboard') }}">Admin</a>
+                        </li>
+                        {% endif %}
+                        {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('login_route') }}">Login</a>
+                        </li>
+                        {% endif %}
+
+                        {# Upload Status Dropdown - for authenticated users #}
+                        {% if current_user.is_authenticated %}
+                        <li class="nav-item dropdown position-relative">
+                            <a href="#" id="upload-status-btn" class="nav-link dropdown-toggle"
+                                data-bs-toggle="dropdown" aria-expanded="false" title="Upload Status">
+                                <i class="bi bi-cloud-upload-fill"></i>
+                                <span id="upload-count-badge"
+                                    class="position-absolute start-50 translate-middle-x badge rounded-pill bg-primary"
+                                    style="display: none; font-size: 0.65rem; bottom: -8px;">
+                                    0
+                                </span>
+                            </a>
+                            <div class="dropdown-menu dropdown-menu-end p-0"
+                                style="min-width: 320px; max-width: 400px;">
+                                <div
+                                    class="dropdown-header d-flex justify-content-between align-items-center bg-body-tertiary">
+                                    <span class="fw-semibold">Upload Status</span>
+                                    <button class="btn btn-sm btn-link text-muted p-0" onclick="refreshUploadStatus()"
+                                        title="Refresh">
+                                        <i class="bi bi-arrow-clockwise"></i>
+                                    </button>
+                                </div>
+                                <div id="upload-status-list" class="list-group list-group-flush"
+                                    style="max-height: 300px; overflow-y: auto;">
+                                    <div class="list-group-item text-center text-muted small">
+                                        No active uploads
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                        {% endif %}
+
+                        <!-- Theme Toggle -->
+                        <li class="nav-item ms-lg-2">
+                            <div class="theme-toggle d-flex gap-2 align-items-center">
+                                <div class="form-check form-switch fs-6 mb-0">
+                                    <input class="form-check-input me-0" type="checkbox" id="toggle-dark"
+                                        style="cursor: pointer">
+                                </div>
+                                <i class="bi bi-moon-stars"></i>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="content-wrapper container">
+            <div class="page-heading mb-3">
+                <h3>{% block page_title %}{% endblock %}</h3>
+                {% block breadcrumb %}{% endblock %}
+            </div>
+
+            <div class="page-content">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="py-3 mt-auto">
+            <div class="container">
+                <div class="footer clearfix mb-0 text-muted d-flex justify-content-between">
+                    <div>
+                        <p>2025 &copy; SmartLib</p>
+                    </div>
+                    <div>
+                        <p class="mb-0">Crafted with <span class="text-danger"><i
+                                    class="bi bi-heart-fill icon-mid"></i></span></p>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='assets/mazer/static/js/components/dark.js') }}"></script>
+    <script
+        src="{{ url_for('static', filename='assets/mazer/extensions/perfect-scrollbar/perfect-scrollbar.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/mazer/compiled/js/app.js') }}"></script>
+
+    {# CSRF Utilities - Required for AJAX calls with CSRF protection #}
+    <script
+        src="{{ url_for('static', filename='js/csrf-utils.js') }}?v={{ config.get('APP_VERSION', '1.0') }}"></script>
+
+    {# Upload Status Tracker - Load for authenticated users #}
+    {% if current_user.is_authenticated %}
+    <script
+        src="{{ url_for('static', filename='js/upload-status.js') }}?v={{ config.get('APP_VERSION', '1.0') }}"></script>
+    {% endif %}
+
+    {% block js %}{% endblock %}
+</body>
+
+</html>

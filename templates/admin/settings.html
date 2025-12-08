@@ -122,21 +122,23 @@
 
     {# Sidebar with info #}
     <div class="col-12 col-xl-4">
-        <div class="card bg-light-primary">
-            <div class="card-header bg-transparent border-bottom border-primary-subtle">
-                <h6 class="mb-0 text-primary"><i class="bi bi-info-circle-fill me-2"></i>About Settings</h6>
+        <div class="card border border-primary-subtle">
+            <div class="card-header bg-light-primary">
+                <h6 class="mb-0 text-primary fw-bold"><i class="bi bi-info-circle-fill me-2"></i>About Settings</h6>
             </div>
-            <div class="card-body text-primary-emphasis">
-                <h6 class="fw-bold"><i class="bi bi-people-fill me-2"></i>User Limit Notes</h6>
-                <ul class="small mb-4 ps-3">
+            <div class="card-body pt-4">
+                <h6 class="fw-bold text-body-emphasis"><i class="bi bi-people-fill me-2 text-primary"></i>User Limit
+                    Notes</h6>
+                <ul class="small mb-4 ps-3 text-body-secondary">
                     <li>Settings persist across restarts.</li>
                     <li>Changes take effect immediately.</li>
                     <li>Cannot set limit below active user count.</li>
                     <li>Admins count toward the limit.</li>
                     <li>Disabled users are ignored.</li>
                 </ul>
-                <h6 class="fw-bold"><i class="bi bi-box-seam-fill me-2"></i>Build Information</h6>
-                <ul class="small mb-0 ps-3">
+                <h6 class="fw-bold text-body-emphasis"><i class="bi bi-box-seam-fill me-2 text-primary"></i>Build
+                    Information</h6>
+                <ul class="small mb-0 ps-3 text-body-secondary">
                     <li><strong>Version:</strong> {{ config.BUILD_VERSION }}</li>
                     <li><strong>Build Date:</strong> {{ config.BUILD_DATE }}</li>
                     <li><strong>Edition:</strong> <span class="badge bg-primary">{{ config.APP_EDITION }}</span></li>
@@ -153,8 +155,8 @@
     // Client-side validation
     document.getElementById('max_active_users').addEventListener('change', function () {
         const newLimit = parseInt(this.value);
-        const currentActive = {{ active_user_count }
-    }; // Rendered by Jinja
+        const currentActive = {{ active_user_count|default (0)
+    }};
 
     if (newLimit < currentActive) {
         alert(`Warning: New limit (${newLimit}) is lower than current active users (${currentActive}). You must disable ${currentActive - newLimit} user(s) first.`);

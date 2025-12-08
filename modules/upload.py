@@ -297,15 +297,21 @@ def init_upload(app):
         if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
             return jsonify({'valid': False, 'message': 'Only absolute HTTP or HTTPS URLs are allowed.'})
 
+        # Use shorter timeout for faster validation (3s instead of 5s)
+        # Only use HEAD request - no GET fallback to save time
         response = None
         try:
-            response = requests.head(raw_url, allow_redirects=True, timeout=5)
-            if response.status_code >= 400:
-                response.close()
-                response = requests.get(raw_url, allow_redirects=True, timeout=5, stream=True)
-            status_code = getattr(response, "status_code", None)
-            if status_code is None or status_code >= 400:
-                return jsonify({'valid': False, 'message': f'URL responded with status code {status_code or "unknown"}.'})
+            response = requests.head(raw_url, allow_redirects=True, timeout=3)
+            status_code = response.status_code
+            # Accept any non-error response (including 403/405 which some servers return for HEAD)
+            if status_code < 500:
+                return jsonify({'valid': True, 'message': f'URL is reachable (status: {status_code}).'})
+            else:
+                return jsonify({'valid': False, 'message': f'Server error: {status_code}'})
+        except requests.Timeout:
+            # If HEAD times out, still consider it potentially valid (server might be slow)
+            logger.info("URL validation HEAD timeout for %s, considering valid", raw_url)
+            return jsonify({'valid': True, 'message': 'URL timed out but may still be valid.'})
         except requests.RequestException as exc:
             logger.info("URL validation failed for %s: %s", raw_url, exc)
             return jsonify({'valid': False, 'message': 'URL could not be reached.'})
@@ -315,8 +321,6 @@ def init_upload(app):
                     response.close()
                 except Exception:
                     pass
-
-        return jsonify({'valid': True, 'message': 'URL is reachable.'})
 
     @app.route('/process_url', methods=['POST'])
     @login_required

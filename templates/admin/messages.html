@@ -49,10 +49,10 @@
         <form method="post" action="{{ url_for('admin_messages.cleanup_messages') }}" class="row g-2">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="col-8">
-            <div class="form-floating">
+            <div class="mb-2">
+              <label for="retention_days" class="form-label small mb-1">Retention (days)</label>
               <input type="number" class="form-control" id="retention_days" name="retention_days" min="1"
-                value="{{ default_retention_days }}" required placeholder="Days">
-              <label for="retention_days">Retention (days)</label>
+                value="{{ default_retention_days }}" required placeholder="30">
             </div>
           </div>
           <div class="col-4 d-flex align-items-end">

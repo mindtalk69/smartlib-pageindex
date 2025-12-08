@@ -118,10 +118,21 @@ tha/* Styles specific to the upload/download page */
 /* REMOVED specific background/border/shadow/padding rules for .login-form-container */
 /* Relying on the styles from darkmode.css for the container */
 
-/* Apply custom curve to library select dropdowns on upload page */
+/* Apply custom curve and consistent font to library select dropdowns on upload page */
 .upload-page-container #librarySelectUrl,
-.upload-page-container #librarySelectBatch {
-  border-radius: var(--custom-button-radius) !important; /* Force the curve */
+.upload-page-container #librarySelectBatch,
+#librarySelectUrl,
+#librarySelectBatch {
+  border-radius: var(--bs-border-radius);
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+/* Ensure dropdown options also have consistent styling */
+#librarySelectUrl option,
+#librarySelectBatch option {
+  font-size: 0.9rem;
+  font-family: inherit;
 }
 
 /* --- Translucent Toast Styles (Upload Page Specific) --- */

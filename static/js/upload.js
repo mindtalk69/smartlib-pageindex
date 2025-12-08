@@ -366,7 +366,7 @@
                 });
                 urlListDisplay.appendChild(list);
             } else {
-                urlListDisplay.innerHTML = '<p class="text-muted small mb-0">No URLs added yet.</p>';
+                urlListDisplay.innerHTML = '<p class="text-body small mb-0">No URLs added yet.</p>';
             }
             checkUrlFormState(); // Update button states
         }
@@ -430,73 +430,40 @@
 
             const formatValidUrls = potentialUrls.filter(url => isValidUrl(url));
 
-            const validationPromises = formatValidUrls.map(url => {
-                const headers = {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': window.readCurrentCsrfToken() // Ensure CSRF token is added
-                };
-                // Wrap with fetchWithCsrfRetry
-                return window.fetchWithCsrfRetry('/validate_url', {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify({ url: url })
-                })
-                    .then(response => response.json())
-                    .then(data => ({ url: url, valid: data.valid, message: data.message }))
-                    .catch(error => ({ url: url, valid: false, message: `Fetch error: ${error.message}` }));
-            });
-
+            // INSTANT VALIDATION: Skip backend call, just use client-side format validation
+            // Reachability will be checked during actual URL processing
             const formatInvalidCount = potentialUrls.length - formatValidUrls.length;
-            const results = await Promise.allSettled(validationPromises);
 
-            let backendValidatedCount = 0;
-            let backendFailedCount = 0;
-            const newlyValidatedUrls = [];
-
-            results.forEach(result => {
-                if (result.status === 'fulfilled' && result.value && result.value.valid) {
-                    // Add only if valid AND not already in the main list
-                    if (!urlsToProcess.includes(result.value.url)) {
-                        newlyValidatedUrls.push(result.value.url);
-                        //backendValidatedCount++;
-                        if (result.value.url) backendValidatedCount++; // Ensure URL exists
-                    }
-                } else {
-                    backendFailedCount++;
-                    // Optionally log failed validation reason:
-                    // console.warn(`Validation failed for ${result.value?.url || 'unknown URL'}: ${result.value?.message || result.reason}`);
+            // Add format-valid URLs directly to the list
+            let addedCount = 0;
+            formatValidUrls.forEach(url => {
+                if (!urlsToProcess.includes(url)) {
+                    urlsToProcess.push(url);
+                    addedCount++;
                 }
             });
 
-            // Add the newly validated URLs to the main list
-            urlsToProcess.push(...newlyValidatedUrls);
-
             // Update UI
-            if (backendValidatedCount > 0) {
+            if (addedCount > 0) {
                 urlTextarea.value = ''; // Clear textarea only if URLs were added
                 renderUrlList(); // Update the displayed list
             }
 
             // Construct status message
             let statusMsg = '';
-            if (backendValidatedCount > 0) {
-                statusMsg += `Added ${backendValidatedCount} valid & accessible URL(s) to the list. `;
-            } else if (potentialUrls.length > 0) { // Only say "no new" if some were attempted
-                statusMsg += `No new valid & accessible URLs added. `;
+            if (addedCount > 0) {
+                statusMsg += `Added ${addedCount} URL(s) to the list. `;
+            } else if (potentialUrls.length > 0) {
+                statusMsg += `No new URLs added (already in list or invalid format). `;
             }
-            //const totalFailed = formatInvalidCount + backendFailedCount;
-            // Ensure result.value exists before accessing properties
-            const actualBackendFailedCount = results.filter(r => r.status === 'fulfilled' && r.value && !r.value.valid).length;
-            const totalFailed = formatInvalidCount + actualBackendFailedCount;
-            if (totalFailed > 0) {
-                statusMsg += `Skipped ${totalFailed} invalid or inaccessible entries.`;
+            if (formatInvalidCount > 0) {
+                statusMsg += `Skipped ${formatInvalidCount} invalid format entries.`;
             }
 
-            // Use toast for feedback instead of urlStatus div
-            const toastType = backendValidatedCount > 0 ? 'info' : 'warning';
-            console.log(`[DEBUG] Calling showToast. Type: ${toastType}, Message: "${statusMsg}"`); // Add log
-            //showToast(statusMsg, toastType);
-            if (statusMsg.trim()) { // Only show toast if there's a message
+            // Use toast for feedback
+            const toastType = addedCount > 0 ? 'info' : 'warning';
+            console.log(`[DEBUG] Calling showToast. Type: ${toastType}, Message: "${statusMsg}"`);
+            if (statusMsg.trim()) {
                 showToast(statusMsg, toastType);
             }
             // urlStatus.innerHTML = ''; // Clear any old status messages if desired
@@ -618,6 +585,10 @@
 
                         if (response.ok && data.success) {
                             successCount++;
+
+                            // Show status container
+                            urlStatus.classList.remove('d-none');
+
                             const messageText = data.message || data.warning || '';
                             const successHTML = `<p class="small text-body-secondary mb-1">Success: ${url} ${messageText}</p>`;
                             urlStatus.insertAdjacentHTML('beforeend', successHTML);
@@ -632,6 +603,7 @@
                         } else {
                             errorCount++;
                             // Append error message
+                            urlStatus.classList.remove('d-none'); // Ensure visible
                             const errorHTML = `<p class="small text-danger mb-1">Error: ${url} - ${data.message || 'Unknown error'}</p>`;
                             urlStatus.insertAdjacentHTML('beforeend', errorHTML);
                         }
@@ -639,6 +611,7 @@
                         errorCount++;
                         console.error(`Error processing URL ${url}:`, error);
                         // Append fetch error message
+                        urlStatus.classList.remove('d-none'); // Ensure visible
                         const fetchErrorHTML = `<p class="small text-danger mb-1">Error: ${url} - ${error.message}</p>`;
                         urlStatus.insertAdjacentHTML('beforeend', fetchErrorHTML);
                     }
@@ -813,6 +786,7 @@
                 isBatchUploading = true;
                 uploadBatchBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading ${filesToUpload.length} files...`; // Use array length
                 batchStatus.innerHTML = ''; // Clear previous status
+                batchStatus.classList.remove('d-none'); // Show status container
                 batchProgressBar.style.display = 'block'; // Show progress bar
                 console.log('[Batch Upload] batchProgressBar found:', !!batchProgressBar);
                 // --- Initialize Progress Bar ---
