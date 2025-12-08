@@ -1,131 +1,134 @@
-{% extends "admin/base.html" %}
-{% block title %}Message Viewer{% endblock %}
+{% extends "admin/layout_mazer.html" %}
 
-{% block admin_title %}Messages History{% endblock %} {# Set the page title #}
+{% block admin_title %}Messages History{% endblock %}
+
+{% block admin_breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
+<li class="breadcrumb-item active" aria-current="page">Message History</li>
+{% endblock %}
 
 {% block admin_content %}
-<div class="container mt-4">
-    {# Removed H2 and H6 as title is now in admin_title block #}
+<style>
+  .message-snippet {
+    max-height: 4.2rem;
+    overflow: hidden;
+    position: relative;
+  }
 
-    <style>
-      .message-snippet {
-        max-height: 4.2rem;
-        overflow: hidden;
-        position: relative;
-      }
-      .message-snippet::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: 1.2rem;
-        background: linear-gradient(180deg, rgba(255,255,255,0) 0%, var(--bs-body-bg) 100%);
-      }
-      .message-snippet.no-fade::after {
-        display: none;
-      }
-    </style>
+  .message-snippet::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 1.2rem;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, var(--bs-card-bg, #fff) 100%);
+  }
 
-    <div class="row row-cols-1 row-cols-lg-2 mb-4 g-3">
-        <div class="col">
-            <div class="card h-100">
-                <div class="card-header">
-                    <i class="fas fa-database me-2"></i>Export &amp; Cleanup
-                </div>
-                <div class="card-body">
-                    <p class="text-muted">
-                        Export conversation history older than a retention window, remove it from SQLite,
-                        and run <code>VACUUM</code> to reclaim disk space.
-                    </p>
-                    <form method="post" action="{{ url_for('admin_messages.cleanup_messages') }}" class="row g-2">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <div class="col-8">
-                            <label for="retention_days" class="form-label">Retention window (days)</label>
-                            <input
-                                type="number"
-                                class="form-control"
-                                id="retention_days"
-                                name="retention_days"
-                                min="1"
-                                value="{{ default_retention_days }}"
-                                required
-                            >
-                        </div>
-                        <div class="col-4 d-flex align-items-end">
-                            <button type="submit" class="btn btn-danger w-100">
-                                <i class="fas fa-broom me-1"></i>Export &amp; Purge
-                            </button>
-                        </div>
-                    </form>
-                    <small class="text-muted d-block mt-2">
-                        Archives are saved in <code>{{ message_log_directory }}</code> using the pattern
-                        <code>message_history_archive_YYYYMMDD_HHMMSS.csv</code>.
-                    </small>
-                </div>
+  .message-snippet.no-fade::after {
+    display: none;
+  }
+
+  /* Dark mode support for snippet fade */
+  html[data-bs-theme="dark"] .message-snippet::after {
+    background: linear-gradient(180deg, rgba(30, 30, 45, 0) 0%, #1e1e2d 100%);
+  }
+</style>
+
+<div class="row mb-4">
+  <div class="col-12 col-xl-6 mb-3 mb-xl-0">
+    <div class="card h-100">
+      <div class="card-header">
+        <h4 class="card-title"><i class="bi bi-database-fill me-2"></i>Export &amp; Cleanup</h4>
+      </div>
+      <div class="card-body">
+        <p class="text-muted">
+          Export conversation history older than a retention window, remove it from SQLite,
+          and run <code>VACUUM</code> to reclaim disk space.
+        </p>
+        <form method="post" action="{{ url_for('admin_messages.cleanup_messages') }}" class="row g-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="col-8">
+            <div class="form-floating">
+              <input type="number" class="form-control" id="retention_days" name="retention_days" min="1"
+                value="{{ default_retention_days }}" required placeholder="Days">
+              <label for="retention_days">Retention (days)</label>
             </div>
-        </div>
-        <div class="col">
-            <div class="card h-100">
-                <div class="card-header">
-                    <i class="fas fa-download me-2"></i>Quick Export
-                </div>
-                <div class="card-body">
-                    <p class="text-muted mb-3">
-                        Download the current table contents as CSV without deleting anything.
-                    </p>
-                    <a href="{{ url_for('admin.export_message_history_csv') }}" class="btn btn-outline-primary">
-                        <i class="fas fa-file-export me-1"></i> Export Active Messages
-                    </a>
-                </div>
-            </div>
-        </div>
+          </div>
+          <div class="col-4 d-flex align-items-end">
+            <button type="submit" class="btn btn-danger w-100 h-100">
+              <i class="bi bi-trash-fill me-1"></i> Purge
+            </button>
+          </div>
+        </form>
+        <small class="text-muted d-block mt-2">
+          Archives saved as: <code>message_history_archive_YYYYMMDD_...csv</code>
+        </small>
+      </div>
     </div>
+  </div>
+  <div class="col-12 col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h4 class="card-title"><i class="bi bi-download me-2"></i>Quick Export</h4>
+      </div>
+      <div class="card-body d-flex flex-column justify-content-center">
+        <p class="text-muted mb-3">
+          Download the current table contents as CSV without deleting anything.
+        </p>
+        <a href="{{ url_for('admin.export_message_history_csv') }}" class="btn btn-primary">
+          <i class="bi bi-file-earmark-spreadsheet-fill me-1"></i> Export Active Messages
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
 
-    <div class="table-responsive mt-2">
-        <table class="table table-striped" id="messagesTable"> 
-            <thead>
-                <tr>
-                    <th style="width: 15%;">User</th>
-                    <th style="width: 40%;">Message</th>
-                    <th style="width: 35%;">Answer</th>
-                    <th style="width: 20%;">Date</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for msg in messages %} {# msg is a MessageHistory object #}
-                {% set timestamp_text = msg.timestamp.strftime('%Y-%m-%d %H:%M:%S') if msg.timestamp else 'N/A' %}
-                {% set message_text = msg.message_text or '' %}
-                {% set answer_text = msg.answer or '' %}
-                <tr data-id="{{ msg.message_id }}">
-                    <td>{{ msg.author.username if msg.author else 'Unknown User' }}</td>
-                    <td>
-                        <div class="message-snippet{% if message_text|length <= 240 %} no-fade{% endif %}">
-                            {{ message_text }}
-                        </div>
-                    </td>
-                    <td>
-                        <div class="message-snippet{% if answer_text|length <= 240 %} no-fade{% endif %}">
-                            {{ answer_text or '—' }}
-                        </div>
-                        <button
-                            type="button"
-                            class="btn btn-link btn-sm p-0 mt-1 btn-view-message"
-                            data-user="{{ msg.author.username if msg.author else 'Unknown User' }}"
-                            data-timestamp="{{ timestamp_text }}"
-                            data-message="{{ message_text|e }}"
-                            data-answer="{{ answer_text|e }}"
-                        >
-                            View full text
-                        </button>
-                    </td>
-                    <td>{{ timestamp_text }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {# Removed server-side pagination controls as DataTables will handle it #}
+<div class="card">
+  <div class="card-header">
+    <h4 class="card-title">Message Log</h4>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-striped" id="messagesTable">
+        <thead>
+          <tr>
+            <th style="width: 15%;">User</th>
+            <th style="width: 40%;">Message</th>
+            <th style="width: 35%;">Answer</th>
+            <th style="width: 10%;">Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for msg in messages %}
+          {% set timestamp_text = msg.timestamp.strftime('%Y-%m-%d %H:%M:%S') if msg.timestamp else 'N/A' %}
+          {% set message_text = msg.message_text or '' %}
+          {% set answer_text = msg.answer or '' %}
+          <tr data-id="{{ msg.message_id }}">
+            <td class="fw-bold">{{ msg.author.username if msg.author else 'Unknown User' }}</td>
+            <td>
+              <div class="message-snippet{% if message_text|length <= 240 %} no-fade{% endif %}">
+                {{ message_text }}
+              </div>
+            </td>
+            <td>
+              <div class="message-snippet{% if answer_text|length <= 240 %} no-fade{% endif %}">
+                {{ answer_text or '—' }}
+              </div>
+              <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none btn-view-message"
+                data-user="{{ msg.author.username if msg.author else 'Unknown User' }}"
+                data-timestamp="{{ timestamp_text }}" data-message="{{ message_text|e }}"
+                data-answer="{{ answer_text|e }}">
+                View full text
+              </button>
+            </td>
+            <td><small class="text-muted">{{ timestamp_text }}</small></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
+  </div>
 </div>
 
 <div class="modal fade" id="messageDetailModal" tabindex="-1" aria-hidden="true">
@@ -136,16 +139,21 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <dl class="row">
-          <dt class="col-sm-3">User</dt>
-          <dd class="col-sm-9" id="modalMessageUser">—</dd>
-          <dt class="col-sm-3">Timestamp</dt>
-          <dd class="col-sm-9" id="modalMessageTimestamp">—</dd>
-        </dl>
-        <h6>Message</h6>
-        <p class="border rounded p-2 bg-light" id="modalMessageText" style="white-space: pre-wrap;">—</p>
-        <h6>Answer</h6>
-        <p class="border rounded p-2 bg-light" id="modalMessageAnswer" style="white-space: pre-wrap;">—</p>
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <strong>User:</strong> <span id="modalMessageUser" class="text-primary">—</span>
+          </div>
+          <div class="col-md-6">
+            <strong>Timestamp:</strong> <span id="modalMessageTimestamp" class="text-muted">—</span>
+          </div>
+        </div>
+
+        <h6 class="text-uppercase text-muted small fw-bold">User Message</h6>
+        <div class="p-3 bg-light rounded mb-3 border" id="modalMessageText" style="white-space: pre-wrap;">—</div>
+
+        <h6 class="text-uppercase text-muted small fw-bold">AI Answer</h6>
+        <div class="p-3 bg-light-primary rounded border border-primary-subtle" id="modalMessageAnswer"
+          style="white-space: pre-wrap;">—</div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -155,27 +163,38 @@
 </div>
 {% endblock %}
 
-{% block scripts %}
-{{ super() }}
+{% block admin_scripts %}
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    const modalElement = document.getElementById('messageDetailModal');
-    if (!modalElement) {
-      return;
-    }
-    let modalInstance;
-    function getModal() {
-      if (!modalInstance) {
-        modalInstance = new bootstrap.Modal(modalElement);
-      }
-      return modalInstance;
+    const table = document.getElementById('messagesTable');
+    if (table && typeof simpleDatatables !== 'undefined') {
+      new simpleDatatables.DataTable(table, {
+        searchable: true,
+        fixedHeight: false,
+        perPage: 10,
+        columns: [
+          { select: 2, sortable: false }, // Answer column not sortable (contains button)
+          { select: 3, type: 'date', format: 'YYYY-MM-DD HH:mm:ss' }
+        ]
+      });
     }
 
-    document.body.addEventListener('click', function (event) {
+    const modalElement = document.getElementById('messageDetailModal');
+    let modalInstance;
+
+    if (modalElement) {
+      modalInstance = new bootstrap.Modal(modalElement);
+    }
+
+    // Event delegation for "View full text" button since Datatable might redraw rows
+    const tableContainer = document.querySelector('#messagesTable');
+    // Use closest stable container if table ID is manipulated by datatables lib
+    const container = tableContainer ? tableContainer.closest('.card-body') : document.body;
+
+    container.addEventListener('click', function (event) {
       const button = event.target.closest('.btn-view-message');
-      if (!button) {
-        return;
-      }
+      if (!button) return;
+
       const user = button.getAttribute('data-user') || 'Unknown User';
       const timestamp = button.getAttribute('data-timestamp') || '—';
       const message = button.getAttribute('data-message') || '';
@@ -186,9 +205,8 @@
       document.getElementById('modalMessageText').textContent = message || '—';
       document.getElementById('modalMessageAnswer').textContent = answer || '—';
 
-      getModal().show();
+      if (modalInstance) modalInstance.show();
     });
   });
 </script>
-{# DataTables initialization handled in admin-datatables.js #}
 {% endblock %}

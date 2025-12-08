@@ -24,11 +24,29 @@ document.addEventListener("DOMContentLoaded", function () {
     const ocrMode = visualGroundingCheckbox.dataset.ocrMode || "default";
     const isOcrLocal = ocrMode === "default";
 
+    const visualGroundingInfo = document.getElementById("visualGroundingInfoAdmin");
+
     function updateVisualGroundingWarning() {
-      if (visualGroundingCheckbox.checked && !isOcrLocal) {
-        visualGroundingOcrWarning.classList.remove("d-none");
+      // Logic:
+      // 1. If not checked -> hide both
+      // 2. If checked AND NOT local OCR -> show warning, hide info (or show both? usually warning takes precedence)
+      // 3. If checked AND local OCR -> show info, hide warning
+
+      if (!visualGroundingCheckbox.checked) {
+        if (visualGroundingOcrWarning) visualGroundingOcrWarning.classList.add("d-none");
+        if (visualGroundingInfo) visualGroundingInfo.classList.add("d-none");
+        return;
+      }
+
+      // Checked...
+      if (!isOcrLocal) {
+        // Incompatible OCR mode
+        if (visualGroundingOcrWarning) visualGroundingOcrWarning.classList.remove("d-none");
+        if (visualGroundingInfo) visualGroundingInfo.classList.add("d-none");
       } else {
-        visualGroundingOcrWarning.classList.add("d-none");
+        // Compatible
+        if (visualGroundingOcrWarning) visualGroundingOcrWarning.classList.add("d-none");
+        if (visualGroundingInfo) visualGroundingInfo.classList.remove("d-none");
       }
     }
 

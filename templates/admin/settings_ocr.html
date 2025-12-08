@@ -1,110 +1,148 @@
-{% extends "admin/base.html" %}
-{% block title %}OCR Settings{% endblock %}
+{% extends "admin/layout_mazer.html" %}
+
+{% block admin_title %}OCR Settings{% endblock %}
+
+{% block admin_breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
+<li class="breadcrumb-item active" aria-current="page">OCR Settings</li>
+{% endblock %}
 
 {% block admin_content %}
-<div class="container mt-4">
-  <h2>OCR Settings</h2>
-  <form method="POST" id="ocrSettingsForm">
-    {{ form.csrf_token }}
-    <div class="mb-3 form-check form-switch">
-      <input class="form-check-input ms-3" type="checkbox" id="isEnabledOcr" name="is_enabled_ocr" value="1" {% if is_enabled_ocr %}checked{% endif %}>
-      <label class="form-check-label" for="isEnabledOcr">
-        Enable OCR Features
-      </label>
-    </div>
-    <div id="autoOcrSection" style="display: none; margin-left:2.5em;">
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" id="isAutoOcr" name="is_auto_ocr" value="1" {% if is_auto_ocr %}checked{% endif %}>
-        <label class="form-check-label" for="isAutoOcr">
-          Allow automatic OCR if PDF is image-only
-        </label>
-        <div class="form-text text-muted" style="margin-left:1.5em;">
-          If enabled, the system will automatically use OCR for PDFs that are detected as fully image-based. This may incur Azure costs if Azure Document Intelligence is selected.
-        </div>
-      </div>
-    </div>
-    <div id="ocrModeSection" style="display: none;">
-      <div class="mb-3">
-        <label class="form-label">OCR Mode</label>
-        <div>
-          <input type="radio" class="form-check-input" id="modeAzure" name="ocr_mode" value="azure"
-            {% if form.ocr_mode.data == 'azure' %}checked{% endif %}>
-          <label class="form-check-label me-3" for="modeAzure">
-            Azure Document Intelligence <span class="text-muted">(Incurs cost/trx)</span>
-          </label>
-          <input type="radio" class="form-check-input" id="modeOther" name="ocr_mode" value="default"
-            {% if form.ocr_mode.data == 'default' %}checked{% endif %}>
-          <label class="form-check-label" for="modeOther">
-            Default<span class="text-muted">(local)</span>
-          </label>
-        </div>
-      </div>
-      <div id="azureFields" style="display: none;">
-        <div class="mb-3">
-          <label class="form-label" for="endpoint">Azure Document Intelligence Endpoint</label>
-          {{ form.endpoint(class="form-control", id="endpoint", placeholder="https://<resource-name>.cognitiveservices.azure.com/") }}
-        </div>
-        <div class="alert alert-info small" role="note">
-          <p class="mb-1">
-            Manage the Azure Document Intelligence key via Azure Key Vault. Set the App Service
-            setting <code>DOC_INTELLIGENCE_KEY</code> to a Key Vault reference such as
-            <code>@Microsoft.KeyVault(SecretUri=https://&lt;vault&gt;.vault.azure.net/secrets/&lt;secret&gt;/&lt;version&gt;)</code>.
-          </p>
-          {% if key_env_available %}
-          <span class="text-success">Key Vault reference detected in the current configuration.</span>
-          {% else %}
-          <span class="text-warning">No Key Vault reference detected. Update the App Service setting before enabling Azure mode.</span>
-          {% endif %}
-          {% if legacy_key_present %}
-          <span class="text-danger d-block mt-1">A legacy key stored in the database will be removed when you save these settings.</span>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-    <button type="submit" class="btn btn-primary">Save Settings</button>
-    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary ms-2">Cancel</a>
-  </form>
+<div class="card">
+  <div class="card-header">
+    <h4 class="card-title">OCR Configuration</h4>
+  </div>
+  <div class="card-body">
+    <form method="POST" id="ocrSettingsForm">
+      {{ form.csrf_token }}
 
-  <div class="mt-3">
-    <h5>OCR Descriptions</h5>
-    <ul>
-      <li><strong>Azure Document Intelligence:</strong> Best for quality, please check for pricing.</li>
-      <li><strong>Default:</strong> Free, but needs GPU installed for best performance.</li>
-    </ul>
+      <div class="form-check form-switch mb-4">
+        <input class="form-check-input" type="checkbox" id="isEnabledOcr" name="is_enabled_ocr" value="1" {% if
+          is_enabled_ocr %}checked{% endif %}>
+        <label class="form-check-label fw-bold" for="isEnabledOcr">
+          Enable OCR Features
+        </label>
+      </div>
+
+      <div id="autoOcrSection" style="display: none;" class="ms-md-4 mb-4">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="isAutoOcr" name="is_auto_ocr" value="1" {% if is_auto_ocr
+            %}checked{% endif %}>
+          <label class="form-check-label" for="isAutoOcr">
+            Allow automatic OCR if PDF is image-only
+          </label>
+        </div>
+        <div class="form-text text-muted mt-1">
+          If enabled, the system will automatically use OCR for PDFs that are detected as fully image-based.
+          <br><i class="bi bi-info-circle me-1"></i> This may incur Azure costs if Azure Document Intelligence is
+          selected.
+        </div>
+      </div>
+
+      <div id="ocrModeSection" style="display: none;" class="ms-md-4">
+        <h5 class="mb-3">OCR Mode</h5>
+        <div class="mb-3">
+          <div class="form-check mb-2">
+            <input type="radio" class="form-check-input" id="modeAzure" name="ocr_mode" value="azure" {% if
+              form.ocr_mode.data=='azure' %}checked{% endif %}>
+            <label class="form-check-label" for="modeAzure">
+              <strong>Azure Document Intelligence</strong> <span class="badge bg-light-warning text-warning ms-2">Incurs
+                cost/trx</span>
+              <div class="text-muted small">Best for quality, please check for pricing.</div>
+            </label>
+          </div>
+          <div class="form-check mb-3">
+            <input type="radio" class="form-check-input" id="modeOther" name="ocr_mode" value="default" {% if
+              form.ocr_mode.data=='default' %}checked{% endif %}>
+            <label class="form-check-label" for="modeOther">
+              <strong>Default (Local)</strong>
+              <div class="text-muted small">Free, but needs GPU installed for best performance.</div>
+            </label>
+          </div>
+        </div>
+
+        <div id="azureFields" style="display: none;" class="card bg-light border-0 mb-3">
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label" for="endpoint">Azure Document Intelligence Endpoint</label>
+              {{ form.endpoint(class="form-control", id="endpoint",
+              placeholder="https://<resource-name>.cognitiveservices.azure.com/") }}
+            </div>
+            <div class="alert alert-info small mb-0" role="alert">
+              <h6 class="alert-heading"><i class="bi bi-key-fill me-2"></i>Key Management</h6>
+              <p class="mb-2">
+                Manage the Azure Document Intelligence key via Azure Key Vault. Set the App Service
+                setting <code>DOC_INTELLIGENCE_KEY</code> to a Key Vault reference such as
+                <code>@Microsoft.KeyVault(SecretUri=https://&lt;vault&gt;.vault.azure.net/secrets/&lt;secret&gt;/&lt;version&gt;)</code>.
+              </p>
+              {% if key_env_available %}
+              <div class="text-success"><i class="bi bi-check-circle-fill me-1"></i> Key Vault reference detected in the
+                current configuration.</div>
+              {% else %}
+              <div class="text-warning"><i class="bi bi-exclamation-triangle-fill me-1"></i> No Key Vault reference
+                detected. Update the App Service setting before enabling Azure mode.</div>
+              {% endif %}
+              {% if legacy_key_present %}
+              <div class="text-danger mt-2"><i class="bi bi-trash-fill me-1"></i> A legacy key stored in the database
+                will be removed when you save these settings.</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="mt-4">
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-save me-1"></i> Save Settings
+        </button>
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-light-secondary">Cancel</a>
+      </div>
+    </form>
   </div>
 </div>
+{% endblock %}
 
+{% block admin_scripts %}
 <script>
   function updateOcrFormVisibility() {
     const enabled = document.getElementById('isEnabledOcr').checked;
     const ocrModeSection = document.getElementById('ocrModeSection');
     const azureFields = document.getElementById('azureFields');
     const autoOcrSection = document.getElementById('autoOcrSection');
+
     if (enabled) {
-      ocrModeSection.style.display = '';
-      autoOcrSection.style.display = '';
+      if (ocrModeSection) ocrModeSection.style.display = 'block';
+      if (autoOcrSection) autoOcrSection.style.display = 'block';
+
       // Show/hide Azure fields based on selected radio
       const azureRadio = document.getElementById('modeAzure');
-      if (azureRadio.checked) {
-        azureFields.style.display = '';
+      if (azureRadio && azureRadio.checked) {
+        if (azureFields) azureFields.style.display = 'block';
       } else {
-        azureFields.style.display = 'none';
+        if (azureFields) azureFields.style.display = 'none';
       }
     } else {
-      ocrModeSection.style.display = 'none';
-      azureFields.style.display = 'none';
-      autoOcrSection.style.display = 'none';
+      if (ocrModeSection) ocrModeSection.style.display = 'none';
+      if (azureFields) azureFields.style.display = 'none';
+      if (autoOcrSection) autoOcrSection.style.display = 'none';
     }
   }
 
-  document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('DOMContentLoaded', function () {
     // Initial state
     updateOcrFormVisibility();
     // Switch event
-    document.getElementById('isEnabledOcr').addEventListener('change', updateOcrFormVisibility);
+    const ocrSwitch = document.getElementById('isEnabledOcr');
+    if (ocrSwitch) ocrSwitch.addEventListener('change', updateOcrFormVisibility);
+
     // Radio events
-    document.getElementById('modeAzure').addEventListener('change', updateOcrFormVisibility);
-    document.getElementById('modeOther').addEventListener('change', updateOcrFormVisibility);
+    const azureRadio = document.getElementById('modeAzure');
+    const otherRadio = document.getElementById('modeOther');
+
+    if (azureRadio) azureRadio.addEventListener('change', updateOcrFormVisibility);
+    if (otherRadio) otherRadio.addEventListener('change', updateOcrFormVisibility);
   });
 </script>
 {% endblock %}

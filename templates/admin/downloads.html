@@ -1,106 +1,135 @@
-{% extends "admin/base.html" %}
+{% extends "admin/layout_mazer.html" %}
 
-{% block admin_title %}Download Management{% endblock %} {# Set the page title #}
+{% block page_title %}Download Management{% endblock %}
 
-{% block admin_content %}
-<div class="container mt-4">
-    {# Removed H2 and H6 as title is now in admin_title block #}
-    {% set download_list = downloads|default([]) %}
-    {% set has_downloads = download_list|length > 0 %}
-
-    {% if not has_downloads %}
-    <div class="alert alert-info text-center" role="status">
-        No URL downloads recorded yet.
-    </div>
-    {% endif %}
-    
-    <div class="table-responsive">
-        <table class="table table-striped" id="downloadsTable"> 
-            <thead>
-                <tr>
-                    <th>No.</th>
-                    <th>URL</th>
-                    <th>Library</th>
-                    <th>Knowledge</th>
-                    <th>Metadata</th>
-                    <th>Status</th>
-                    <th>Content Type</th>
-                    <th>User</th>
-                    <th>Downloaded At</th>
-                    <th>Is OCR</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if has_downloads %}
-                {% for download in download_list %}
-                <tr data-id="{{ download.id }}">
-                    <td>{{ loop.index }}</td>
-                    <td>
-                        <a href="{{ download.url }}" target="_blank" rel="noopener noreferrer" title="{{ download.url }}">
-                            {{ download.url|truncate(50) }}
-                        </a>
-                    </td>
-                    <td>{{ download.library_name or 'N/A' }}</td>
-                    <td>{{ download.knowledge_name or 'N/A' }}</td>
-                    <td class="small text-muted">{{ download.metadata_summary }}</td>
-                    <td>
-                        {% set status_lower = (download.status or 'unknown')|lower %}
-                        {% if status_lower == 'success' %}
-                            {% set badge_class = 'bg-success' if not light_theme else 'bg-primary' %}
-                        {% elif status_lower in ['processing', 'in_progress'] %}
-                            {% set badge_class = 'bg-info text-dark' %}
-                        {% elif status_lower in ['queued', 'pending'] %}
-                            {% set badge_class = 'bg-warning text-dark' %}
-                        {% else %}
-                            {% set badge_class = 'bg-danger' %}
-                        {% endif %}
-                        <span class="badge {{ badge_class }}">
-                            {{ status_lower.replace('_', ' ')|title }}
-                        </span>
-                        {% if download.error_message %}
-                        <div class="small text-muted mt-1">{{ download.error_message }}</div>
-                        {% endif %}
-                    </td>
-                    <td>{{ download.content_type or 'N/A' }}</td>
-                    <td>{{ download.username }}</td>
-                    <td>
-                        {% if download.processed_at %}
-                            {{ download.processed_at.strftime('%Y-%m-%d %H:%M') }}
-                        {% else %}
-                            N/A
-                        {% endif %}
-                    </td>
-                    <td>{% if download.is_ocr %}Yes{% else %}No{% endif %}</td>
-                    <td>
-                        <div class="action-buttons">
-                            <button class="btn btn-sm btn-danger delete-download-btn" 
-                                    data-id="{{ download.id }}"
-                                    data-url="{{ download.url }}"
-                                    title="Delete Download Record">
-                                <i class="bi bi-trash-fill"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-                {% endif %}
-            </tbody>
-        </table>
-    </div>
-</div>
+{% block breadcrumb %}
+<li class="breadcrumb-item active" aria-current="page">URL Downloads</li>
 {% endblock %}
 
-{% block admin_scripts %}
-{{ super() }}
+{% block content %}
+<section class="section">
+    <div class="card">
+        <div class="card-header">
+            <h4 class="card-title">URL Downloads</h4>
+        </div>
+        <div class="card-body">
+            {% set download_list = downloads|default([]) %}
+            {% set has_downloads = download_list|length > 0 %}
+
+            {% if not has_downloads %}
+            <div class="alert alert-info text-center" role="status">
+                No URL downloads recorded yet.
+            </div>
+            {% endif %}
+
+            <div class="table-responsive">
+                <table class="table table-striped" id="downloadsTable">
+                    <thead>
+                        <tr>
+                            <th>No.</th>
+                            <th>URL</th>
+                            <th>Library</th>
+                            <th>Knowledge</th>
+                            <th>Metadata</th>
+                            <th>Status</th>
+                            <th>Content Type</th>
+                            <th>User</th>
+                            <th>Downloaded At</th>
+                            <th>Is OCR</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if has_downloads %}
+                        {% for download in download_list %}
+                        <tr data-id="{{ download.id }}">
+                            <td>{{ loop.index }}</td>
+                            <td>
+                                <a href="{{ download.url }}" target="_blank" rel="noopener noreferrer"
+                                    title="{{ download.url }}">
+                                    {{ download.url|truncate(50) }}
+                                </a>
+                            </td>
+                            <td>{{ download.library_name or 'N/A' }}</td>
+                            <td>{{ download.knowledge_name or 'N/A' }}</td>
+                            <td class="small text-muted">{{ download.metadata_summary }}</td>
+                            <td>
+                                {% set status_lower = (download.status or 'unknown')|lower %}
+                                {% if status_lower == 'success' %}
+                                {% set badge_class = 'bg-success' %}
+                                {% elif status_lower in ['processing', 'in_progress'] %}
+                                {% set badge_class = 'bg-info' %}
+                                {% elif status_lower in ['queued', 'pending'] %}
+                                {% set badge_class = 'bg-warning text-dark' %}
+                                {% else %}
+                                {% set badge_class = 'bg-danger' %}
+                                {% endif %}
+                                <span class="badge {{ badge_class }}">
+                                    {{ status_lower.replace('_', ' ')|title }}
+                                </span>
+                                {% if download.error_message %}
+                                <div class="small text-muted mt-1">{{ download.error_message }}</div>
+                                {% endif %}
+                            </td>
+                            <td>{{ download.content_type or 'N/A' }}</td>
+                            <td>{{ download.username }}</td>
+                            <td>
+                                {% if download.processed_at %}
+                                {{ download.processed_at.strftime('%Y-%m-%d %H:%M') }}
+                                {% else %}
+                                N/A
+                                {% endif %}
+                            </td>
+                            <td>{% if download.is_ocr %}Yes{% else %}No{% endif %}</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn btn-sm btn-danger delete-download-btn"
+                                        data-id="{{ download.id }}" data-url="{{ download.url }}"
+                                        title="Delete Download Record">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block js %}
+<!-- jQuery & DataTables -->
+<script src="{{ url_for('static', filename='assets/mazer/extensions/jquery/jquery.min.js') }}"></script>
+<script
+    src="{{ url_for('static', filename='assets/mazer/extensions/datatables.net/js/jquery.dataTables.min.js') }}"></script>
+<script
+    src="{{ url_for('static', filename='assets/mazer/extensions/datatables.net-bs5/js/dataTables.bootstrap5.min.js') }}"></script>
+
+<!-- CSRF Utils for fetchWithCsrfRetry -->
+<script src="{{ url_for('static', filename='js/csrf-utils.js') }}?v={{ config['APP_VERSION'] }}"></script>
+
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         const tableSelector = '#downloadsTable';
+
+        // Initialize DataTables
+        if (!$.fn.DataTable.isDataTable(tableSelector)) {
+            $(tableSelector).DataTable({
+                "columnDefs": [
+                    { "orderable": false, "targets": 10 } // Disable sorting on Actions column
+                ]
+            });
+        }
+
         const tableApi = (window.jQuery && $.fn.DataTable && $.fn.DataTable.isDataTable(tableSelector))
             ? $(tableSelector).DataTable()
             : null;
 
-        $(tableSelector).on('click', '.delete-download-btn', function() {
+        $(tableSelector).on('click', '.delete-download-btn', function () {
             const button = $(this);
             const downloadId = button.data('id');
             const downloadUrl = button.data('url');
@@ -112,6 +141,7 @@
 
             button.prop('disabled', true);
 
+            // Use fetchWithCsrfRetry from csrf-utils.js
             fetchWithCsrfRetry(`/admin/downloads/delete/${downloadId}`, {
                 method: 'DELETE',
                 headers: {

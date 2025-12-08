@@ -1,72 +1,130 @@
-{% extends "admin/base.html" %}
+{% extends "admin/layout_mazer.html" %}
 
-{% block admin_title %}Reset/Clear Transaction Tables{% endblock %}
+{% block admin_title %}Reset Transaction Data{% endblock %}
+
+{% block admin_breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
+<li class="breadcrumb-item active" aria-current="page">Reset Data</li>
+{% endblock %}
 
 {% block admin_content %}
-<div class="container mt-4">
-    <div class="alert alert-danger" role="alert">
-        <strong>Danger! This is a destructive operation.</strong>
-        <br>
-        <b>What will happen:</b>
-        <ul>
-            <li>All <b>uploaded files</b> and their records will be deleted.</li>
-            <li>All <b>URL download</b> records will be deleted.</li>
-            <li>All <b>vector references</b> (linking files/URLs to vector stores) will be deleted.</li>
-            <li>All <b>message history</b> will be deleted.</li>
-            <li>All <b>message feedback</b> records will be deleted.</li>
-            <li>All <b>folder upload jobs</b> will be deleted.</li>
-            <li>All <b>visual grounding activities</b> will be deleted.</li>
-            <li>All <b>document</b> records will be deleted.</li>
-            <li>All <b>library references</b> will be deleted.</li>
-        </ul>
-        <b>Impact:</b>
-        <ul>
-            <li>All user-uploaded content and associated data will be lost.</li>
-            <li>Any search, retrieval, or RAG features relying on these records will be broken until new data is uploaded.</li>
-            <li>This action is <u>irreversible</u> and cannot be undone.</li>
-            <li>The action will be logged with your username and timestamp for audit purposes.</li>
-        </ul>
-        <b>Only perform this action if you are absolutely sure and have made backups if needed.</b>
+<div class="row">
+  <div class="col-12">
+    <div class="card border-danger">
+      <div class="card-header bg-danger text-white">
+        <h4 class="card-title text-white"><i class="bi bi-exclamation-triangle-fill me-2"></i>Danger Zone</h4>
+      </div>
+      <div class="card-body pt-4">
+        <div class="alert alert-light-danger color-danger">
+          <h5 class="alert-heading"><i class="bi bi-exclamation-circle"></i> Destructive Operation</h5>
+          <p>This action will permanently delete data. Please read carefully.</p>
+        </div>
+
+        <div class="row">
+          <div class="col-md-6">
+            <h6>What will be deleted:</h6>
+            <ul class="list-group list-group-flush mb-3">
+              <li class="list-group-item"><i class="bi bi-file-earmark-x me-2 text-danger"></i>Uploaded files &amp;
+                records</li>
+              <li class="list-group-item"><i class="bi bi-cloud-download me-2 text-danger"></i>URL download records</li>
+              <li class="list-group-item"><i class="bi bi-link-45deg me-2 text-danger"></i>Vector references</li>
+              <li class="list-group-item"><i class="bi bi-chat-history me-2 text-danger"></i>Message history</li>
+              <li class="list-group-item"><i class="bi bi-chat-heart me-2 text-danger"></i>Feedback records</li>
+              <li class="list-group-item"><i class="bi bi-folder-x me-2 text-danger"></i>Folder upload jobs</li>
+              <li class="list-group-item"><i class="bi bi-bullseye me-2 text-danger"></i>Visual grounding activities
+              </li>
+              <li class="list-group-item"><i class="bi bi-file-text me-2 text-danger"></i>Document records</li>
+              <li class="list-group-item"><i class="bi bi-collection me-2 text-danger"></i>Library references</li>
+            </ul>
+          </div>
+          <div class="col-md-6">
+            <h6>Impact &amp; Consequences:</h6>
+            <div class="p-3 bg-light-secondary rounded text-muted">
+              <ul class="mb-0">
+                <li>All user-uploaded content and associated data will be lost.</li>
+                <li>RAG features will be broken until new data is uploaded.</li>
+                <li>This action is <u>irreversible</u>.</li>
+                <li>The action will be logged for audit purposes.</li>
+              </ul>
+            </div>
+            <div class="mt-4 text-center">
+              <p class="fw-bold text-danger">Only perform this action if you are absolutely sure.</p>
+              <button class="btn btn-danger btn-lg w-100 mb-2" data-bs-toggle="modal"
+                data-bs-target="#confirmResetModal">
+                <i class="bi bi-trash-fill me-2"></i>Reset All Transaction Tables
+              </button>
+              <a href="{{ url_for('admin.admin_reset_data_log') }}" class="btn btn-outline-secondary w-100">
+                <i class="bi bi-clock-history me-2"></i>View Reset Activity Log
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="d-flex flex-wrap gap-2 mt-2 align-items-center">
-        <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#confirmResetModal">
-            Reset/Clear All Transaction Tables
-        </button>
-        <a href="{{ url_for('admin.admin_reset_data_log') }}" class="btn btn-outline-primary">
-            <i class="fas fa-history me-1"></i> View Reset Activity Log
-        </a>
-        <form method="POST" action="{{ url_for('admin.admin_cleanup_generated_maps') }}" class="d-flex align-items-center gap-2">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="number" min="0" name="retention_hours" class="form-control form-control-sm" placeholder="Retention (hrs)" value="{{ map_retention_hours }}" style="width: 140px;">
-            <button type="submit" class="btn btn-outline-secondary btn-sm">
-                <i class="fas fa-broom me-1"></i> Purge Generated Maps
+  </div>
+</div>
+
+<div class="row mt-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h4 class="card-title">Maintenance Tools</h4>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('admin.admin_cleanup_generated_maps') }}"
+          class="row align-items-end g-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="col-md-4">
+            <label for="retention_hours" class="form-label">Map File Retention</label>
+            <div class="input-group">
+              <input type="number" min="0" id="retention_hours" name="retention_hours" class="form-control"
+                placeholder="Hours" value="{{ map_retention_hours }}">
+              <span class="input-group-text">Hours</span>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <button type="submit" class="btn btn-secondary w-100">
+              <i class="bi bi-eraser-fill me-1"></i> Purge Generated Maps
             </button>
+          </div>
+          <div class="col-md-12">
+            <small class="text-muted">Deletes temporary generated map files older than the specified retention
+              period.</small>
+          </div>
         </form>
+      </div>
     </div>
+  </div>
 </div>
 
 <!-- Modal -->
-<div class="modal fade" id="confirmResetModal" tabindex="-1" aria-labelledby="confirmResetModalLabel" aria-hidden="true">
+<div class="modal fade" id="confirmResetModal" tabindex="-1" aria-labelledby="confirmResetModalLabel"
+  aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
       <form method="POST" action="{{ url_for('admin.admin_reset_data') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="modal-header">
-          <h5 class="modal-title" id="confirmResetModalLabel">Confirm Reset</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title white" id="confirmResetModalLabel">Confirm Reset</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <p>
-            Are you sure you want to <strong>permanently delete</strong> all records from the transaction tables? This action cannot be undone.
+          <div class="text-center mb-4">
+            <i class="bi bi-exclamation-triangle text-danger display-1"></i>
+          </div>
+          <p class="text-center lead">
+            Are you sure you want to <strong>permanently delete</strong> all records from the transaction tables?
           </p>
+          <p class="text-center text-muted small">This action cannot be undone.</p>
           <div class="mb-3">
-            <label for="confirmText" class="form-label">Type <b>RESET</b> to confirm:</label>
-            <input type="text" class="form-control" id="confirmText" name="confirm_text" required pattern="RESET">
+            <label for="confirmText" class="form-label fw-bold">Type "RESET" to confirm:</label>
+            <input type="text" class="form-control" id="confirmText" name="confirm_text" required pattern="RESET"
+              placeholder="RESET" autocomplete="off">
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-danger">Yes, Reset All</button>
+          <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger ml-1">Yes, Reset All</button>
         </div>
       </form>
     </div>

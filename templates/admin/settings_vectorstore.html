@@ -1,202 +1,202 @@
-{% extends "admin/base.html" %}
-{# Import BOTH macros now #}
+{% extends "admin/layout_mazer.html" %}
 {% from "admin/_formhelpers.html" import render_field, render_field_stacked %}
 
-{# Set the overall page title (optional, inherits from base if not set) #}
-{% block title %}Vector Store Settings | Admin{% endblock %}
-
-{# Set the title within the content card header #}
 {% block admin_title %}Vector Store Settings{% endblock %}
 
-{# Use the correct block name for the main content #}
+{% block admin_breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
+<li class="breadcrumb-item active" aria-current="page">Vector Store Settings</li>
+{% endblock %}
+
 {% block admin_content %}
-{# The container/card structure is already provided by base.html, just add the form #}
-<form method="POST" action="{{ url_for('admin.vector_store_settings') }}">
-    {{ form.hidden_tag() }}
-    {{ form.csrf_token }}
-
-    {# --- Provider Selection --- #}
-    {# --- Provider Selection --- #}
-    <div class="mb-3">
-        <label class="form-label">{{ form.provider.label }}</label>
-
-        {# Logic to restrict provider based on APP_EDITION #}
-        {% if app_edition == 'ENT' %}
-        <div class="alert alert-info py-2">
-            <i class="fas fa-building me-2"></i> Enterprise Edition: <strong>PGVector</strong> is the enforced provider.
-        </div>
-        {# Render hidden input to ensure form submission works #}
-        <input type="hidden" name="provider" value="pgvector">
-        {% elif app_edition == 'BASIC' %}
-        <div class="alert alert-secondary py-2">
-            <i class="fas fa-cube me-2"></i> Basic Edition: <strong>ChromaDB</strong> is the enforced provider.
-        </div>
-        {# Render hidden input to ensure form submission works #}
-        <input type="hidden" name="provider" value="chromadb">
-        {% else %}
-        {# Fallback for unknown edition or dev mode: Show all options #}
-        {% for subfield in form.provider %}
-        <div class="form-check">
-            {{ subfield(class="form-check-input", onclick="toggleProviderFields()") }}
-            {{ subfield.label(class="form-check-label") }}
-        </div>
-        {% endfor %}
-        {% endif %}
-
-        {% if form.provider.errors %}
-        <div class="invalid-feedback d-block">
-            {{ form.provider.errors|join(' ') }}
-        </div>
-        {% endif %}
+<div class="card">
+    <div class="card-header">
+        <h4 class="card-title">Configuration</h4>
     </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('admin.vector_store_settings') }}">
+            {{ form.hidden_tag() }}
 
-    {# --- Store Mode --- #}
-    {# --- Store Mode --- #}
-    {% if app_edition == 'BASIC' or not app_edition %}
-    <div class="mb-3" id="store-mode-group">
-        {# Use render_field_stacked macro #}
-        {{ render_field_stacked(form.store_mode, class="form-select", label_visible=true) }}
-        <small class="form-text text-muted">Determines how local stores (ChromaDB) are organized.</small>
+            {# --- Provider Selection --- #}
+            <div class="mb-3">
+                <label class="form-label fw-bold">{{ form.provider.label }}</label>
+
+                {# Logic to restrict provider based on APP_EDITION #}
+                {% if app_edition == 'ENT' %}
+                <div class="alert alert-info py-2">
+                    <i class="bi bi-building me-2"></i> Enterprise Edition: <strong>PGVector</strong> is the enforced
+                    provider.
+                </div>
+                <input type="hidden" name="provider" value="pgvector">
+                {% elif app_edition == 'BASIC' %}
+                <div class="alert alert-secondary py-2">
+                    <i class="bi bi-box-seam me-2"></i> Basic Edition: <strong>ChromaDB</strong> is the enforced
+                    provider.
+                </div>
+                <input type="hidden" name="provider" value="chromadb">
+                {% else %}
+                {# Fallback for unknown edition or dev mode: Show all options #}
+                {% for subfield in form.provider %}
+                <div class="form-check">
+                    {{ subfield(class="form-check-input", onclick="toggleProviderFields()") }}
+                    {{ subfield.label(class="form-check-label") }}
+                </div>
+                {% endfor %}
+                {% endif %}
+
+                {% if form.provider.errors %}
+                <div class="invalid-feedback d-block">
+                    {{ form.provider.errors|join(' ') }}
+                </div>
+                {% endif %}
+            </div>
+
+            {# --- Store Mode --- #}
+            {% if app_edition == 'BASIC' or not app_edition %}
+            <div class="mb-3" id="store-mode-group">
+                {{ render_field_stacked(form.store_mode, class="form-select", label_visible=true) }}
+                <small class="form-text text-muted">Determines how local stores (ChromaDB) are organized.</small>
+            </div>
+            {% endif %}
+
+            <div id="pgvector-fields" style="display: none;">
+                <h5 class="mt-4 mb-3">PGVector Settings</h5>
+                <div class="mb-3">
+                    <label for="{{ form.pg_connection.id }}" class="form-label">{{ form.pg_connection.label }}</label>
+                    <input type="text" class="form-control {% if form.pg_connection.errors %}is-invalid{% endif %}"
+                        id="{{ form.pg_connection.id }}" name="{{ form.pg_connection.name }}"
+                        placeholder="{{ pg_conn_placeholder }}" aria-describedby="pgConnHelp">
+                    <div id="pgConnHelp" class="form-text">{{ form.pg_connection.description }}</div>
+                    {% if form.pg_connection.errors %}
+                    <div class="invalid-feedback d-block">
+                        {{ form.pg_connection.errors|join(' ') }}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="mb-3">
+                    {% if app_edition == 'ENT' %}
+                    {{ form.pg_collection.label(class="form-label") }}
+                    <input type="text" class="form-control-plaintext" readonly
+                        value="{{ form.pg_collection.data or current_settings.PGVECTOR_COLLECTION_NAME }}"
+                        aria-describedby="pgCollectionHelp">
+                    <div id="pgCollectionHelp" class="form-text">
+                        <i class="bi bi-info-circle"></i> Read-only. Collection name is managed via
+                        <code>PGVECTOR_COLLECTION_NAME</code> environment variable.
+                        <br>Current value from environment: <strong>{{ current_settings.PGVECTOR_COLLECTION_NAME
+                            }}</strong>
+                    </div>
+                    {% else %}
+                    {{ render_field_stacked(form.pg_collection, label_visible=true) }}
+                    {% endif %}
+                </div>
+            </div>
+
+            <div id="chromadb-fields" style="display: none;">
+                <h5 class="mt-4 mb-3">ChromaDB Settings</h5>
+                <div class="mb-3">
+                    {{ render_field_stacked(form.chroma_collection, label_visible=true) }}
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save me-1"></i> Save Settings
+                </button>
+            </div>
+        </form>
     </div>
-    {% endif %}
+</div>
 
-    <hr>
+<div class="card mt-4">
+    <div class="card-header">
+        <h4 class="card-title">Storage Management</h4>
+    </div>
+    <div class="card-body">
+        <p class="text-muted mb-4">Manage existing vector store data. Deleting a collection is permanent and cannot be
+            undone.</p>
 
-    {# --- PGVector Specific Fields --- #}
-    {# --- PGVector Specific Fields --- #}
-    {% if app_edition == 'ENT' or not app_edition %}
-    <div id="pgvector-fields" style="display: none;"> {# Initially hidden #}
-        <h5>PGVector Settings</h5>
-        {# Keep manual rendering for connection string (label is already above) #}
-        <div class="mb-3">
-            <label for="{{ form.pg_connection.id }}" class="form-label">{{ form.pg_connection.label }}</label>
-            <input type="text" class="form-control {% if form.pg_connection.errors %}is-invalid{% endif %}"
-                id="{{ form.pg_connection.id }}" name="{{ form.pg_connection.name }}"
-                placeholder="{{ pg_conn_placeholder }}" aria-describedby="pgConnHelp">
-            <div id="pgConnHelp" class="form-text">{{ form.pg_connection.description }}</div>
-            {% if form.pg_connection.errors %}
-            <div class="invalid-feedback">
-                {{ form.pg_connection.errors|join(' ') }}
+        {# --- ChromaDB Management Section --- #}
+        {% if app_edition == 'BASIC' or not app_edition %}
+        <div id="chromadb-management-section"
+            style="display: {% if current_settings.VECTOR_STORE_PROVIDER == 'chromadb' %}block{% else %}none{% endif %};">
+            <h5>ChromaDB Storage Management</h5>
+            <p>The following ChromaDB stores and collections were found in the
+                <code>{{ chroma_base_path or 'data/chroma' }}</code> directory. You can delete individual collections,
+                which are
+                typically tied to the current embedding model ({{ current_embedding }}).
+            </p>
+
+            {% if chroma_stores_info %}
+            {% for store_info in chroma_stores_info %}
+            <div class="card border mb-3 shadow-none">
+                <div class="card-header bg-light">
+                    Store Scope: <strong>{{ store_info.scope }}</strong>
+                    <small class="text-muted d-block">Path: {{ store_info.path }}</small>
+                </div>
+                <div class="card-body">
+                    {% if store_info.collections %}
+                    <ul class="list-group list-group-flush">
+                        {% for collection in store_info.collections %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <div>
+                                <span class="fw-bold">{{ collection.name }}</span>
+                                <span class="badge bg-secondary rounded-pill ms-2">{{ collection.count }} items</span>
+                            </div>
+                            <form method="POST" action="{{ url_for('admin.delete_chroma_collection') }}"
+                                onsubmit="return confirm('Are you sure you want to delete the collection \'{{ collection.name }}\'? This is irreversible.');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="store_path" value="{{ store_info.path }}">
+                                <input type="hidden" name="collection_name" value="{{ collection.name }}">
+                                <button type="submit" class="btn btn-danger btn-sm">
+                                    <i class="bi bi-trash"></i> Delete
+                                </button>
+                            </form>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% elif store_info.error %}
+                    <p class="text-danger mb-0">Could not inspect store: {{ store_info.error }}</p>
+                    {% else %}
+                    <p class="text-muted mb-0">No collections found in this store.</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                No ChromaDB stores found in <code>{{ chroma_base_path or 'data/chroma' }}</code>.
             </div>
             {% endif %}
         </div>
-        <div class="mb-3">
-            {# PGVector collection name - read-only for Enterprise (infrastructure-managed) #}
-            {% if app_edition == 'ENT' %}
-                {{ form.pg_collection.label(class="form-label") }}
-                <input type="text" class="form-control-plaintext" readonly
-                       value="{{ form.pg_collection.data or current_settings.PGVECTOR_COLLECTION_NAME }}"
-                       aria-describedby="pgCollectionHelp">
-                <div id="pgCollectionHelp" class="form-text">
-                    <i class="bi bi-info-circle"></i> Read-only. Collection name is managed via <code>PGVECTOR_COLLECTION_NAME</code> environment variable.
-                    <br>Current value from environment: <strong>{{ current_settings.PGVECTOR_COLLECTION_NAME }}</strong>
-                </div>
-            {% else %}
-                {# Editable for BASIC edition #}
-                {{ render_field_stacked(form.pg_collection, label_visible=true) }}
-            {% endif %}
-        </div>
-    </div>
-    {% endif %}
+        {% endif %}
 
-    {# --- ChromaDB Specific Fields --- #}
-    {# --- ChromaDB Specific Fields --- #}
-    {% if app_edition == 'BASIC' or not app_edition %}
-    <div id="chromadb-fields" style="display: none;"> {# Initially hidden #}
-        <h5>ChromaDB Settings</h5>
-        <div class="mb-3">
-            {# Use render_field_stacked macro #}
-            {{ render_field_stacked(form.chroma_collection, label_visible=true) }}
-        </div>
-        {# Add chroma_base_path field if needed using render_field_stacked #}
-    </div>
-    {% endif %}
-
-    <button type="submit" class="btn btn-primary">Save Settings</button>
-</form>
-
-<hr class="my-4">
-
-{# --- Storage Management Section --- #}
-<h4>Storage Management</h4>
-<p class="text-muted">Manage existing vector store data. Deleting a collection is permanent and cannot be undone.</p>
-
-{# --- ChromaDB Management Section --- #}
-{# --- ChromaDB Management Section --- #}
-{% if app_edition == 'BASIC' or not app_edition %}
-<div id="chromadb-management-section"
-    style="display: {% if current_settings.VECTOR_STORE_PROVIDER == 'chromadb' %}block{% else %}none{% endif %};">
-    <h5>ChromaDB Storage Management</h5>
-    <p>The following ChromaDB stores and collections were found in the
-        <code>{{ chroma_base_path or 'data/chroma' }}</code> directory. You can delete individual collections, which are
-        typically tied to the current embedding model ({{ current_embedding }}).
-    </p>
-
-    {% if chroma_stores_info %}
-    {% for store_info in chroma_stores_info %}
-    <div class="card mb-3">
-        <div class="card-header">
-            Store Scope: <strong>{{ store_info.scope }}</strong>
-            <small class="text-muted d-block">Path: {{ store_info.path }}</small>
-        </div>
-        <div class="card-body">
-            {% if store_info.collections %}
-            <ul class="list-group">
-                {% for collection in store_info.collections %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <div>
-                        <span class="fw-bold">{{ collection.name }}</span>
-                        <span class="badge bg-secondary rounded-pill ms-2">{{ collection.count }} items</span>
+        {# --- PGVector Reset Section --- #}
+        {% if app_edition == 'ENT' or not app_edition %}
+        <div id="pgvector-reset-section"
+            style="display: {% if current_settings.VECTOR_STORE_PROVIDER == 'pgvector' %}block{% else %}none{% endif %};">
+            <h5>PGVector Reset Option</h5>
+            <div class="alert alert-danger">
+                <form method="POST" action="{{ url_for('admin.reset_pgvector_store') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <p class="mb-2">This will delete ALL data from the configured PGVector collection: <strong>{{
+                            current_settings.PGVECTOR_COLLECTION_NAME }}</strong></p>
+                    <div class="mb-3">
+                        <label for="pg-reset-confirm" class="form-label">To confirm, type exactly: <strong>RESET
+                                PGVECTOR</strong></label>
+                        <input type="text" id="pg-reset-confirm" name="confirm_text" class="form-control" required>
                     </div>
-                    <form method="POST" action="{{ url_for('admin.delete_chroma_collection') }}"
-                        onsubmit="return confirm('Are you sure you want to delete the collection \'{{ collection.name }}\'? This is irreversible.');">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="hidden" name="store_path" value="{{ store_info.path }}">
-                        <input type="hidden" name="collection_name" value="{{ collection.name }}">
-                        <button type="submit" class="btn btn-danger btn-sm">
-                            <i class="fas fa-trash-alt"></i> Delete
-                        </button>
-                    </form>
-                </li>
-                {% endfor %}
-            </ul>
-            {% elif store_info.error %}
-            <p class="text-danger">Could not inspect store: {{ store_info.error }}</p>
-            {% else %}
-            <p class="text-muted">No collections found in this store.</p>
-            {% endif %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-exclamation-octagon me-1"></i> Reset PGVector Collection
+                    </button>
+                </form>
+            </div>
         </div>
+        {% endif %}
     </div>
-    {% endfor %}
-    {% else %}
-    <p class="text-muted">No ChromaDB stores found in <code>{{ chroma_base_path or 'data/chroma' }}</code>.</p>
-    {% endif %}
 </div>
-{% endif %}
-
-{# --- PGVector Reset Section --- #}
-{# --- PGVector Reset Section --- #}
-{% if app_edition == 'ENT' or not app_edition %}
-<div id="pgvector-reset-section"
-    style="display: {% if current_settings.VECTOR_STORE_PROVIDER == 'pgvector' %}block{% else %}none{% endif %};">
-    <h5>PGVector Reset Option</h5>
-    <form method="POST" action="{{ url_for('admin.reset_pgvector_store') }}" class="mb-3 border p-3 rounded">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <p>This will delete ALL data from the configured PGVector collection: <strong>{{
-                current_settings.PGVECTOR_COLLECTION_NAME }}</strong></p>
-        <div class="mb-3">
-            <label for="pg-reset-confirm" class="form-label">To confirm, type exactly: <strong class="text-danger">RESET
-                    PGVECTOR</strong></label>
-            <input type="text" id="pg-reset-confirm" name="confirm_text" class="form-control" required>
-        </div>
-        <button type="submit" class="btn btn-danger">Reset PGVector Collection</button>
-    </form>
-</div>
-{% endif %}
 {% endblock %}
 
-
-{# Add the script block specifically for admin scripts #}
 {% block admin_scripts %}
 <script>
     function toggleProviderFields() {

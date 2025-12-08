@@ -1,57 +1,87 @@
-{% extends "admin/base.html" %}
+{% extends "admin/layout_mazer.html" %}
 
 {% block admin_title %}Reset Activity Log{% endblock %}
 
+{% block admin_breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('admin.admin_reset_data') }}">Reset Data</a></li>
+<li class="breadcrumb-item active" aria-current="page">Log</li>
+{% endblock %}
+
 {% block admin_content %}
-<div class="container mt-4">
-    <h5>Reset/Clear Transaction Tables Activity Log</h5>
-    <div class="alert alert-info">
-        This table shows all reset/clear actions performed by admins, including who performed the action, when, and how many records were deleted from each table.
+<div class="card">
+    <div class="card-header">
+        <h4 class="card-title">Activity Log</h4>
+        <p class="card-text text-muted small">
+            History of destructive reset actions performed by admins.
+        </p>
     </div>
-    <table class="table table-bordered table-striped">
-        <thead>
-            <tr>
-                <th>Timestamp (UTC)</th>
-                <th>User</th>
-                <th>User ID</th>
-                <th>Tables Cleared</th>
-                <th>Counts</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for entry in log_entries %}
-            <tr>
-                <td>{{ entry.timestamp }}</td>
-                <td>{{ entry.user }}</td>
-                <td>{{ entry.user_id }}</td>
-                <td>
-                    <ul>
-                        {% for t in entry.tables_cleared %}
-                        <li>{{ t }}</li>
-                        {% endfor %}
-                    </ul>
-                </td>
-                <td>
-                    <ul>
-                        {% for k, v in entry.counts.items() %}
-                        <li>{{ k }}: {{ v }}</li>
-                        {% endfor %}
-                    </ul>
-                    {% if entry.verification %}
-                    <br><strong>Verification:</strong>
-                    <ul>
-                        {% for k, v in entry.verification.items() %}
-                        <li>{{ k }}: {{ v }} remaining</li>
-                        {% endfor %}
-                    </ul>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% if not log_entries %}
-    <div class="alert alert-warning">No reset activity has been logged yet.</div>
-    {% endif %}
+    <div class="card-body">
+        {% if not log_entries %}
+        <div class="alert alert-warning"><i class="bi bi-info-circle me-2"></i>No reset activity has been logged yet.
+        </div>
+        {% else %}
+        <div class="table-responsive">
+            <table class="table table-striped" id="logTable">
+                <thead>
+                    <tr>
+                        <th>Timestamp (UTC)</th>
+                        <th>User</th>
+                        <th>User ID</th>
+                        <th>Tables Cleared</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in log_entries %}
+                    <tr>
+                        <td style="white-space: nowrap;">{{ entry.timestamp }}</td>
+                        <td class="fw-bold">{{ entry.user }}</td>
+                        <td>{{ entry.user_id }}</td>
+                        <td>
+                            {% if entry.tables_cleared %}
+                            <div class="d-flex flex-wrap gap-1">
+                                {% for t in entry.tables_cleared %}
+                                <span class="badge bg-light-danger text-danger border border-danger">{{ t }}</span>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <span class="text-muted fst-italic">None</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <ul class="list-unstyled mb-0 small">
+                                {% for k, v in entry.counts.items() %}
+                                <li><strong class="text-dark">{{ k }}:</strong> {{ v }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% if entry.verification %}
+                            <hr class="my-1">
+                            <strong>Remaining:</strong>
+                            <ul class="list-unstyled mb-0 small text-muted">
+                                {% for k, v in entry.verification.items() %}
+                                <li>{{ k }}: {{ v }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
 </div>
+{% endblock %}
+
+{% block admin_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        if (typeof simpleDatatables !== 'undefined') {
+            const table = document.getElementById('logTable');
+            if (table) new simpleDatatables.DataTable(table, { searchable: true, fixedHeight: false });
+        }
+    });
+</script>
 {% endblock %}

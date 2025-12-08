@@ -1,81 +1,74 @@
-{% extends "admin/base.html" %}
+{% extends "admin/layout_mazer.html" %}
 
-{% block admin_title %}Category Management{% endblock %} {# Set the page title #}
+{% block page_title %}Category Management{% endblock %}
 
-{% block admin_content %}
-{# Removed the H1 title row as title is now in admin_title block #}
-<div class="d-flex justify-content-end mb-3"> {# Simple div for Add button for now #}
-    {# Updated button style and added modal attributes #}
-    <button type="button" class="btn btn-primary"
-                data-bs-toggle="modal" 
-                data-bs-target="#categoryModal" 
+{% block breadcrumb %}
+<li class="breadcrumb-item active" aria-current="page">Categories</li>
+{% endblock %}
+
+{% block content %}
+<section class="section">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="card-title mb-0">Categories</h4>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#categoryModal"
                 id="addCategoryBtn">
-            <i class="bi bi-plus-lg me-1"></i>
-            Add New Category
-        </button>
+                <i class="bi bi-plus-lg me-1"></i>
+                Add New Category
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped" id="categoriesTable">
+                    <thead>
+                        <tr>
+                            <th>No.</th>
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th>Created By</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if categories %}
+                        {% for category in categories %}
+                        <tr data-id="{{ category.id }}">
+                            <td class="row-number">{{ loop.index }}</td>
+                            <td class="category-name">{{ category.name }}</td>
+                            <td class="category-description" title="{{ category.description | default('', true) }}">{{
+                                category.description[:80] ~ ('...' if category.description and
+                                category.description|length > 80 else '') }}</td>
+                            <td class="category-created-by">{{ category.creator_name | default('N/A', true) }}</td>
+                            <td class="category-created-at">{{ category.created_at.strftime('%Y-%m-%d %H:%M:%S') if
+                                category.created_at else 'N/A' }}</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn btn-sm btn-warning edit-btn" data-id="{{ category.id }}"
+                                        data-form-edit="categoryForm"
+                                        data-api-endpoint="/admin/categories/data/{{ category.id }}"
+                                        title="Edit Category">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger delete-btn" data-id="{{ category.id }}"
+                                        data-name="{{ category.name }}" title="Delete Category">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center">No categories found.</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
-</div>
-
-{# Display flashed messages #}
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    {% for category, message in messages %}
-      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      </div>
-    {% endfor %}
-  {% endif %}
-{% endwith %}
-
-<div class="table-responsive">
-    <table class="table table-striped" id="categoriesTable">
-        <thead>
-            <tr>
-                <th>No.</th>
-                <th>Name</th>
-                <th>Description</th>
-                <th>Created By</th>
-                <th>Created At</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% if categories %}
-                {% for category in categories %}
-                <tr data-id="{{ category.id }}">
-                    <td class="row-number">{{ loop.index }}</td>
-                    <td class="category-name">{{ category.name }}</td>
-                    <td class="category-description" title="{{ category.description | default('', true) }}">{{ category.description[:80] ~ ('...' if category.description and category.description|length > 80 else '') }}</td>
-                    <td class="category-created-by">{{ category.creator_name | default('N/A', true) }}</td>
-                    <td class="category-created-at">{{ category.created_at.strftime('%Y-%m-%d %H:%M:%S') if category.created_at else 'N/A' }}</td>
-                    <td>
-                        <div class="action-buttons">
-                            <button class="btn btn-sm btn-warning edit-btn"
-                                    data-id="{{ category.id }}"
-                                    data-form-edit="categoryForm"
-                                    data-api-endpoint="/admin/categories/data/{{ category.id }}"
-                                    title="Edit Category">
-                                <i class="bi bi-pencil-fill"></i>
-                            </button>
-                            <button class="btn btn-sm btn-danger delete-btn"
-                                    data-id="{{ category.id }}"
-                                    data-name="{{ category.name }}"
-                                    title="Delete Category">
-                                <i class="bi bi-trash-fill"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            {% else %}
-                <tr>
-                    <td colspan="6" class="text-center">No categories found.</td>
-                </tr>
-            {% endif %}
-        </tbody>
-    </table>
-</div>
+</section>
 
 <!-- Add/Edit Category Modal -->
 <div class="modal fade" id="categoryModal" tabindex="-1" aria-labelledby="categoryModalLabel" aria-hidden="true">
@@ -93,11 +86,13 @@
                         <input type="text" class="form-control" id="categoryName" name="name" required>
                     </div>
                     <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-1"> {# Flex container for label and button #}
-                            <label for="categoryDescription" class="form-label mb-0">Description</label> {# Remove bottom margin from label #}
-                            <button class="btn btn-secondary btn-sm" type="button" id="generateDescBtn" title="Generate Description (AI)"> {# Style like knowledges.html #}
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label for="categoryDescription" class="form-label mb-0">Description</label>
+                            <button class="btn btn-secondary btn-sm" type="button" id="generateDescBtn"
+                                title="Generate Description (AI)">
                                 <i class="bi bi-magic"></i>
-                                <span class="spinner-border spinner-border-sm ms-1 d-none" role="status" aria-hidden="true"></span> {# Loading spinner #}
+                                <span class="spinner-border spinner-border-sm ms-1 d-none" role="status"
+                                    aria-hidden="true"></span>
                             </button>
                         </div>
                         <textarea class="form-control" id="categoryDescription" name="description" rows="3"></textarea>
@@ -112,10 +107,19 @@
         </div>
     </div>
 </div>
-
 {% endblock %}
 
-{% block admin_scripts %}
-{{ super() }}
+{% block js %}
+<!-- jQuery & DataTables -->
+<script src="{{ url_for('static', filename='assets/mazer/extensions/jquery/jquery.min.js') }}"></script>
+<script
+    src="{{ url_for('static', filename='assets/mazer/extensions/datatables.net/js/jquery.dataTables.min.js') }}"></script>
+<script
+    src="{{ url_for('static', filename='assets/mazer/extensions/datatables.net-bs5/js/dataTables.bootstrap5.min.js') }}"></script>
+
+<!-- CSRF Utils -->
+<script src="{{ url_for('static', filename='js/csrf-utils.js') }}?v={{ config['APP_VERSION'] }}"></script>
+
+<!-- Category Scripts -->
 <script src="{{ url_for('static', filename='js/admin/admin-categories.js') }}"></script>
 {% endblock %}
