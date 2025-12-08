@@ -319,7 +319,7 @@ PY
     fi
 
     # Determine which app file to use
-    APP_MODULE=${APP_MODULE:-"main:app"}
+    APP_MODULE=${APP_MODULE:-"app:app"}
 
     # Try to start with gunicorn if available, otherwise use Flask
     if command -v gunicorn &> /dev/null; then

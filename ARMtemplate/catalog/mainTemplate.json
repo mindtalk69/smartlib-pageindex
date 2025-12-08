@@ -554,6 +554,7 @@
       ],
       "properties": {
         "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('sharedAppServicePlanName'))]",
+        "publicNetworkAccess": "Disabled",
         "siteConfig": {
           "linuxFxVersion": "[concat('DOCKER|', variables('acrLoginServer'), '/', parameters('workerDockerImageName'))]",
           "appCommandLine": "./docker-entrypoint.sh worker",
