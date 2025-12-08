@@ -26,6 +26,17 @@
     const batchStatus = document.getElementById('batch-status');
     const batchProgressBar = document.getElementById('batch-progress-bar'); // Added progress bar element
 
+    // Debug logging for batch upload elements
+    console.log('[Upload Debug] Batch upload elements:', {
+        batchUploadForm: !!batchUploadForm,
+        librarySelectBatch: !!librarySelectBatch,
+        batchFileInput: !!batchFileInput,
+        uploadBatchBtn: !!uploadBatchBtn,
+        batchFileList: !!batchFileList,
+        batchStatus: !!batchStatus,
+        batchProgressBar: !!batchProgressBar
+    });
+
     // --- Visual Grounding OCR Warning ---
     const visualGroundingCheckbox = document.getElementById('enableVisualGroundingBatch');
     const visualGroundingOcrWarning = document.getElementById('visualGroundingOcrWarning');
@@ -293,11 +304,13 @@
                             submitButton.disabled = true;
 
                             // Dispatch file-uploaded event to trigger upload status tracker
-                            if (data.task_id) {
+                            // Backend returns task_id in files array: data.files[0].task_id
+                            const taskId = data.task_id || (data.files && data.files[0] && data.files[0].task_id);
+                            if (taskId && taskId !== 'processing_disabled') {
                                 const filename = formData.get('file')?.name || 'Unknown file';
-                                console.log('[Upload] Dispatching file-uploaded event for task:', data.task_id, 'file:', filename);
+                                console.log('[Upload] Dispatching file-uploaded event for task:', taskId, 'file:', filename);
                                 document.dispatchEvent(new CustomEvent('file-uploaded', {
-                                    detail: { task_id: data.task_id, filename: filename }
+                                    detail: { task_id: taskId, filename: filename }
                                 }));
                             }
                         } else {
@@ -409,7 +422,7 @@
             if (knowledgeField) {
                 knowledgeField.value = selectedOption?.dataset?.knowledgeId || '';
             }
-            updateLibraryDetails(this, null, 'libraryMetadataInfoUrl');
+            updateLibraryDetails(this, 'libraryMetadataInfoUrl', null);
 
             checkUrlFormState('library-change');
         });
@@ -650,7 +663,7 @@
 
 
     // --- Batch Upload Logic ---
-    if (librarySelectBatch && uploadBatchBtn && batchFileInput && batchFileList && batchStatus) {
+    if (batchUploadForm && librarySelectBatch && uploadBatchBtn && batchFileInput && batchFileList && batchStatus) {
         // Disable batch submit button initially
         uploadBatchBtn.disabled = true;
 
@@ -719,7 +732,7 @@
 
 
         librarySelectBatch.addEventListener('change', () => {
-            updateLibraryDetails(librarySelectBatch, null, 'libraryMetadataInfoBatch');
+            updateLibraryDetails(librarySelectBatch, 'libraryMetadataInfoBatch', null);
             checkBatchFormState('library-change');
         });
 
@@ -879,10 +892,12 @@
                             if (ok && data.success) {
                                 successCount++;
                                 // Dispatch file-uploaded event to trigger upload status tracker
-                                if (data.task_id) {
-                                    console.log('[BatchUpload] Dispatching file-uploaded event for task:', data.task_id, 'file:', fileName);
+                                // Backend returns task_id in files array: data.files[0].task_id
+                                const taskId = data.task_id || (data.files && data.files[0] && data.files[0].task_id);
+                                if (taskId && taskId !== 'processing_disabled') {
+                                    console.log('[BatchUpload] Dispatching file-uploaded event for task:', taskId, 'file:', fileName);
                                     document.dispatchEvent(new CustomEvent('file-uploaded', {
-                                        detail: { task_id: data.task_id, filename: fileName }
+                                        detail: { task_id: taskId, filename: fileName }
                                     }));
                                 }
                             } else {
@@ -944,7 +959,7 @@
     // --- Knowledge Mode Only: Attach listeners if knowledge selection fields exist ---
     if (librarySelectUrl && document.getElementById('knowledgeIdUrl')) {
         librarySelectUrl.addEventListener('change', function () {
-            updateLibraryDetails(this, null, 'libraryMetadataInfoUrl');
+            updateLibraryDetails(this, 'libraryMetadataInfoUrl', null);
 
             // Set knowledge_id hidden input based on selected library
             const selectedOption = this.options[this.selectedIndex];
@@ -957,7 +972,7 @@
             checkUrlFormState();
         });
         // Initial call in case a library is pre-selected
-        updateLibraryDetails(librarySelectUrl, null, 'libraryMetadataInfoUrl');
+        updateLibraryDetails(librarySelectUrl, 'libraryMetadataInfoUrl', null);
         // Also set knowledge_id on initial load
         const selectedOption = librarySelectUrl.selectedIndex >= 0
             ? librarySelectUrl.options[librarySelectUrl.selectedIndex]
@@ -972,7 +987,7 @@
 
     if (librarySelectBatch && document.getElementById('knowledgeIdBatch')) {
         librarySelectBatch.addEventListener('change', function () {
-            updateLibraryDetails(this, null, 'libraryMetadataInfoBatch');
+            updateLibraryDetails(this, 'libraryMetadataInfoBatch', null);
             // Set knowledge_id hidden input based on selected library
             const selectedOption = this.options[this.selectedIndex];
             const knowledgeIdBatch = document.getElementById('knowledgeIdBatch');
@@ -984,7 +999,7 @@
             checkBatchFormState();
         });
         // Initial call
-        updateLibraryDetails(librarySelectBatch, null, 'libraryMetadataInfoBatch');
+        updateLibraryDetails(librarySelectBatch, 'libraryMetadataInfoBatch', null);
         // Also set knowledge_id on initial load
 
         const selectedOption = librarySelectBatch.selectedIndex >= 0
@@ -999,10 +1014,10 @@
     }
     if (librarySelectFile) {
         librarySelectFile.addEventListener('change', function () {
-            updateLibraryDetails(this, null, 'libraryMetadataInfoFile');
+            updateLibraryDetails(this, 'libraryMetadataInfoFile', null);
         });
         // Initial call
-        updateLibraryDetails(librarySelectFile, null, 'libraryMetadataInfoFile');
+        updateLibraryDetails(librarySelectFile, 'libraryMetadataInfoFile', null);
 
     }
 

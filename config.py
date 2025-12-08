@@ -24,7 +24,7 @@ else:
 class Config:
     """Base configuration."""
     # Internal build version - update this when deploying new builds
-    BUILD_VERSION = "1.1.1"
+    BUILD_VERSION = "1.1.7"
     BUILD_DATE = "2025-12-08"
     
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
@@ -191,7 +191,7 @@ class Config:
     # Keep VECTOR_STORE_MODE for structuring local paths (ChromaDB)
     VECTOR_STORE_MODE = os.environ.get('VECTOR_STORE_MODE', 'knowledge').lower() # e.g., knowledge, user, global
     print(f"DEBUG [config.py]: Config.VECTOR_STORE_MODE set to: {VECTOR_STORE_MODE}")
-    APP_VERSION = os.environ.get('APP_VERSION') or str(int(time.time()))
+    APP_VERSION = os.environ.get('APP_VERSION') or BUILD_VERSION
 
     MAP_GENERATE_PNG = os.environ.get('MAP_GENERATE_PNG', 'false').lower() in ('true', '1', 'yes')
     try:
