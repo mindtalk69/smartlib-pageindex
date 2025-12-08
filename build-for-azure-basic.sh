@@ -43,8 +43,11 @@ for arg in "${@:2}"; do
 done
 
 # ----- Auto-versioning -----
-# Read current version from config.py
-CURRENT_VERSION=$(grep -oP 'BUILD_VERSION\s*=\s*"\K[^"]+' config.py 2>/dev/null || echo "1.0.0")
+# Read current version from config.py (portable - works on both macOS and Linux)
+CURRENT_VERSION=$(sed -n 's/.*BUILD_VERSION *= *"\([^"]*\)".*/\1/p' config.py 2>/dev/null | head -1)
+if [ -z "$CURRENT_VERSION" ]; then
+    CURRENT_VERSION="1.0.0"
+fi
 echo -e "${BLUE}Current BUILD_VERSION: ${CURRENT_VERSION}${NC}"
 
 # Auto-increment patch version (1.0.X -> 1.0.X+1)
@@ -57,10 +60,17 @@ NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
 # Get current date for BUILD_DATE
 BUILD_DATE=$(date +%Y-%m-%d)
 
-# Update config.py with new version
+# Update config.py with new version (portable sed - works on both macOS and Linux)
 echo -e "${YELLOW}Updating BUILD_VERSION to ${NEW_VERSION}...${NC}"
-sed -i "s/BUILD_VERSION = \".*\"/BUILD_VERSION = \"${NEW_VERSION}\"/" config.py
-sed -i "s/BUILD_DATE = \".*\"/BUILD_DATE = \"${BUILD_DATE}\"/" config.py
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS (BSD sed requires '' after -i)
+    sed -i '' "s/BUILD_VERSION = \".*\"/BUILD_VERSION = \"${NEW_VERSION}\"/" config.py
+    sed -i '' "s/BUILD_DATE = \".*\"/BUILD_DATE = \"${BUILD_DATE}\"/" config.py
+else
+    # Linux (GNU sed)
+    sed -i "s/BUILD_VERSION = \".*\"/BUILD_VERSION = \"${NEW_VERSION}\"/" config.py
+    sed -i "s/BUILD_DATE = \".*\"/BUILD_DATE = \"${BUILD_DATE}\"/" config.py
+fi
 
 echo -e "${GREEN}✓ Version updated: ${CURRENT_VERSION} -> ${NEW_VERSION}${NC}"
 

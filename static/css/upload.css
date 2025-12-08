@@ -1,19 +1,25 @@
 /* Styles specific to the upload/download page */
 
 /* Ensure tabs display side by side (horizontal layout) */
+/* Ensure tabs display side by side (horizontal layout) */
 #uploadTabs.nav-tabs {
   display: flex !important;
   flex-direction: row !important;
-  flex-wrap: wrap !important;
+  flex-wrap: nowrap !important;
+  /* Force single line */
+  width: 100%;
 }
 
 #uploadTabs.nav-tabs .nav-item {
-  display: inline-block !important;
   flex: 0 0 auto !important;
+  /* Let them size naturally, or use 1 1 0 to expand equal width */
+  margin-right: 0.5rem;
+  /* Little gap */
 }
 
 #uploadTabs.nav-tabs .nav-link {
-  display: inline-block !important;
+  white-space: nowrap;
+  /* Prevent text wrapping inside tab */
 }
 
 #url-list-display {
@@ -143,8 +149,10 @@
 
 /* --- Tab Content Height --- */
 #uploadTabsContent {
-  height: 400px;
-  /* Fixed height for the tab content area */
+  /* height: 400px; */
+  /* Removed fixed height to allow wrapper to grow naturally */
+  min-height: 300px;
+  /* Minimum height ensures it doesn't collapse too small */
   /* overflow-y: auto; */
   /* Optional: Add scroll if content ever exceeds fixed height */
 }
@@ -156,9 +164,47 @@
 
 /* --- Upload Page Specific Layout --- */
 
-.upload-section-row {
-  margin-top: 3rem !important;
-  /* Increase top margin */
+/* Row container - add top margin */
+.row.justify-content-center {
+  margin-top: 2rem;
+}
+
+/* Wrapper for Upload Form (Tabs + Content) - Mazer Card Style */
+.upload-form-wrapper {
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius-lg);
+  background-color: var(--bs-body-bg);
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  overflow: hidden;
+  min-height: 500px;
+}
+
+/* Card Header Section */
+.upload-form-header {
+  background-color: var(--bs-tertiary-bg);
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+/* Card Body Section */
+.upload-form-body {
+  padding: 1.5rem;
+}
+
+/* Responsive padding adjustments */
+@media (max-width: 576px) {
+  .upload-form-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .upload-form-body {
+    padding: 1rem;
+  }
+}
+
+/* Dark mode enhancements */
+[data-bs-theme="dark"] .upload-form-wrapper {
+  box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.3);
 }
 
 /* REMOVED specific background/border/shadow/padding rules for .login-form-container */
