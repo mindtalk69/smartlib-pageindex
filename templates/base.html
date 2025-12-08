@@ -1,47 +1,68 @@
 <!DOCTYPE html>
-<html lang="en" style="height: 100%;"> {# Removed overflow: hidden; #}
+<html lang="en" style="height: 100%;">
 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}SmartLib{% endblock %}</title>
-  <!-- Bootswatch Cosmo Theme CSS from CDN -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.0/dist/cosmo/bootstrap.min.css"
-    crossorigin="anonymous">
+  <!-- Mazer CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='assets/mazer/compiled/css/app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='assets/mazer/compiled/css/app-dark.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='assets/mazer/compiled/css/iconly.css') }}">
   <!-- Bootstrap Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
   <!-- Favicon -->
   <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}?v={{ config['APP_VERSION'] }}">
   <!-- Application styles -->
   <style>
-    .navbar {
+    /* Seamless navbar styling for Mazer */
+    .navbar.seamless-navbar {
+      background-color: transparent !important;
+      padding-top: 0.5rem !important;
+      padding-bottom: 0.5rem !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      margin-bottom: 0 !important;
+      min-height: 60px;
       position: relative;
       z-index: 1060;
     }
 
-    .navbar .nav-link {
+    /* Adaptive text color for navbar items */
+    .navbar.seamless-navbar .nav-link,
+    .navbar.seamless-navbar .navbar-brand {
+      color: var(--bs-body-color) !important;
       transition: color 0.15s ease-in-out;
     }
 
-    [data-bs-theme="light"] .navbar.navbar-dark .nav-link {
-      color: #212529;
+    .navbar.seamless-navbar .nav-link:hover,
+    .navbar.seamless-navbar .nav-link:focus {
+      color: var(--bs-primary) !important;
     }
 
-    [data-bs-theme="light"] .navbar.navbar-dark .nav-link:hover,
-    [data-bs-theme="light"] .navbar.navbar-dark .nav-link:focus {
-      color: #0d6efd;
+    /* Toggler Icon Visibility Fix */
+    .navbar.seamless-navbar .navbar-toggler {
+      border-color: var(--bs-border-color);
+      color: var(--bs-body-color);
     }
 
-    [data-bs-theme="light"] .navbar.navbar-dark .navbar-toggler-icon {
-      filter: invert(0.85);
+    .navbar.seamless-navbar .navbar-toggler-icon {
+      background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%2833, 37, 41, 0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+      filter: none;
+      transition: filter 0.3s;
     }
 
-    [data-bs-theme="light"] .navbar.navbar-dark .navbar-brand,
-    [data-bs-theme="light"] .navbar.navbar-dark .navbar-brand span {
-      color: #212529;
+    /* Dark Mode: Invert icon to white */
+    [data-bs-theme="dark"] .navbar.seamless-navbar .navbar-toggler-icon {
+      filter: invert(1) grayscale(100%) brightness(200%);
     }
 
-    /* Base UI improvements */
+    /* Light Mode: Ensure icon remains dark */
+    [data-bs-theme="light"] .navbar.seamless-navbar .navbar-toggler-icon {
+      filter: none;
+    }
+
+    /* Theme toggle button */
     .theme-toggle-btn {
       display: flex;
       align-items: center;
@@ -57,6 +78,29 @@
       font-size: 1.2rem;
     }
 
+    /* Navbar font size adjustment */
+    .navbar.seamless-navbar .nav-link {
+      font-size: 0.9rem;
+    }
+
+    /* Theme toggle vertical alignment */
+    .navbar.seamless-navbar .theme-toggle {
+      display: flex;
+      align-items: center;
+    }
+
+    .navbar.seamless-navbar .theme-toggle .form-check {
+      margin-bottom: 0;
+      display: flex;
+      align-items: center;
+    }
+
+    .navbar.seamless-navbar .theme-toggle i {
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    /* Mobile menu styling */
     @media (max-width: 991.98px) {
       .navbar .container {
         position: relative;
@@ -67,23 +111,39 @@
         top: 100%;
         left: 0;
         right: 0;
-        z-index: 1050;
-        background-color: rgba(15, 23, 42, 0.98);
+        z-index: 9999;
+        background: #ffffff !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
         border-radius: 0.5rem;
-        padding: 1rem;
+        padding: 1rem 1.5rem;
         margin-top: 0.5rem;
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.3);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.25);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        opacity: 1 !important;
       }
 
-      [data-bs-theme="light"] .navbar .navbar-collapse {
-        background-color: rgba(255, 255, 255, 0.98);
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+      .navbar .navbar-collapse .navbar-nav {
+        text-align: center;
       }
 
-      [data-bs-theme="light"] .navbar .navbar-collapse .nav-link,
-      [data-bs-theme="light"] .navbar .navbar-collapse .nav-link span,
-      [data-bs-theme="light"] .navbar .navbar-collapse .nav-link i {
+      .navbar .navbar-collapse .nav-item {
+        padding: 0.25rem 0;
+      }
+
+      .navbar .navbar-collapse .nav-link {
+        justify-content: center;
         color: #212529 !important;
+      }
+
+      /* Ensure solid background in dark mode */
+      [data-bs-theme="dark"] .navbar .navbar-collapse {
+        background: #1e1e2d !important;
+        border-color: rgba(255, 255, 255, 0.1);
+      }
+
+      [data-bs-theme="dark"] .navbar .navbar-collapse .nav-link {
+        color: #e1e1e1 !important;
       }
     }
   </style>
@@ -113,9 +173,11 @@
 {# Apply flexbox layout to body #}
 
 <body style="height: 100vh; margin: 0; display: flex; flex-direction: column;">
+  <!-- Mazer Theme Initialization (must be first to prevent flash) -->
+  <script src="{{ url_for('static', filename='assets/mazer/static/js/initTheme.js') }}"></script>
+
   <!-- Bootstrap Navbar -->
-  <nav class="navbar navbar-expand-lg navbar-dark" style="overflow: visible !important; flex-shrink: 0;"> {# Added
-    flex-shrink: 0 #}
+  <nav class="navbar navbar-expand-lg seamless-navbar" style="overflow: visible !important; flex-shrink: 0;">
     <div class="container" style="overflow: visible !important;"> {# Added overflow visible #}
       <a class="navbar-brand d-flex align-items-center" href="/">
         <img id="img-logo" src="{{ logo_url }}" style="height: 48px; width: 48px; object-fit: contain;" class="me-2"
@@ -185,11 +247,12 @@
           </li>
           {% endif %}
           <li class="nav-item">
-            <button id="theme-toggle" class="nav-link theme-toggle-btn"
-              style="background: none; border: none; cursor: pointer;">
-              <i class="bi bi-sun-fill d-none d-lg-inline"></i>
-              <span class="d-lg-none">Toggle Theme</span>
-            </button>
+            <div class="nav-link theme-toggle d-flex gap-2 align-items-center py-2">
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="toggle-dark" style="cursor: pointer">
+              </div>
+              <i class="bi bi-moon-stars"></i>
+            </div>
           </li>
         </ul>
       </div>

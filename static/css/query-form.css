@@ -15,13 +15,15 @@
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
-  max-width: 863px; /* Increased from 750px */
+  max-width: 863px;
+  /* Increased from 750px */
   z-index: 1050;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   min-height: 80px;
-  transition: all var(--theme-transition-duration, 0.3s) ease; /* Added transition */
+  transition: all var(--theme-transition-duration, 0.3s) ease;
+  /* Added transition */
 }
 
 [data-bs-theme="dark"] .query-form-container {
@@ -30,12 +32,14 @@
 }
 
 .query-form-inner {
-  width: 90%; 
-  max-width: 748px; /* Increased from 650px */
-  margin: 0 auto; 
+  width: 90%;
+  max-width: 748px;
+  /* Increased from 650px */
+  margin: 0 auto;
   position: relative;
   z-index: 1;
-  transition: all var(--theme-transition-duration, 0.3s) ease; /* Added transition */
+  transition: all var(--theme-transition-duration, 0.3s) ease;
+  /* Added transition */
 }
 
 @media (max-width: 576px) {
@@ -49,15 +53,19 @@
   color: var(--custom-text-on-primary);
   border: none !important;
   border-radius: 28px;
-  padding: 12px 12px; /* Reduced horizontal padding */
+  padding: 12px 12px;
+  /* Reduced horizontal padding */
   box-shadow: none !important;
 }
 
 [data-bs-theme="dark"] .query-form-inner {
-  background: var(--bs-input-bg, #2a2a2a); /* Use theme variable */
-  border: 1px solid var(--bs-input-border, rgba(255, 255, 255, 0.15)); /* Use theme variable */
+  background: var(--bs-input-bg, #2a2a2a);
+  /* Use theme variable */
+  border: 1px solid var(--bs-input-border, rgba(255, 255, 255, 0.15));
+  /* Use theme variable */
   border-radius: 28px;
-  padding: 12px 12px; /* Reduced horizontal padding */
+  padding: 12px 12px;
+  /* Reduced horizontal padding */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -67,20 +75,21 @@
   align-items: center;
   background: #fff;
   border-radius: 28px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
   padding: 0 8px;
   width: 100%;
   transition: all var(--theme-transition-duration, 0.3s) ease;
-  border: 1px solid rgba(0,0,0,0.08);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   min-height: 56px;
   margin-bottom: 0;
   position: relative;
   overflow: visible;
 }
+
 [data-bs-theme="dark"] .query-input-wrapper {
   background: var(--bs-input-bg, #2a2a2a);
-  border: 1px solid var(--bs-input-border, rgba(255,255,255,0.15));
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  border: 1px solid var(--bs-input-border, rgba(255, 255, 255, 0.15));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 /* Remove border/background from children */
@@ -105,12 +114,14 @@
   outline: none !important;
   overflow-y: hidden;
   display: block;
-  color: #212529; /* Dark text for light mode */
+  color: #212529;
+  /* Dark text for light mode */
 }
 
 /* Dark mode textarea text color */
 [data-bs-theme="dark"] .query-input-wrapper .query-input-area {
-  color: #e1e1e1; /* Light text for dark mode */
+  color: #e1e1e1;
+  /* Light text for dark mode */
 }
 
 /* Placeholder color for better visibility */
@@ -136,40 +147,56 @@
   border-radius: 50%;
   transition: background 0.2s, color 0.2s;
 }
+
 .query-input-wrapper .query-input-btn:last-child {
   margin-right: 0;
 }
+
 .query-input-wrapper .query-input-btn:focus {
   outline: none;
   box-shadow: 0 0 0 2px var(--custom-primary, #6d5cae);
 }
 
+/* Ensure icons are properly centered within buttons */
+.query-input-wrapper .query-input-btn i,
+.query-input-wrapper .query-input-btn .bi {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  vertical-align: middle;
+}
+
 /* Remove border-radius from .input-group if still present */
-.input-group { 
-  border-radius: 0; 
-  background: transparent; 
-  margin-bottom: 0; 
-  overflow: visible; /* Ensure badge isn't clipped */
-  position: relative; /* Needed for absolute positioning of badge */
+.input-group {
+  border-radius: 0;
+  background: transparent;
+  margin-bottom: 0;
+  overflow: visible;
+  /* Ensure badge isn't clipped */
+  position: relative;
+  /* Needed for absolute positioning of badge */
 }
 
 /* Dark theme input group */
 [data-bs-theme="dark"] .input-group {
   border-color: var(--bs-input-border, rgba(255, 255, 255, 0.15)) !important;
-  background-color: var(--bs-input-bg, #2a2a2a) !important; 
+  background-color: var(--bs-input-bg, #2a2a2a) !important;
 }
+
 [data-bs-theme="dark"] .input-group .form-control,
 [data-bs-theme="dark"] .input-group .form-select,
 [data-bs-theme="dark"] .input-group .btn {
-   background-color: var(--bs-input-bg, #2a2a2a) !important; 
-   border-color: transparent !important; 
-   color: var(--bs-body-color, #e1e1e1) !important;
+  background-color: var(--bs-input-bg, #2a2a2a) !important;
+  border-color: transparent !important;
+  color: var(--bs-body-color, #e1e1e1) !important;
 }
+
 [data-bs-theme="dark"] .input-group .form-control:focus,
 [data-bs-theme="dark"] .input-group .form-select:focus {
-   border-color: var(--bs-primary, #6d5cae) !important; 
-   box-shadow: none; 
-   background-color: var(--bs-input-bg, #2a2a2a) !important;
+  border-color: var(--bs-primary, #6d5cae) !important;
+  box-shadow: none;
+  background-color: var(--bs-input-bg, #2a2a2a) !important;
 }
 
 /* Query Textarea */
@@ -179,92 +206,107 @@
 
 /* Paperclip Button with Badge */
 #show-files-btn {
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0; 
-    border: none; 
-    background: transparent; 
-    transition: all 0.2s ease; 
-    color: var(--bs-secondary-color);
-    position: relative;
-    overflow: visible;
-    margin-right: 0; /* Remove right margin */
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  transition: all 0.2s ease;
+  color: var(--bs-secondary-color);
+  position: relative;
+  overflow: visible;
+  margin-right: 0;
+  /* Remove right margin */
 }
+
 #show-files-btn:hover {
-    color: var(--bs-body-color);
+  color: var(--bs-body-color);
 }
+
 [data-bs-theme="light"] .query-form-inner #show-files-btn {
-    color: rgba(255, 255, 255, 0.8); 
+  color: rgba(255, 255, 255, 0.8);
 }
+
 [data-bs-theme="light"] .query-form-inner #show-files-btn:hover {
-    color: #ffffff; 
+  color: #ffffff;
 }
+
 /* --- File Count Badge --- */
 #file-count-badge {
-    font-size: 0.7em;
-    padding: 0.25em 0.5em;
-    position: absolute;
-    top: 4px;
-    right: 2px;
-    transform: translate(-5%, -35%) !important;
-    z-index: 1060;
-    min-width: 1.5em;
-    min-height: 1.5em;
-    display: flex !important;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    border: 2px solid var(--bs-body-bg, #fff);
-    font-weight: 600;
+  font-size: 0.7em;
+  padding: 0.25em 0.5em;
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  transform: translate(-5%, -35%) !important;
+  z-index: 1060;
+  min-width: 1.5em;
+  min-height: 1.5em;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 2px solid var(--bs-body-bg, #fff);
+  font-weight: 600;
 }
 
 [data-bs-theme="dark"] #file-count-badge {
-    border-color: var(--bs-dark);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  border-color: var(--bs-dark);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 [data-bs-theme="light"] .query-form-inner #file-count-badge {
-    border-color: var(--custom-primary, #6d5cae);
+  border-color: var(--custom-primary, #6d5cae);
 }
 
 /* Plus Button */
 .input-group .dropup {
-    /* Reverted negative margin */
+  /* Reverted negative margin */
 }
+
 #add-context-btn {
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0; 
-    border: none; 
-    background: transparent; 
-    transition: all 0.2s ease; 
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  transition: all 0.2s ease;
 }
+
 #add-context-btn .bi-plus-lg {
-    font-size: 32px;
-    position: relative;
-    top: 1px; 
-    transition: transform 0.3s ease;
+  font-size: 32px;
+  position: relative;
+  top: 1px;
+  transition: transform 0.3s ease;
 }
+
 #add-context-btn:hover .bi-plus-lg {
-    transform: scale(1.2);
+  transform: scale(1.2);
 }
+
 [data-bs-theme="light"] #add-context-btn {
-    color: #6c757d; /* Default light theme color */
+  color: #6c757d;
+  /* Default light theme color */
 }
+
 [data-bs-theme="dark"] #add-context-btn {
-    color: var(--bs-secondary-color); /* Default dark theme color */
+  color: var(--bs-secondary-color);
+  /* Default dark theme color */
 }
+
 [data-bs-theme="light"] .query-form-inner #add-context-btn {
-    color: rgba(255, 255, 255, 0.8); /* Color inside light form */
+  color: rgba(255, 255, 255, 0.8);
+  /* Color inside light form */
 }
+
 [data-bs-theme="light"] .query-form-inner #add-context-btn:hover {
-   color: #ffffff; 
+  color: #ffffff;
 }
 
 /* Container for Send/Mic Buttons - REMOVED specific rule */
@@ -272,64 +314,75 @@
 /* Send/Mic Buttons */
 #send-btn,
 #mic-btn {
-  width: 48px; /* Standardize size */
-  height: 48px; /* Standardize size */
+  width: 48px;
+  /* Standardize size */
+  height: 48px;
+  /* Standardize size */
   padding: 0;
-  display: flex; /* Add back flex for icon alignment only */
+  display: flex;
+  /* Add back flex for icon alignment only */
   align-items: center;
   justify-content: center;
   /* Removed margin: 0 4px; */
-  border-radius: 50%; /* Make round */
+  border-radius: 50%;
+  /* Make round */
 }
+
 #send-btn {
   background-color: var(--custom-primary);
   color: white;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   border: none;
-  margin-left: auto; /* Push to the right */
+  margin-left: auto;
+  /* Push to the right */
 }
+
 #mic-btn {
-  margin-left: 4px; /* Restore small positive margin */
-    /* Removed duplicate width/height since they're defined in the shared rule above */
-    font-size: 1.3rem;
-    color: var(--bs-secondary-color);
-    transition: all 0.2s ease;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-tap-highlight-color: transparent;
+  margin-left: 4px;
+  /* Restore small positive margin */
+  /* Removed duplicate width/height since they're defined in the shared rule above */
+  font-size: 1.3rem;
+  color: var(--bs-secondary-color);
+  transition: all 0.2s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 #mic-btn .bi-mic-fill {
-    font-size: 1.5rem;
+  font-size: 1.5rem;
 }
 
 #mic-btn:active,
 #mic-btn.btn-danger {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.3);
+  transform: scale(0.95);
+  box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.3);
 }
 
 #mic-btn.btn-danger {
-    background-color: var(--bs-danger) !important;
-    border-color: var(--bs-danger) !important;
-    color: white !important;
+  background-color: var(--bs-danger) !important;
+  border-color: var(--bs-danger) !important;
+  color: white !important;
 }
+
 [data-bs-theme="light"] .query-form-inner #mic-btn {
-    color: rgba(255, 255, 255, 0.8);
-    border-color: rgba(255, 255, 255, 0.5);
-    background-color: rgba(0, 0, 0, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.5);
+  background-color: rgba(0, 0, 0, 0.1);
 }
+
 [data-bs-theme="light"] .query-form-inner #mic-btn:hover {
-   color: #ffffff;
-   background-color: rgba(255, 255, 255, 0.1);
-   border-color: rgba(255, 255, 255, 0.7);
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.7);
 }
 
 
 /* --- Buttons Below Input Group --- */
 .query-form-container .btn-group {
   margin-top: 4px;
-  background: rgba(128, 128, 128, 0.05); /* Subtle background */
+  background: rgba(128, 128, 128, 0.05);
+  /* Subtle background */
   border-radius: 20px;
   padding: 2px;
 }
@@ -357,6 +410,7 @@
   color: #ffffff;
   border-color: rgba(255, 255, 255, 0.5);
 }
+
 [data-bs-theme="light"] .query-form-inner #historyBtn:hover,
 [data-bs-theme="light"] .query-form-inner #librarySelectBtn:hover {
   background-color: rgba(255, 255, 255, 0.1);
@@ -365,14 +419,16 @@
 /* Dark theme overrides */
 [data-bs-theme="dark"] #historyBtn,
 [data-bs-theme="dark"] #librarySelectBtn {
-   border-color: rgba(255, 255, 255, 0.2);
-   color: #ffffff; /* Keep white for contrast */
-   background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  /* Keep white for contrast */
+  background-color: rgba(255, 255, 255, 0.05);
 }
+
 [data-bs-theme="dark"] #historyBtn:hover,
 [data-bs-theme="dark"] #librarySelectBtn:hover {
-   background-color: rgba(255, 255, 255, 0.1);
-   border-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 /* Hide dropdown caret ONLY for History button */
@@ -382,9 +438,12 @@
 
 /* --- MMR Switch Override --- */
 #mmrToggleSwitch.form-check-input {
-  border-radius: 2em; /* Ensure rounded edges */
-  width: 2.5em; /* Slightly wider for better proportion */
-  height: 1.25em; /* Match Bootstrap's default height */
+  border-radius: 2em;
+  /* Ensure rounded edges */
+  width: 2.5em;
+  /* Slightly wider for better proportion */
+  height: 1.25em;
+  /* Match Bootstrap's default height */
 }
 
 #mmrToggleSwitch.form-check-input:checked {
@@ -399,66 +458,76 @@
 }
 
 /* --- Dropdown Menus (General) --- */
-[data-bs-theme="dark"] .dropdown-menu { 
-    background-color: #2a2a2a !important; 
-    border-color: var(--bs-border-color) !important; 
-    --bs-dropdown-link-hover-bg: #3a3a3a !important;
-    --bs-dropdown-link-active-bg: var(--custom-primary) !important;
-    --bs-dropdown-link-color: var(--bs-body-color) !important;
-    --bs-dropdown-link-hover-color: var(--bs-body-color) !important;
-    --bs-dropdown-link-active-color: var(--custom-text-on-primary) !important;
+[data-bs-theme="dark"] .dropdown-menu {
+  background-color: #2a2a2a !important;
+  border-color: var(--bs-border-color) !important;
+  --bs-dropdown-link-hover-bg: #3a3a3a !important;
+  --bs-dropdown-link-active-bg: var(--custom-primary) !important;
+  --bs-dropdown-link-color: var(--bs-body-color) !important;
+  --bs-dropdown-link-hover-color: var(--bs-body-color) !important;
+  --bs-dropdown-link-active-color: var(--custom-text-on-primary) !important;
 }
-[data-bs-theme="dark"] .dropdown-item { 
-    color: var(--bs-body-color) !important; 
+
+[data-bs-theme="dark"] .dropdown-item {
+  color: var(--bs-body-color) !important;
 }
-[data-bs-theme="dark"] .dropdown-item:hover, 
-[data-bs-theme="dark"] .dropdown-item:focus { 
-    background-color: #3a3a3a !important; 
+
+[data-bs-theme="dark"] .dropdown-item:hover,
+[data-bs-theme="dark"] .dropdown-item:focus {
+  background-color: #3a3a3a !important;
 }
-[data-bs-theme="dark"] .dropdown-item.active, 
+
+[data-bs-theme="dark"] .dropdown-item.active,
 [data-bs-theme="dark"] .dropdown-item:active {
-    background-color: var(--custom-primary) !important;
-    color: var(--custom-text-on-primary) !important;
+  background-color: var(--custom-primary) !important;
+  color: var(--custom-text-on-primary) !important;
 }
 
 
 /* --- File Upload Popover Styles --- */
 .file-list-popover {
-    max-width: 350px; /* Adjust as needed */
-    /* Add theme-specific popover styles if needed */
+  max-width: 350px;
+  /* Adjust as needed */
+  /* Add theme-specific popover styles if needed */
 }
 
 .popover-file-list {
-    max-height: 150px; /* Limit height */
-    overflow-y: auto;  /* Enable scroll */
-    margin-bottom: 0.5rem; /* Space before buttons */
-    padding-right: 5px; /* Space for scrollbar */
+  max-height: 150px;
+  /* Limit height */
+  overflow-y: auto;
+  /* Enable scroll */
+  margin-bottom: 0.5rem;
+  /* Space before buttons */
+  padding-right: 5px;
+  /* Space for scrollbar */
 }
 
 .popover-file-list li {
-    padding: 0.2rem 0;
+  padding: 0.2rem 0;
 }
 
 .popover-file-list .remove-file-btn {
-    /* Styles for the small remove button */
-    width: 1.2rem; 
-    height: 1.2rem; 
-    line-height: 1; 
-    flex-shrink: 0;
-    padding: 0;
-    font-size: 0.8rem; /* Adjust icon size via font-size */
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+  /* Styles for the small remove button */
+  width: 1.2rem;
+  height: 1.2rem;
+  line-height: 1;
+  flex-shrink: 0;
+  padding: 0;
+  font-size: 0.8rem;
+  /* Adjust icon size via font-size */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .popover-file-list .remove-file-btn i {
-    vertical-align: baseline; /* Adjust icon alignment */
+  vertical-align: baseline;
+  /* Adjust icon alignment */
 }
 
 /* --- Icon Adjustments --- */
 #show-files-btn .bi-paperclip {
-    font-size: 1.3rem;
-    position: relative;
-    top: 1px;
+  font-size: 1.3rem;
+  position: relative;
+  top: 1px;
 }

@@ -1,24 +1,27 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
   console.log("Darkmode script loaded");
-  
+
   const htmlElement = document.documentElement;
-  const themeToggle = document.getElementById('theme-toggle');
-  const themeIcon = themeToggle?.querySelector('i');
-  
+
+  // Support both old button style (theme-toggle) and new Mazer switch style (toggle-dark)
+  const themeToggleBtn = document.getElementById('theme-toggle');
+  const themeToggleSwitch = document.getElementById('toggle-dark');
+  const themeIcon = themeToggleBtn?.querySelector('i');
+
   // Check for saved theme preference or use user's system preference
   const storedTheme = localStorage.getItem('theme');
   const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   const initialTheme = storedTheme || systemTheme;
-  
+
   // Apply the theme on page load
   applyTheme(initialTheme);
-  
+
   // Function to apply theme
   function applyTheme(theme) {
     // Set data-bs-theme attribute for Bootstrap 5
     htmlElement.setAttribute('data-bs-theme', theme);
 
-    // Update the theme toggle button icon
+    // Update the old-style toggle button icon (if present)
     if (themeIcon) {
       if (theme === 'dark') {
         themeIcon.classList.remove('bi-sun-fill');
@@ -29,9 +32,16 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
 
-    // Toggle navbar classes for light/dark mode
+    // Update the Mazer-style toggle switch (if present)
+    if (themeToggleSwitch) {
+      themeToggleSwitch.checked = (theme === 'dark');
+    }
+
+    // Note: For seamless-navbar, we don't add/remove navbar-dark/light classes
+    // The CSS uses var(--bs-body-color) which responds to data-bs-theme automatically
     const navbar = document.querySelector('.navbar');
-    if (navbar) {
+    if (navbar && !navbar.classList.contains('seamless-navbar')) {
+      // Only apply old-style classes to non-seamless navbars
       navbar.classList.remove('navbar-dark', 'navbar-light', 'bg-dark', 'bg-light');
       if (theme === 'dark') {
         navbar.classList.add('navbar-dark', 'bg-dark');
@@ -51,17 +61,27 @@ document.addEventListener('DOMContentLoaded', function() {
     localStorage.setItem('theme', theme);
     console.log("Applied theme:", theme);
   }
-  
-  // Theme toggle button click handler
-  if (themeToggle) {
-    themeToggle.addEventListener('click', function() {
+
+  // Old-style button toggle click handler
+  if (themeToggleBtn) {
+    themeToggleBtn.addEventListener('click', function () {
       const currentTheme = htmlElement.getAttribute('data-bs-theme');
       const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-      
       applyTheme(newTheme);
       console.log("Switched to", newTheme, "theme");
     });
-  } else {
-    console.error("Theme toggle button not found");
+  }
+
+  // Mazer-style switch toggle change handler
+  if (themeToggleSwitch) {
+    themeToggleSwitch.addEventListener('change', function () {
+      const newTheme = this.checked ? 'dark' : 'light';
+      applyTheme(newTheme);
+      console.log("Switched to", newTheme, "theme via switch");
+    });
+  }
+
+  if (!themeToggleBtn && !themeToggleSwitch) {
+    console.warn("No theme toggle element found (neither 'theme-toggle' nor 'toggle-dark')");
   }
 });
