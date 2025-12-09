@@ -1,10 +1,11 @@
-{% extends "admin/base.html" %}
+{% extends "admin/layout_mazer.html" %}
 {% block title %}Prompt Management{% endblock %}
 
 {% block admin_title %}Prompt Management{% endblock %}
 
 {% block admin_content %}
-<p class="text-muted mb-4">Manage the three system prompts for your app. Select a type to view, edit, or add its content. Prompts support markdown formatting. (only in RAG)</p>
+<p class="text-muted mb-4">Manage the three system prompts for your app. Select a type to view, edit, or add its
+  content. Prompts support markdown formatting. (only in RAG)</p>
 
 <!-- Hidden input to store prompts data -->
 <input type="hidden" id="prompts-data" value="{{ prompts_json|tojson|replace('"', '"') }}">
@@ -15,14 +16,14 @@
     <select class="form-select" id="prompt-type" name="name" required>
       <option value="">Select Type</option>
       {% for prompt_type, label in {
-        'rag_qa': 'RAG Q & A',
-        'followup_question': 'Generate Followed Up Question',
-        'GENERATE_DESCRIPTION': 'Generate Text Descriptions'
+      'rag_qa': 'RAG Q & A',
+      'followup_question': 'Generate Followed Up Question',
+      'GENERATE_DESCRIPTION': 'Generate Text Descriptions'
       }.items() %}
-        {% set prompt_obj = prompts|selectattr('name', 'equalto', prompt_type)|first %}
-        <option value="{{ prompt_type }}" data-id="{{ prompt_obj.id if prompt_obj else '' }}">
-          {{ label }}
-        </option>
+      {% set prompt_obj = prompts|selectattr('name', 'equalto', prompt_type)|first %}
+      <option value="{{ prompt_type }}" data-id="{{ prompt_obj.id if prompt_obj else '' }}">
+        {{ label }}
+      </option>
       {% endfor %}
     </select>
   </div>
@@ -50,130 +51,130 @@
 
 {% block admin_scripts %}
 <script>
-const PROMPT_TYPES = {
-  "rag_qa": "RAG Q & A",
-  "followup_question": "Generate Followed Up Question",
-  "GENERATE_DESCRIPTION": "Generate Text Descriptions"
-};
+  const PROMPT_TYPES = {
+    "rag_qa": "RAG Q & A",
+    "followup_question": "Generate Followed Up Question",
+    "GENERATE_DESCRIPTION": "Generate Text Descriptions"
+  };
 
-// Initialize promptsData from the hidden input
-let promptsData = {};
-try {
-  const promptsDataInput = document.getElementById('prompts-data');
-  if (promptsDataInput && promptsDataInput.value) {
-    const promptsList = JSON.parse(promptsDataInput.value);
-    // Convert array to object with name as key
-    promptsList.forEach(prompt => {
-      if (prompt && prompt.name) {
-        promptsData[prompt.name] = prompt;
-      }
-    });
+  // Initialize promptsData from the hidden input
+  let promptsData = {};
+  try {
+    const promptsDataInput = document.getElementById('prompts-data');
+    if (promptsDataInput && promptsDataInput.value) {
+      const promptsList = JSON.parse(promptsDataInput.value);
+      // Convert array to object with name as key
+      promptsList.forEach(prompt => {
+        if (prompt && prompt.name) {
+          promptsData[prompt.name] = prompt;
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error parsing prompts data:', error);
   }
-} catch (error) {
-  console.error('Error parsing prompts data:', error);
-}
 
-function loadPrompt(type) {
-  const data = promptsData[type];
-  const select = document.getElementById('prompt-type');
-  const selectedOption = select.options[select.selectedIndex];
-  if (data) {
-    document.getElementById('prompt-id').value = data.id;
-    if (selectedOption) selectedOption.setAttribute('data-id', data.id);
-    document.getElementById('prompt-description').value = data.description || '';
-    document.getElementById('prompt-content').value = data.content || '';
-    document.getElementById('prompt-active').checked = !!data.is_active;
-    document.getElementById('delete-prompt-btn').style.display = '';
-    document.getElementById('prompt-status').innerHTML = '<span class="text-success">Loaded existing prompt for "' + PROMPT_TYPES[type] + '"</span>';
-  } else {
-    document.getElementById('prompt-id').value = '';
-    if (selectedOption) selectedOption.setAttribute('data-id', '');
-    document.getElementById('prompt-description').value = '';
-    document.getElementById('prompt-content').value = '';
-    document.getElementById('prompt-active').checked = false;
-    document.getElementById('delete-prompt-btn').style.display = 'none';
-    if (type)
-      document.getElementById('prompt-status').innerHTML = '<span class="text-info">No prompt found for "' + PROMPT_TYPES[type] + '". You can add a new one.</span>';
-    else
-      document.getElementById('prompt-status').innerHTML = '';
-  }
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-  // On type change, load prompt data if exists
-  document.getElementById('prompt-type').addEventListener('change', function() {
-    loadPrompt(this.value);
-  });
-
-  // Reset form
-  document.getElementById('reset-prompt-btn').addEventListener('click', function() {
-    document.getElementById('prompt-form').reset();
-    document.getElementById('prompt-id').value = '';
-    document.getElementById('delete-prompt-btn').style.display = 'none';
-    document.getElementById('prompt-status').innerHTML = '';
-  });
-
-  // Save prompt via AJAX
-  document.getElementById('save-prompt-btn').addEventListener('click', function(event) {
-    event.preventDefault(); // Prevent default form submission
-
-    const form = document.getElementById('prompt-form');
-    const formData = new FormData(form);
-    const promptData = {};
-
-    // Always include all fields explicitly
-    // Get id from selected option's data-id if present
+  function loadPrompt(type) {
+    const data = promptsData[type];
     const select = document.getElementById('prompt-type');
     const selectedOption = select.options[select.selectedIndex];
-    let promptId = document.getElementById('prompt-id').value;
-    if (selectedOption && selectedOption.getAttribute('data-id')) {
-      promptId = selectedOption.getAttribute('data-id');
+    if (data) {
+      document.getElementById('prompt-id').value = data.id;
+      if (selectedOption) selectedOption.setAttribute('data-id', data.id);
+      document.getElementById('prompt-description').value = data.description || '';
+      document.getElementById('prompt-content').value = data.content || '';
+      document.getElementById('prompt-active').checked = !!data.is_active;
+      document.getElementById('delete-prompt-btn').style.display = '';
+      document.getElementById('prompt-status').innerHTML = '<span class="text-success">Loaded existing prompt for "' + PROMPT_TYPES[type] + '"</span>';
+    } else {
+      document.getElementById('prompt-id').value = '';
+      if (selectedOption) selectedOption.setAttribute('data-id', '');
+      document.getElementById('prompt-description').value = '';
+      document.getElementById('prompt-content').value = '';
+      document.getElementById('prompt-active').checked = false;
+      document.getElementById('delete-prompt-btn').style.display = 'none';
+      if (type)
+        document.getElementById('prompt-status').innerHTML = '<span class="text-info">No prompt found for "' + PROMPT_TYPES[type] + '". You can add a new one.</span>';
+      else
+        document.getElementById('prompt-status').innerHTML = '';
     }
-    promptData['id'] = promptId || null;
-    promptData['name'] = document.getElementById('prompt-type').value;
-    promptData['description'] = document.getElementById('prompt-description').value;
-    promptData['content'] = document.getElementById('prompt-content').value;
-    promptData['is_active'] = document.getElementById('prompt-active').checked;
+  }
 
-    // Debug: log payload
-    console.log('Prompt save payload:', promptData);
-
-    if (!promptData['name'] || !promptData['content']) {
-      document.getElementById('prompt-status').innerHTML = '<span class="text-danger">Prompt type and content are required.</span>';
-      return;
-    }
-
-    // Get CSRF token from meta tag
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-
-    fetch('/admin/prompts/save', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken
-      },
-      body: JSON.stringify(promptData),
-    })
-    .then(response => {
-      if (response.ok) {
-        return response.json();
-      } else {
-        throw new Error('Failed to save prompt.');
-      }
-    })
-    .then(data => {
-      document.getElementById('prompt-status').innerHTML = '<span class="text-success">Prompt saved successfully!</span>';
-      // For simplicity, reload page to refresh promptsData
-      window.location.reload();
-    })
-    .catch(error => {
-      console.error('Error saving prompt:', error);
-      document.getElementById('prompt-status').innerHTML = '<span class="text-danger">Error saving prompt: ' + error.message + '</span>';
+  document.addEventListener('DOMContentLoaded', function () {
+    // On type change, load prompt data if exists
+    document.getElementById('prompt-type').addEventListener('change', function () {
+      loadPrompt(this.value);
     });
-  });
 
-  // TODO: Implement AJAX for save/delete
-  // For now, form is UI only.
-});
+    // Reset form
+    document.getElementById('reset-prompt-btn').addEventListener('click', function () {
+      document.getElementById('prompt-form').reset();
+      document.getElementById('prompt-id').value = '';
+      document.getElementById('delete-prompt-btn').style.display = 'none';
+      document.getElementById('prompt-status').innerHTML = '';
+    });
+
+    // Save prompt via AJAX
+    document.getElementById('save-prompt-btn').addEventListener('click', function (event) {
+      event.preventDefault(); // Prevent default form submission
+
+      const form = document.getElementById('prompt-form');
+      const formData = new FormData(form);
+      const promptData = {};
+
+      // Always include all fields explicitly
+      // Get id from selected option's data-id if present
+      const select = document.getElementById('prompt-type');
+      const selectedOption = select.options[select.selectedIndex];
+      let promptId = document.getElementById('prompt-id').value;
+      if (selectedOption && selectedOption.getAttribute('data-id')) {
+        promptId = selectedOption.getAttribute('data-id');
+      }
+      promptData['id'] = promptId || null;
+      promptData['name'] = document.getElementById('prompt-type').value;
+      promptData['description'] = document.getElementById('prompt-description').value;
+      promptData['content'] = document.getElementById('prompt-content').value;
+      promptData['is_active'] = document.getElementById('prompt-active').checked;
+
+      // Debug: log payload
+      console.log('Prompt save payload:', promptData);
+
+      if (!promptData['name'] || !promptData['content']) {
+        document.getElementById('prompt-status').innerHTML = '<span class="text-danger">Prompt type and content are required.</span>';
+        return;
+      }
+
+      // Get CSRF token from meta tag
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+      fetch('/admin/prompts/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify(promptData),
+      })
+        .then(response => {
+          if (response.ok) {
+            return response.json();
+          } else {
+            throw new Error('Failed to save prompt.');
+          }
+        })
+        .then(data => {
+          document.getElementById('prompt-status').innerHTML = '<span class="text-success">Prompt saved successfully!</span>';
+          // For simplicity, reload page to refresh promptsData
+          window.location.reload();
+        })
+        .catch(error => {
+          console.error('Error saving prompt:', error);
+          document.getElementById('prompt-status').innerHTML = '<span class="text-danger">Error saving prompt: ' + error.message + '</span>';
+        });
+    });
+
+    // TODO: Implement AJAX for save/delete
+    // For now, form is UI only.
+  });
 </script>
 {% endblock %}

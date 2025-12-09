@@ -176,6 +176,7 @@
   <!-- Mazer Theme Initialization (must be first to prevent flash) -->
   <script src="{{ url_for('static', filename='assets/mazer/static/js/initTheme.js') }}"></script>
 
+  {% block body_content %}
   <!-- Bootstrap Navbar -->
   <nav class="navbar navbar-expand-lg seamless-navbar" style="overflow: visible !important; flex-shrink: 0;">
     <div class="container" style="overflow: visible !important;"> {# Added overflow visible #}
@@ -279,10 +280,10 @@
   </div>
 
   <!-- Footer (reduced size, normal flow) -->
-  <footer class="text-center py-1 text-body-secondary small" style="font-size: 0.7rem; z-index: 1; flex-shrink: 0;"> {#
-    Removed position-absolute, added flex-shrink #}
+  <footer class="text-center py-1 text-body-secondary small" style="font-size: 0.7rem; z-index: 1; flex-shrink: 0;">
     Copyright© {{ current_year if current_year is defined else 2025 }} smartlib.id. All rights reserved.
   </footer>
+  {% endblock body_content %}
 
   <!-- jQuery (required for DataTables Bootstrap 5 integration JS) -->
   <script src="https://code.jquery.com/jquery-3.7.0.min.js"

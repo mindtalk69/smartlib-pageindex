@@ -1,9 +1,9 @@
-{% extends "admin/base.html" %}
+{% extends "admin/layout_mazer.html" %}
 
 {% block title %}Vector References - Admin{% endblock %}
 
 {% block admin_title %}
-    Vector References
+Vector References
 {% endblock %}
 
 {% block admin_content %}
@@ -11,7 +11,8 @@
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h4>Vector References</h4>
-            <a href="{{ url_for('vector_reference_logs.list_vector_reference_logs') }}" class="btn btn-outline-primary">View Log Files</a>
+            <a href="{{ url_for('vector_reference_logs.list_vector_reference_logs') }}"
+                class="btn btn-outline-primary">View Log Files</a>
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -26,18 +27,18 @@
                     </thead>
                     <tbody>
                         {% if references %}
-                            {% for ref in references %}
-                            <tr>
-                                <td>{{ ref.id }}</td>
-                                <td>{{ ref.file_id if ref.file_id is not none else 'N/A' }}</td>
-                                <td>{{ ref.url_download_id if ref.url_download_id is not none else 'N/A' }}</td>
-                                <td>{{ ref.chunk_index if ref.chunk_index is not none else 'N/A' }}</td>
-                            </tr>
-                            {% endfor %}
+                        {% for ref in references %}
+                        <tr>
+                            <td>{{ ref.id }}</td>
+                            <td>{{ ref.file_id if ref.file_id is not none else 'N/A' }}</td>
+                            <td>{{ ref.url_download_id if ref.url_download_id is not none else 'N/A' }}</td>
+                            <td>{{ ref.chunk_index if ref.chunk_index is not none else 'N/A' }}</td>
+                        </tr>
+                        {% endfor %}
                         {% else %}
-                            <tr>
-                                <td colspan="4">No vector references found in the database.</td>
-                            </tr>
+                        <tr>
+                            <td colspan="4">No vector references found in the database.</td>
+                        </tr>
                         {% endif %}
                     </tbody>
                 </table>
@@ -50,10 +51,10 @@
 {% block admin_scripts %}
 {{ super() }}
 <script>
-$(document).ready(function() {
-    $('#vectorReferencesTable').DataTable({
-        "order": [[ 0, "desc" ]] // Order by ID descending
+    $(document).ready(function () {
+        $('#vectorReferencesTable').DataTable({
+            "order": [[0, "desc"]] // Order by ID descending
+        });
     });
-});
 </script>
 {% endblock %}

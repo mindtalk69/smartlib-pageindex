@@ -141,10 +141,25 @@
 {% endblock %}
 
 {% block admin_scripts %}
-<script type="module">
-  import { fetchWithCsrfRetry } from "{{ url_for('static', filename='js/csrf-utils.js') }}";
+<script
+  src="{{ url_for('static', filename='assets/mazer/extensions/simple-datatables/umd/simple-datatables.js') }}"></script>
+<script>
+  // Inline CSRF utility
+  function getCsrfToken() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute('content') : '';
+  }
+
+  function fetchWithCsrf(url, options = {}) {
+    options.headers = options.headers || {};
+    options.headers['X-CSRFToken'] = getCsrfToken();
+    return fetch(url, options);
+  }
 
   document.addEventListener('DOMContentLoaded', function () {
+    console.log('[Models] DOMContentLoaded fired');
+    console.log('[Models] Bootstrap available:', typeof bootstrap);
+
     // Initialize Simple Datatables
     const table = document.getElementById('models-table');
     if (table && typeof simpleDatatables !== 'undefined') {
@@ -156,22 +171,36 @@
     }
 
     const modalEl = document.getElementById('modelModal');
+    if (!modalEl) {
+      console.error('[Models] Modal element not found');
+      return;
+    }
+
+    console.log('[Models] Creating Bootstrap Modal...');
     const modal = new bootstrap.Modal(modalEl);
+    console.log('[Models] Modal created successfully');
+
     const form = document.getElementById('modelForm');
 
-    // Add model
-    document.getElementById('btn-add-model').addEventListener('click', () => {
-      form.reset();
-      document.getElementById('model-id').value = '';
-      // Set safe defaults
-      document.getElementById('model-temperature').value = '';
-      document.getElementById('model-streaming').value = 'true';
-      document.getElementById('model-default').value = 'false';
-      modal.show();
-    });
+    // Add model button
+    const addBtn = document.getElementById('btn-add-model');
+    if (addBtn) {
+      console.log('[Models] Add button found, attaching listener');
+      addBtn.addEventListener('click', function () {
+        console.log('[Models] Add button clicked');
+        form.reset();
+        document.getElementById('model-id').value = '';
+        document.getElementById('model-temperature').value = '';
+        document.getElementById('model-streaming').value = 'true';
+        document.getElementById('model-default').value = 'false';
+        modal.show();
+      });
+    } else {
+      console.error('[Models] Add button NOT found');
+    }
 
-    // Event Delegation for action buttons (since Datatable might re-render rows)
-    document.querySelector('#models-table').addEventListener('click', (e) => {
+    // Event Delegation for action buttons
+    document.querySelector('#models-table').addEventListener('click', function (e) {
       const btnEdit = e.target.closest('.btn-edit');
       const btnDelete = e.target.closest('.btn-delete');
       const btnSetDefault = e.target.closest('.btn-set-default');
@@ -183,9 +212,9 @@
 
       // Edit
       if (btnEdit) {
-        fetchWithCsrfRetry(`/admin/models/data/${id}`)
-          .then(r => r.json())
-          .then(res => {
+        fetchWithCsrf('/admin/models/data/' + id)
+          .then(function (r) { return r.json(); })
+          .then(function (res) {
             if (res.status === 'success') {
               const m = res.model;
               document.getElementById('model-id').value = m.id;
@@ -201,48 +230,48 @@
               alert('Failed to load model data: ' + res.message);
             }
           })
-          .catch(err => alert('Error loading model data: ' + err));
+          .catch(function (err) { alert('Error loading model data: ' + err); });
       }
 
       // Delete
       if (btnDelete) {
         if (!confirm('Delete this model?')) return;
-        fetchWithCsrfRetry(`/admin/models/delete/${id}`, { method: 'POST' })
-          .then(r => r.json())
-          .then(res => {
+        fetchWithCsrf('/admin/models/delete/' + id, { method: 'POST' })
+          .then(function (r) { return r.json(); })
+          .then(function (res) {
             if (res.status === 'success') location.reload();
             else alert('Failed to delete: ' + res.message);
           })
-          .catch(err => alert('Error: ' + err));
+          .catch(function (err) { alert('Error: ' + err); });
       }
 
       // Set Default
       if (btnSetDefault) {
         if (!confirm('Set this model as the global default?')) return;
-        fetchWithCsrfRetry(`/admin/models/set-default/${id}`, { method: 'POST' })
-          .then(r => r.json())
-          .then(res => {
+        fetchWithCsrf('/admin/models/set-default/' + id, { method: 'POST' })
+          .then(function (r) { return r.json(); })
+          .then(function (res) {
             if (res.status === 'success') location.reload();
             else alert('Failed to set default: ' + res.message);
           })
-          .catch(err => alert('Error: ' + err));
+          .catch(function (err) { alert('Error: ' + err); });
       }
 
       // Set Multimodal
       if (btnSetMultimodal) {
         if (!confirm('Set this model as the multimodal default?')) return;
-        fetchWithCsrfRetry(`/admin/models/set-multimodal/${id}`, { method: 'POST' })
-          .then(r => r.json())
-          .then(res => {
+        fetchWithCsrf('/admin/models/set-multimodal/' + id, { method: 'POST' })
+          .then(function (r) { return r.json(); })
+          .then(function (res) {
             if (res.status === 'success') location.reload();
             else alert('Failed to set multimodal model: ' + res.message);
           })
-          .catch(err => alert('Error: ' + err));
+          .catch(function (err) { alert('Error: ' + err); });
       }
     });
 
     // Submit add/edit
-    form.addEventListener('submit', (ev) => {
+    form.addEventListener('submit', function (ev) {
       ev.preventDefault();
       const id = document.getElementById('model-id').value;
       const payload = {
@@ -254,15 +283,15 @@
         description: document.getElementById('model-description').value,
         is_default: document.getElementById('model-default').value === 'true'
       };
-      const url = id ? `/admin/models/edit/${id}` : `/admin/models/add`;
+      const url = id ? '/admin/models/edit/' + id : '/admin/models/add';
 
-      fetchWithCsrfRetry(url, {
+      fetchWithCsrf(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
-        .then(r => r.json())
-        .then(res => {
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
           if (res.status === 'success') {
             modal.hide();
             location.reload();
@@ -270,8 +299,10 @@
             alert('Error saving model: ' + res.message);
           }
         })
-        .catch(err => alert('Error: ' + err));
+        .catch(function (err) { alert('Error: ' + err); });
     });
+
+    console.log('[Models] Page initialization complete');
   });
 </script>
 {% endblock %}
