@@ -1,5 +1,55 @@
 # SmartLib Dev Progress Log
 
+## 2025-12-09 – Azure Files Sync Improvements
+
+### Summary
+Improved user experience when querying documents after uploads on Azure by adding query-time worker wake-up and enhanced indexing toast messaging.
+
+### Query-Time Worker Wake-Up
+- **Added `wake_worker()` call in `/api/query`**: Before executing ChromaDB vector store queries, the endpoint now pings the Celery worker (5s timeout) to wake it from Azure App Service cold starts.
+- **Conditional activation**: Only runs when `VECTOR_STORE_PROVIDER=chromadb` to avoid unnecessary overhead for PGVector deployments.
+- **Complements existing upload wake**: Previously `wake_worker()` only ran before uploads; now it also runs before queries to handle the gap when worker sleeps between upload completion and first query.
+
+### Enhanced Indexing Toast
+- **Updated completion message**: Toast now shows "📚 Indexing complete! You can start querying now."
+- **Azure sync timing guidance**: Added note "On Azure, it may take ~15-30 seconds for the index to sync" to set user expectations for Azure Files SMB mount latency.
+
+### Worker-Only ChromaDB Access (File Deletion)
+- **Audit Result**: Found that `admin_files.py` was the ONLY place where web container directly accessed ChromaDB.
+- **New Celery Task**: Added `delete_document_vectors` task to `vector_tasks.py` that runs on worker.
+- **Worker Wrapper**: Added `delete_document_vectors_via_worker()` to `celery_tasks.py` for web to call.
+- **Eliminated Direct Access**: Modified `admin_files.py` `_delete_vectors()` to use worker task instead of importing/using ChromaDB directly.
+- **Impact**: Web container no longer needs to access ChromaDB files, eliminating Azure Files sync issues for admin file deletion.
+
+### Files Modified
+- `modules/query.py` – Added `wake_worker` import and call before agent invocation (lines 26, 521-524)
+- `static/js/upload-status.js` – Enhanced `showCompletionToast()` with Azure sync timing note (lines 243-246)
+- `modules/vector_tasks.py` – Added `delete_document_vectors` Celery task (lines 313-378)
+- `modules/celery_tasks.py` – Added `DELETE_DOCUMENT_VECTORS_TASK` constant and `delete_document_vectors_via_worker()` wrapper
+- `modules/admin_files.py` – Replaced direct ChromaDB access with worker task call in `_delete_vectors()`
+
+### Duplicate File Cleanup (Delete-then-Add)
+- **Problem**: Re-uploading the same file created duplicate vectors in ChromaDB, causing redundant search results.
+- **Solution**: Added `cleanup_duplicate_file()` function that automatically removes existing vectors and DB records before re-ingesting.
+- **Behavior**: When a file with the same name is uploaded to the same library/knowledge, the old data is cleaned up first.
+- **Files**: `modules/upload_processing.py` – Added `cleanup_duplicate_file()` helper (lines 60-180) and integrated into `async_process_single_file` Celery task (lines 1130-1148).
+
+### Duplicate File Confirmation UI
+- **Problem**: Users had no warning before replacing existing files.
+- **Solution**: Added confirmation modal before uploads proceed.
+- **Features**:
+  - `/api/check-duplicates` endpoint checks if files exist before upload
+  - Bootstrap modal shows list of duplicate files with upload dates
+  - User must click "Replace Files" to proceed
+  - Works for both batch file uploads AND URL downloads
+- **URL Download Enhancement**: Duplicate check runs when adding URLs to list (early feedback via toast warning)
+- **Files Modified**:
+  - `modules/upload.py` – Added `/api/check-duplicates` endpoint, removed premature `add_uploaded_file()` call
+  - `templates/upload.html` – Added `duplicateConfirmModal` Bootstrap modal
+  - `static/js/upload.js` – Added `checkForDuplicates()`, `showDuplicateConfirmation()`, integrated into batch upload and URL download flows
+
+---
+
 ## 2025-12-07 – Visual Grounding Fixes & Upload UX Improvements
 
 ### Summary

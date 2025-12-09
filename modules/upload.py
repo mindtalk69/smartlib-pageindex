@@ -219,18 +219,10 @@ def init_upload(app):
                 temp_file_path = temp_dir / filename
                 file.save(str(temp_file_path))
 
-                # Add to database
-                file_size = temp_file_path.stat().st_size
-                stored_filename = f"{uuid4()}_{filename}"
-                
-                uploaded_file = add_uploaded_file(
-                    user_id=current_user.user_id,
-                    original_name=filename,
-                    stored_name=stored_filename,
-                    size=file_size,
-                    library_id=library_id,
-                    knowledge_id=knowledge_id
-                )
+                # NOTE: Don't call add_uploaded_file() here!
+                # The Celery worker (process_uploaded_file) creates the DB record
+                # after cleanup_duplicate_file() runs. Creating it here caused
+                # duplicate rows in /admin/files.
                 
                 # Submit processing task to Celery worker
                 enable_visual_grounding = request.form.get('enable_visual_grounding') == 'true'
@@ -274,7 +266,6 @@ def init_upload(app):
                 
                 uploaded_files.append({
                     'filename': filename,
-                    'file_id': uploaded_file,
                     'task_id': task_id
                 })
 
@@ -283,6 +274,62 @@ def init_upload(app):
             'message': f'Successfully uploaded {len(uploaded_files)} file(s). Processing started.',
             'files': uploaded_files
         })
+
+    @app.route('/api/check-duplicates', methods=['POST'])
+    @login_required
+    @csrf.exempt
+    def check_duplicates():
+        """Check if any of the submitted filenames already exist in the target library/knowledge.
+        
+        This allows the UI to show a confirmation dialog before replacing existing files.
+        """
+        from modules.database import UploadedFile
+        
+        data = request.get_json(silent=True) or {}
+        filenames = data.get('filenames', [])
+        library_id = data.get('library_id')
+        knowledge_id = data.get('knowledge_id')
+        
+        if not filenames:
+            return jsonify({'duplicates': []})
+        
+        if not library_id:
+            return jsonify({'duplicates': [], 'error': 'Library ID required'}), 400
+        
+        try:
+            library_id = int(library_id)
+        except (TypeError, ValueError):
+            return jsonify({'duplicates': [], 'error': 'Invalid library ID'}), 400
+        
+        # Convert knowledge_id if provided
+        knowledge_id_int = None
+        if knowledge_id and knowledge_id not in ('', 'null', 'None'):
+            try:
+                knowledge_id_int = int(knowledge_id)
+            except (TypeError, ValueError):
+                pass
+        
+        duplicates = []
+        for filename in filenames:
+            # Query for existing file with same name in same library/knowledge
+            query = UploadedFile.query.filter_by(
+                original_filename=filename,
+                library_id=library_id,
+            )
+            
+            if knowledge_id_int is not None:
+                query = query.filter_by(knowledge_id=knowledge_id_int)
+            
+            existing = query.first()
+            if existing:
+                duplicates.append({
+                    'filename': filename,
+                    'file_id': existing.file_id,
+                    'upload_time': existing.upload_time.isoformat() if existing.upload_time else None,
+                })
+        
+        logger.info(f"[CheckDuplicates] Found {len(duplicates)} duplicate(s) for {len(filenames)} file(s)")
+        return jsonify({'duplicates': duplicates})
 
     @app.route('/validate_url', methods=['POST'])
     @login_required

@@ -23,7 +23,7 @@ from modules.database import Document as DB_Document
 from langchain_core.messages import HumanMessage, AIMessage # <-- Import the agentic workflow
 from modules.llm_utils import get_active_prompt_content, get_active_language_name, get_llm # Added get_llm
 # from modules.agent import invoke_agent_graph  # <-- MOVED TO WORKER ONLY
-from modules.celery_tasks import invoke_agent_via_worker, resume_agent_via_worker
+from modules.celery_tasks import invoke_agent_via_worker, resume_agent_via_worker, wake_worker
 from modules.access_control import (
     filter_accessible_knowledges,
     get_user_group_ids,
@@ -517,6 +517,11 @@ def init_query(app):
         if stream_flag and db_message_id_for_stream:
             extra_kwargs["db_message_id_for_stream"] = db_message_id_for_stream
             extra_kwargs["user_id_for_stream"] = current_user.get_id()
+
+        # Wake worker before ChromaDB queries to handle Azure App Service cold starts
+        # This ensures the worker is active and can access the shared Azure Files mount
+        if vector_store_config.get("backend") == "chromadb":
+            wake_worker(timeout=5.0)  # Quick ping, don't block long
 
         task_timeout = current_app.config.get('AGENT_TASK_TIMEOUT', 120)
 

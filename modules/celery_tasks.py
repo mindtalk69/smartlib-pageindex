@@ -26,6 +26,7 @@ AGENT_STREAMING_TASK = "modules.agent.invoke_agent_graph_streaming"
 DOCUMENT_CHUNKS_TASK = "modules.vector_tasks.fetch_document_chunks"
 LIST_CHROMA_STORES_TASK = "modules.vector_tasks.list_chroma_stores"
 DELETE_CHROMA_COLLECTION_TASK = "modules.vector_tasks.delete_chroma_collection"
+DELETE_DOCUMENT_VECTORS_TASK = "modules.vector_tasks.delete_document_vectors"
 RESUME_AGENT_TASK = "modules.agent.resume_agent_graph"
 
 
@@ -253,6 +254,46 @@ def delete_chroma_collection_via_worker(persist_directory: str, collection_name:
         },
     )
     return bool(result)
+
+
+def delete_document_vectors_via_worker(
+    persist_directory: str,
+    collection_name: str,
+    doc_ids: List[str],
+    timeout: float = 30.0,
+) -> Dict[str, Any]:
+    """Delete specific document vectors via worker task.
+    
+    This eliminates direct ChromaDB access from web container,
+    avoiding Azure Files sync issues.
+    
+    Args:
+        persist_directory: Path to ChromaDB persistence directory.
+        collection_name: Name of the collection.
+        doc_ids: List of document IDs to delete.
+        timeout: Maximum seconds to wait for worker response.
+        
+    Returns:
+        Dict with 'success', 'deleted_count', and optional 'error' keys.
+    """
+    if not doc_ids:
+        return {"success": True, "deleted_count": 0}
+    
+    result = _send_task_and_wait(
+        DELETE_DOCUMENT_VECTORS_TASK,
+        {
+            "persist_directory": persist_directory,
+            "collection_name": collection_name,
+            "doc_ids": doc_ids,
+        },
+        timeout=timeout,
+    )
+    
+    if result is None:
+        # Worker unavailable or timeout
+        return {"success": False, "deleted_count": 0, "error": "Worker unavailable"}
+    
+    return result
 
 
 def offload_streaming_agent_task(

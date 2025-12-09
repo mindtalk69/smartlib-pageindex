@@ -83,6 +83,12 @@ def _sanitize_collection_name(raw_value: str) -> str:
 
 
 def _delete_vectors(doc_ids, user_id, knowledge_id) -> int:
+    """Delete vectors via Celery worker to avoid Azure Files sync issues.
+    
+    Previously this function directly accessed ChromaDB, which caused
+    sync issues on Azure when both web and worker containers tried to
+    access the same Azure Files mount. Now it delegates to the worker.
+    """
     if not doc_ids:
         return 0
 
@@ -108,33 +114,30 @@ def _delete_vectors(doc_ids, user_id, knowledge_id) -> int:
 
     collection_name = _sanitize_collection_name(current_app.config.get('CHROMA_COLLECTION_NAME', 'documents-vectors'))
 
+    # Use Celery worker for ChromaDB access to avoid Azure Files sync issues
     try:
-        import chromadb
-        from modules.vector_tasks import get_cached_chroma_client
-    except ImportError as import_exc:
-        logging.error("Chroma backend not available when attempting vector deletion: %s", import_exc)
-        return 0
-
-    try:
-        # Use cached client for performance (25s → <1s)
-        client = get_cached_chroma_client(str(persist_dir))
-        try:
-            collection = client.get_collection(name=collection_name)
-        except Exception as lookup_exc:
-            logging.info(
-                "Chroma collection %s not available at %s; skipping vector deletion (%s)",
-                collection_name,
-                persist_dir,
-                lookup_exc,
-            )
+        from modules.celery_tasks import delete_document_vectors_via_worker
+        
+        result = delete_document_vectors_via_worker(
+            persist_directory=str(persist_dir),
+            collection_name=collection_name,
+            doc_ids=doc_ids,
+            timeout=30.0,
+        )
+        
+        if result.get("success"):
+            deleted_count = result.get("deleted_count", 0)
+            logging.info("Deleted %s vector entries via worker from collection %s", deleted_count, collection_name)
+            return deleted_count
+        else:
+            error = result.get("error", "Unknown error")
+            logging.error("Worker failed to delete vectors: %s", error)
             return 0
-
-        collection.delete(ids=doc_ids)
-        logging.info("Deleted %s vector entries from collection %s", len(doc_ids), collection_name)
-        return len(doc_ids)
+            
     except Exception as delete_exc:
         logging.error("Failed removing vectors for doc_ids %s: %s", doc_ids, delete_exc, exc_info=True)
-        raise
+        # Don't raise - allow file deletion to proceed even if vector deletion fails
+        return 0
 
 
 @files_bp.route('/delete/<int:file_id>', methods=['DELETE'])

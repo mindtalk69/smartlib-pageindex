@@ -310,3 +310,70 @@ def delete_chroma_collection(persist_directory: str, collection_name: str) -> bo
             "Failed to delete Chroma collection %s from %s", collection_name, persist_directory
         )
         raise
+
+
+@celery.task(name="modules.vector_tasks.delete_document_vectors")
+def delete_document_vectors(
+    persist_directory: str,
+    collection_name: str,
+    doc_ids: List[str],
+) -> Dict[str, object]:
+    """Delete specific document vectors from a ChromaDB collection.
+
+    This task runs on the worker to avoid Azure Files sync issues when
+    the web container tries to access ChromaDB directly.
+
+    Args:
+        persist_directory: Path where the Chroma collection is persisted.
+        collection_name: Name of the vector store collection.
+        doc_ids: List of document IDs to delete.
+
+    Returns:
+        Dictionary with 'deleted_count' and 'success' keys.
+    """
+    try:
+        import chromadb
+        from chromadb.errors import NotFoundError
+    except ImportError as exc:
+        logger.error("ChromaDB is not installed in this environment: %s", exc)
+        return {"success": False, "deleted_count": 0, "error": str(exc)}
+
+    if not doc_ids:
+        logger.info("[DeleteVectors] No doc_ids provided, nothing to delete")
+        return {"success": True, "deleted_count": 0}
+
+    persist_path = Path(persist_directory)
+    if not persist_path.exists():
+        logger.info("[DeleteVectors] Directory %s does not exist; skipping", persist_directory)
+        return {"success": True, "deleted_count": 0, "message": "Directory not found"}
+
+    try:
+        # Use cached client for performance
+        client = get_cached_chroma_client(persist_directory)
+        try:
+            collection = client.get_collection(name=collection_name)
+        except NotFoundError:
+            logger.info(
+                "[DeleteVectors] Collection '%s' not found at '%s'; skipping",
+                collection_name,
+                persist_directory,
+            )
+            return {"success": True, "deleted_count": 0, "message": "Collection not found"}
+
+        # Delete the vectors
+        collection.delete(ids=doc_ids)
+        logger.info(
+            "[DeleteVectors] Deleted %d vector entries from collection '%s' at '%s'",
+            len(doc_ids),
+            collection_name,
+            persist_directory,
+        )
+        return {"success": True, "deleted_count": len(doc_ids)}
+
+    except Exception as exc:
+        logger.exception(
+            "[DeleteVectors] Failed to delete vectors for doc_ids %s: %s",
+            doc_ids,
+            exc,
+        )
+        return {"success": False, "deleted_count": 0, "error": str(exc)}

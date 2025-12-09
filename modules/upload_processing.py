@@ -57,6 +57,132 @@ from modules.database import (
 # Import the vector store processing function from the new utility module
 from modules.vector_store_utils import process_and_store_chunks
 
+
+def cleanup_duplicate_file(
+    filename: str,
+    library_id: int,
+    knowledge_id: int | None,
+    user_id: str,
+    logger=None,
+) -> dict:
+    """Remove existing vectors and DB records if the same file was previously uploaded.
+    
+    This implements "delete-then-add" behavior for duplicate file uploads, ensuring
+    clean re-uploads without duplicate content in the vector store.
+    
+    Args:
+        filename: Original filename being uploaded.
+        library_id: Library ID for the upload.
+        knowledge_id: Knowledge base ID (optional).
+        user_id: User ID for the upload.
+        logger: Optional logger instance.
+        
+    Returns:
+        Dict with 'found', 'deleted_files', 'deleted_vectors' keys.
+    """
+    logger = logger or logging.getLogger(__name__)
+    result = {"found": False, "deleted_files": 0, "deleted_vectors": 0}
+    
+    try:
+        # Find existing files with the same filename in the same library/knowledge
+        query = UploadedFile.query.filter_by(
+            original_filename=filename,
+            library_id=library_id,
+        )
+        
+        # Also filter by knowledge_id if in knowledge mode
+        if knowledge_id is not None:
+            query = query.filter_by(knowledge_id=knowledge_id)
+        
+        existing_files = query.all()
+        
+        if not existing_files:
+            logger.info(f"[DuplicateCleanup] No existing file found for '{filename}' in library {library_id}")
+            return result
+        
+        result["found"] = True
+        logger.info(f"[DuplicateCleanup] Found {len(existing_files)} existing upload(s) for '{filename}' - cleaning up...")
+        
+        for existing_file in existing_files:
+            file_id = existing_file.file_id
+            
+            # Find associated Document records to get vector IDs
+            docs = (
+                DBDocument.query
+                .filter_by(
+                    source=filename,
+                    library_id=library_id,
+                    knowledge_id=knowledge_id,
+                )
+                .all()
+            )
+            doc_ids = [str(doc.id) for doc in docs]
+            
+            # Delete vectors via worker (to avoid Azure Files sync issues)
+            if doc_ids:
+                try:
+                    from flask import current_app
+                    from modules.llm_utils import get_lc_store_path
+                    from modules.celery_tasks import delete_document_vectors_via_worker
+                    
+                    vector_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb')
+                    
+                    if vector_provider == 'chromadb':
+                        persist_path = get_lc_store_path(user_id=user_id, knowledge_id=knowledge_id)
+                        if persist_path and Path(persist_path).exists():
+                            collection_name = current_app.config.get('CHROMA_COLLECTION_NAME', 'documents-vectors')
+                            
+                            delete_result = delete_document_vectors_via_worker(
+                                persist_directory=str(persist_path),
+                                collection_name=collection_name,
+                                doc_ids=doc_ids,
+                                timeout=30.0,
+                            )
+                            
+                            if delete_result.get("success"):
+                                result["deleted_vectors"] += delete_result.get("deleted_count", 0)
+                                logger.info(f"[DuplicateCleanup] Deleted {delete_result.get('deleted_count', 0)} vectors for file_id {file_id}")
+                            else:
+                                logger.warning(f"[DuplicateCleanup] Vector deletion failed: {delete_result.get('error', 'Unknown')}")
+                except Exception as vec_err:
+                    logger.error(f"[DuplicateCleanup] Error deleting vectors: {vec_err}", exc_info=True)
+            
+            # Delete DB records
+            try:
+                # Delete Document records
+                for doc in docs:
+                    db.session.delete(doc)
+                
+                # Delete VectorReference records
+                from modules.database import VectorReference
+                VectorReference.query.filter_by(file_id=file_id).delete(synchronize_session=False)
+                
+                # Delete LibraryReference records
+                LibraryReference.query.filter_by(reference_type='file', source_id=file_id).delete(synchronize_session=False)
+                
+                # Delete VisualGroundingActivity records
+                VisualGroundingActivity.query.filter_by(file_id=file_id).delete(synchronize_session=False)
+                
+                # Delete the UploadedFile record
+                db.session.delete(existing_file)
+                
+                result["deleted_files"] += 1
+                logger.info(f"[DuplicateCleanup] Deleted file_id {file_id} and associated records")
+                
+            except Exception as db_err:
+                logger.error(f"[DuplicateCleanup] Error deleting DB records for file_id {file_id}: {db_err}", exc_info=True)
+        
+        # Commit all deletions
+        db.session.commit()
+        logger.info(f"[DuplicateCleanup] Cleanup complete: {result['deleted_files']} files, {result['deleted_vectors']} vectors removed")
+        
+    except Exception as cleanup_err:
+        db.session.rollback()
+        logger.error(f"[DuplicateCleanup] Cleanup failed for '{filename}': {cleanup_err}", exc_info=True)
+        result["error"] = str(cleanup_err)
+    
+    return result
+
 def process_uploaded_file(
     file_path,
     filename,
@@ -1000,6 +1126,25 @@ def async_process_single_file(self, temp_file_path_from_route, original_filename
                 meta={'filename': original_filename, 'stage': stage, 'progress': progress}
             )
             task_logger.info(f"[Progress] {progress}% - {stage}")
+
+        # Cleanup existing file if this is a re-upload (delete-then-add)
+        # This prevents duplicate vectors in ChromaDB when the same file is uploaded again
+        cleanup_result = cleanup_duplicate_file(
+            filename=original_filename,
+            library_id=library_id,
+            knowledge_id=knowledge_id,
+            user_id=user_id,
+            logger=task_logger,
+        )
+        if cleanup_result.get("found"):
+            task_logger.info(
+                f"[DuplicateCleanup] Re-upload detected. Cleaned up {cleanup_result.get('deleted_files', 0)} file(s) "
+                f"and {cleanup_result.get('deleted_vectors', 0)} vectors before re-ingesting."
+            )
+            self.update_state(
+                state='PROGRESS',
+                meta={'filename': original_filename, 'stage': 'Cleaned up previous version...', 'progress': 8}
+            )
 
         result = process_uploaded_file(
             file_path=temp_file_path_from_route,

@@ -242,7 +242,8 @@ class UploadStatusTracker {
             </div>
             <div class="toast-body">
                 <strong>${this.escapeHtml(task.filename)}</strong> has been processed successfully.<br>
-                <small class="text-muted">Document is now ready for querying.</small>
+                <small class="text-muted">📚 Indexing complete! You can start querying now.</small><br>
+                <small class="text-muted opacity-75">Note: On Azure, it may take ~15-30 seconds for the index to sync.</small>
             </div>
         `;
 

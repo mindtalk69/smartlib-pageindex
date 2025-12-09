@@ -79,6 +79,83 @@
     let isBatchUploading = false; // Flag for batch uploads
     let urlsToProcess = []; // Array to hold URLs to be processed
     let batchFilesArray = []; // Array to hold File objects for batch upload
+    let pendingBatchUpload = null; // Stores data for pending upload awaiting confirmation
+
+    // --- Duplicate Check Modal Elements ---
+    const duplicateConfirmModal = document.getElementById('duplicateConfirmModal');
+    const duplicateFileList = document.getElementById('duplicateFileList');
+    const confirmReplaceBtn = document.getElementById('confirmReplaceBtn');
+    let duplicateModalInstance = null;
+    // Note: Modal initialization happens later after bootstrapAvailable is declared
+
+    /**
+     * Check if any files already exist in the target library/knowledge
+     * @param {string[]} filenames - Array of filenames to check
+     * @param {string|number} libraryId - Library ID
+     * @param {string|number|null} knowledgeId - Knowledge ID (optional)
+     * @returns {Promise<Object[]>} - Array of duplicate file objects
+     */
+    async function checkForDuplicates(filenames, libraryId, knowledgeId) {
+        try {
+            // Get CSRF token from meta tag or use the global function if available
+            const csrfToken = window.readCurrentCsrfToken
+                ? window.readCurrentCsrfToken()
+                : document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+            const response = await fetch('/api/check-duplicates', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    filenames: filenames,
+                    library_id: libraryId,
+                    knowledge_id: knowledgeId || null
+                })
+            });
+            const data = await response.json();
+            return data.duplicates || [];
+        } catch (error) {
+            console.error('[DuplicateCheck] Error checking duplicates:', error);
+            return []; // On error, proceed without blocking
+        }
+    }
+
+    /**
+     * Show the duplicate confirmation modal with the list of duplicate files
+     * @param {Object[]} duplicates - Array of duplicate file objects
+     * @param {Function} onConfirm - Callback when user confirms replacement
+     */
+    function showDuplicateConfirmation(duplicates, onConfirm) {
+        if (!duplicateFileList || !duplicateModalInstance) {
+            // Modal not available, proceed without confirmation
+            onConfirm();
+            return;
+        }
+
+        // Populate the duplicate file list
+        duplicateFileList.innerHTML = duplicates.map(dup => {
+            const uploadDate = dup.upload_time
+                ? new Date(dup.upload_time).toLocaleDateString()
+                : 'Unknown date';
+            return `<li class="list-group-item d-flex justify-content-between align-items-center">
+                <span class="text-truncate me-2">${dup.filename}</span>
+                <small class="text-muted flex-shrink-0">Uploaded: ${uploadDate}</small>
+            </li>`;
+        }).join('');
+
+        // Set up confirm button handler
+        const handleConfirm = () => {
+            confirmReplaceBtn.removeEventListener('click', handleConfirm);
+            duplicateModalInstance.hide();
+            onConfirm();
+        };
+        confirmReplaceBtn.addEventListener('click', handleConfirm);
+
+        // Show the modal
+        duplicateModalInstance.show();
+    }
 
     // --- Tooltip Initialization ---
     const bootstrapAvailable = typeof window.bootstrap !== 'undefined';
@@ -92,6 +169,11 @@
         : [];
     if (!bootstrapAvailable && tooltipTriggerList.length > 0) {
         console.warn('[Upload Page] Bootstrap JS not detected; skipping tooltip initialization.');
+    }
+
+    // Initialize duplicate confirmation modal (after bootstrapAvailable is set)
+    if (duplicateConfirmModal && bootstrapAvailable && window.bootstrap?.Modal) {
+        duplicateModalInstance = new window.bootstrap.Modal(duplicateConfirmModal);
     }
 
     // --- Toast Helper Function ---
@@ -433,26 +515,53 @@
             const urlsRaw = urlTextarea.value.trim();
             if (!urlsRaw) return;
 
+            const selectedLibraryOption = librarySelectUrl.options[librarySelectUrl.selectedIndex];
+            const selectedLibraryId = selectedLibraryOption?.value;
+            const knowledgeIdUrlField = document.getElementById('knowledgeIdUrl');
+            const knowledgeIdValue = knowledgeIdUrlField ? knowledgeIdUrlField.value : (selectedLibraryOption?.dataset?.knowledgeId || '');
+
             addUrlsBtn.disabled = true; // Disable button during validation
             addUrlsBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Validating URLs...';
-            // urlStatus.innerHTML = '<div class="alert alert-info" role="alert">Validating URLs...</div>'; // Replaced with toast below if needed, or just rely on button text
 
             const potentialUrls = urlsRaw.split(/[\n,]+/)
                 .map(url => url.trim())
                 .filter(url => url);
 
             const formatValidUrls = potentialUrls.filter(url => isValidUrl(url));
-
-            // INSTANT VALIDATION: Skip backend call, just use client-side format validation
-            // Reachability will be checked during actual URL processing
             const formatInvalidCount = potentialUrls.length - formatValidUrls.length;
 
-            // Add format-valid URLs directly to the list
+            // Extract filenames from URLs for duplicate check
+            const urlFilenames = formatValidUrls.map(url => {
+                try {
+                    const urlPath = new URL(url).pathname;
+                    let filename = urlPath.split('/').pop() || 'downloaded_document';
+                    if (!filename.includes('.')) {
+                        filename = filename + '.html';
+                    }
+                    return filename;
+                } catch (e) {
+                    return 'downloaded_document.html';
+                }
+            });
+
+            // Check for duplicates if library is selected
+            let duplicateFilenames = [];
+            if (selectedLibraryId && urlFilenames.length > 0) {
+                addUrlsBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Checking duplicates...';
+                const duplicates = await checkForDuplicates(urlFilenames, selectedLibraryId, knowledgeIdValue);
+                duplicateFilenames = duplicates.map(d => d.filename);
+            }
+
+            // Add format-valid URLs directly to the list (mark duplicates)
             let addedCount = 0;
-            formatValidUrls.forEach(url => {
+            let duplicateCount = 0;
+            formatValidUrls.forEach((url, idx) => {
                 if (!urlsToProcess.includes(url)) {
                     urlsToProcess.push(url);
                     addedCount++;
+                    if (duplicateFilenames.includes(urlFilenames[idx])) {
+                        duplicateCount++;
+                    }
                 }
             });
 
@@ -466,6 +575,9 @@
             let statusMsg = '';
             if (addedCount > 0) {
                 statusMsg += `Added ${addedCount} URL(s) to the list. `;
+                if (duplicateCount > 0) {
+                    statusMsg += `⚠️ ${duplicateCount} will replace existing files. `;
+                }
             } else if (potentialUrls.length > 0) {
                 statusMsg += `No new URLs added (already in list or invalid format). `;
             }
@@ -474,15 +586,14 @@
             }
 
             // Use toast for feedback
-            const toastType = addedCount > 0 ? 'info' : 'warning';
+            const toastType = duplicateCount > 0 ? 'warning' : (addedCount > 0 ? 'info' : 'warning');
             console.log(`[DEBUG] Calling showToast. Type: ${toastType}, Message: "${statusMsg}"`);
             if (statusMsg.trim()) {
                 showToast(statusMsg, toastType);
             }
-            // urlStatus.innerHTML = ''; // Clear any old status messages if desired
 
-            addUrlsBtn.innerHTML = 'Add URLs to List'; // Restore button text
-            checkUrlFormState(); // Re-check button states (including enabling addUrlsBtn if textarea still has content)
+            addUrlsBtn.innerHTML = '<i class="bi bi-plus-circle me-1"></i> Add URLs to List'; // Restore button text
+            checkUrlFormState(); // Re-check button states
         });
 
 
@@ -532,133 +643,176 @@
                     return;
                 }
 
-                isUrlProcessing = true;
-                processUrlsBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing ${urlsToProcess.length} URLs...`;
-                urlStatus.innerHTML = ''; // Clear previous status
-                const urlProgressBar = document.getElementById('url-progress-bar'); // Get URL progress bar
-                const progressBarInnerUrl = urlProgressBar ? urlProgressBar.querySelector('.progress-bar') : null;
-                console.log('[URL Upload] urlProgressBar found:', !!urlProgressBar, 'progressBarInnerUrl found:', !!progressBarInnerUrl);
-                // --- Initialize Progress Bar ---
-                if (urlProgressBar && progressBarInnerUrl) {
-                    urlProgressBar.style.display = 'block'; // Show progress bar
-                    progressBarInnerUrl.style.width = '0%';
-                    progressBarInnerUrl.setAttribute('aria-valuenow', '0');
-                    progressBarInnerUrl.textContent = 'Starting...';
-                    console.log('[URL Upload] Progress bar initialized and shown.');
-                    progressBarInnerUrl.classList.remove('bg-success', 'bg-warning', 'bg-danger'); // Ensure default color
-                }
-                // --- End Initialize ---
-
-
-                let successCount = 0;
-                let errorCount = 0;
-                const statusMessages = []; // Store individual messages
-
-                // Process URLs one by one (could be parallelized with Promise.all if backend supports it well)
-                for (let i = 0; i < urlsToProcess.length; i++) {
-                    const url = urlsToProcess[i];
-
-                    // --- Update Progress Bar ---
-                    const percent = Math.round(((i + 1) / urlsToProcess.length) * 100);
-                    if (progressBarInnerUrl) {
-                        console.log(`[URL Upload] Updating progress for URL ${i + 1}: ${percent}% - ${url}`);
-                        progressBarInnerUrl.style.width = percent + '%';
-                        progressBarInnerUrl.setAttribute('aria-valuenow', percent);
-                        progressBarInnerUrl.textContent = `Processing ${i + 1} of ${urlsToProcess.length}: ${url}`;
-
-                    }
-                    // --- End Progress Update ---
-
-                    //   const headers = {'Content-Type': 'application/json'};
-                    //   if (csrfToken) {
-                    //       headers['X-CSRFToken'] = csrfToken;
-                    //   }
-
+                // Extract filenames from URLs for duplicate check
+                const urlFilenames = urlsToProcess.map(url => {
                     try {
-                        // Get knowledge_id from hidden input
-                        const knowledgeIdUrl = document.getElementById('knowledgeIdUrl');
-                        const knowledgeId = knowledgeIdUrl ? knowledgeIdUrl.value : '';
-                        const headers = {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': window.readCurrentCsrfToken()
-                        };
-
-                        // Wrap with fetchWithCsrfRetry
-                        const response = await window.fetchWithCsrfRetry('/process_url', {
-                            method: 'POST',
-                            headers: headers,
-                            body: JSON.stringify({
-                                url: url,
-                                library_id: selectedLibraryId,
-                                library_name: selectedLibraryName,
-                                knowledge_id: knowledgeId
-                            })
-                        });
-                        const data = await response.json();
-
-                        if (response.ok && data.success) {
-                            successCount++;
-
-                            // Show status container
-                            urlStatus.classList.remove('d-none');
-
-                            const messageText = data.message || data.warning || '';
-                            const successHTML = `<p class="small text-body-secondary mb-1">Success: ${url} ${messageText}</p>`;
-                            urlStatus.insertAdjacentHTML('beforeend', successHTML);
-
-                            // Dispatch file-uploaded event to trigger upload status tracker
-                            if (data.task_id) {
-                                console.log('[URLDownload] Dispatching file-uploaded event for task:', data.task_id, 'url:', url);
-                                document.dispatchEvent(new CustomEvent('file-uploaded', {
-                                    detail: { task_id: data.task_id, filename: url }
-                                }));
-                            }
-                        } else {
-                            errorCount++;
-                            // Append error message
-                            urlStatus.classList.remove('d-none'); // Ensure visible
-                            const errorHTML = `<p class="small text-danger mb-1">Error: ${url} - ${data.message || 'Unknown error'}</p>`;
-                            urlStatus.insertAdjacentHTML('beforeend', errorHTML);
+                        const urlPath = new URL(url).pathname;
+                        let filename = urlPath.split('/').pop() || 'downloaded_document';
+                        if (!filename.includes('.')) {
+                            filename = filename + '.html';
                         }
-                    } catch (error) {
-                        errorCount++;
-                        console.error(`Error processing URL ${url}:`, error);
-                        // Append fetch error message
-                        urlStatus.classList.remove('d-none'); // Ensure visible
-                        const fetchErrorHTML = `<p class="small text-danger mb-1">Error: ${url} - ${error.message}</p>`;
-                        urlStatus.insertAdjacentHTML('beforeend', fetchErrorHTML);
+                        return filename;
+                    } catch (e) {
+                        return 'downloaded_document.html';
                     }
-                    // Scroll status div
-                    urlStatus.scrollTop = urlStatus.scrollHeight;
+                });
+
+                // Check for duplicate files before processing
+                processUrlsBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Checking for duplicates...';
+
+                const duplicates = await checkForDuplicates(urlFilenames, selectedLibraryId, knowledgeIdValue);
+
+                if (duplicates.length > 0) {
+                    // Show confirmation modal and wait for user decision
+                    processUrlsBtn.innerHTML = '<i class="bi bi-cloud-download me-1"></i> Download & Process';
+                    processUrlsBtn.disabled = false;
+
+                    showDuplicateConfirmation(duplicates, () => {
+                        // User confirmed - proceed with URL processing
+                        performUrlProcessing(urlsToProcess, selectedLibraryId, selectedLibraryName, knowledgeIdValue);
+                    });
+                    return;
                 }
 
-                // Final status update - Append summary
-                if (progressBarInnerUrl) { // Update progress bar on completion
-                    progressBarInnerUrl.style.width = '100%';
-                    console.log('[URL Upload] Progress bar complete.');
-                    progressBarInnerUrl.textContent = 'Complete';
-                    progressBarInnerUrl.classList.add(errorCount > 0 ? 'bg-warning' : 'bg-success');
-                }
-                // Append final summary
-                const summaryHTML = `<p class="small text-body-secondary mt-2"><strong>Processing complete. Success: ${successCount}, Errors: ${errorCount}.</strong></p>`;
-                urlStatus.insertAdjacentHTML('beforeend', summaryHTML);
-                urlStatus.scrollTop = urlStatus.scrollHeight; // Scroll to bottom
-
-                // Hide progress bar after a short delay
-                if (urlProgressBar) {
-                    setTimeout(() => {
-                        console.log('[URL Upload] Hiding progress bar.');
-                        urlProgressBar.style.display = 'none';
-                    }, 2000);
-                }
-
-                isUrlProcessing = false;
-                processUrlsBtn.innerHTML = 'Download & Process URLs';
-                urlsToProcess = []; // Clear the list after processing
-                renderUrlList(); // Update display to show empty list
-                checkUrlFormState(); // Disable buttons
+                // No duplicates - proceed with URL processing
+                performUrlProcessing(urlsToProcess, selectedLibraryId, selectedLibraryName, knowledgeIdValue);
             });
         } // End listener attachment check
+
+        // Extracted URL processing function for reuse after confirmation
+        async function performUrlProcessing(urlsToProcess, selectedLibraryId, selectedLibraryName, knowledgeIdValue) {
+            isUrlProcessing = true;
+            processUrlsBtn.disabled = true;
+            processUrlsBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing ${urlsToProcess.length} URLs...`;
+            urlStatus.innerHTML = ''; // Clear previous status
+            const urlProgressBar = document.getElementById('url-progress-bar'); // Get URL progress bar
+            const progressBarInnerUrl = urlProgressBar ? urlProgressBar.querySelector('.progress-bar') : null;
+            console.log('[URL Upload] urlProgressBar found:', !!urlProgressBar, 'progressBarInnerUrl found:', !!progressBarInnerUrl);
+            // --- Initialize Progress Bar ---
+            if (urlProgressBar && progressBarInnerUrl) {
+                urlProgressBar.style.display = 'block'; // Show progress bar
+                progressBarInnerUrl.style.width = '0%';
+                progressBarInnerUrl.setAttribute('aria-valuenow', '0');
+                progressBarInnerUrl.textContent = 'Starting...';
+                console.log('[URL Upload] Progress bar initialized and shown.');
+                progressBarInnerUrl.classList.remove('bg-success', 'bg-warning', 'bg-danger'); // Ensure default color
+            }
+            // --- End Initialize ---
+
+
+            let successCount = 0;
+            let errorCount = 0;
+            const statusMessages = []; // Store individual messages
+
+            // Process URLs one by one (could be parallelized with Promise.all if backend supports it well)
+            for (let i = 0; i < urlsToProcess.length; i++) {
+                const url = urlsToProcess[i];
+
+                // --- Update Progress Bar ---
+                const percent = Math.round(((i + 1) / urlsToProcess.length) * 100);
+                if (progressBarInnerUrl) {
+                    console.log(`[URL Upload] Updating progress for URL ${i + 1}: ${percent}% - ${url}`);
+                    progressBarInnerUrl.style.width = percent + '%';
+                    progressBarInnerUrl.setAttribute('aria-valuenow', percent);
+                    progressBarInnerUrl.textContent = `Processing ${i + 1} of ${urlsToProcess.length}: ${url}`;
+
+                }
+                // --- End Progress Update ---
+
+                //   const headers = {'Content-Type': 'application/json'};
+                //   if (csrfToken) {
+                //       headers['X-CSRFToken'] = csrfToken;
+                //   }
+
+                try {
+                    // Get knowledge_id from hidden input
+                    const knowledgeIdUrl = document.getElementById('knowledgeIdUrl');
+                    const knowledgeId = knowledgeIdUrl ? knowledgeIdUrl.value : '';
+
+                    // Get CSRF token from meta tag or use the global function if available
+                    const csrfToken = window.readCurrentCsrfToken
+                        ? window.readCurrentCsrfToken()
+                        : document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+                    const headers = {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    };
+
+                    const response = await fetch('/process_url', {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify({
+                            url: url,
+                            library_id: selectedLibraryId,
+                            library_name: selectedLibraryName,
+                            knowledge_id: knowledgeId
+                        })
+                    });
+                    const data = await response.json();
+
+                    if (response.ok && data.success) {
+                        successCount++;
+
+                        // Show status container
+                        urlStatus.classList.remove('d-none');
+
+                        const messageText = data.message || data.warning || '';
+                        const successHTML = `<p class="small text-body-secondary mb-1">Success: ${url} ${messageText}</p>`;
+                        urlStatus.insertAdjacentHTML('beforeend', successHTML);
+
+                        // Dispatch file-uploaded event to trigger upload status tracker
+                        if (data.task_id) {
+                            console.log('[URLDownload] Dispatching file-uploaded event for task:', data.task_id, 'url:', url);
+                            document.dispatchEvent(new CustomEvent('file-uploaded', {
+                                detail: { task_id: data.task_id, filename: url }
+                            }));
+                        }
+                    } else {
+                        errorCount++;
+                        // Append error message
+                        urlStatus.classList.remove('d-none'); // Ensure visible
+                        const errorHTML = `<p class="small text-danger mb-1">Error: ${url} - ${data.message || 'Unknown error'}</p>`;
+                        urlStatus.insertAdjacentHTML('beforeend', errorHTML);
+                    }
+                } catch (error) {
+                    errorCount++;
+                    console.error(`Error processing URL ${url}:`, error);
+                    // Append fetch error message
+                    urlStatus.classList.remove('d-none'); // Ensure visible
+                    const fetchErrorHTML = `<p class="small text-danger mb-1">Error: ${url} - ${error.message}</p>`;
+                    urlStatus.insertAdjacentHTML('beforeend', fetchErrorHTML);
+                }
+                // Scroll status div
+                urlStatus.scrollTop = urlStatus.scrollHeight;
+            }
+
+            // Final status update - Append summary
+            if (progressBarInnerUrl) { // Update progress bar on completion
+                progressBarInnerUrl.style.width = '100%';
+                console.log('[URL Upload] Progress bar complete.');
+                progressBarInnerUrl.textContent = 'Complete';
+                progressBarInnerUrl.classList.add(errorCount > 0 ? 'bg-warning' : 'bg-success');
+            }
+            // Append final summary
+            const summaryHTML = `<p class="small text-body-secondary mt-2"><strong>Processing complete. Success: ${successCount}, Errors: ${errorCount}.</strong></p>`;
+            urlStatus.insertAdjacentHTML('beforeend', summaryHTML);
+            urlStatus.scrollTop = urlStatus.scrollHeight; // Scroll to bottom
+
+            // Hide progress bar after a short delay
+            if (urlProgressBar) {
+                setTimeout(() => {
+                    console.log('[URL Upload] Hiding progress bar.');
+                    urlProgressBar.style.display = 'none';
+                }, 2000);
+            }
+
+            isUrlProcessing = false;
+            processUrlsBtn.innerHTML = 'Download & Process URLs';
+            urlsToProcess = []; // Clear the list after processing
+            renderUrlList(); // Update display to show empty list
+            checkUrlFormState(); // Disable buttons
+        } // End performUrlProcessing function
     } // End URL Download Logic block
 
 
@@ -796,162 +950,193 @@
                     return;
                 }
 
-                isBatchUploading = true;
-                uploadBatchBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading ${filesToUpload.length} files...`; // Use array length
-                batchStatus.innerHTML = ''; // Clear previous status
-                batchStatus.classList.remove('d-none'); // Show status container
-                batchProgressBar.style.display = 'block'; // Show progress bar
-                console.log('[Batch Upload] batchProgressBar found:', !!batchProgressBar);
-                // --- Initialize Progress Bar ---
-                const progressBarInnerBatch = batchProgressBar.querySelector('.progress-bar');
-                if (progressBarInnerBatch) {
-                    progressBarInnerBatch.style.width = '0%';
-                    progressBarInnerBatch.setAttribute('aria-valuenow', '0');
-                    progressBarInnerBatch.textContent = 'Starting...';
-                    console.log('[Batch Upload] Progress bar initialized and shown.');
-                    progressBarInnerBatch.classList.remove('bg-success', 'bg-warning', 'bg-danger'); // Ensure default color
-                }
-                // --- End Initialize ---
+                // Check for duplicate files before uploading
+                const filenames = filesToUpload.map(f => f.name);
+                uploadBatchBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Checking for duplicates...';
 
-                const uploadPromises = [];
-                let successCount = 0;
-                let errorCount = 0;
+                const duplicates = await checkForDuplicates(filenames, libraryId, knowledgeIdValue);
 
-                // Get reference to the checkbox BEFORE the loop
-                const groundingCheckbox = document.getElementById('enableVisualGroundingBatch');
+                if (duplicates.length > 0) {
+                    // Show confirmation modal and wait for user decision
+                    uploadBatchBtn.innerHTML = '<i class="bi bi-upload me-1"></i> Upload Files';
+                    uploadBatchBtn.disabled = false;
 
-                // Iterate over our managed array
-                for (let i = 0; i < filesToUpload.length; i++) {
-                    const file = filesToUpload[i]; // Get file from our array
-
-                    // --- Update Progress Bar ---
-                    const percent = Math.round(((i + 1) / filesToUpload.length) * 100);
-                    if (progressBarInnerBatch) {
-                        console.log(`[Batch Upload] Updating progress for File ${i + 1}: ${percent}% - ${file.name}`);
-                        progressBarInnerBatch.style.width = percent + '%';
-                        progressBarInnerBatch.setAttribute('aria-valuenow', percent);
-                        progressBarInnerBatch.textContent = `Processing ${i + 1} of ${filesToUpload.length}: ${file.name}`;
-                    }
-                    // --- End Progress Update ---
-
-                    // --- Create FormData for EACH file ---
-                    const fileFormData = new FormData();
-                    fileFormData.append('library_id', libraryId);
-                    fileFormData.append('library_name', libraryName);
-                    fileFormData.append('file', file, file.name); // Add the current file
-                    // Append knowledge_id from hidden input
-                    if (knowledgeIdValue) {
-                        fileFormData.append('knowledge_id', knowledgeIdValue);
-                    }
-
-
-                    // --- Manually add checkbox state if checked ---
-
-                    if (groundingCheckbox && groundingCheckbox.checked) {
-                        // Backend checks for key presence, value doesn't strictly matter but 'true' is clear
-                        fileFormData.append('enable_visual_grounding', 'true');
-                    }
-                    // --- End manual checkbox check ---
-
-                    //   const headers = {};
-                    //   if (csrfToken) {
-                    //       headers['X-CSRFToken'] = csrfToken;
-                    //   }
-
-                    const headers = {
-                        // FormData sets Content-Type automatically
-                        'X-CSRFToken': window.readCurrentCsrfToken()
-                    };
-
-                    // Create a promise for each file upload using the specific file's FormData
-                    //const uploadPromise = fetch('/upload', { // Reusing the single upload endpoint
-                    const uploadPromise = window.fetchWithCsrfRetry('/upload', { // Reusing the single upload endpoint
-                        method: 'POST',
-                        body: fileFormData, // Send the FormData specific to this file
-                        headers: headers
-                    })
-                        .then(response => response.json().then(data => ({ ok: response.ok, data: data, fileName: file.name }))) // Pass filename along
-                        .then(({ ok, data, fileName }) => { // Receive fileName here
-                            // Use text-body-secondary for success (brighter than muted), text-danger for errors
-                            const messageClass = ok && data.success ? 'text-body-secondary' : 'text-danger';
-                            const statusPrefix = ok && data.success ? 'uploaded' : 'error';
-                            // Ensure filename is used correctly in messageText
-                            const messageText = ok && data.success ? `${fileName}` : `${fileName}: ${data.message || 'Unknown error'}`;
-
-                            // Append status message instead of replacing
-                            const statusHTML = `<p class="small ${messageClass} mb-1">${statusPrefix} ${i + 1} of ${filesToUpload.length} - ${messageText}</p>`;
-                            batchStatus.insertAdjacentHTML('beforeend', statusHTML);
-                            // Scroll to the bottom of the status div
-                            batchStatus.scrollTop = batchStatus.scrollHeight;
-
-                            // Update modal progress text
-                            if (modalProgressText) {
-                                modalProgressText.textContent = `Uploaded ${i + 1} of ${filesToUpload.length} - ${file.name}`;
-                            }
-
-                            if (ok && data.success) {
-                                successCount++;
-                                // Dispatch file-uploaded event to trigger upload status tracker
-                                // Backend returns task_id in files array: data.files[0].task_id
-                                const taskId = data.task_id || (data.files && data.files[0] && data.files[0].task_id);
-                                if (taskId && taskId !== 'processing_disabled') {
-                                    console.log('[BatchUpload] Dispatching file-uploaded event for task:', taskId, 'file:', fileName);
-                                    document.dispatchEvent(new CustomEvent('file-uploaded', {
-                                        detail: { task_id: taskId, filename: fileName }
-                                    }));
-                                }
-                            } else {
-                                errorCount++;
-                            }
-                        })
-                        .catch(error => {
-                            errorCount++;
-                            console.error(`Error uploading file ${file.name}:`, error);
-                            // Append error status message
-                            const errorHTML = `<p class="small text-danger mb-1">error ${i + 1} of ${filesToUpload.length} - ${file.name}: ${error.message}</p>`;
-                            batchStatus.insertAdjacentHTML('beforeend', errorHTML);
-                            // Scroll to the bottom of the status div
-                            batchStatus.scrollTop = batchStatus.scrollHeight;
-
-                            // Update modal progress text on error
-                            if (modalProgressText) {
-                                modalProgressText.textContent = `Error uploading ${file.name}`;
-                            }
-                        });
-                    uploadPromises.push(uploadPromise);
+                    showDuplicateConfirmation(duplicates, () => {
+                        // User confirmed - proceed with upload
+                        performBatchUpload(filesToUpload, libraryId, libraryName, knowledgeIdValue);
+                    });
+                    return;
                 }
 
-                // Wait for all uploads to settle
-                await Promise.allSettled(uploadPromises);
-
-                // Final status update - Append summary message
-                if (progressBarInnerBatch) { // Update progress bar on completion
-                    progressBarInnerBatch.style.width = '100%';
-                    console.log('[Batch Upload] Progress bar complete.');
-                    progressBarInnerBatch.textContent = 'Complete';
-                    progressBarInnerBatch.classList.add(errorCount > 0 ? 'bg-warning' : 'bg-success'); // Indicate success/partial success
-                }
-                // Append final summary
-                const summaryHTML = `<p class="small text-body-secondary mt-2"><strong>Batch complete. Success: ${successCount}, Errors: ${errorCount}.</strong></p>`;
-                batchStatus.insertAdjacentHTML('beforeend', summaryHTML);
-                batchStatus.scrollTop = batchStatus.scrollHeight; // Scroll to bottom
-
-                // Hide progress bar after a short delay (e.g., 2 seconds)
-                setTimeout(() => {
-                    console.log('[Batch Upload] Hiding progress bar.');
-                    batchProgressBar.style.display = 'none';
-                }, 2000);
-
-                isBatchUploading = false;
-                uploadBatchBtn.innerHTML = 'Upload Batch to Library';
-                // Reset our array, the input, and the display
-                batchFilesArray = [];
-                batchFileInput.value = ''; // Clear file input
-                renderBatchFileList(); // Clear file list display via render
-                // librarySelectBatch.value = ''; // DO NOT Reset library selection
-                checkBatchFormState(); // Ensure button is disabled after completion
+                // No duplicates - proceed with upload
+                performBatchUpload(filesToUpload, libraryId, libraryName, knowledgeIdValue);
             });
-        } // End listener attachment check
+        }
+
+        // Extracted batch upload function for reuse after confirmation
+        async function performBatchUpload(filesToUpload, libraryId, libraryName, knowledgeIdValue) {
+            isBatchUploading = true;
+            uploadBatchBtn.disabled = true;
+            uploadBatchBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading ${filesToUpload.length} files...`; // Use array length
+            batchStatus.innerHTML = ''; // Clear previous status
+            batchStatus.classList.remove('d-none'); // Show status container
+            batchProgressBar.style.display = 'block'; // Show progress bar
+            console.log('[Batch Upload] batchProgressBar found:', !!batchProgressBar);
+            // --- Initialize Progress Bar ---
+            const progressBarInnerBatch = batchProgressBar.querySelector('.progress-bar');
+            if (progressBarInnerBatch) {
+                progressBarInnerBatch.style.width = '0%';
+                progressBarInnerBatch.setAttribute('aria-valuenow', '0');
+                progressBarInnerBatch.textContent = 'Starting...';
+                console.log('[Batch Upload] Progress bar initialized and shown.');
+                progressBarInnerBatch.classList.remove('bg-success', 'bg-warning', 'bg-danger'); // Ensure default color
+            }
+            // --- End Initialize ---
+
+            const uploadPromises = [];
+            let successCount = 0;
+            let errorCount = 0;
+
+            // Get reference to the checkbox BEFORE the loop
+            const groundingCheckbox = document.getElementById('enableVisualGroundingBatch');
+
+            // Iterate over our managed array
+            for (let i = 0; i < filesToUpload.length; i++) {
+                const file = filesToUpload[i]; // Get file from our array
+
+                // --- Update Progress Bar ---
+                const percent = Math.round(((i + 1) / filesToUpload.length) * 100);
+                if (progressBarInnerBatch) {
+                    console.log(`[Batch Upload] Updating progress for File ${i + 1}: ${percent}% - ${file.name}`);
+                    progressBarInnerBatch.style.width = percent + '%';
+                    progressBarInnerBatch.setAttribute('aria-valuenow', percent);
+                    progressBarInnerBatch.textContent = `Processing ${i + 1} of ${filesToUpload.length}: ${file.name}`;
+                }
+                // --- End Progress Update ---
+
+                // --- Create FormData for EACH file ---
+                const fileFormData = new FormData();
+                fileFormData.append('library_id', libraryId);
+                fileFormData.append('library_name', libraryName);
+                fileFormData.append('file', file, file.name); // Add the current file
+                // Append knowledge_id from hidden input
+                if (knowledgeIdValue) {
+                    fileFormData.append('knowledge_id', knowledgeIdValue);
+                }
+
+
+                // --- Manually add checkbox state if checked ---
+
+                if (groundingCheckbox && groundingCheckbox.checked) {
+                    // Backend checks for key presence, value doesn't strictly matter but 'true' is clear
+                    fileFormData.append('enable_visual_grounding', 'true');
+                }
+                // --- End manual checkbox check ---
+
+                //   const headers = {};
+                //   if (csrfToken) {
+                //       headers['X-CSRFToken'] = csrfToken;
+                //   }
+
+                // Get CSRF token from meta tag or use the global function if available
+                const csrfToken = window.readCurrentCsrfToken
+                    ? window.readCurrentCsrfToken()
+                    : document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+                const headers = {
+                    // FormData sets Content-Type automatically
+                    'X-CSRFToken': csrfToken
+                };
+
+                // Create a promise for each file upload using the specific file's FormData
+                //const uploadPromise = fetch('/upload', { // Reusing the single upload endpoint
+                const uploadPromise = fetch('/upload', { // Reusing the single upload endpoint
+                    method: 'POST',
+                    body: fileFormData, // Send the FormData specific to this file
+                    headers: headers
+                })
+                    .then(response => response.json().then(data => ({ ok: response.ok, data: data, fileName: file.name }))) // Pass filename along
+                    .then(({ ok, data, fileName }) => { // Receive fileName here
+                        // Use text-body-secondary for success (brighter than muted), text-danger for errors
+                        const messageClass = ok && data.success ? 'text-body-secondary' : 'text-danger';
+                        const statusPrefix = ok && data.success ? 'uploaded' : 'error';
+                        // Ensure filename is used correctly in messageText
+                        const messageText = ok && data.success ? `${fileName}` : `${fileName}: ${data.message || 'Unknown error'}`;
+
+                        // Append status message instead of replacing
+                        const statusHTML = `<p class="small ${messageClass} mb-1">${statusPrefix} ${i + 1} of ${filesToUpload.length} - ${messageText}</p>`;
+                        batchStatus.insertAdjacentHTML('beforeend', statusHTML);
+                        // Scroll to the bottom of the status div
+                        batchStatus.scrollTop = batchStatus.scrollHeight;
+
+                        // Update modal progress text
+                        if (modalProgressText) {
+                            modalProgressText.textContent = `Uploaded ${i + 1} of ${filesToUpload.length} - ${file.name}`;
+                        }
+
+                        if (ok && data.success) {
+                            successCount++;
+                            // Dispatch file-uploaded event to trigger upload status tracker
+                            // Backend returns task_id in files array: data.files[0].task_id
+                            const taskId = data.task_id || (data.files && data.files[0] && data.files[0].task_id);
+                            if (taskId && taskId !== 'processing_disabled') {
+                                console.log('[BatchUpload] Dispatching file-uploaded event for task:', taskId, 'file:', fileName);
+                                document.dispatchEvent(new CustomEvent('file-uploaded', {
+                                    detail: { task_id: taskId, filename: fileName }
+                                }));
+                            }
+                        } else {
+                            errorCount++;
+                        }
+                    })
+                    .catch(error => {
+                        errorCount++;
+                        console.error(`Error uploading file ${file.name}:`, error);
+                        // Append error status message
+                        const errorHTML = `<p class="small text-danger mb-1">error ${i + 1} of ${filesToUpload.length} - ${file.name}: ${error.message}</p>`;
+                        batchStatus.insertAdjacentHTML('beforeend', errorHTML);
+                        // Scroll to the bottom of the status div
+                        batchStatus.scrollTop = batchStatus.scrollHeight;
+
+                        // Update modal progress text on error
+                        if (modalProgressText) {
+                            modalProgressText.textContent = `Error uploading ${file.name}`;
+                        }
+                    });
+                uploadPromises.push(uploadPromise);
+            }
+
+            // Wait for all uploads to settle
+            await Promise.allSettled(uploadPromises);
+
+            // Final status update - Append summary message
+            if (progressBarInnerBatch) { // Update progress bar on completion
+                progressBarInnerBatch.style.width = '100%';
+                console.log('[Batch Upload] Progress bar complete.');
+                progressBarInnerBatch.textContent = 'Complete';
+                progressBarInnerBatch.classList.add(errorCount > 0 ? 'bg-warning' : 'bg-success'); // Indicate success/partial success
+            }
+            // Append final summary
+            const summaryHTML = `<p class="small text-body-secondary mt-2"><strong>Batch complete. Success: ${successCount}, Errors: ${errorCount}.</strong></p>`;
+            batchStatus.insertAdjacentHTML('beforeend', summaryHTML);
+            batchStatus.scrollTop = batchStatus.scrollHeight; // Scroll to bottom
+
+            // Hide progress bar after a short delay (e.g., 2 seconds)
+            setTimeout(() => {
+                console.log('[Batch Upload] Hiding progress bar.');
+                batchProgressBar.style.display = 'none';
+            }, 2000);
+
+            isBatchUploading = false;
+            uploadBatchBtn.innerHTML = 'Upload Batch to Library';
+            // Reset our array, the input, and the display
+            batchFilesArray = [];
+            batchFileInput.value = ''; // Clear file input
+            renderBatchFileList(); // Clear file list display via render
+            // librarySelectBatch.value = ''; // DO NOT Reset library selection
+            checkBatchFormState(); // Ensure button is disabled after completion
+        } // End performBatchUpload function
+
         checkBatchFormState('initial');
     } // End Batch Upload Logic
 
