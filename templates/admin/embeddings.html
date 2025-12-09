@@ -68,9 +68,7 @@
 {% endblock %}
 
 {% block admin_scripts %}
-<script type="module">
-    import { fetchWithCsrfRetry } from "{{ url_for('static', filename='js/csrf-utils.js') }}";
-
+<script>
     document.getElementById('embedding-model-form').addEventListener('submit', function (e) {
         e.preventDefault();
 

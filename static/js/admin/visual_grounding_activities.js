@@ -1,4 +1,4 @@
-import { fetchWithCsrfRetry } from '../csrf-utils.js';
+// fetchWithCsrfRetry is available globally from csrf-utils.js loaded in base.html
 
 document.addEventListener('DOMContentLoaded', function () {
     const activitiesTable = document.getElementById('visualGroundingActivitiesTable');
