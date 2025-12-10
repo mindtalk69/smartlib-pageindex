@@ -1,5 +1,77 @@
 # SmartLib Dev Progress Log
 
+## 2025-12-10 – Azure Files Upload Sync Fix
+
+### Summary
+Fixed file upload failures on Azure where worker couldn't find uploaded files due to SMB mount propagation delays.
+
+### Root Cause
+Azure Files is an SMB-based shared filesystem. When the web container saves a file:
+1. The write goes to local buffer/cache first
+2. Without explicit flush, data may not propagate to other containers immediately
+3. Worker container sees stale cache and fails with "No such file or directory"
+
+### Fix Applied
+- **Added `os.fsync()` after file saves**: Forces immediate flush to Azure Files SMB share before dispatching Celery task
+- **Applied to both upload flows**:
+  - `/upload` endpoint (batch file uploads)
+  - `/process_url` endpoint (URL downloads)
+- **Added file verification**: Confirms file exists with size logging after save+sync
+- **Improved error handling**: Returns clear error if file save fails verification
+
+### Files Modified
+- `modules/upload.py` – Added fsync and verification for both file upload and URL download flows
+
+### Technical Details
+```python
+# After file.save()
+with open(str(temp_file_path), 'rb') as f:
+    os.fsync(f.fileno())
+    
+# For URL downloads (within write context)
+temp_file.flush()
+os.fsync(temp_file.fileno())
+```
+
+### Verification
+- Deploy updated code to Azure Web App
+- Upload test file and monitor worker logs
+- Verify no "No such file or directory" errors
+
+### Worker Heartbeat Task Registration Fix
+- **Issue**: `[WakeWorker] Failed to wake worker (NotRegistered): 'celery_app.worker_heartbeat'`
+- **Root Cause**: The `worker_heartbeat` task was defined AFTER the task registration logging in `celery_app.py`, causing Celery not to include it in task discovery
+- **Fix**: Moved `worker_heartbeat` task definition to appear BEFORE the task registry logging so it's properly registered
+- **File Modified**: `celery_app.py` – Reorganized task definition order
+
+### Case-Insensitive Query Enhancement
+- **Issue**: Lowercase queries like "byd" failed to match documents containing "BYD"
+- **Root Cause**: Embedding models don't perfectly handle case variations for short queries
+- **Fix**: Added query enhancement in `perform_retrieval()` that automatically includes uppercase variants for short queries (1-2 words)
+- **Example**: Query "byd forklift" becomes "byd BYD forklift FORKLIFT"
+- **File Modified**: `modules/agent.py` – Added case enhancement logic before embedding
+
+### Files Modified Summary
+| File | Change |
+|------|--------|
+| `modules/upload.py` | fsync + verification for Azure Files |
+| `celery_app.py` | Heartbeat task registration order |
+| `modules/agent.py` | Case-insensitive query + Celery deadlock fix |
+| `app.py` | Smart embedding warmup (skip local models on web) |
+
+### Smart Embedding Warmup Fix
+- **Issue**: Web container crashed on startup when using local HuggingFace models (e.g., BAAI/bge-m3) because `langchain-huggingface` is only installed on worker
+- **Fix**: Added check in `app.py` to skip embedding warmup for local models on web container
+- **Log output**: `Embedding warmup skipped: model 'BAAI/bge-m3' requires langchain-huggingface (not installed in this container).`
+
+### Celery Subtask Deadlock Fix
+- **Issue**: When streaming task on worker tried to offload retrieval to another worker task, it called `.get()` which Celery prohibits
+- **Error**: `Never call result.get() within a task!`
+- **Fix**: Added `current_task.request.id` check in `retrieve_context_tool` to detect if already inside a Celery task and skip offloading
+- **File Modified**: `modules/agent.py`
+
+---
+
 ## 2025-12-09 – Azure Files Sync Improvements
 
 ### Summary

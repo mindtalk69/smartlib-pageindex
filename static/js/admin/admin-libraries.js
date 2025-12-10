@@ -57,16 +57,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const knowledgeNamesSource = raw.knowledge_names ?? raw.knowledgeNames ?? raw.knowledges ?? [];
         const knowledgeNames = Array.isArray(knowledgeNamesSource)
             ? knowledgeNamesSource
-                  .map((entry) => {
-                      if (typeof entry === 'string') {
-                          return entry;
-                      }
-                      if (entry && typeof entry === 'object' && 'name' in entry) {
-                          return entry.name;
-                      }
-                      return null;
-                  })
-                  .filter(Boolean)
+                .map((entry) => {
+                    if (typeof entry === 'string') {
+                        return entry;
+                    }
+                    if (entry && typeof entry === 'object' && 'name' in entry) {
+                        return entry.name;
+                    }
+                    return null;
+                })
+                .filter(Boolean)
             : [];
 
         return {
@@ -352,9 +352,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (response.ok && result.status === 'success') {
                 libraryModal.hide();
+                // Ensure modal backdrop is fully removed
+                setTimeout(() => {
+                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.overflow = '';
+                    document.body.style.paddingRight = '';
+                }, 150);
                 alert(
                     result.message ||
-                        `Library ${currentEditId ? 'updated' : 'added'} successfully.`,
+                    `Library ${currentEditId ? 'updated' : 'added'} successfully.`,
                 );
                 const returnedLibrary = result.library;
                 if (returnedLibrary) {
@@ -376,7 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 throw new Error(
                     result.message ||
-                        `Failed to ${currentEditId ? 'update' : 'add'} library.`,
+                    `Failed to ${currentEditId ? 'update' : 'add'} library.`,
                 );
             }
         } catch (error) {

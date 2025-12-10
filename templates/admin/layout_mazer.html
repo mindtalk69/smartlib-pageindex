@@ -165,11 +165,9 @@
                                 class="submenu-item {% if request.endpoint == 'admin.vector_store_settings' %}active{% endif %}">
                                 <a href="{{ url_for('admin.vector_store_settings') }}">Vector Settings</a>
                             </li>
-                            {% if config.get('ENABLE_OCR') %}
                             <li class="submenu-item {% if request.endpoint == 'admin.ocr_settings' %}active{% endif %}">
                                 <a href="{{ url_for('admin.ocr_settings') }}">OCR Settings</a>
                             </li>
-                            {% endif %}
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin_visual_grounding.visual_grounding_activities' %}active{% endif %}">
                                 <a href="{{ url_for('admin_visual_grounding.visual_grounding_activities') }}">Visual

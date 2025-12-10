@@ -533,6 +533,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (response.ok && result.status === 'success') {
                 knowledgeModal.hide();
+                // Ensure modal backdrop is fully removed
+                setTimeout(() => {
+                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.overflow = '';
+                    document.body.style.paddingRight = '';
+                }, 150);
                 showFeedback(result.message || `Knowledge ${currentEditId ? 'updated' : 'added'} successfully.`);
                 const returnedKnowledge = result.knowledge;
                 if (returnedKnowledge) {

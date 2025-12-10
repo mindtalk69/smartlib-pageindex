@@ -463,6 +463,24 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
     start_time = time.perf_counter()
     retrieval_mode = "unknown"
 
+    # --- Case-Insensitive Query Enhancement ---
+    # Short queries (1-2 words) with lowercase letters get enhanced with uppercase variants
+    # This helps embeddings match "byd" with "BYD" in documents
+    original_query = query
+    query_words = query.split()
+    if len(query_words) <= 2:
+        enhanced_words = []
+        for word in query_words:
+            enhanced_words.append(word)
+            # Add uppercase variant if different from original
+            if word != word.upper() and word.upper() not in enhanced_words:
+                enhanced_words.append(word.upper())
+        enhanced_query = " ".join(enhanced_words)
+        if enhanced_query != query:
+            logging.info(f"[RAG] Enhanced short query for case-insensitivity: '{query}' → '{enhanced_query}'")
+            query = enhanced_query
+    # --- End Query Enhancement ---
+
     vector_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb')
     app_default_vector_store_mode = current_app.config.get('VECTOR_STORE_MODE', 'user')
 
@@ -828,28 +846,44 @@ def retrieve_context_tool(query: str, config: dict = None) -> Dict[str, Any]:
     current_model = get_current_embedding_model()
     logging.info("Current embedding model resolved to %s", current_model)
 
+    # For local embedding models, we need to decide whether to offload to worker or call directly
+    # The key insight: if langchain_huggingface is importable, we're on the worker container
+    # and can call perform_retrieval directly. If not, we need to offload.
     if requires_local_embedding(current_model) and not tool_call_config.get("_offloaded_to_worker"):
-        logging.info("Offloading retrieval to worker because %s requires local embeddings", current_model)
-        from celery_app import celery
-
-        offloaded_config = dict(tool_call_config)
-        offloaded_config["_offloaded_to_worker"] = True
-        timeout_seconds = current_app.config.get("RETRIEVAL_OFFLOAD_TIMEOUT", 180)
+        # Check if we have the HuggingFace libraries (only installed on worker)
+        huggingface_available = False
         try:
-            async_result = celery.send_task(
-                "modules.vector_tasks.retrieve_context",
-                args=[query, offloaded_config],
-            )
-            result = async_result.get(timeout=timeout_seconds)
-            logging.info("Worker retrieval completed successfully via Celery")
-            return _rehydrate_documents(result)
-        except Exception as exc:  # pragma: no cover - network/worker issues
-            logging.error("Worker retrieval failed: %s", exc, exc_info=True)
-            return {
-                "documents": [],
-                "structured_query": "Error: worker retrieval failed",
-                "error": str(exc),
-            }
+            import langchain_huggingface  # noqa: F401
+            huggingface_available = True
+        except ImportError:
+            huggingface_available = False
+
+        if huggingface_available:
+            # We have the library, so we're on worker - call directly (avoids .get() deadlock)
+            logging.info("Local embedding library available, calling perform_retrieval directly")
+        else:
+            # We don't have the library, so we're on web - offload to worker
+            logging.info("Offloading retrieval to worker because %s requires local embeddings", current_model)
+            from celery_app import celery
+
+            offloaded_config = dict(tool_call_config)
+            offloaded_config["_offloaded_to_worker"] = True
+            timeout_seconds = current_app.config.get("RETRIEVAL_OFFLOAD_TIMEOUT", 180)
+            try:
+                async_result = celery.send_task(
+                    "modules.vector_tasks.retrieve_context",
+                    args=[query, offloaded_config],
+                )
+                result = async_result.get(timeout=timeout_seconds)
+                logging.info("Worker retrieval completed successfully via Celery")
+                return _rehydrate_documents(result)
+            except Exception as exc:  # pragma: no cover - network/worker issues
+                logging.error("Worker retrieval failed: %s", exc, exc_info=True)
+                return {
+                    "documents": [],
+                    "structured_query": "Error: worker retrieval failed",
+                    "error": str(exc),
+                }
 
     return perform_retrieval(query, tool_call_config)
 

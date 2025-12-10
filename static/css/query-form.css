@@ -18,7 +18,7 @@
   max-width: 863px;
   /* Increased from 750px */
   z-index: 1050;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: none;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   min-height: 80px;
@@ -263,9 +263,6 @@
 }
 
 /* Plus Button */
-.input-group .dropup {
-  /* Reverted negative margin */
-}
 
 #add-context-btn {
   width: 48px;

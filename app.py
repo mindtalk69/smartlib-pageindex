@@ -629,9 +629,25 @@ def create_app():
 
     if app.config.get('EMBEDDING_WARMUP_ENABLED', False):
         try:
-            from modules.llm_utils import warmup_embedding_model
+            from modules.llm_utils import warmup_embedding_model, get_embedding_model_name, requires_local_embedding
             with app.app_context():
-                warmup_embedding_model(sample_text=app.config.get('EMBEDDING_WARMUP_TEXT'))
+                current_embedding_model = get_embedding_model_name()
+                # For local HuggingFace models, check if the required library is installed
+                # This allows warmup on worker (has libs) but skips on web (no libs)
+                if requires_local_embedding(current_embedding_model):
+                    try:
+                        import langchain_huggingface  # noqa: F401
+                        # Library available, proceed with warmup (we're likely on worker)
+                        warmup_embedding_model(sample_text=app.config.get('EMBEDDING_WARMUP_TEXT'))
+                    except ImportError:
+                        # Library not available, skip warmup (we're likely on web container)
+                        app.logger.info(
+                            "Embedding warmup skipped: model '%s' requires langchain-huggingface (not installed in this container).",
+                            current_embedding_model,
+                        )
+                else:
+                    # Azure/cloud model, can warm up in any container
+                    warmup_embedding_model(sample_text=app.config.get('EMBEDDING_WARMUP_TEXT'))
         except Exception as warmup_exc:
             app.logger.warning("Embedding warmup encountered an issue: %s", warmup_exc, exc_info=True)
 

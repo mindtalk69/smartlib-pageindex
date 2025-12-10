@@ -18,14 +18,7 @@ celery = Celery(
 
 logger = logging.getLogger(__name__)
 
-# Log build version at startup
-try:
-    from config import Config
-    logger.info("=" * 60)
-    logger.info(f"SmartLib Worker Build: v{Config.BUILD_VERSION} ({Config.BUILD_DATE})")
-    logger.info("=" * 60)
-except ImportError:
-    logger.warning("Could not load build version from config")
+# Build version is logged after is_celery_worker check to show correct container type
 
 TASK_MODULES = [
     'modules.admin_folder_upload',
@@ -89,9 +82,28 @@ is_celery_worker = (
 )
 
 if is_celery_worker:
+    # Log version banner for WORKER container
+    try:
+        from config import Config
+        logger.info("=" * 60)
+        logger.info(f"SmartLib WORKER Build: v{Config.BUILD_VERSION} ({Config.BUILD_DATE})")
+        logger.info("=" * 60)
+    except ImportError:
+        pass
     logger.info("Detected Celery worker context, registering task modules...")
     _register_task_modules()
-    
+
+# Worker keep-alive heartbeat to prevent Azure App Service cold starts
+# Runs every 5 minutes to ensure worker stays warm
+# NOTE: Defined BEFORE task registry logging so it appears in the list
+@celery.task(name="celery_app.worker_heartbeat")
+def worker_heartbeat():
+    """Simple heartbeat task to keep worker warm and prevent cold starts."""
+    import datetime
+    logger.info(f"[Heartbeat] Worker is alive at {datetime.datetime.utcnow().isoformat()}")
+    return {"status": "alive", "timestamp": datetime.datetime.utcnow().isoformat()}
+
+if is_celery_worker:
     # Log all registered tasks at startup for debugging
     logger.info("=== Registered Celery Tasks ===")
     for task_name in sorted(celery.tasks.keys()):
@@ -99,6 +111,14 @@ if is_celery_worker:
             logger.info("  - %s", task_name)
     logger.info("=== End Registered Tasks ===")
 else:
+    # Log version banner for WEB container
+    try:
+        from config import Config
+        logger.info("=" * 60)
+        logger.info(f"SmartLib WEB Build: v{Config.BUILD_VERSION} ({Config.BUILD_DATE})")
+        logger.info("=" * 60)
+    except ImportError:
+        pass
     logger.info("Not in Celery worker context, skipping heavy task module imports")
 
 # Production-recommended Celery configuration
@@ -155,14 +175,6 @@ if message_cleanup_interval > 0:
     })
     celery.conf.beat_schedule = beat_schedule
 
-# Worker keep-alive heartbeat to prevent Azure App Service cold starts
-# Runs every 5 minutes to ensure worker stays warm
-@celery.task(name="celery_app.worker_heartbeat")
-def worker_heartbeat():
-    """Simple heartbeat task to keep worker warm and prevent cold starts."""
-    import datetime
-    logger.info(f"[Heartbeat] Worker is alive at {datetime.datetime.utcnow().isoformat()}")
-    return {"status": "alive", "timestamp": datetime.datetime.utcnow().isoformat()}
 
 # Enable heartbeat by default, can be disabled with WORKER_HEARTBEAT_ENABLED=false
 heartbeat_enabled = os.environ.get('WORKER_HEARTBEAT_ENABLED', 'true').lower() == 'true'

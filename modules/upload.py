@@ -218,6 +218,25 @@ def init_upload(app):
                 temp_dir.mkdir(parents=True, exist_ok=True)
                 temp_file_path = temp_dir / filename
                 file.save(str(temp_file_path))
+                
+                # Force sync to disk for Azure Files consistency
+                # Azure Files is an SMB mount that has propagation delays between containers.
+                # Without explicit fsync, the worker may not see the file immediately.
+                try:
+                    with open(str(temp_file_path), 'rb') as f:
+                        os.fsync(f.fileno())
+                    logger.debug(f"File synced to disk: {temp_file_path}")
+                except OSError as sync_err:
+                    logger.warning(f"fsync failed for {temp_file_path}: {sync_err}")
+                
+                # Verify file exists after save+sync
+                if not temp_file_path.exists():
+                    logger.error(f"File not found after save+sync: {temp_file_path}")
+                    return jsonify({'success': False, 'message': f'File save failed for {filename}'}), 500
+                
+                file_size = temp_file_path.stat().st_size
+                logger.info(f"File saved successfully: {temp_file_path} ({file_size} bytes)")
+
 
                 # NOTE: Don't call add_uploaded_file() here!
                 # The Celery worker (process_uploaded_file) creates the DB record
@@ -249,13 +268,27 @@ def init_upload(app):
                     # Register task in Redis for status tracking
                     try:
                         import redis
+                        import json
+                        from datetime import datetime, timezone
                         broker_url = os.environ.get('CELERY_BROKER_URL')
                         if broker_url:
                             redis_client = redis.from_url(broker_url)
                             task_key = f"user:{current_user.user_id}:upload_tasks"
+                            task_meta_key = f"user:{current_user.user_id}:upload_task_meta"
+                            
+                            # Add task ID to the task list
                             redis_client.rpush(task_key, task_id)
                             redis_client.expire(task_key, 86400)  # 24 hours
-                            logger.debug(f"Registered task {task_id} for user {current_user.user_id}")
+                            
+                            # Store task metadata (filename, creation time) for status display
+                            task_meta = {
+                                'filename': filename,
+                                'created_at': datetime.now(timezone.utc).isoformat()
+                            }
+                            redis_client.hset(task_meta_key, task_id, json.dumps(task_meta))
+                            redis_client.expire(task_meta_key, 86400)  # 24 hours
+                            
+                            logger.debug(f"Registered task {task_id} for user {current_user.user_id} with filename {filename}")
                         else:
                             logger.warning("CELERY_BROKER_URL not set, skipping task registration")
                     except Exception as e:
@@ -476,6 +509,17 @@ def init_upload(app):
                 for chunk in download_response.iter_content(chunk_size=8192):
                     if chunk:
                         temp_file.write(chunk)
+                # Force sync to disk for Azure Files consistency
+                temp_file.flush()
+                os.fsync(temp_file.fileno())
+            
+            # Verify file exists and log size
+            if temp_file_path.exists():
+                file_size = temp_file_path.stat().st_size
+                logger.info(f"URL download saved successfully: {temp_file_path} ({file_size} bytes)")
+            else:
+                logger.error(f"URL download file not found after save+sync: {temp_file_path}")
+                return jsonify({'success': False, 'message': 'File save failed after download'}), 500
 
         except requests.RequestException as exc:
             if download_response is not None:
@@ -518,12 +562,26 @@ def init_upload(app):
                 if task_id:
                     try:
                         import redis
+                        import json
+                        from datetime import datetime, timezone
                         broker_url = os.environ.get('CELERY_BROKER_URL')
                         if broker_url:
                             redis_client = redis.from_url(broker_url)
                             task_key = f"user:{current_user.user_id}:upload_tasks"
+                            task_meta_key = f"user:{current_user.user_id}:upload_task_meta"
+                            
+                            # Add task ID to the task list
                             redis_client.rpush(task_key, task_id)
                             redis_client.expire(task_key, 86400)  # 24 hours
+                            
+                            # Store task metadata (filename/URL, creation time) for status display
+                            task_meta = {
+                                'filename': temp_file_path.name,
+                                'created_at': datetime.now(timezone.utc).isoformat()
+                            }
+                            redis_client.hset(task_meta_key, task_id, json.dumps(task_meta))
+                            redis_client.expire(task_meta_key, 86400)  # 24 hours
+                            
                             logger.debug(f"Registered URL download task {task_id} for user {current_user.user_id}")
                         else:
                             logger.warning("CELERY_BROKER_URL not set, skipping task registration")
@@ -596,6 +654,8 @@ def init_upload(app):
         from celery.result import AsyncResult
         from celery_app import celery
         import redis
+        from datetime import datetime, timezone
+        import json
 
         try:
             broker_url = os.environ.get('CELERY_BROKER_URL')
@@ -609,6 +669,7 @@ def init_upload(app):
 
         # Get task IDs from Redis for this user
         task_key = f"user:{current_user.user_id}:upload_tasks"
+        task_meta_key = f"user:{current_user.user_id}:upload_task_meta"
         try:
             task_ids = redis_client.lrange(task_key, 0, -1)
             logger.info(f"[UploadStatus] Found {len(task_ids)} task IDs in Redis for user {current_user.user_id}")
@@ -616,34 +677,80 @@ def init_upload(app):
             logger.error(f"Failed to get task list from Redis: {e}")
             return jsonify({'tasks': []})
 
+        # Get task metadata (creation times, filenames)
+        try:
+            task_meta_raw = redis_client.hgetall(task_meta_key)
+            task_meta = {}
+            for k, v in task_meta_raw.items():
+                key = k.decode('utf-8') if isinstance(k, bytes) else k
+                try:
+                    task_meta[key] = json.loads(v.decode('utf-8') if isinstance(v, bytes) else v)
+                except (json.JSONDecodeError, AttributeError):
+                    task_meta[key] = {}
+        except Exception as e:
+            logger.debug(f"No task metadata found: {e}")
+            task_meta = {}
+
         tasks = []
         tasks_to_remove = []
+        meta_to_remove = []
+        current_time = datetime.now(timezone.utc)
 
         for task_id in task_ids:
             task_id_str = task_id.decode('utf-8') if isinstance(task_id, bytes) else task_id
-            logger.info(f"[UploadStatus] Processing task_id: {task_id_str}")
+            logger.debug(f"[UploadStatus] Processing task_id: {task_id_str}")
 
             try:
                 result = AsyncResult(task_id_str, app=celery)
-                logger.info(f"[UploadStatus] Task {task_id_str} - State: {result.state}, Info: {result.info}, Info is None: {result.info is None}")
+                logger.debug(f"[UploadStatus] Task {task_id_str} - State: {result.state}, Info type: {type(result.info)}")
 
-                # Remove orphaned PENDING tasks (no worker processing)
+                # Get task metadata (contains filename and creation time)
+                meta = task_meta.get(task_id_str, {})
+                stored_filename = meta.get('filename', 'Unknown')
+                created_at_str = meta.get('created_at')
+                
+                # Parse creation time
+                task_age_seconds = 0
+                if created_at_str:
+                    try:
+                        created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+                        task_age_seconds = (current_time - created_at).total_seconds()
+                    except (ValueError, AttributeError):
+                        task_age_seconds = 0
+
+                # Check for orphaned PENDING tasks - only remove if older than 5 minutes
+                # This gives workers time to pick up new tasks in batch uploads
+                ORPHAN_GRACE_PERIOD_SECONDS = 300  # 5 minutes
                 if result.state == 'PENDING' and result.info is None:
-                    logger.warning(f"Removing orphaned PENDING task {task_id_str}")
-                    tasks_to_remove.append(task_id_str)
-                    continue  # Skip adding to tasks list
+                    if task_age_seconds > ORPHAN_GRACE_PERIOD_SECONDS:
+                        logger.warning(f"Removing orphaned PENDING task {task_id_str} (age: {task_age_seconds:.0f}s)")
+                        tasks_to_remove.append(task_id_str)
+                        meta_to_remove.append(task_id_str)
+                        continue  # Skip adding to tasks list
+                    else:
+                        # Task is new, keep it and show with stored filename
+                        logger.debug(f"[UploadStatus] Keeping new PENDING task {task_id_str} (age: {task_age_seconds:.0f}s)")
+                        tasks.append({
+                            'task_id': task_id_str,
+                            'status': 'PENDING',
+                            'filename': stored_filename,
+                            'info': {'stage': 'Queued'}
+                        })
+                        continue
 
                 # Build task info
                 task_info = {
                     'task_id': task_id_str,
                     'status': result.state,
-                    'filename': 'Unknown',
+                    'filename': stored_filename,  # Use stored filename as fallback
                     'info': {}
                 }
 
-                # Extract info from result
+                # Extract info from result (overrides stored filename if available)
                 if isinstance(result.info, dict):
-                    task_info['filename'] = result.info.get('filename', 'Unknown')
+                    result_filename = result.info.get('filename')
+                    if result_filename and result_filename != 'Unknown':
+                        task_info['filename'] = result_filename
                     task_info['info'] = {
                         'stage': result.info.get('stage'),
                         'progress': result.info.get('progress'),
@@ -656,24 +763,32 @@ def init_upload(app):
                 if result.state in ['SUCCESS', 'FAILURE']:
                     # Get result timestamp if available
                     if hasattr(result, 'date_done') and result.date_done:
-                        from datetime import datetime, timezone
-                        age = datetime.now(timezone.utc) - result.date_done
+                        age = current_time - result.date_done
                         if age.total_seconds() > 3600:  # 1 hour
                             tasks_to_remove.append(task_id_str)
+                            meta_to_remove.append(task_id_str)
 
             except Exception as e:
                 logger.error(f"Failed to get status for task {task_id_str}: {e}")
                 # Remove invalid task IDs
                 tasks_to_remove.append(task_id_str)
+                meta_to_remove.append(task_id_str)
 
         # Clean up old/invalid tasks
-        logger.info(f"[UploadStatus] Cleaning up {len(tasks_to_remove)} tasks from Redis")
-        for task_id_str in tasks_to_remove:
-            try:
-                redis_client.lrem(task_key, 0, task_id_str)
-                logger.info(f"[UploadStatus] Removed task {task_id_str} from Redis")
-            except Exception as e:
-                logger.error(f"Failed to remove task {task_id_str}: {e}")
+        if tasks_to_remove:
+            logger.info(f"[UploadStatus] Cleaning up {len(tasks_to_remove)} tasks from Redis")
+            for task_id_str in tasks_to_remove:
+                try:
+                    redis_client.lrem(task_key, 0, task_id_str)
+                except Exception as e:
+                    logger.error(f"Failed to remove task {task_id_str}: {e}")
+            
+            # Clean up metadata
+            for task_id_str in meta_to_remove:
+                try:
+                    redis_client.hdel(task_meta_key, task_id_str)
+                except Exception as e:
+                    logger.debug(f"Failed to remove task meta {task_id_str}: {e}")
 
         logger.info(f"[UploadStatus] Returning {len(tasks)} tasks to client")
         return jsonify({'tasks': tasks})
