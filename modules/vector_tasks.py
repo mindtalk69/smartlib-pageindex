@@ -221,8 +221,9 @@ def list_chroma_stores(base_path: Optional[str] = None) -> Dict[str, object]:
     try:
         import chromadb
     except ImportError as exc:
-        logger.error("ChromaDB is not installed in this environment: %s", exc)
-        raise
+        logger.warning("ChromaDB is not installed in this environment (Enterprise mode uses PGVector): %s", exc)
+        # Return empty result instead of raising - graceful degradation for Enterprise edition
+        return {"stores": [], "embedding": None, "base_path": None, "error": "ChromaDB not installed (Enterprise uses PGVector)"}
 
     from modules.llm_utils import get_current_embedding_model
     from modules.database import Knowledge
@@ -291,8 +292,8 @@ def delete_chroma_collection(persist_directory: str, collection_name: str) -> bo
     try:
         import chromadb
     except ImportError as exc:
-        logger.error("ChromaDB is not installed in this environment: %s", exc)
-        raise
+        logger.warning("ChromaDB is not installed in this environment (Enterprise mode uses PGVector): %s", exc)
+        return False
 
     try:
         # Use cached client for performance (25s → <1s)

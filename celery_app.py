@@ -86,7 +86,7 @@ if is_celery_worker:
     try:
         from config import Config
         logger.info("=" * 60)
-        logger.info(f"SmartLib WORKER Build: v{Config.BUILD_VERSION} ({Config.BUILD_DATE})")
+        logger.info(f"SmartLib WORKER Build: v{Config.APP_VERSION} ({Config.BUILD_DATE})")
         logger.info("=" * 60)
     except ImportError:
         pass
@@ -115,7 +115,7 @@ else:
     try:
         from config import Config
         logger.info("=" * 60)
-        logger.info(f"SmartLib WEB Build: v{Config.BUILD_VERSION} ({Config.BUILD_DATE})")
+        logger.info(f"SmartLib WEB Build: v{Config.APP_VERSION} ({Config.BUILD_DATE})")
         logger.info("=" * 60)
     except ImportError:
         pass

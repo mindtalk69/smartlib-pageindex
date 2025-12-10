@@ -777,7 +777,7 @@
   "outputs": {
     "webAppUrl": {
       "type": "string",
-      "value": "[concat('https://', variables('webAppName'), '.azurewebsites.net')]"
+      "value": "[uri(format('https://{0}.azurewebsites.net', variables('webAppName')), '')]"
     },
     "webAppName": {
       "type": "string",
@@ -793,7 +793,7 @@
     },
     "redirectUri": {
       "type": "string",
-      "value": "[concat('https://', variables('webAppName'), '.azurewebsites.net/login_azure')]",
+      "value": "[uri(format('https://{0}.azurewebsites.net', variables('webAppName')), 'login_azure')]",
       "metadata": {
         "description": "Add this URL to your Azure AD App Registration Redirect URIs"
       }

@@ -242,13 +242,15 @@ print(f"Waiting for PostgreSQL at {host}:{port}...")
 
 for i in range(30): # Wait up to 30 seconds
     try:
-        # Try to connect
+        # Try to connect (Azure PostgreSQL requires SSL)
+        ssl_mode = os.environ.get("POSTGRES_SSL_MODE", "require")
         conn = psycopg.connect(
             host=host,
             user=user,
             password=password,
             dbname=dbname,
             port=port,
+            sslmode=ssl_mode,
             connect_timeout=3
         )
         conn.close()
@@ -266,7 +268,9 @@ PY
              # This ensures migrations run against PostgreSQL, not SQLite
              if [ -n "${POSTGRES_HOST}" ] && [ -n "${POSTGRES_USER}" ] && [ -n "${POSTGRES_PASSWORD}" ] && [ -n "${POSTGRES_DATABASE}" ]; then
                  POSTGRES_SSL_MODE="${POSTGRES_SSL_MODE:-disable}"
-                 export SQLALCHEMY_DATABASE_URI="postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT:-5432}/${POSTGRES_DATABASE}?sslmode=${POSTGRES_SSL_MODE}"
+                 # URL-encode the password to handle special characters like @, :, /, etc.
+                 ENCODED_PASSWORD=$(python -c "import urllib.parse; print(urllib.parse.quote('${POSTGRES_PASSWORD}', safe=''))")
+                 export SQLALCHEMY_DATABASE_URI="postgresql+psycopg://${POSTGRES_USER}:${ENCODED_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT:-5432}/${POSTGRES_DATABASE}?sslmode=${POSTGRES_SSL_MODE}"
                  echo "INFO: Set SQLALCHEMY_DATABASE_URI for PostgreSQL (host: ${POSTGRES_HOST}, db: ${POSTGRES_DATABASE})"
              fi
         fi
@@ -368,6 +372,100 @@ elif [ "$1" = "worker" ]; then
     echo "Ensuring database schema is up to date before starting worker..."
     if command -v alembic &> /dev/null; then
         prepare_sqlite_db
+
+        # Check if we need to wait for PostgreSQL (Enterprise Edition)
+        if [ "${APP_EDITION}" = "ENT" ] || [[ "${SQLALCHEMY_DATABASE_URI}" == postgres* ]]; then
+             echo "PostgreSQL detected (Edition: ${APP_EDITION}). Waiting for database to be ready..."
+             
+             # Use a small python script to wait for DB connection
+             python <<'PY'
+import os
+import time
+import sys
+import psycopg
+from sqlalchemy.engine import make_url
+
+# Debug: Print env vars
+print(f"DEBUG: APP_EDITION={os.environ.get('APP_EDITION')}")
+print(f"DEBUG: POSTGRES_HOST={os.environ.get('POSTGRES_HOST')}")
+print(f"DEBUG: POSTGRES_PASSWORD set? {'Yes' if os.environ.get('POSTGRES_PASSWORD') else 'No'}")
+
+# Parse connection params from env vars (preferred for ENT) or URI
+host = os.environ.get("POSTGRES_HOST")
+user = os.environ.get("POSTGRES_USER")
+password = os.environ.get("POSTGRES_PASSWORD")
+dbname = os.environ.get("POSTGRES_DATABASE")
+port = os.environ.get("POSTGRES_PORT", "5432")
+
+# Fallback to parsing URI if individual vars aren't set
+uri = os.environ.get("SQLALCHEMY_DATABASE_URI", "")
+if not host and uri and uri.startswith("postgres"):
+    try:
+        url = make_url(uri)
+        host = url.host
+        port = url.port or 5432
+        user = url.username
+        password = url.password
+        dbname = url.database
+        print(f"DEBUG: Parsed host from URI: {host}")
+    except Exception as e:
+        print(f"Warning: Failed to parse SQLALCHEMY_DATABASE_URI: {e}")
+
+# Fallback defaults for Enterprise edition
+if os.environ.get("APP_EDITION") == "ENT":
+    if not host:
+        print("Warning: POSTGRES_HOST not set, defaulting to 'postgres'")
+        host = "postgres"
+    if not user:
+        print("Warning: POSTGRES_USER not set, defaulting to 'smartlib_admin'")
+        user = "smartlib_admin"
+    if not password:
+        print("Warning: POSTGRES_PASSWORD not set, defaulting to 'smartlib_dev_password'")
+        password = "smartlib_dev_password"
+    if not dbname:
+        print("Warning: POSTGRES_DATABASE not set, defaulting to 'smartlibdb'")
+        dbname = "smartlibdb"
+
+if not host:
+    print("Error: Could not determine PostgreSQL host from env vars or URI.")
+    pass
+
+print(f"Waiting for PostgreSQL at {host}:{port}...")
+
+for i in range(30): # Wait up to 30 seconds
+    try:
+        # Try to connect (Azure PostgreSQL requires SSL)
+        ssl_mode = os.environ.get("POSTGRES_SSL_MODE", "require")
+        conn = psycopg.connect(
+            host=host,
+            user=user,
+            password=password,
+            dbname=dbname,
+            port=port,
+            sslmode=ssl_mode,
+            connect_timeout=3
+        )
+        conn.close()
+        print("PostgreSQL is ready!")
+        sys.exit(0)
+    except Exception as e:
+        print(f"Waiting for DB... ({e})")
+        time.sleep(1)
+
+print("Error: Timed out waiting for PostgreSQL.")
+sys.exit(1)
+PY
+             
+             # Build and export SQLALCHEMY_DATABASE_URI for Alembic
+             if [ -n "${POSTGRES_HOST}" ] && [ -n "${POSTGRES_USER}" ] && [ -n "${POSTGRES_PASSWORD}" ] && [ -n "${POSTGRES_DATABASE}" ]; then
+                 POSTGRES_SSL_MODE="${POSTGRES_SSL_MODE:-disable}"
+                 # URL-encode the password to handle special characters like @, :, /, etc.
+                 ENCODED_PASSWORD=$(python -c "import urllib.parse; print(urllib.parse.quote('${POSTGRES_PASSWORD}', safe=''))")
+                 export SQLALCHEMY_DATABASE_URI="postgresql+psycopg://${POSTGRES_USER}:${ENCODED_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT:-5432}/${POSTGRES_DATABASE}?sslmode=${POSTGRES_SSL_MODE}"
+                 echo "INFO: Set SQLALCHEMY_DATABASE_URI for PostgreSQL (host: ${POSTGRES_HOST}, db: ${POSTGRES_DATABASE})"
+             fi
+        fi
+
         echo "Running alembic upgrade to ensure database is up to date..."
         alembic upgrade head
     else

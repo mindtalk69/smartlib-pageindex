@@ -799,8 +799,7 @@
               "password": "Container Registry Password",
               "confirmPassword": "Confirm password"
             },
-            "defaultValue": "2UmHhHHxyWxPqkfjpe6uTLW+Z0lglz77B7ZQv49KHb+ACRCq/n7M",
-            "toolTip": "Password for smartlibdev.azurecr.io (pre-filled). To get latest: az acr credential show --name smartlibdev",
+            "toolTip": "Password for smartlibdev.azurecr.io. To get: az acr credential show --name smartlibdev",
             "constraints": {
               "required": true
             },
@@ -813,7 +812,7 @@
             "type": "Microsoft.Common.InfoBox",
             "options": {
               "icon": "Info",
-              "text": "📦 Container Registry: smartlibdev.azurecr.io\n👤 Username: smartlibdev (auto-configured)\n🔑 Password: Pre-filled above\n\nThe password is already filled in. You can proceed with deployment or update it if needed."
+              "text": "📦 Container Registry: smartlibdev.azurecr.io\n👤 Username: smartlibdev (auto-configured)\n🔑 Password: Enter above\n\nTo get the password, run: az acr credential show --name smartlibdev"
             }
           },
           {

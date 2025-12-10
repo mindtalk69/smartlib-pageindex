@@ -24,7 +24,7 @@ else:
 class Config:
     """Base configuration."""
     # Internal build version - update this when deploying new builds
-    BUILD_VERSION = "1.1.23"
+    BUILD_VERSION = "1.1.30"
     BUILD_DATE = "2025-12-10"
     
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
@@ -92,7 +92,10 @@ class Config:
 
         if postgres_host and postgres_user and postgres_password and postgres_database:
             # Build connection string from components (supports Azure Key Vault password references)
-            SQLALCHEMY_DATABASE_URI = f"postgresql+psycopg://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_database}?sslmode={postgres_ssl_mode}"
+            # URL-encode the password to handle special characters like @, :, /, etc.
+            from urllib.parse import quote
+            encoded_password = quote(postgres_password, safe='')
+            SQLALCHEMY_DATABASE_URI = f"postgresql+psycopg://{postgres_user}:{encoded_password}@{postgres_host}:{postgres_port}/{postgres_database}?sslmode={postgres_ssl_mode}"
             print(f"DEBUG [config.py]: Built PostgreSQL connection string from components (host: {postgres_host}, db: {postgres_database})")
         else:
             # Fallback to SQLALCHEMY_DATABASE_URI environment variable (backward compatibility)
@@ -191,7 +194,8 @@ class Config:
     # Keep VECTOR_STORE_MODE for structuring local paths (ChromaDB)
     VECTOR_STORE_MODE = os.environ.get('VECTOR_STORE_MODE', 'knowledge').lower() # e.g., knowledge, user, global
     print(f"DEBUG [config.py]: Config.VECTOR_STORE_MODE set to: {VECTOR_STORE_MODE}")
-    APP_VERSION = os.environ.get('APP_VERSION') or BUILD_VERSION
+    # Build full version string with edition suffix (e.g., 1.1.26-ENT or 1.1.26-BASIC)
+    APP_VERSION = os.environ.get('APP_VERSION') or f"{BUILD_VERSION}-{APP_EDITION}"
 
     MAP_GENERATE_PNG = os.environ.get('MAP_GENERATE_PNG', 'false').lower() in ('true', '1', 'yes')
     try:

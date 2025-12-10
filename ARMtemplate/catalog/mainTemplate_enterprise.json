@@ -174,7 +174,7 @@
     },
     "appPrefix": {
       "type": "string",
-      "defaultValue": "smartlib-basic",
+      "defaultValue": "smartlib-ent",
       "minLength": 3,
       "maxLength": 40,
       "metadata": {
@@ -317,8 +317,9 @@
     },
     "postgresDatabaseName": {
       "type": "string",
+      "defaultValue": "smartlib",
       "metadata": {
-        "description": "Database name within the PostgreSQL server (must have pgvector extension enabled)"
+        "description": "Database name to create/use within the PostgreSQL server. Default: smartlib"
       }
     },
     "postgresAdminUser": {
@@ -339,6 +340,13 @@
       "defaultValue": "",
       "metadata": {
         "description": "Optional: Key Vault secret URI containing PostgreSQL password. Takes precedence over postgresAdminPassword."
+      }
+    },
+    "createPostgresDatabase": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "If true, creates the database and enables pgvector extension on the PostgreSQL server. Set to false if database already exists."
       }
     }
   },
@@ -394,6 +402,40 @@
       "kind": "linux",
       "properties": {
         "reserved": true
+      }
+    },
+    {
+      "condition": "[parameters('createPostgresDatabase')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2024-07-01",
+      "name": "postgresSetup",
+      "resourceGroup": "[parameters('postgresServerResourceGroup')]",
+      "properties": {
+        "mode": "Incremental",
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "resources": [
+            {
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/configurations",
+              "apiVersion": "2024-08-01",
+              "name": "[concat(parameters('postgresServerName'), '/azure.extensions')]",
+              "properties": {
+                "value": "VECTOR",
+                "source": "user-override"
+              }
+            },
+            {
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/databases",
+              "apiVersion": "2024-08-01",
+              "name": "[concat(parameters('postgresServerName'), '/', parameters('postgresDatabaseName'))]",
+              "properties": {
+                "charset": "UTF8",
+                "collation": "en_US.utf8"
+              }
+            }
+          ]
+        }
       }
     },
     {
@@ -909,7 +951,7 @@
   "outputs": {
     "webAppUrl": {
       "type": "string",
-      "value": "[concat('https://', variables('webAppName'), '.azurewebsites.net')]"
+      "value": "[uri(format('https://{0}.azurewebsites.net', variables('webAppName')), '')]"
     },
     "webAppName": {
       "type": "string",
@@ -925,7 +967,7 @@
     },
     "redirectUri": {
       "type": "string",
-      "value": "[concat('https://', variables('webAppName'), '.azurewebsites.net/login_azure')]",
+      "value": "[uri(format('https://{0}.azurewebsites.net', variables('webAppName')), 'login_azure')]",
       "metadata": {
         "description": "Add this URL to your Azure AD App Registration Redirect URIs"
       }
