@@ -24,7 +24,7 @@ else:
 class Config:
     """Base configuration."""
     # Internal build version - update this when deploying new builds
-    BUILD_VERSION = "1.1.41"
+    BUILD_VERSION = "1.1.44"
     BUILD_DATE = "2025-12-11"
     
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
@@ -189,7 +189,10 @@ class Config:
     # PGVector specific settings (keep these)
     # Use the same connection string as SQLALCHEMY_DATABASE_URI for pgvector, or allow override
     PGVECTOR_CONNECTION_STRING = os.environ.get('PGVECTOR_CONNECTION_STRING', SQLALCHEMY_DATABASE_URI)
-    PGVECTOR_COLLECTION_NAME = os.environ.get('PGVECTOR_COLLECTION_NAME', 'documents_vectors')
+    PGVECTOR_COLLECTION_NAME = os.environ.get('PGVECTOR_COLLECTION_NAME', 'documents_vectors')  # Deprecated, kept for compatibility
+    # New PGVectorStore settings (table-based API)
+    PGVECTOR_TABLE_NAME = os.environ.get('PGVECTOR_TABLE_NAME', 'document_vectors')
+    PGVECTOR_EMBEDDING_DIMENSION = int(os.environ.get('PGVECTOR_EMBEDDING_DIMENSION', '1536'))
 
     # Keep VECTOR_STORE_MODE for structuring local paths (ChromaDB)
     VECTOR_STORE_MODE = os.environ.get('VECTOR_STORE_MODE', 'knowledge').lower() # e.g., knowledge, user, global

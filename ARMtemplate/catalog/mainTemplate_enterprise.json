@@ -1000,6 +1000,18 @@
       "type": "string",
       "value": "[if(parameters('configureRedisFirewall'), concat('# Run this command for EACH IP address listed above:\naz redis firewall-rules create --resource-group ', parameters('redisResourceGroup'), ' --name ', parameters('redisName'), ' --rule-name AllowAppService-<IP> --start-ip <IP> --end-ip <IP>\n\n# Example:\n# az redis firewall-rules create --resource-group ', parameters('redisResourceGroup'), ' --name ', parameters('redisName'), ' --rule-name AllowWebApp-1 --start-ip 1.2.3.4 --end-ip 1.2.3.4'), 'Redis firewall not configured (configureRedisFirewall=false)')]"
     },
+    "step9_PostgreSQL_WebApp_IPs": {
+      "type": "string",
+      "value": "[concat('# Web App outbound IPs (add PostgreSQL firewall rules for each):\n# ', replace(reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2023-01-01').outboundIpAddresses, ',', '\n# '))]"
+    },
+    "step10_PostgreSQL_Worker_IPs": {
+      "type": "string",
+      "value": "[concat('# Worker App outbound IPs (add PostgreSQL firewall rules for each):\n# ', replace(reference(resourceId('Microsoft.Web/sites', variables('workerAppName')), '2023-01-01').outboundIpAddresses, ',', '\n# '))]"
+    },
+    "step11_PostgreSQL_Firewall_Command": {
+      "type": "string",
+      "value": "[concat('# CRITICAL: Add firewall rules for BOTH web and worker app IPs\n# Run this command for EACH IP address from steps 9 and 10:\naz postgres flexible-server firewall-rule create \\\n  --resource-group ', parameters('postgresServerResourceGroup'), ' \\\n  --name ', parameters('postgresServerName'), ' \\\n  --rule-name AllowAppService-<IP> \\\n  --start-ip-address <IP> \\\n  --end-ip-address <IP>\n\n# Example:\n# az postgres flexible-server firewall-rule create --resource-group myRG --name myserver --rule-name AllowWorkerApp-1 --start-ip-address 1.2.3.4 --end-ip-address 1.2.3.4')]"
+    },
     "deployedResourceGroup": {
       "type": "string",
       "value": "[parameters('resourceGroup')]"

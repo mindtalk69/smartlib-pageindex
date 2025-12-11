@@ -2,7 +2,7 @@ from flask import current_app
 import logging
 import os
 import re
-from langchain_postgres import PGVector
+# PGVectorStore utilities imported when needed (lazy import to avoid circular deps)
 
 from langchain_community.vectorstores.utils import filter_complex_metadata
 from modules.llm_utils import get_lc_store_path, get_embedding_function
@@ -18,58 +18,27 @@ try:
     from sqlalchemy.exc import OperationalError
     HAS_TENACITY = True
 except ImportError:
-    logger.warning("Tenacity or SQLAlchemy not found. Retry logic for PGVector will be disabled.")
+    logger.warning("Tenacity or SQLAlchemy not found. Retry logic for PGVectorStore will be disabled.")
     HAS_TENACITY = False
 
-def _init_pgvector_with_retry(embedding_function, documents, collection_name, connection_string, ids):
+
+def _add_documents_with_retry(store, documents, ids):
     """
-    Helper function to initialize PGVector with retry logic.
+    Helper function to add documents to PGVectorStore with retry logic.
     """
-    # Engine args for robust Azure PostgreSQL connections:
-    # - pool_pre_ping: Check connection validity before using (handles stale connections)
-    # - pool_recycle: Recycle connections after 30 minutes (handles Azure idle disconnects)
-    # - connect_args: Add connection timeout to prevent indefinite hangs
-    engine_args = {
-        "pool_pre_ping": True,
-        "pool_recycle": 1800,  # 30 minutes
-        "connect_args": {
-            "connect_timeout": 30,  # 30 second connection timeout
-        }
-    }
-    
     if HAS_TENACITY:
-        # Define the retry decorator dynamically to capture the logger
         @retry(
             stop=stop_after_attempt(5),
             wait=wait_exponential(multiplier=1, min=2, max=30),
             retry=retry_if_exception_type(OperationalError),
             reraise=True
         )
-        def _create_store():
-            logger.info(f"Attempting to connect to PGVector (Collection: {collection_name})...")
-            return PGVector.from_documents(
-                embedding=embedding_function,
-                documents=documents,
-                collection_name=collection_name,
-                connection=connection_string,
-                ids=ids,
-                use_jsonb=True,  # Store metadata as JSONB (supports all fields including docling_json_path)
-                engine_args=engine_args,  # Add connection pool settings for Azure
-                create_extension=False,  # Skip CREATE EXTENSION - already installed on Azure PostgreSQL
-            )
-        return _create_store()
+        def _add_with_retry():
+            logger.info(f"Attempting to add {len(documents)} documents to PGVectorStore...")
+            return store.add_documents(documents, ids=ids)
+        return _add_with_retry()
     else:
-        # Fallback without retry
-        return PGVector.from_documents(
-            embedding=embedding_function,
-            documents=documents,
-            collection_name=collection_name,
-            connection=connection_string,
-            ids=ids,
-            use_jsonb=True,  # Store metadata as JSONB (supports all fields including docling_json_path)
-            engine_args=engine_args,  # Add connection pool settings for Azure
-            create_extension=False,  # Skip CREATE EXTENSION - already installed on Azure PostgreSQL
-        )
+        return store.add_documents(documents, ids=ids)
 
 
 def log_vector_reference(file_id, url_download_id, chunk_index):
@@ -163,42 +132,30 @@ def process_and_store_chunks(splits, user_id, embedding_function, logger, file_i
 
             logger.info(f"Successfully logged {len(splits)} vector references")
 
-        # --- PGVector ---
+        # --- PGVectorStore (new langchain-postgres API) ---
         if vector_provider == 'pgvector':
             try:
-                connection_string = current_app.config.get('PGVECTOR_CONNECTION_STRING')
-                collection_name = current_app.config.get('PGVECTOR_COLLECTION_NAME')
-                if not connection_string:
-                    raise ValueError("PGVECTOR_CONNECTION_STRING is not configured.")
-                if not collection_name:
-                    raise ValueError("PGVECTOR_COLLECTION_NAME is not configured.")
-
-                logger.info(f"Initializing PGVector store instance. Collection: '{collection_name}'")
-
-                # Use helper with retry logic to create the collection and add documents
-                pgvector_store = _init_pgvector_with_retry(
-                    embedding_function=embedding_function,
+                from modules.pgvector_utils import get_pg_vector_store
+                
+                table_name = current_app.config.get('PGVECTOR_TABLE_NAME', 'document_vectors')
+                
+                logger.info(f"Initializing PGVectorStore instance. Table: '{table_name}'")
+                
+                # Get store instance (handles connection pooling and table init)
+                pgvector_store = get_pg_vector_store(embedding_function)
+                
+                # Add documents with retry logic
+                _add_documents_with_retry(
+                    store=pgvector_store,
                     documents=splits,
-                    collection_name=collection_name,
-                    connection_string=connection_string,
                     ids=new_uuid_indexes,
                 )
-                logger.info(f"PGVector instance created and documents added.")
-
-                logger.info(f"Successfully added {len(splits)} chunks to PGVector collection '{collection_name}'.")
-                # No explicit save needed for PGVector
-
-                return len(splits) # Return number of chunks processed
-            except TypeError as te:
-                # Catch potential TypeError from constructor if connection_string is STILL not accepted
-                if 'connection_string' in str(te):
-                    logger.error(f"PGVector constructor error: {te}. Check if 'PGVECTOR_CONNECTION_STRING' environment variable is set and if the library version expects it as an init argument.", exc_info=True)
-                    raise ValueError("PGVector initialization failed. Ensure connection string environment variable is set or library version is compatible.") from te
-                else:
-                    logger.error(f"TypeError during PGVector processing: {te}", exc_info=True)
-                    raise # Re-raise other TypeErrors
+                
+                logger.info(f"PGVectorStore: Successfully added {len(splits)} chunks to table '{table_name}'.")
+                
+                return len(splits)  # Return number of chunks processed
             except Exception as e:
-                logger.error(f"Error processing/storing chunks for PGVector: {e}", exc_info=True)
+                logger.error(f"Error processing/storing chunks for PGVectorStore: {e}", exc_info=True)
                 # Re-raise the exception so the calling function can handle rollback etc.
                 raise
 

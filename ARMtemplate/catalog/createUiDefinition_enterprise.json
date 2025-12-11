@@ -132,7 +132,7 @@
             "type": "Microsoft.Common.InfoBox",
             "options": {
               "icon": "Warning",
-              "text": "⚠️ CRITICAL PREREQUISITE\n\nYou MUST create PostgreSQL Flexible Server with pgvector extension BEFORE deploying SmartLib Enterprise.\n\n✅ Required Setup:\n1. Create PostgreSQL Flexible Server (version 15 or 16)\n2. Create a database for SmartLib\n3. Enable pgvector extension on the database\n4. Configure firewall to allow Azure services\n\nWithout pgvector extension, deployment will FAIL!",
+              "text": "⚠️ CRITICAL PREREQUISITE\n\nYou MUST create PostgreSQL Flexible Server with pgvector extension BEFORE deploying SmartLib Enterprise.\n\n✅ Required Setup:\n1. Create PostgreSQL Flexible Server (version 15 or 16)\n2. Create a database for SmartLib\n3. Enable pgvector extension on the database\n4. Configure firewall to allow Azure services\n5. ⚠️ CRITICAL: After deployment, add firewall rules for BOTH web and worker app outbound IPs (see deployment outputs step9-11)\n\nWithout pgvector extension, deployment will FAIL!\nWithout firewall rules for BOTH apps, worker cannot store documents to vector database!",
               "uri": "https://smartlib.id/enterprise-prerequisites"
             }
           },

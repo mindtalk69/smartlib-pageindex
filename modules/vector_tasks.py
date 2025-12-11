@@ -86,30 +86,20 @@ def fetch_document_chunks(persist_directory: str, collection_name: str, document
 
     logger.info(f"[FetchChunks] Using vector provider: {vector_provider}")
 
-    # === PGVector Backend ===
+    # === PGVectorStore Backend (new langchain-postgres API) ===
     if vector_provider == 'pgvector':
         try:
-            from langchain_postgres import PGVector
+            from modules.pgvector_utils import get_pg_vector_store
             from modules.llm_utils import get_embedding_function
         except ImportError as exc:
-            logger.error("PGVector dependencies not installed: %s", exc)
+            logger.error("PGVectorStore dependencies not installed: %s", exc)
             raise
 
         try:
-            connection_string = os.environ.get('PGVECTOR_CONNECTION_STRING')
-            if not connection_string:
-                logger.error("PGVECTOR_CONNECTION_STRING not set")
-                return {"documents": [], "metadatas": []}
-
             embed_func = get_embedding_function()
-
-            # Initialize PGVector store
-            store = PGVector(
-                connection=connection_string,
-                embeddings=embed_func,
-                collection_name=collection_name,
-                use_jsonb=True
-            )
+            
+            # Get store instance (handles connection pooling and table init)
+            store = get_pg_vector_store(embed_func)
 
             # Query by metadata filter
             # Try multiple field names in priority order
@@ -124,20 +114,20 @@ def fetch_document_chunks(persist_directory: str, collection_name: str, document
                         filter={field: document_id}
                     )
                     if results:
-                        logger.info(f"[PGVectorFetch] Found {len(results)} chunks using metadata field '{field}'")
+                        logger.info(f"[PGVectorStoreFetch] Found {len(results)} chunks using metadata field '{field}'")
                         break
                 except Exception as e:
-                    logger.debug(f"[PGVectorFetch] Failed to query with field '{field}': {e}")
+                    logger.debug(f"[PGVectorStoreFetch] Failed to query with field '{field}': {e}")
                     continue
 
             documents = [doc.page_content for doc in results]
             metadatas = [doc.metadata for doc in results]
 
-            logger.info(f"[PGVectorFetch] Retrieved {len(documents)} chunks for document {document_id}")
+            logger.info(f"[PGVectorStoreFetch] Retrieved {len(documents)} chunks for document {document_id}")
             return {"documents": documents, "metadatas": metadatas}
 
         except Exception as exc:
-            logger.exception("Failed to fetch document chunks from PGVector for %s", document_id)
+            logger.exception("Failed to fetch document chunks from PGVectorStore for %s", document_id)
             raise
 
     # === ChromaDB Backend ===

@@ -506,34 +506,15 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
 
     store = None
     if vector_provider == 'pgvector':
-        from langchain_postgres import PGVector
-        connection_string = current_app.config.get('PGVECTOR_CONNECTION_STRING')
-        collection_name = current_app.config.get('PGVECTOR_COLLECTION_NAME', 'documents_vectors')
-        if not connection_string:
-            logging.error("PGVECTOR_CONNECTION_STRING not configured.")
-            return {"documents": [], "structured_query": "PGVector not configured.", "error": "PGVector not configured."}
-
-        logging.info(f"[PGVector DEBUG] Using connection: {connection_string[:30]}..., collection: {collection_name}")
+        from modules.pgvector_utils import get_pg_vector_store
+        table_name = current_app.config.get('PGVECTOR_TABLE_NAME', 'document_vectors')
+        
+        logging.info(f"[PGVectorStore DEBUG] Using table: {table_name}")
         try:
-            # Engine args for robust Azure PostgreSQL connections
-            engine_args = {
-                "pool_pre_ping": True,
-                "pool_recycle": 1800,  # 30 minutes
-                "connect_args": {
-                    "connect_timeout": 30,  # 30 second connection timeout
-                }
-            }
-            store = PGVector(
-                connection=connection_string,  # Correct parameter name
-                embeddings=embed_func,
-                collection_name=collection_name,
-                use_jsonb=True,
-                distance_strategy=DistanceStrategy.COSINE,
-                engine_args=engine_args,  # Add connection pool settings for Azure
-            )
+            store = get_pg_vector_store(embed_func)
         except Exception as e:
-            logging.error(f"[PGVector DEBUG] Error initializing PGVector: {e}")
-            return {"documents": [], "structured_query": "Error initializing PGVector.", "error": str(e)}
+            logging.error(f"[PGVectorStore DEBUG] Error initializing PGVectorStore: {e}")
+            return {"documents": [], "structured_query": "Error initializing PGVectorStore.", "error": str(e)}
     elif vector_provider == 'chromadb':
         # Runtime check: Ensure ChromaDB is available
         if not CHROMA_AVAILABLE:

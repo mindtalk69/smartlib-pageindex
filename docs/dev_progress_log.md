@@ -1,5 +1,145 @@
 # SmartLib Dev Progress Log
 
+## 2025-12-11 – Migrated from PGVector to PGVectorStore
+
+### Summary
+Migrated from deprecated `langchain_postgres.PGVector` class to new `PGVectorStore` API to fix persistent "Connection refused" errors in Celery worker context.
+
+### Root Cause
+- **PGVector class deprecated**: Since `langchain-postgres` v0.0.14, `PGVector` is deprecated in favor of `PGVectorStore`
+- **Connection handling issues**: The deprecated class had connection management issues that manifested only in Celery worker forked processes
+- **Manual SSH tests passed**: Direct connections from worker SSH worked fine, but Celery tasks failed
+
+### Solution Applied
+
+#### 1. Created New Utility Module
+**File**: `modules/pgvector_utils.py`
+- `get_pg_engine()` - Thread-safe singleton PGEngine with connection pooling
+- `ensure_table_exists()` - Initialize vectorstore table on first use  
+- `get_pg_vector_store()` - Factory function for PGVectorStore instances
+
+#### 2. Updated Vector Store Utils
+**File**: `modules/vector_store_utils.py`
+- Replaced `PGVector.from_documents()` with `get_pg_vector_store().add_documents()`
+- Removed deprecated `_init_pgvector_with_retry()` function
+- Added `_add_documents_with_retry()` for new API
+
+#### 3. Updated Agent Retrieval
+**File**: `modules/agent.py`
+- Replaced `PGVector()` constructor with `get_pg_vector_store()`
+- Connection pooling now handled by PGEngine singleton
+
+#### 4. Updated Vector Tasks
+**File**: `modules/vector_tasks.py`
+- Replaced `PGVector()` in `fetch_document_chunks()` with `get_pg_vector_store()`
+
+#### 5. Added Config Settings
+**File**: `config.py`
+- `PGVECTOR_TABLE_NAME` (default: `document_vectors`)
+- `PGVECTOR_EMBEDDING_DIMENSION` (default: `1536`)
+
+### API Difference
+**Old (deprecated)**:
+```python
+store = PGVector.from_documents(docs, embedding, connection=conn_str, collection_name=name)
+```
+
+**New (PGVectorStore)**:
+```python
+from modules.pgvector_utils import get_pg_vector_store
+store = get_pg_vector_store(embedding)
+store.add_documents(docs, ids=uuids)
+```
+
+### Verification Required
+1. Test from worker SSH with mock embeddings
+2. Rebuild Docker image and deploy
+3. Upload test document and verify logs show: `PGVectorStore: Successfully added X chunks`
+
+---
+
+## 2025-12-11 – Azure PostgreSQL Firewall Rules for Worker App
+
+### Summary
+Fixed "Connection refused" errors when worker container tried to store documents to PGVector by identifying that Azure PostgreSQL Flexible Server firewall rules were missing for the worker app's outbound IP addresses.
+
+### Root Cause
+- **Worker cannot connect to PostgreSQL, but web can**: Web app successfully saves documents to `documents` table, but worker fails when trying to store vectors to PGVector
+- **Azure PostgreSQL firewall**: The firewall was only configured to allow the web app's outbound IPs, blocking the worker app
+- **Different outbound IPs**: Azure App Service web and worker apps have different outbound IP addresses that must BOTH be allowed
+- **Missing ARM template guidance**: The Enterprise ARM template provided firewall instructions for Redis but not for PostgreSQL
+
+### Error Symptoms
+```
+[2025-12-11 05:45:15,211: INFO/MainProcess] Attempting to connect to PGVector (Collection: documents_vectors)...
+[Multiple retry attempts over 4 minutes with exponential backoff]
+[2025-12-11 05:49:25,012: ERROR/MainProcess] Error processing/storing chunks for PGVector:
+(psycopg.OperationalError) connection failed: Connection refused
+    Is the server running on that host and accepting TCP/IP connections?
+```
+
+### Solution Applied
+
+#### 1. Added PostgreSQL Firewall Output Instructions to ARM Template
+**File**: `ARMtemplate/catalog/mainTemplate_enterprise.json`
+- Added `step9_PostgreSQL_WebApp_IPs` output: Lists web app's outbound IPs
+- Added `step10_PostgreSQL_Worker_IPs` output: Lists worker app's outbound IPs
+- Added `step11_PostgreSQL_Firewall_Command` output: Provides ready-to-run Azure CLI commands for adding firewall rules
+
+**Output format** (similar to existing Redis firewall instructions):
+```bash
+# CRITICAL: Add firewall rules for BOTH web and worker app IPs
+# Run this command for EACH IP address from steps 9 and 10:
+az postgres flexible-server firewall-rule create \
+  --resource-group <postgres-rg> \
+  --name <postgres-server> \
+  --rule-name AllowAppService-<IP> \
+  --start-ip-address <IP> \
+  --end-ip-address <IP>
+```
+
+#### 2. Updated UI Definition with Firewall Warning
+**File**: `ARMtemplate/catalog/createUiDefinition_enterprise.json`
+- Updated PostgreSQL prerequisite info box to emphasize post-deployment firewall configuration
+- Added step 5: "⚠️ CRITICAL: After deployment, add firewall rules for BOTH web and worker app outbound IPs (see deployment outputs step9-11)"
+- Clarified consequences: "Without firewall rules for BOTH apps, worker cannot store documents to vector database!"
+
+#### 3. Immediate Manual Fix for Existing Deployments
+Users can get outbound IPs and add firewall rules immediately:
+```bash
+# Get Web App IPs
+az webapp show --name <web-app> --resource-group <rg> --query outboundIpAddresses --output tsv
+
+# Get Worker App IPs
+az webapp show --name <worker-app> --resource-group <rg> --query outboundIpAddresses --output tsv
+
+# Add firewall rule for each IP
+az postgres flexible-server firewall-rule create \
+  --resource-group <postgres-rg> \
+  --name <postgres-server> \
+  --rule-name AllowWorkerApp-<IP> \
+  --start-ip-address <IP> \
+  --end-ip-address <IP>
+```
+
+### Files Modified
+- `ARMtemplate/catalog/mainTemplate_enterprise.json` – Added outputs for PostgreSQL firewall configuration (steps 9-11)
+- `ARMtemplate/catalog/createUiDefinition_enterprise.json` – Updated prerequisite warning with post-deployment firewall requirement
+
+### Verification Steps
+1. Deploy ARM template or check deployment outputs for existing deployments
+2. Copy web and worker app outbound IPs from outputs (steps 9-10)
+3. Run firewall rule creation commands for each IP (step 11)
+4. Test document upload - worker should now successfully store vectors to PGVector
+
+### Related Context
+- Azure App Service apps have multiple outbound IPs (comma-separated list)
+- Each IP must be added as a separate firewall rule
+- PostgreSQL Flexible Server firewall rules are required even when using VNet integration in some scenarios
+- This pattern matches the existing Redis firewall configuration in the template
+
+---
+
 ## 2025-12-11 – PGVector Connection & Query Fixes
 
 ### Summary
