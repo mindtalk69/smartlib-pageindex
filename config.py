@@ -24,8 +24,8 @@ else:
 class Config:
     """Base configuration."""
     # Internal build version - update this when deploying new builds
-    BUILD_VERSION = "1.1.37"
-    BUILD_DATE = "2025-12-10"
+    BUILD_VERSION = "1.1.38"
+    BUILD_DATE = "2025-12-11"
     
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
     SQLALCHEMY_TRACK_MODIFICATIONS = False

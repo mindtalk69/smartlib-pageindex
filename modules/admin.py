@@ -1709,7 +1709,7 @@ def vector_store_settings():
             provider = form.provider.data
             store_mode = form.store_mode.data
             chroma_collection = form.chroma_collection.data or 'documents-vectors'
-            pg_collection = form.pg_collection.data or 'langchain_vectors'
+            pg_collection = form.pg_collection.data or 'documents_vectors'
             submitted_pg_conn = form.pg_connection.data
 
             # Validation based on provider
@@ -1781,7 +1781,7 @@ def vector_store_settings():
     form.provider.data = settings.get('VECTOR_STORE_PROVIDER', 'chromadb')
     form.store_mode.data = settings.get('vector_store_mode', settings.get('VECTOR_STORE_MODE', 'knowledge'))
     form.chroma_collection.data = settings.get('CHROMA_COLLECTION_NAME', 'documents-vectors')
-    form.pg_collection.data = settings.get('PGVECTOR_COLLECTION_NAME', 'langchain_vectors')
+    form.pg_collection.data = settings.get('PGVECTOR_COLLECTION_NAME', 'documents_vectors')
 
     # Handle placeholder for connection string
     if settings.get('PGVECTOR_CONNECTION_STRING', ''):

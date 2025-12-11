@@ -508,7 +508,7 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
     if vector_provider == 'pgvector':
         from langchain_postgres import PGVector
         connection_string = current_app.config.get('PGVECTOR_CONNECTION_STRING')
-        collection_name = current_app.config.get('PGVECTOR_COLLECTION_NAME', 'langchain_vectors')
+        collection_name = current_app.config.get('PGVECTOR_COLLECTION_NAME', 'documents_vectors')
         if not connection_string:
             logging.error("PGVECTOR_CONNECTION_STRING not configured.")
             return {"documents": [], "structured_query": "PGVector not configured.", "error": "PGVector not configured."}
