@@ -258,23 +258,13 @@
         });
     });
 
-    // Run on page load to set initial state for both settings and reset sections
+    // Run on page load to set initial state for settings form fields
     document.addEventListener('DOMContentLoaded', function () {
         toggleProviderFields(); // For the main settings form
 
-        // Set initial visibility for reset sections based on currently SAVED setting
-        const currentProvider = "{{ current_settings.get('VECTOR_STORE_PROVIDER', '') }}"; // Get saved provider
-        const chromaManagement = document.getElementById('chromadb-management-section');
-        const pgvectorReset = document.getElementById('pgvector-reset-section');
-
-        if (chromaManagement) chromaManagement.style.display = 'none';
-        if (pgvectorReset) pgvectorReset.style.display = 'none';
-
-        if (currentProvider === 'chromadb') {
-            if (chromaManagement) chromaManagement.style.display = 'block';
-        } else if (currentProvider === 'pgvector') {
-            if (pgvectorReset) pgvectorReset.style.display = 'block';
-        }
+        // Note: Reset sections visibility is already correctly set by server-side template
+        // based on current_settings.get('VECTOR_STORE_PROVIDER')
+        // No need to override with JavaScript on page load
     });
 </script>
 {% endblock %}
