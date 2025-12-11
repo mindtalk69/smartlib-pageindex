@@ -3,7 +3,7 @@
 ## 2025-12-11 – Fixed PGVector using SQLAlchemy Engine
 
 ### Summary
-Fixed persistent "Connection refused" errors in Celery worker by using Flask-SQLAlchemy's engine directly instead of PGEngine's async connection handling.
+Fixed persistent "Connection refused" errors in Celery worker by using Flask-SQLAlchemy's `db.engine` directly instead of PGEngine's async connection handling.
 
 ### Root Cause
 - **PGEngine uses async internally**: Even `PGVectorStore.create_sync()` uses async event loop
@@ -11,50 +11,32 @@ Fixed persistent "Connection refused" errors in Celery worker by using Flask-SQL
 - **SQLAlchemy works fine**: `db.engine` connects successfully in the same context
 
 ### Solution Applied
+Pass SQLAlchemy engine to PGVector instead of connection string:
 
-#### 1. Created New Utility Module
-**File**: `modules/pgvector_utils.py`
-- `get_pg_engine()` - Thread-safe singleton PGEngine with connection pooling
-- `ensure_table_exists()` - Initialize vectorstore table on first use  
-- `get_pg_vector_store()` - Factory function for PGVectorStore instances
-
-#### 2. Updated Vector Store Utils
-**File**: `modules/vector_store_utils.py`
-- Replaced `PGVector.from_documents()` with `get_pg_vector_store().add_documents()`
-- Removed deprecated `_init_pgvector_with_retry()` function
-- Added `_add_documents_with_retry()` for new API
-
-#### 3. Updated Agent Retrieval
-**File**: `modules/agent.py`
-- Replaced `PGVector()` constructor with `get_pg_vector_store()`
-- Connection pooling now handled by PGEngine singleton
-
-#### 4. Updated Vector Tasks
-**File**: `modules/vector_tasks.py`
-- Replaced `PGVector()` in `fetch_document_chunks()` with `get_pg_vector_store()`
-
-#### 5. Added Config Settings
-**File**: `config.py`
-- `PGVECTOR_TABLE_NAME` (default: `document_vectors`)
-- `PGVECTOR_EMBEDDING_DIMENSION` (default: `1536`)
-
-### API Difference
-**Old (deprecated)**:
 ```python
-store = PGVector.from_documents(docs, embedding, connection=conn_str, collection_name=name)
+from extensions import db
+from langchain_postgres import PGVector
+
+store = PGVector(
+    embeddings=embedding_func,
+    connection=db.engine,  # SQLAlchemy engine, not connection string
+    collection_name=collection_name,
+    create_extension=False,
+    async_mode=False,
+)
 ```
 
-**New (PGVectorStore)**:
-```python
-from modules.pgvector_utils import get_pg_vector_store
-store = get_pg_vector_store(embedding)
-store.add_documents(docs, ids=uuids)
-```
+#### Files Updated
+- `modules/pgvector_utils.py` - `get_pg_vector_store()` uses `db.engine`
+- `modules/vector_store_utils.py` - Uses `get_pg_vector_store()`
+- `modules/agent.py` - Uses `get_pg_vector_store()`
+- `modules/vector_tasks.py` - Uses `get_pg_vector_store()`
 
-### Verification Required
-1. Test from worker SSH with mock embeddings
-2. Rebuild Docker image and deploy
-3. Upload test document and verify logs show: `PGVectorStore: Successfully added X chunks`
+### Verification ✅
+```
+[2025-12-11 07:57:57] PGVector: Successfully added 72 chunks to collection 'documents_vectors'
+[2025-12-11 07:57:58] Task succeeded in 344.98s: {'success': True, 'file_id': 16}
+```
 
 ---
 

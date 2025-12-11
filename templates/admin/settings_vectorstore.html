@@ -118,7 +118,7 @@
         {# --- ChromaDB Management Section --- #}
         {% if app_edition == 'BASIC' or not app_edition %}
         <div id="chromadb-management-section"
-            style="display: {% if current_settings.VECTOR_STORE_PROVIDER == 'chromadb' %}block{% else %}none{% endif %};">
+            style="display: {% if current_settings.get('VECTOR_STORE_PROVIDER') == 'chromadb' %}block{% else %}none{% endif %};">
             <h5>ChromaDB Storage Management</h5>
             <p>The following ChromaDB stores and collections were found in the
                 <code>{{ chroma_base_path or 'data/chroma' }}</code> directory. You can delete individual collections,
@@ -174,13 +174,13 @@
         {# --- PGVector Reset Section --- #}
         {% if app_edition == 'ENT' or not app_edition %}
         <div id="pgvector-reset-section"
-            style="display: {% if current_settings.VECTOR_STORE_PROVIDER == 'pgvector' %}block{% else %}none{% endif %};">
+            style="display: {% if current_settings.get('VECTOR_STORE_PROVIDER') == 'pgvector' %}block{% else %}none{% endif %};">
             <h5>PGVector Reset Option</h5>
             <div class="alert alert-danger">
                 <form method="POST" action="{{ url_for('admin.reset_pgvector_store') }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <p class="mb-2">This will delete ALL data from the configured PGVector collection: <strong>{{
-                            current_settings.PGVECTOR_COLLECTION_NAME }}</strong></p>
+                            current_settings.get('PGVECTOR_COLLECTION_NAME', 'documents_vectors') }}</strong></p>
                     <div class="mb-3">
                         <label for="pg-reset-confirm" class="form-label">To confirm, type exactly: <strong>RESET
                                 PGVECTOR</strong></label>
@@ -264,7 +264,7 @@
         toggleProviderFields(); // For the main settings form
 
         // Set initial visibility for reset sections based on currently SAVED setting
-        const currentProvider = "{{ current_settings.VECTOR_STORE_PROVIDER }}"; // Get saved provider
+        const currentProvider = "{{ current_settings.get('VECTOR_STORE_PROVIDER', '') }}"; // Get saved provider
         const chromaManagement = document.getElementById('chromadb-management-section');
         const pgvectorReset = document.getElementById('pgvector-reset-section');
 
