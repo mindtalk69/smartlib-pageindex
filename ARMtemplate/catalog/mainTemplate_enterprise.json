@@ -647,10 +647,6 @@
               "value": "[variables('postgresConnectionString')]"
             },
             {
-              "name": "PGVECTOR_CONNECTION_STRING",
-              "value": "[variables('postgresConnectionString')]"
-            },
-            {
               "name": "RUN_DEFAULT_MODELS",
               "value": "[if(parameters('runDefaultModels'), 'true', 'false')]"
             },
@@ -869,10 +865,6 @@
             },
             {
               "name": "SQLALCHEMY_DATABASE_URI",
-              "value": "[variables('postgresConnectionString')]"
-            },
-            {
-              "name": "PGVECTOR_CONNECTION_STRING",
               "value": "[variables('postgresConnectionString')]"
             },
             {

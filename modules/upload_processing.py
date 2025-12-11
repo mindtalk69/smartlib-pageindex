@@ -431,9 +431,15 @@ def process_uploaded_file(
             target_json_path_str = None
 
     # --- DoclingLoader Logic ---
-    docling_export_type_str = app_config.get('DOCLING_EXPORT_TYPE', 'MARKDOWN').upper() if app_config else 'MARKDOWN'
-    logger.info(f"[Upload DEBUG] DOCLING_EXPORT_TYPE from app_config: {docling_export_type_str}")
-    logger.info(f"[Upload DEBUG] DOCLING_EXPORT_TYPE from os.environ: {os.environ.get('DOCLING_EXPORT_TYPE', 'NOT SET')}")
+    # Determine export type based on OCR mode:
+    # - Azure Document Intelligence (IS_OCR_LOCAL=False) → MARKDOWN (Azure DocInt outputs markdown natively)
+    # - Local OCR (IS_OCR_LOCAL=True) → DOC_CHUNKS (Docling chunk-based processing)
+    if IS_OCR_LOCAL:
+        docling_export_type_str = 'DOC_CHUNKS'
+    else:
+        docling_export_type_str = 'MARKDOWN'
+    logger.info(f"[Upload DEBUG] DOCLING_EXPORT_TYPE selected: {docling_export_type_str} (IS_OCR_LOCAL={IS_OCR_LOCAL})")
+    logger.info(f"[Upload DEBUG] OCR settings: IS_ENABLED_OCR={IS_ENABLED_OCR}, IS_AUTO_OCR={IS_AUTO_OCR}")
     splits = []
     loaded_docs = []
     chunker = None # Initialize chunker

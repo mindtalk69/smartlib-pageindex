@@ -1,5 +1,151 @@
 # SmartLib Dev Progress Log
 
+## 2025-12-10 – Upload Page Layout & Centering Fix
+
+### Summary
+Fixed the Upload & Download page layout to properly center the card both horizontally and vertically, and improved the visual structure with Mazer-consistent styling.
+
+### Issues Fixed
+1. **Horizontal centering**: Card was stuck on the left side of the page
+2. **Vertical centering**: Card was positioned at the top instead of centered
+3. **Tab layout**: "Download from URL" and "File Upload" tabs were stacking vertically instead of side-by-side
+4. **Card structure**: Needed a cleaner header/body separation matching Mazer design patterns
+
+### Solution
+Restored Bootstrap's proven row/col centering pattern (same as login page):
+```html
+<div class="row justify-content-center upload-row">
+  <div class="col-md-8 col-lg-7 col-xl-6">
+    <div class="upload-form-wrapper">
+      <!-- Header + Body -->
+    </div>
+  </div>
+</div>
+```
+
+Added CSS for vertical centering:
+```css
+.upload-row {
+  min-height: calc(100vh - 150px);
+  align-items: center;
+}
+```
+
+### Files Modified
+- `templates/upload.html` – Restored Bootstrap row/col structure with `upload-row` class, added header/body sections, `nav-fill` for tabs
+- `static/css/upload.css` – Added `.upload-row` with flexbox vertical centering, `.upload-form-wrapper` styling, `.upload-form-header` and `.upload-form-body` sections
+
+### Result
+- ✅ Card horizontally centered
+- ✅ Card vertically centered
+- ✅ Tabs side-by-side with equal width
+- ✅ Responsive on mobile/desktop
+- ✅ Dark/light theme compatible
+
+---
+
+## 2025-12-10 – Build Script Cross-Platform Compatibility Fix
+
+### Summary
+Fixed `build-for-azure-enterprise.sh` to work on both macOS and Linux/WSL2 by replacing Linux-specific commands with cross-platform alternatives.
+
+### Issues Fixed
+1. **`grep -oP` not supported on macOS**: BSD grep (macOS default) doesn't support Perl-compatible regex (`-P` flag). Replaced with `grep | sed` combo.
+2. **`sed -i` syntax difference**: macOS requires `sed -i ''` (empty extension), Linux uses `sed -i`. Added OS detection.
+3. **Ambiguous grep pattern**: The original `grep 'BUILD_VERSION'` matched both the assignment line and f-string references like `{BUILD_VERSION}`, causing multi-line output that broke version parsing.
+
+### Fix Applied
+```bash
+# OS detection for sed compatibility
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    SED_INPLACE="sed -i ''"
+else
+    SED_INPLACE="sed -i"
+fi
+
+# Precise grep pattern (matches only assignment, not f-string refs)
+CURRENT_VERSION=$(grep 'BUILD_VERSION = "' config.py | head -1 | sed 's/.*BUILD_VERSION = "\([^"]*\)".*/\1/')
+```
+
+### Files Modified
+- `build-for-azure-enterprise.sh` – Cross-platform grep/sed patterns
+
+### Note
+`build-for-azure-basic.sh` was already fixed with cross-platform compatibility in a previous session.
+
+---
+
+## 2025-12-10 – Dynamic DOCLING_EXPORT_TYPE Based on OCR Mode
+
+### Summary
+Fixed `DOCLING_EXPORT_TYPE` configuration mismatch where the export type was hardcoded regardless of OCR mode selected in admin settings.
+
+### Root Cause
+`config.py` had `DOCLING_EXPORT_TYPE` hardcoded to `DOC_CHUNKS` (line 172), but the export type should be determined dynamically based on the OCR mode (`/admin/settings/ocr`):
+- **Azure Document Intelligence** → `MARKDOWN` (Azure DocInt outputs markdown natively)
+- **Local OCR** → `DOC_CHUNKS` (Docling chunk-based processing)
+
+### Fix Applied
+- **`modules/upload_processing.py`**: Changed from reading `app_config.get('DOCLING_EXPORT_TYPE')` to dynamic selection based on `IS_OCR_LOCAL` flag:
+  ```python
+  if IS_OCR_LOCAL:
+      docling_export_type_str = 'DOC_CHUNKS'
+  else:
+      docling_export_type_str = 'MARKDOWN'
+  ```
+- **`config.py`**: Restored env var reading with `DOC_CHUNKS` default (actual behavior determined at runtime)
+
+### Files Modified
+- `modules/upload_processing.py` – Dynamic export type based on OCR mode
+- `config.py` – Restored env var with proper default and comments
+
+### Verification
+Worker logs now show correct export type based on OCR mode:
+- Local OCR: `[Upload DEBUG] DOCLING_EXPORT_TYPE selected: DOC_CHUNKS (IS_OCR_LOCAL=True)`
+- Azure DocInt: `[Upload DEBUG] DOCLING_EXPORT_TYPE selected: MARKDOWN (IS_OCR_LOCAL=False)`
+
+---
+
+## 2025-12-10 – PGVector Connection String URL-Encoding Fix (ENT Edition)
+
+### Summary
+Fixed Enterprise edition vector store operations failing with "Name or service not known" DNS resolution error when uploading documents, even though alembic migrations and SQLAlchemy connections worked fine.
+
+### Root Cause
+The ARM template (`mainTemplate_enterprise.json`) was explicitly setting `PGVECTOR_CONNECTION_STRING` with the PostgreSQL password concatenated directly into the connection string **without URL-encoding**. If the password contained special characters like `@`, `:`, `/`, or `#`, the connection string parser would misinterpret the hostname.
+
+**Example:** With password `myP@ssword`, the connection string became:
+```
+postgresql+psycopg://user:myP@ssword@server.postgres.database.azure.com:5432/db
+```
+The parser interpreted `@ssword@server.postgres.database.azure.com` as the hostname, causing DNS lookup failure.
+
+Meanwhile, `SQLALCHEMY_DATABASE_URI` worked because `config.py` builds it from individual `POSTGRES_*` components with proper URL-encoding:
+```python
+from urllib.parse import quote
+encoded_password = quote(postgres_password, safe='')
+SQLALCHEMY_DATABASE_URI = f"postgresql+psycopg://{postgres_user}:{encoded_password}@{postgres_host}:..."
+```
+
+### Fix Applied
+Removed the redundant `PGVECTOR_CONNECTION_STRING` environment variable from both web and worker app settings in the ARM template. Now `config.py` line 191 falls back to the properly URL-encoded `SQLALCHEMY_DATABASE_URI`:
+```python
+PGVECTOR_CONNECTION_STRING = os.environ.get('PGVECTOR_CONNECTION_STRING', SQLALCHEMY_DATABASE_URI)
+```
+
+### Files Modified
+- `ARMtemplate/catalog/mainTemplate_enterprise.json` – Removed `PGVECTOR_CONNECTION_STRING` from both web (line 650-651) and worker (line 875-876) app settings
+
+### Immediate Workaround (Before Redeploy)
+For existing deployments, manually remove `PGVECTOR_CONNECTION_STRING` from App Service worker's Configuration → Application Settings in Azure Portal and restart the worker.
+
+### Verification
+- Alembic migrations succeed (used URL-encoded `SQLALCHEMY_DATABASE_URI`)
+- Document uploads complete successfully
+- Chunks stored to PGVector without DNS resolution errors
+
+---
+
 ## 2025-12-10 – Azure Files Upload Sync Fix
 
 ### Summary
