@@ -1660,8 +1660,17 @@ def vector_store_settings():
         ]
         settings_query = AppSettings.query.filter(AppSettings.key.in_(settings_keys)).all()
         settings = {s.key: s.value for s in settings_query}
-        # Set defaults if not found
-        settings.setdefault('VECTOR_STORE_PROVIDER', current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb'))
+        
+        # Get App Edition early - needed for provider logic
+        app_edition = current_app.config.get('APP_EDITION', 'BASIC')
+        
+        # Set defaults if not found, but for ENT edition, FORCE pgvector regardless of DB value
+        if app_edition == 'ENT':
+            # Enterprise edition: PGVector is enforced, ignore DB setting
+            settings['VECTOR_STORE_PROVIDER'] = 'pgvector'
+        else:
+            settings.setdefault('VECTOR_STORE_PROVIDER', current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb'))
+        
         settings.setdefault('VECTOR_STORE_MODE', 'knowledge')
         settings.setdefault('vector_store_mode', 'knowledge')
         settings.setdefault('CHROMA_COLLECTION_NAME', 'documents-vectors')
@@ -1673,9 +1682,11 @@ def vector_store_settings():
     except Exception as e:
         logging.error(f"Error fetching vector store settings: {traceback.format_exc()}")
         flash('Error loading vector store settings.', 'danger')
-        # Use safe defaults on error
+        # Use safe defaults on error - get app_edition for provider logic
+        app_edition = current_app.config.get('APP_EDITION', 'BASIC')
+        provider = 'pgvector' if app_edition == 'ENT' else current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb')
         settings = {
-            'VECTOR_STORE_PROVIDER': current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb'), 
+            'VECTOR_STORE_PROVIDER': provider, 
             'VECTOR_STORE_MODE': 'knowledge',
             'vector_store_mode': 'knowledge',
             'CHROMA_COLLECTION_NAME': 'documents-vectors',
@@ -1683,8 +1694,7 @@ def vector_store_settings():
             'PGVECTOR_COLLECTION_NAME': 'documents-vectors'
         }
 
-    # Get App Edition
-    app_edition = current_app.config.get('APP_EDITION', 'BASIC')
+    # app_edition already set in try block or except block above
 
     # --- ChromaDB Inspection (if provider is chromadb) ---
     current_embedding = None
