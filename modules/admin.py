@@ -1661,7 +1661,7 @@ def vector_store_settings():
         settings_query = AppSettings.query.filter(AppSettings.key.in_(settings_keys)).all()
         settings = {s.key: s.value for s in settings_query}
         # Set defaults if not found
-        settings.setdefault('VECTOR_STORE_PROVIDER', 'chromadb')
+        settings.setdefault('VECTOR_STORE_PROVIDER', current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb'))
         settings.setdefault('VECTOR_STORE_MODE', 'knowledge')
         settings.setdefault('vector_store_mode', 'knowledge')
         settings.setdefault('CHROMA_COLLECTION_NAME', 'documents-vectors')
@@ -1675,7 +1675,7 @@ def vector_store_settings():
         flash('Error loading vector store settings.', 'danger')
         # Use safe defaults on error
         settings = {
-            'VECTOR_STORE_PROVIDER': 'chromadb', 
+            'VECTOR_STORE_PROVIDER': current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb'), 
             'VECTOR_STORE_MODE': 'knowledge',
             'vector_store_mode': 'knowledge',
             'CHROMA_COLLECTION_NAME': 'documents-vectors',

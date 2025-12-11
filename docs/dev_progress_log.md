@@ -1,5 +1,32 @@
 # SmartLib Dev Progress Log
 
+## 2025-12-11 – Fixed PGVector Reset Button Conditional Logic (Part 3)
+
+### Summary
+Fixed PGVector reset button not appearing in `/admin/settings/vectorstore` on Azure ENT deployments even after Parts 1 & 2.
+
+### Root Cause - Part 3 (Settings Dict Default Issue)
+The `vector_store_settings()` route in `admin.py` was defaulting `VECTOR_STORE_PROVIDER` to `'chromadb'` when not in AppSettings table:
+- **Line 1664**: `settings.setdefault('VECTOR_STORE_PROVIDER', 'chromadb')` 
+- **Line 1678**: Error fallback also hardcoded `'chromadb'`
+- For ENT edition, `VECTOR_STORE_PROVIDER` is set via `config.py` (to `'pgvector'`), not stored in AppSettings
+- Template condition `{% if current_settings.get('VECTOR_STORE_PROVIDER') == 'pgvector' %}` evaluated to FALSE
+
+### Solution Applied - Part 3
+Changed both lines to use Flask config as default:
+```python
+# Before (line 1664)
+settings.setdefault('VECTOR_STORE_PROVIDER', 'chromadb')
+
+# After
+settings.setdefault('VECTOR_STORE_PROVIDER', current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb'))
+```
+
+### Files Modified
+- `modules/admin.py` – Lines 1664 and 1678: Use `current_app.config` for default instead of hardcoded value
+
+---
+
 ## 2025-12-11 – Fixed PGVector Reset Button Conditional Logic
 
 ### Summary
