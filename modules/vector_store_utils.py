@@ -55,6 +55,7 @@ def _init_pgvector_with_retry(embedding_function, documents, collection_name, co
                 ids=ids,
                 use_jsonb=True,  # Store metadata as JSONB (supports all fields including docling_json_path)
                 engine_args=engine_args,  # Add connection pool settings for Azure
+                create_extension=False,  # Skip CREATE EXTENSION - already installed on Azure PostgreSQL
             )
         return _create_store()
     else:
@@ -67,6 +68,7 @@ def _init_pgvector_with_retry(embedding_function, documents, collection_name, co
             ids=ids,
             use_jsonb=True,  # Store metadata as JSONB (supports all fields including docling_json_path)
             engine_args=engine_args,  # Add connection pool settings for Azure
+            create_extension=False,  # Skip CREATE EXTENSION - already installed on Azure PostgreSQL
         )
 
 

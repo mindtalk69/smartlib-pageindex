@@ -643,10 +643,6 @@
               "value": "require"
             },
             {
-              "name": "SQLALCHEMY_DATABASE_URI",
-              "value": "[variables('postgresConnectionString')]"
-            },
-            {
               "name": "RUN_DEFAULT_MODELS",
               "value": "[if(parameters('runDefaultModels'), 'true', 'false')]"
             },
@@ -862,10 +858,6 @@
             {
               "name": "POSTGRES_SSL_MODE",
               "value": "require"
-            },
-            {
-              "name": "SQLALCHEMY_DATABASE_URI",
-              "value": "[variables('postgresConnectionString')]"
             },
             {
               "name": "WEBSITES_PORT",
