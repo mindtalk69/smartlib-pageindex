@@ -172,7 +172,7 @@
         {% endif %}
 
         {# --- PGVector Reset Section --- #}
-        {% if app_edition == 'ENT' or not app_edition %}
+        {# Show PGVector section when provider is pgvector, regardless of edition #}
         <div id="pgvector-reset-section"
             style="display: {% if current_settings.get('VECTOR_STORE_PROVIDER') == 'pgvector' %}block{% else %}none{% endif %};">
             <h5>PGVector Reset Option</h5>
@@ -192,7 +192,6 @@
                 </form>
             </div>
         </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}

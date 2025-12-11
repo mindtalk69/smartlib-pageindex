@@ -1,5 +1,75 @@
 # SmartLib Dev Progress Log
 
+## 2025-12-11 – Fixed PGVector Reset Button Conditional Logic
+
+### Summary
+Fixed the PGVector reset button not appearing in `/admin/settings/vectorstore` on Azure deployments when `APP_EDITION` environment variable was not explicitly set.
+
+### Root Cause - Part 2 (Azure Deployment Issue)
+After fixing dot notation (Part 1), the button worked locally but NOT on Azure because:
+- **Line 175** had conditional: `{% if app_edition == 'ENT' or not app_edition %}`
+- `config.py` defaults `APP_EDITION` to `'BASIC'` when env var is not set (line 70)
+- On Azure, if `APP_EDITION` is not set in Application Settings, it defaults to `'BASIC'`
+- When `app_edition == 'BASIC'`:
+  - `app_edition == 'ENT'` → False
+  - `not app_edition` → False (because 'BASIC' is truthy)
+  - **Entire PGVector section was hidden!**
+- Locally worked because enterprise Docker images or manual `APP_EDITION=ENT` setting
+
+### Solution Applied - Part 2
+**Removed edition-based conditional entirely** from PGVector section (line 175):
+- PGVector reset section now displays based ONLY on `VECTOR_STORE_PROVIDER == 'pgvector'`
+- Works regardless of `APP_EDITION` setting (ENT, BASIC, or not set)
+- JavaScript still handles visibility toggling based on selected provider
+- ChromaDB section still respects `app_edition == 'BASIC'` check (line 119)
+
+```jinja2
+<!-- Before -->
+{% if app_edition == 'ENT' or not app_edition %}
+<div id="pgvector-reset-section" ...>
+
+<!-- After (removed edition check) -->
+<div id="pgvector-reset-section" ...>
+```
+
+### Files Modified
+- `templates/admin/settings_vectorstore.html` – Removed `{% if app_edition == 'ENT' or not app_edition %}` and closing `{% endif %}` from PGVector section
+
+### Verification Steps
+1. Deploy to Azure WITHOUT setting `APP_EDITION` environment variable
+2. Set `VECTOR_STORE_PROVIDER=pgvector` in admin settings
+3. Navigate to `/admin/settings/vectorstore`
+4. PGVector reset button should now be visible
+
+---
+
+## 2025-12-11 – Fixed PGVector Reset Button Not Displaying (Part 1)
+
+### Summary
+Fixed the PGVector reset button not appearing in `/admin/settings/vectorstore` for Enterprise edition after Mazer template migration.
+
+### Root Cause - Part 1 (Dot Notation)
+- Template used `current_settings.VECTOR_STORE_PROVIDER` (dot notation) to access dict values
+- Jinja2 dict access was inconsistent, causing the visibility condition to fail
+- JavaScript on page load also used dot notation, hiding the section
+
+### Solution Applied - Part 1
+Changed dict access from dot notation to `.get()` method in `settings_vectorstore.html`:
+- Line 121: CSS display condition for ChromaDB section
+- Line 177: CSS display condition for PGVector reset section
+- Line 267: JavaScript `currentProvider` variable
+
+```html
+<!-- Before -->
+{% if current_settings.VECTOR_STORE_PROVIDER == 'pgvector' %}
+
+<!-- After -->
+{% if current_settings.get('VECTOR_STORE_PROVIDER') == 'pgvector' %}
+```
+
+---
+
+
 ## 2025-12-11 – Fixed PGVector using SQLAlchemy Engine
 
 ### Summary
