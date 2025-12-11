@@ -86,20 +86,20 @@ def fetch_document_chunks(persist_directory: str, collection_name: str, document
 
     logger.info(f"[FetchChunks] Using vector provider: {vector_provider}")
 
-    # === PGVectorStore Backend (new langchain-postgres API) ===
+    # === PGVector with SQLAlchemy Engine ===
     if vector_provider == 'pgvector':
         try:
             from modules.pgvector_utils import get_pg_vector_store
             from modules.llm_utils import get_embedding_function
         except ImportError as exc:
-            logger.error("PGVectorStore dependencies not installed: %s", exc)
+            logger.error("PGVector dependencies not installed: %s", exc)
             raise
 
         try:
             embed_func = get_embedding_function()
             
-            # Get store instance (handles connection pooling and table init)
-            store = get_pg_vector_store(embed_func)
+            # Get store instance using SQLAlchemy engine (avoids async issues)
+            store = get_pg_vector_store(embed_func, collection_name=collection_name)
 
             # Query by metadata filter
             # Try multiple field names in priority order

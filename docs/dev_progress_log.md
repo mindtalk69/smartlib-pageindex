@@ -1,14 +1,14 @@
 # SmartLib Dev Progress Log
 
-## 2025-12-11 – Migrated from PGVector to PGVectorStore
+## 2025-12-11 – Fixed PGVector using SQLAlchemy Engine
 
 ### Summary
-Migrated from deprecated `langchain_postgres.PGVector` class to new `PGVectorStore` API to fix persistent "Connection refused" errors in Celery worker context.
+Fixed persistent "Connection refused" errors in Celery worker by using Flask-SQLAlchemy's engine directly instead of PGEngine's async connection handling.
 
 ### Root Cause
-- **PGVector class deprecated**: Since `langchain-postgres` v0.0.14, `PGVector` is deprecated in favor of `PGVectorStore`
-- **Connection handling issues**: The deprecated class had connection management issues that manifested only in Celery worker forked processes
-- **Manual SSH tests passed**: Direct connections from worker SSH worked fine, but Celery tasks failed
+- **PGEngine uses async internally**: Even `PGVectorStore.create_sync()` uses async event loop
+- **Flask context conflicts**: Async event loop doesn't work properly in Flask/Celery context
+- **SQLAlchemy works fine**: `db.engine` connects successfully in the same context
 
 ### Solution Applied
 

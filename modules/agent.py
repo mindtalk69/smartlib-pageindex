@@ -507,14 +507,14 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
     store = None
     if vector_provider == 'pgvector':
         from modules.pgvector_utils import get_pg_vector_store
-        table_name = current_app.config.get('PGVECTOR_TABLE_NAME', 'document_vectors')
+        collection_name = current_app.config.get('PGVECTOR_COLLECTION_NAME', 'documents_vectors')
         
-        logging.info(f"[PGVectorStore DEBUG] Using table: {table_name}")
+        logging.info(f"[PGVector DEBUG] Using collection: {collection_name}")
         try:
-            store = get_pg_vector_store(embed_func)
+            store = get_pg_vector_store(embed_func, collection_name=collection_name)
         except Exception as e:
-            logging.error(f"[PGVectorStore DEBUG] Error initializing PGVectorStore: {e}")
-            return {"documents": [], "structured_query": "Error initializing PGVectorStore.", "error": str(e)}
+            logging.error(f"[PGVector DEBUG] Error initializing PGVector: {e}")
+            return {"documents": [], "structured_query": "Error initializing PGVector.", "error": str(e)}
     elif vector_provider == 'chromadb':
         # Runtime check: Ensure ChromaDB is available
         if not CHROMA_AVAILABLE:

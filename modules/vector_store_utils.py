@@ -132,17 +132,17 @@ def process_and_store_chunks(splits, user_id, embedding_function, logger, file_i
 
             logger.info(f"Successfully logged {len(splits)} vector references")
 
-        # --- PGVectorStore (new langchain-postgres API) ---
+        # --- PGVector with SQLAlchemy Engine ---
         if vector_provider == 'pgvector':
             try:
                 from modules.pgvector_utils import get_pg_vector_store
                 
-                table_name = current_app.config.get('PGVECTOR_TABLE_NAME', 'document_vectors')
+                collection_name = current_app.config.get('PGVECTOR_COLLECTION_NAME', 'documents_vectors')
                 
-                logger.info(f"Initializing PGVectorStore instance. Table: '{table_name}'")
+                logger.info(f"Initializing PGVector store. Collection: '{collection_name}'")
                 
-                # Get store instance (handles connection pooling and table init)
-                pgvector_store = get_pg_vector_store(embedding_function)
+                # Get store instance using SQLAlchemy engine (avoids async issues in Flask/Celery)
+                pgvector_store = get_pg_vector_store(embedding_function, collection_name=collection_name)
                 
                 # Add documents with retry logic
                 _add_documents_with_retry(
@@ -151,11 +151,11 @@ def process_and_store_chunks(splits, user_id, embedding_function, logger, file_i
                     ids=new_uuid_indexes,
                 )
                 
-                logger.info(f"PGVectorStore: Successfully added {len(splits)} chunks to table '{table_name}'.")
+                logger.info(f"PGVector: Successfully added {len(splits)} chunks to collection '{collection_name}'.")
                 
                 return len(splits)  # Return number of chunks processed
             except Exception as e:
-                logger.error(f"Error processing/storing chunks for PGVectorStore: {e}", exc_info=True)
+                logger.error(f"Error processing/storing chunks for PGVector: {e}", exc_info=True)
                 # Re-raise the exception so the calling function can handle rollback etc.
                 raise
 
