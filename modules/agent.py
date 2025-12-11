@@ -515,12 +515,21 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
 
         logging.info(f"[PGVector DEBUG] Using connection: {connection_string[:30]}..., collection: {collection_name}")
         try:
+            # Engine args for robust Azure PostgreSQL connections
+            engine_args = {
+                "pool_pre_ping": True,
+                "pool_recycle": 1800,  # 30 minutes
+                "connect_args": {
+                    "connect_timeout": 30,  # 30 second connection timeout
+                }
+            }
             store = PGVector(
                 connection=connection_string,  # Correct parameter name
                 embeddings=embed_func,
                 collection_name=collection_name,
                 use_jsonb=True,
-                distance_strategy=DistanceStrategy.COSINE
+                distance_strategy=DistanceStrategy.COSINE,
+                engine_args=engine_args,  # Add connection pool settings for Azure
             )
         except Exception as e:
             logging.error(f"[PGVector DEBUG] Error initializing PGVector: {e}")

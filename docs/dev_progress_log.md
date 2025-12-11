@@ -1,9 +1,24 @@
 # SmartLib Dev Progress Log
 
-## 2025-12-10 – Upload Page Layout & Centering Fix
+## 2025-12-11 – PGVector Connection & Query Fixes
 
 ### Summary
-Fixed the Upload & Download page layout to properly center the card both horizontally and vertically, and improved the visual structure with Mazer-consistent styling.
+Fixed two critical issues preventing PGVector queries from returning documents in the Enterprise edition.
+
+### Issues Fixed
+1. **Collection Name Mismatch**: Queries in `agent.py` defaulted to `langchain_vectors` while uploads went to `documents_vectors`, causing queries to search an empty collection.
+2. **Connection Refused Errors**: PGVector creates its own SQLAlchemy engine separately from Flask-SQLAlchemy. Added `engine_args` with connection pool settings for Azure PostgreSQL reliability.
+
+### Solution
+1. Fixed default collection name in `modules/agent.py` line 511 and `modules/admin.py` lines 1712, 1784 to `documents_vectors`.
+2. Added `engine_args` to PGVector initialization in both upload (`vector_store_utils.py`) and query (`agent.py`) paths:
+   - `pool_pre_ping=True`: Checks connection validity before using (handles stale connections)
+   - `pool_recycle=1800`: Recycles connections after 30 mins (handles Azure idle disconnects)
+   - `connect_timeout=30`: Prevents indefinite connection hangs
+
+---
+
+## 2025-12-10 – Upload Page Layout & Centering Fix
 
 ### Issues Fixed
 1. **Horizontal centering**: Card was stuck on the left side of the page

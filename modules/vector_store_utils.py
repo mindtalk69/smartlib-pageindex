@@ -25,6 +25,18 @@ def _init_pgvector_with_retry(embedding_function, documents, collection_name, co
     """
     Helper function to initialize PGVector with retry logic.
     """
+    # Engine args for robust Azure PostgreSQL connections:
+    # - pool_pre_ping: Check connection validity before using (handles stale connections)
+    # - pool_recycle: Recycle connections after 30 minutes (handles Azure idle disconnects)
+    # - connect_args: Add connection timeout to prevent indefinite hangs
+    engine_args = {
+        "pool_pre_ping": True,
+        "pool_recycle": 1800,  # 30 minutes
+        "connect_args": {
+            "connect_timeout": 30,  # 30 second connection timeout
+        }
+    }
+    
     if HAS_TENACITY:
         # Define the retry decorator dynamically to capture the logger
         @retry(
@@ -42,6 +54,7 @@ def _init_pgvector_with_retry(embedding_function, documents, collection_name, co
                 connection=connection_string,
                 ids=ids,
                 use_jsonb=True,  # Store metadata as JSONB (supports all fields including docling_json_path)
+                engine_args=engine_args,  # Add connection pool settings for Azure
             )
         return _create_store()
     else:
@@ -53,7 +66,9 @@ def _init_pgvector_with_retry(embedding_function, documents, collection_name, co
             connection=connection_string,
             ids=ids,
             use_jsonb=True,  # Store metadata as JSONB (supports all fields including docling_json_path)
+            engine_args=engine_args,  # Add connection pool settings for Azure
         )
+
 
 def log_vector_reference(file_id, url_download_id, chunk_index):
     """
