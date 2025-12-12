@@ -22,23 +22,48 @@ except ImportError:
     HAS_TENACITY = False
 
 
-def _add_documents_with_retry(store, documents, ids):
+def _add_documents_with_retry(store, documents, ids, batch_size=20):
     """
     Helper function to add documents to PGVectorStore with retry logic.
+    Processes documents in batches to avoid OOM when generating embeddings.
+    
+    Args:
+        store: The PGVector store instance
+        documents: List of documents to add
+        ids: List of IDs corresponding to documents
+        batch_size: Number of documents to process per batch (default 20)
     """
-    if HAS_TENACITY:
-        @retry(
-            stop=stop_after_attempt(5),
-            wait=wait_exponential(multiplier=1, min=2, max=30),
-            retry=retry_if_exception_type(OperationalError),
-            reraise=True
-        )
-        def _add_with_retry():
-            logger.info(f"Attempting to add {len(documents)} documents to PGVectorStore...")
-            return store.add_documents(documents, ids=ids)
-        return _add_with_retry()
-    else:
-        return store.add_documents(documents, ids=ids)
+    total_docs = len(documents)
+    logger.info(f"Adding {total_docs} documents to PGVectorStore in batches of {batch_size}...")
+    
+    # Process in batches to reduce peak memory usage during embedding generation
+    for batch_start in range(0, total_docs, batch_size):
+        batch_end = min(batch_start + batch_size, total_docs)
+        batch_docs = documents[batch_start:batch_end]
+        batch_ids = ids[batch_start:batch_end] if ids else None
+        
+        batch_num = (batch_start // batch_size) + 1
+        total_batches = (total_docs + batch_size - 1) // batch_size
+        logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch_docs)} documents)...")
+        
+        if HAS_TENACITY:
+            @retry(
+                stop=stop_after_attempt(5),
+                wait=wait_exponential(multiplier=1, min=2, max=30),
+                retry=retry_if_exception_type(OperationalError),
+                reraise=True
+            )
+            def _add_batch():
+                return store.add_documents(batch_docs, ids=batch_ids)
+            _add_batch()
+        else:
+            store.add_documents(batch_docs, ids=batch_ids)
+        
+        logger.info(f"Batch {batch_num}/{total_batches} completed successfully.")
+    
+    logger.info(f"All {total_docs} documents added successfully.")
+    return total_docs
+
 
 
 def log_vector_reference(file_id, url_download_id, chunk_index):

@@ -1,5 +1,66 @@
 # SmartLib Dev Progress Log
 
+## 2025-12-12 – Fixed OOM During Embedding Generation (Batch Processing)
+
+### Summary
+Fixed the worker being killed by SIGKILL (OOM) when generating embeddings for large documents by adding batch processing.
+
+### Root Cause
+When uploading a large PDF (90+ pages, 124 chunks), the `add_documents` call would try to generate embeddings for ALL chunks at once. Combined with:
+- Docling models already in memory
+- HuggingFace embedding model loaded (~2-4GB for bge-m3)
+- 124 document embeddings computed simultaneously
+
+This caused memory exhaustion and Azure's OOM Killer terminated the worker with SIGKILL (signal 9).
+
+### Solution
+Modified `_add_documents_with_retry()` in `modules/vector_store_utils.py` to process documents in batches of 20:
+- Reduces peak memory usage during embedding generation
+- Each batch is processed and committed before starting the next
+- Includes batch progress logging for monitoring
+
+### Files Modified
+- `modules/vector_store_utils.py` – Added batch processing to `_add_documents_with_retry()`
+
+### Additional Recommendation
+For Enterprise edition with large documents, use **Azure OpenAI embeddings** (`text-embedding-3-small`) instead of local HuggingFace models. Azure embeddings are computed server-side and don't load multi-GB models into worker memory.
+
+---
+
+## 2025-12-12 – Fixed Smart OCR Skip for Non-Image-Only PDFs
+
+### Summary
+Fixed the upload processing to correctly skip OCR for PDFs that already have extractable text, when "Allow automatic OCR if PDF is image-only" setting is enabled.
+
+### Root Cause
+The `IS_AUTO_OCR` setting (checkbox "Allow automatic OCR if PDF is image-only") was **not actually checking** if the PDF was image-only. The code at line 453 was:
+```python
+if IS_ENABLED_OCR and IS_AUTO_OCR and app_config and 'AppSettings' in app_config:
+    # Runs OCR on ALL PDFs, ignoring IS_PDF_IMAGE_ONLY!
+```
+This caused RapidOCR to run on **all PDFs**, including text-based ones, resulting in 10+ hour processing times for large documents.
+
+### Solution
+Changed the OCR condition to properly check `IS_PDF_IMAGE_ONLY`:
+```python
+should_apply_ocr = IS_ENABLED_OCR and (
+    (IS_AUTO_OCR and IS_PDF_IMAGE_ONLY) or  # Auto mode: only for image-only PDFs
+    (not IS_AUTO_OCR)  # Manual mode: apply to all (legacy behavior)
+)
+```
+
+Now when "Allow automatic OCR if PDF is image-only" is checked:
+- **Image-only PDFs** → OCR is applied (slow but necessary)
+- **Text-based PDFs** → OCR is skipped (fast processing) ✅
+
+### Files Modified
+- `modules/upload_processing.py` – Lines 447-510: Fixed OCR condition logic
+
+### Expected Improvement
+- 90-page text-based PDF: **10+ hours → ~5 minutes**
+
+---
+
 ## 2025-12-11 – Fixed PGVector Reset Button Conditional Logic (Part 3)
 
 ### Summary

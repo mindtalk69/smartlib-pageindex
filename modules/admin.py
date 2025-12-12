@@ -1503,12 +1503,16 @@ def admin_reset_data():
                     logging.warning(f"Table {model.__tablename__} still has {count} rows after reset!")
 
             # Final session cleanup to prevent orphaned object issues
+            # Save user info BEFORE expunge_all() - expunge detaches current_user from session
+            saved_username = current_user.username
+            saved_user_id = current_user.get_id()
+            
             db.session.expunge_all()
 
-            # Log the action
+            # Log the action (using saved values since current_user is now detached)
             log_entry = {
-                "user": current_user.username,
-                "user_id": current_user.get_id(),
+                "user": saved_username,
+                "user_id": saved_user_id,
                 "action": "reset_transaction_tables",
                 "tables_cleared": [
                     "uploaded_files", "url_downloads", "vector_references",

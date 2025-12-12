@@ -444,13 +444,20 @@ def process_uploaded_file(
     loaded_docs = []
     chunker = None # Initialize chunker
 
-    # OCR for image-only PDF
+    # Initialize OCR-related variables
     api_endpoint = None
     api_key = None
-    is_az_doci = False # Flag to track if Azure Doc Intelligence was used
+    is_az_doci = False  # Flag to track if Azure Doc Intelligence was used
 
-    # hit azure if IS_OCR_LOCAL = false
-    if IS_ENABLED_OCR and IS_AUTO_OCR and app_config and 'AppSettings' in app_config:
+    # OCR for image-only PDF (only when IS_AUTO_OCR is enabled AND the PDF is actually image-only)
+    # IS_AUTO_OCR means "automatically apply OCR only to image-only PDFs"
+    should_apply_ocr = IS_ENABLED_OCR and (
+        (IS_AUTO_OCR and IS_PDF_IMAGE_ONLY) or  # Auto mode: only for image-only PDFs
+        (not IS_AUTO_OCR)  # Manual mode: apply to all (legacy behavior)
+    )
+    
+    if should_apply_ocr and app_config and 'AppSettings' in app_config:
+        logger.info(f"[OCR] Enabling OCR for PDF (IS_AUTO_OCR={IS_AUTO_OCR}, IS_PDF_IMAGE_ONLY={IS_PDF_IMAGE_ONLY})")
 
         # if visual grounding applied we can not used docintteligence unless it works like schema from docling to display grounding
         if IS_OCR_LOCAL == False:
@@ -500,6 +507,8 @@ def process_uploaded_file(
                     logger.info("Re-initialized converter with local OCR enabled for PDFs.")
                 else:
                     logger.error("OCR options unavailable; proceeding without OCR-enabled converter for PDFs.")
+    elif IS_ENABLED_OCR and IS_AUTO_OCR and not IS_PDF_IMAGE_ONLY:
+        logger.info(f"[OCR] Skipping OCR - PDF has extractable text (IS_PDF_IMAGE_ONLY=False)")
 
 
     if docling_export_type_str == 'DOC_CHUNKS':
