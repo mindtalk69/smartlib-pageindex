@@ -311,3 +311,28 @@ ARM templates in `ARMtemplate/` directory:
 - **LOCAL_DOCKER_SETUP_SUMMARY.md**: Docker Compose setup and testing
 - **ARMtemplate/docs/**: Azure deployment guides
 - **README.md**: High-level project overview and quick start
+
+## Daily latest development progress (Please to Read On)
+smartlib/docs/dev_progress_log.md
+
+## based on APP_EDITION
+
+# APP_EDITION = "basic"
+
+### build for azure basic
+build-for-azure-basic.sh
+
+### ARM Template:
+ARMtemplate/catalogs/createUIDefinition.json
+ARMtemplate/catalogs/mainTemplate.json 
+
+
+# APP_EDITION = "enterprise"
+
+### build for azure enterprise
+build-for-azure-enterprise.sh
+
+### ARM Template:
+ARMtemplate/catalogs/createUIDefinition_enterprise.json
+ARMtemplate/catalogs/mainTemplate_enterprise.json 
+
