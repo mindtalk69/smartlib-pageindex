@@ -1116,8 +1116,7 @@ def get_lc_store_path(user_id=None, knowledge_id=None, mode_param=None): # Renam
     logger.info(f"VECTOR_STORE_MODE: {mode}")
 
     # sqlite-vec uses a single shared database, no per-user/knowledge subdirectories needed
-    # This function is kept for backward compatibility with ChromaDB-based deployments
-    # For sqlite-vec (BASIC edition default), this returns None as vectors are in the main DB
+    # This function returns paths for legacy compatibility but is not used by sqlite-vec
     base_path = None
     try:
         from flask import current_app

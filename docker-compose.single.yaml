@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  smartlib:
+    image: smartlib-basic:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/home/data
+    env_file:
+      - .env.dev
+    environment:
+      - APP_EDITION=BASIC
+      - VECTOR_STORE_PROVIDER=sqlite-vec
+      - SQLALCHEMY_DATABASE_URI=sqlite:////home/data/smartlib.db
+      - CELERY_BROKER_URL=sqlite:////home/data/celery.db
+      - CELERY_RESULT_BACKEND=sqlite:////home/data/celery.db
+      - LOCAL_MODE=true
+      - DEFAULT_EMBEDDING_MODEL=text-embedding-3-small
+      - EMBEDDING_WARMUP_ENABLED=false
+      - AGENT_TASK_TIMEOUT=240
+      - IS_ENABLED_OCR=1
+      - IS_OCR_LOCAL=false
+      - DOCLING_EXPORT_TYPE=MARKDOWN
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

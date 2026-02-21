@@ -1,0 +1,664 @@
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+}
+
+/* ========== SmartLib Chat Styles ========== */
+
+/* App Layout */
+.app-wrapper {
+  @apply flex h-screen;
+}
+
+.app-container {
+  @apply flex-1 flex flex-col w-full overflow-y-auto;
+}
+
+/* Header */
+.chat-header {
+  @apply sticky top-0 z-30 flex items-center gap-4 py-4 px-4 border-b bg-background;
+}
+
+.chat-header h1 {
+  @apply text-2xl font-bold;
+}
+
+.header-actions {
+  @apply flex items-center gap-2 ml-auto;
+}
+
+/* Chat Main */
+.chat-main {
+  @apply flex-1 px-4;
+}
+
+.message-list {
+  @apply flex flex-col gap-6;
+}
+
+/* Empty State */
+.empty-state {
+  @apply flex flex-col items-center justify-center text-center py-20 flex-1;
+}
+
+.empty-icon {
+  @apply text-6xl mb-6;
+}
+
+.empty-state h2 {
+  @apply text-3xl font-bold mb-2;
+}
+
+.empty-state p {
+  @apply text-muted-foreground text-lg max-w-md;
+}
+
+/* Messages */
+.message {
+  @apply flex gap-4;
+}
+
+.message-avatar {
+  @apply flex-shrink-0 w-10 h-10 flex items-center justify-center text-xl rounded-lg border bg-muted;
+}
+
+.message-content {
+  @apply flex-1 min-w-0;
+}
+
+.message-text {
+  @apply leading-relaxed whitespace-pre-wrap break-words;
+}
+
+/* Ultra-compact text styling for assistant messages - NO Tailwind prose */
+.compact-text {
+  line-height: 1.3;
+}
+
+.compact-text p {
+  margin: 0;
+  line-height: 1.3;
+}
+
+.compact-text p+p {
+  margin-top: 0.1rem;
+}
+
+.compact-text ul,
+.compact-text ol {
+  margin: 0.1rem 0;
+  padding-left: 1.25rem;
+}
+
+.compact-text li {
+  margin: 0;
+  line-height: 1.3;
+}
+
+.compact-text li+li {
+  margin-top: 0.05rem;
+}
+
+.compact-text li>p {
+  margin: 0;
+}
+
+.compact-text strong {
+  font-weight: 600;
+}
+
+.compact-text h1,
+.compact-text h2,
+.compact-text h3,
+.compact-text h4 {
+  margin: 0.25rem 0 0.1rem 0;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.compact-text h1:first-child,
+.compact-text h2:first-child,
+.compact-text h3:first-child,
+.compact-text h4:first-child {
+  margin-top: 0;
+}
+
+.compact-text code {
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  background: hsl(var(--muted));
+  font-family: ui-monospace, monospace;
+  font-size: 0.875em;
+}
+
+.compact-text pre {
+  margin: 0.25rem 0;
+  padding: 0.4rem;
+  border-radius: 0.4rem;
+  background: hsl(var(--muted));
+  overflow-x: auto;
+}
+
+.compact-text pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.compact-text blockquote {
+  margin: 0.25rem 0;
+  padding-left: 0.5rem;
+  border-left: 2px solid hsl(var(--muted-foreground) / 0.3);
+  font-style: italic;
+  color: hsl(var(--muted-foreground));
+}
+
+.compact-text a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+}
+
+
+.message-user .message-text {
+  @apply bg-zinc-900 text-white rounded-2xl px-4 py-3;
+}
+
+.message-user .message-avatar {
+  @apply bg-zinc-900 text-white border-zinc-900;
+}
+
+.dark .message-user .message-text {
+  @apply bg-zinc-800;
+}
+
+.dark .message-user .message-avatar {
+  @apply bg-zinc-800 border-zinc-800;
+}
+
+/* Citations */
+.citations {
+  @apply mt-2 p-3 rounded-lg border bg-muted/50 text-sm;
+}
+
+.citations-header {
+  @apply font-semibold mb-1 text-muted-foreground;
+}
+
+.citation {
+  @apply flex items-center gap-2 py-1;
+}
+
+.citation-source {
+  @apply font-medium;
+}
+
+.citation-page {
+  @apply text-muted-foreground text-xs;
+}
+
+/* Footer */
+.chat-footer {
+  @apply py-6 px-4 border-t;
+}
+
+.query-form {
+  @apply flex items-end gap-2 p-2 rounded-xl border bg-muted/30 focus-within:ring-2 focus-within:ring-ring;
+}
+
+.query-input {
+  @apply flex-1 min-h-12 max-h-48 px-4 py-3 bg-transparent border-none resize-none outline-none text-base;
+}
+
+/* History Panel */
+/* .history-toggle positioning removed (handled in JSX) */
+
+.history-panel {
+  @apply fixed left-0 top-0 bottom-0 w-72 bg-background border-r -translate-x-full transition-transform duration-300 z-40 flex flex-col;
+}
+
+.history-panel.open {
+  @apply translate-x-0;
+}
+
+.history-header {
+  @apply flex justify-between items-center p-6 border-b;
+}
+
+.history-header h3 {
+  @apply text-lg font-semibold;
+}
+
+.history-content {
+  @apply flex-1 overflow-y-auto p-2;
+}
+
+.history-item {
+  @apply p-3 mb-1 rounded-lg cursor-pointer transition-colors border border-transparent hover:bg-accent hover:border-border;
+}
+
+.history-item.active {
+  @apply bg-primary text-primary-foreground;
+}
+
+.history-item-title {
+  @apply font-medium mb-1 truncate;
+}
+
+.history-item-preview {
+  @apply text-sm text-muted-foreground truncate;
+}
+
+.history-item.active .history-item-preview {
+  @apply text-primary-foreground/70;
+}
+
+/* Settings Modal */
+.settings-section {
+  @apply mb-8;
+}
+
+.settings-section h4 {
+  @apply mb-4 text-muted-foreground text-sm uppercase tracking-wide font-semibold;
+}
+
+.settings-row {
+  @apply flex justify-between items-center py-3;
+}
+
+.settings-row label small {
+  @apply block text-muted-foreground text-xs mt-0.5;
+}
+
+/* Knowledge Selector */
+.selector-dropdown {
+  @apply absolute top-full right-0 mt-1 p-4 rounded-lg border bg-popover min-w-64 z-50 shadow-lg;
+}
+
+.selector-group {
+  @apply mb-4;
+}
+
+.selector-group label {
+  @apply block mb-1 text-sm text-muted-foreground font-medium;
+}
+
+/* Action & Nav Menus */
+.action-menu-backdrop,
+.nav-menu-backdrop {
+  @apply fixed inset-0 z-40;
+}
+
+.action-menu-dropdown {
+  @apply absolute bottom-full left-0 mb-1 min-w-44 rounded-lg border bg-popover shadow-lg z-50 overflow-hidden;
+}
+
+.nav-menu-dropdown {
+  @apply absolute top-full right-0 mt-1 min-w-48 rounded-lg border bg-popover shadow-lg z-50 overflow-hidden;
+}
+
+.action-menu-item,
+.nav-menu-item {
+  @apply flex items-center gap-2 w-full p-3 text-sm cursor-pointer transition-colors hover:bg-accent;
+}
+
+.nav-menu-divider {
+  @apply my-1 border-t;
+}
+
+/* Modal */
+.modal-overlay {
+  @apply fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4;
+}
+
+.modal-content {
+  @apply bg-background border rounded-lg max-w-xl w-full max-h-[90vh] flex flex-col;
+}
+
+.modal-header {
+  @apply flex justify-between items-center p-6 border-b;
+}
+
+.modal-header h3 {
+  @apply text-lg font-semibold;
+}
+
+.modal-close {
+  @apply bg-transparent text-2xl text-muted-foreground cursor-pointer hover:text-foreground;
+}
+
+.modal-body {
+  @apply flex-1 overflow-y-auto p-6;
+}
+
+.modal-footer {
+  @apply flex justify-end gap-2 p-6 border-t;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  @apply w-1.5;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-border rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground;
+}
+
+/* Visible scrollbar for data tables */
+.scrollbar-visible {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+
+.scrollbar-visible::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.scrollbar-visible::-webkit-scrollbar-track {
+  background: hsl(var(--muted) / 0.3);
+  border-radius: 4px;
+}
+
+.scrollbar-visible::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 4px;
+}
+
+.scrollbar-visible::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Suggested Questions Grid */
+.suggested-questions-container {
+  @apply w-full max-w-2xl mx-auto mt-6 px-4;
+}
+
+.suggested-questions-grid {
+  @apply grid grid-cols-2 md:grid-cols-3 gap-3;
+}
+
+.question-box {
+  @apply p-4 text-xs text-left rounded-lg border bg-card shadow-sm hover:shadow-md hover:bg-accent/50 hover:border-primary/30 cursor-pointer transition-all duration-300;
+  @apply line-clamp-3 min-h-[80px] flex items-center;
+  opacity: 0;
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.question-box:nth-child(1) {
+  animation-delay: 0.1s;
+}
+
+.question-box:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.question-box:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.question-box:nth-child(4) {
+  animation-delay: 0.4s;
+}
+
+.question-box:nth-child(5) {
+  animation-delay: 0.5s;
+}
+
+.question-box:nth-child(6) {
+  animation-delay: 0.6s;
+}
+
+.question-box:hover {
+  @apply -translate-y-0.5;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .app-container {
+    @apply px-2;
+  }
+
+  .chat-header h1 {
+    @apply text-xl;
+  }
+
+  .history-panel {
+    @apply w-full;
+  }
+
+  .suggested-questions-grid {
+    @apply grid-cols-2;
+  }
+}
+
+/* ========== CopilotKit Theme Integration ========== */
+/* Use explicit RGB colors since CopilotKit may not support oklch() format */
+:root {
+  --copilot-kit-primary-color: rgb(59, 130, 246);
+  /* Blue primary */
+  --copilot-kit-contrast-color: rgb(255, 255, 255);
+  /* White text on primary */
+  --copilot-kit-secondary-color: rgb(243, 244, 246);
+  /* Light gray for AI messages */
+  --copilot-kit-secondary-contrast-color: rgb(0, 0, 0);
+  /* Black text */
+  --copilot-kit-background-color: rgb(255, 255, 255);
+  /* White background */
+  --copilot-kit-muted-color: rgb(107, 114, 128);
+  /* Gray for placeholder/muted */
+  --copilot-kit-separator-color: rgba(0, 0, 0, 0.1);
+  /* Light border */
+  --copilot-kit-scrollbar-color: rgba(0, 0, 0, 0.2);
+  --copilot-kit-response-button-color: rgb(51, 51, 51);
+  --copilot-kit-response-button-background-color: rgb(255, 255, 255);
+}
+
+.dark {
+  --copilot-kit-primary-color: rgb(59, 130, 246);
+  --copilot-kit-contrast-color: rgb(255, 255, 255);
+  --copilot-kit-secondary-color: rgb(38, 38, 38);
+  /* Dark gray for AI messages */
+  --copilot-kit-secondary-contrast-color: rgb(255, 255, 255);
+  /* White text */
+  --copilot-kit-background-color: rgb(23, 23, 23);
+  /* Dark background */
+  --copilot-kit-muted-color: rgb(156, 163, 175);
+  --copilot-kit-separator-color: rgba(255, 255, 255, 0.1);
+  --copilot-kit-scrollbar-color: rgba(255, 255, 255, 0.2);
+  --copilot-kit-response-button-color: rgb(229, 229, 229);
+  --copilot-kit-response-button-background-color: rgb(38, 38, 38);
+}
+
+/* Ensure inputs use the correct background and text colors */
+.copilotKitInput {
+  background-color: rgb(255, 255, 255) !important;
+}
+
+.copilotKitInput>textarea {
+  color: rgb(0, 0, 0) !important;
+  background-color: rgb(255, 255, 255) !important;
+  caret-color: rgb(0, 0, 0) !important;
+  /* Make cursor visible */
+}
+
+/* Fix for placeholder visibility */
+.copilotKitInput>textarea::placeholder {
+  color: rgb(107, 114, 128) !important;
+  opacity: 1;
+}
+
+/* Response/AI message text color - CRITICAL FIX */
+.copilotKitMessage {
+  color: rgb(0, 0, 0) !important;
+  background-color: rgb(243, 244, 246) !important;
+}
+
+/* User message styling - ensure readable */
+.copilotKitUserMessage,
+.copilotKitMessage[data-role="user"] {
+  color: rgb(255, 255, 255) !important;
+  background-color: rgb(59, 130, 246) !important;
+}
+
+/* Loading spinner color */
+.copilotKitLoading,
+.copilotKitThinking {
+  color: rgb(0, 0, 0) !important;
+}
+
+/* Dark mode overrides for input */
+.dark .copilotKitInput {
+  background-color: rgb(23, 23, 23) !important;
+}
+
+.dark .copilotKitInput>textarea {
+  color: rgb(255, 255, 255) !important;
+  background-color: rgb(23, 23, 23) !important;
+  caret-color: rgb(255, 255, 255) !important;
+}
+
+.dark .copilotKitMessage {
+  color: rgb(255, 255, 255) !important;
+  background-color: rgb(38, 38, 38) !important;
+}

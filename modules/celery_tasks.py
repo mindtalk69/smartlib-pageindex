@@ -249,7 +249,6 @@ def delete_vector_store_via_worker(provider: str, **kwargs) -> bool:
 
     For sqlite-vec: Deletes records from the document_vectors table.
     For PGVector: Deletes records from the PGVector collection.
-    For ChromaDB (legacy): Deletes the Chroma collection.
     """
     return _send_task_and_wait(
         DELETE_VECTOR_STORE_TASK,
@@ -264,16 +263,15 @@ def delete_document_vectors_via_worker(
     timeout: float = 30.0,
 ) -> Dict[str, Any]:
     """Delete specific document vectors via worker task.
-    
-    This eliminates direct ChromaDB access from web container,
-    avoiding Azure Files sync issues.
-    
+
+    For sqlite-vec and PGVector, vector deletion is handled by database cascade deletes.
+
     Args:
-        persist_directory: Path to ChromaDB persistence directory.
-        collection_name: Name of the collection.
+        persist_directory: Path to vector store (unused for sqlite-vec/PGVector).
+        collection_name: Name of the collection/table (unused for sqlite-vec/PGVector).
         doc_ids: List of document IDs to delete.
         timeout: Maximum seconds to wait for worker response.
-        
+
     Returns:
         Dict with 'success', 'deleted_count', and optional 'error' keys.
     """

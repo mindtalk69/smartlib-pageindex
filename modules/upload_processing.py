@@ -119,35 +119,16 @@ def cleanup_duplicate_file(
             doc_ids = [str(doc.id) for doc in docs]
             
             # Delete vectors via worker (to avoid Azure Files sync issues)
+            # For sqlite-vec and PGVector, vectors are deleted via database cascade deletes
+            # when Document records are deleted, so no manual deletion is needed
             if doc_ids:
-                try:
-                    from flask import current_app
-                    from modules.llm_utils import get_lc_store_path
-                    from modules.celery_tasks import delete_document_vectors_via_worker
-
-                    vector_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'sqlite-vec')
-
-                    if vector_provider == 'chromadb':
-                        # Legacy ChromaDB deletion (backward compatibility only)
-                        persist_path = get_lc_store_path(user_id=user_id, knowledge_id=knowledge_id)
-                        if persist_path and Path(persist_path).exists():
-                            collection_name = current_app.config.get('CHROMA_COLLECTION_NAME', 'documents-vectors')
-
-                            delete_result = delete_document_vectors_via_worker(
-                                persist_directory=str(persist_path),
-                                collection_name=collection_name,
-                                doc_ids=doc_ids,
-                                timeout=30.0,
-                            )
-
-                            if delete_result.get("success"):
-                                result["deleted_vectors"] += delete_result.get("deleted_count", 0)
-                                logger.info(f"[DuplicateCleanup] Deleted {delete_result.get('deleted_count', 0)} vectors for file_id {file_id}")
-                            else:
-                                logger.warning(f"[DuplicateCleanup] Vector deletion failed: {delete_result.get('error', 'Unknown')}")
-                    # sqlite-vec vectors are handled automatically via database cascade deletes
-                except Exception as vec_err:
-                    logger.error(f"[DuplicateCleanup] Error deleting vectors: {vec_err}", exc_info=True)
+                vector_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'sqlite-vec')
+                if vector_provider in ('sqlite-vec', 'pgvector'):
+                    logger.info(
+                        f"[DuplicateCleanup] Vector deletion for {vector_provider} is handled by database cascade deletes"
+                    )
+                else:
+                    logger.warning(f"[DuplicateCleanup] Vector deletion not supported for provider {vector_provider}")
             
             # Delete DB records
             try:
@@ -1145,7 +1126,7 @@ def async_process_single_file(self, temp_file_path_from_route, original_filename
             task_logger.info(f"[Progress] {progress}% - {stage}")
 
         # Cleanup existing file if this is a re-upload (delete-then-add)
-        # This prevents duplicate vectors in ChromaDB when the same file is uploaded again
+        # This prevents duplicate vectors when the same file is uploaded again
         cleanup_result = cleanup_duplicate_file(
             filename=original_filename,
             library_id=library_id,
