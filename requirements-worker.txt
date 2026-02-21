@@ -2,7 +2,14 @@
 # WORKER OPTIMIZED REQUIREMENTS.TXT - Target: ~500-600MB for BASIC edition
 # ML and document processing container with full RAG capabilities
 # sqlite-vec for vector storage (no PostgreSQL/PGVector)
+# CPU-ONLY: torch is pinned to the CPU build to avoid NVIDIA/CUDA downloads.
+# The Dockerfile passes --extra-index-url https://download.pytorch.org/whl/cpu
 # ============================================================================
+
+# ── CPU-only PyTorch (MUST be first so transitive deps don't pull CUDA) ──────
+# Install via: pip install --extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.3.0             # pip will resolve torch+cpu from the whl/cpu index
+torchvision>=0.18.0      # required by some docling OCR pipelines
 
 # Core Web Framework (needed for task processing)
 Flask==3.1.0

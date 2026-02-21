@@ -10,6 +10,7 @@ from modules.database import (
     get_multimodal_model_id,
     set_multimodal_model,
     ModelConfig,
+    LLMProvider,
 )
 import traceback
 import logging
@@ -39,7 +40,7 @@ def _coerce_temperature(value):
         raise ValueError("Temperature must be a numeric value.") from exc
 
 
-def _validate_deployment_configuration(deployment_name: str, temperature: float | None, streaming: bool) -> tuple[bool, str | None]:
+def _validate_deployment_configuration(deployment_name: str, temperature: float | None, streaming: bool, provider_obj=None) -> tuple[bool, str | None]:
     """Ensure deployment settings are compatible and reachable."""
     if streaming and not is_streaming_supported_for_deployment(deployment_name):
         return False, (
@@ -51,8 +52,21 @@ def _validate_deployment_configuration(deployment_name: str, temperature: float 
     if not temp_ok:
         return False, temp_error
 
+    # Extract API details from the provider object if it exists
+    api_key = None
+    endpoint = None
+    if provider_obj:
+        api_key = provider_obj.api_key
+        endpoint = provider_obj.base_url
+
     try:
-        get_llm(model_name=deployment_name, streaming=streaming, temperature=temperature)
+        get_llm(
+            model_name=deployment_name, 
+            streaming=streaming, 
+            temperature=temperature,
+            api_key=api_key,
+            endpoint=endpoint
+        )
     except Exception as exc:
         logging.warning(
             "Deployment validation failed for %s (streaming=%s, temperature=%s): %s",
@@ -78,12 +92,16 @@ def _check_admin():
 def model_management():
     try:
         models = get_models()
+        providers = LLMProvider.query.filter_by(is_active=True).order_by(LLMProvider.name).all()
+        # Convert providers to dict so we can pass them to the template easily
+        providers_data = [p.to_dict() for p in providers]
     except Exception as e:
         logging.error(f"Error loading model configs: {e}", exc_info=True)
         flash('Error loading model configurations.', 'danger')
         models = []
+        providers_data = []
     current_multimodal_id = get_multimodal_model_id()
-    return render_template('admin/models.html', models=models, current_multimodal_id=current_multimodal_id)
+    return render_template('admin/models.html', models=models, providers=providers_data, current_multimodal_id=current_multimodal_id)
 
 
 @models_bp.route('/data/<int:model_id>', methods=['GET'])
@@ -110,14 +128,19 @@ def add_model():
         name = name.strip()
     if isinstance(deployment_name, str):
         deployment_name = deployment_name.strip()
-    provider = data.get('provider', 'azure_openai')
+    provider_id = data.get('provider_id')
     raw_temperature = data.get('temperature')
     streaming = bool(data.get('streaming', False))
     description = data.get('description')
     set_as_default = bool(data.get('is_default', False))
 
-    if not name or not deployment_name:
-        return jsonify({"status": "error", "message": "Name and deployment_name are required"}), 400
+    if not name or not deployment_name or not provider_id:
+        return jsonify({"status": "error", "message": "Name, deployment_name, and provider_id are required"}), 400
+
+    provider_obj = db.session.get(LLMProvider, provider_id)
+    if not provider_obj:
+        return jsonify({"status": "error", "message": "Invalid provider selected"}), 400
+    provider_type = provider_obj.provider_type
 
     try:
         temperature = _coerce_temperature(raw_temperature)
@@ -128,6 +151,7 @@ def add_model():
         deployment_name,
         temperature,
         streaming,
+        provider_obj=provider_obj
     )
     if not valid:
         return jsonify({"status": "error", "message": validation_error}), 400
@@ -139,7 +163,8 @@ def add_model():
         model_id = create_model(
             name=name,
             deployment_name=deployment_name,
-            provider=provider,
+            provider=provider_type,
+            provider_id=provider_obj.id,
             temperature=temperature,
             streaming=streaming,
             description=description,
@@ -188,9 +213,19 @@ def edit_model(model_id):
         deployment_candidate = new_deployment
         allowed['deployment_name'] = deployment_candidate
 
-    for key in ['provider', 'description']:
-        if key in data:
-            allowed[key] = data[key]
+    if 'provider_id' in data and data['provider_id']:
+        provider_id = data['provider_id']
+        provider_obj = db.session.get(LLMProvider, provider_id)
+        if not provider_obj:
+            return jsonify({"status": "error", "message": "Invalid provider selected"}), 400
+        allowed['provider_id'] = provider_id
+        allowed['provider'] = provider_obj.provider_type
+    else:
+        # Fallback to existing provider on the model if provider_id isn't changing
+        provider_obj = current_model.provider_obj
+
+    if 'description' in data:
+        allowed['description'] = data['description']
 
     if 'is_default' in data:
         allowed['is_default'] = bool(data['is_default'])
@@ -212,6 +247,7 @@ def edit_model(model_id):
         deployment_candidate,
         temperature_candidate,
         streaming_candidate,
+        provider_obj=provider_obj
     )
     if not valid:
         return jsonify({"status": "error", "message": validation_error}), 400

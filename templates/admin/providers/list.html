@@ -1,0 +1,252 @@
+{% extends "admin/layout_mazer.html" %}
+
+{% block admin_title %}LLM Providers{% endblock %}
+
+{% block admin_breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
+<li class="breadcrumb-item active" aria-current="page">LLM Providers</li>
+{% endblock %}
+
+{% block admin_content %}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h4 class="card-title">LLM Providers</h4>
+    <a href="{{ url_for('admin_providers.add_provider') }}" class="btn btn-primary">
+      <i class="bi bi-plus-lg me-1"></i> Add Provider
+    </a>
+  </div>
+  <div class="card-body">
+    {% if providers %}
+    <div class="table-responsive">
+      <table class="table table-striped" id="providers-table">
+        <thead>
+          <tr>
+            <th width="30"><i class="bi bi-grip-vertical" title="Drag to reorder"></i></th>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Base URL</th>
+            <th>Status</th>
+            <th>Health</th>
+            <th>Models</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="provider-list-body">
+          {% for provider in providers %}
+          <tr data-provider-id="{{ provider.id }}" class="provider-row">
+            <td class="drag-handle">
+              <i class="bi bi-grip-vertical text-muted" style="cursor: move;"></i>
+            </td>
+            <td><strong>{{ provider.name }}</strong></td>
+            <td>
+              {% if provider.provider_type == 'azure_openai' %}
+              <span class="badge bg-primary">Azure OpenAI</span>
+              {% elif provider.provider_type == 'ollama' %}
+              <span class="badge bg-info">Ollama</span>
+              {% elif provider.provider_type == 'openai' %}
+              <span class="badge bg-success">OpenAI</span>
+              {% else %}
+              <span class="badge bg-secondary">{{ provider.provider_type }}</span>
+              {% endif %}
+            </td>
+            <td><small>{{ provider.base_url or 'N/A' }}</small></td>
+            <td>
+              {% if provider.is_active %}
+              <span class="badge bg-success">Active</span>
+              {% else %}
+              <span class="badge bg-secondary">Inactive</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if provider.health_status == 'healthy' %}
+              <span class="badge bg-success">Healthy</span>
+              {% elif provider.health_status == 'degraded' %}
+              <span class="badge bg-warning">Degraded</span>
+              {% elif provider.health_status == 'offline' %}
+              <span class="badge bg-danger">Offline</span>
+              {% else %}
+              <span class="badge bg-secondary">Unknown</span>
+              {% endif %}
+              {% if provider.last_health_check %}
+              <br><small class="text-muted">{{ provider.last_health_check.strftime('%Y-%m-%d %H:%M') }}</small>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge bg-info">{{ provider.models.count() }}</span>
+            </td>
+            <td>
+              <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-outline-primary btn-test-provider" data-id="{{ provider.id }}"
+                  title="Test Connection">
+                  <i class="bi bi-lightning"></i>
+                </button>
+                <a href="{{ url_for('admin_providers.edit_provider', provider_id=provider.id) }}"
+                  class="btn btn-outline-secondary" title="Edit">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <button type="button" class="btn btn-outline-danger btn-delete-provider" data-id="{{ provider.id }}"
+                  title="Delete">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle me-2"></i>
+      No providers configured yet. <a href="{{ url_for('admin_providers.add_provider') }}">Add your first provider</a>.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block admin_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Initialize Sortable for drag-and-drop priority reordering
+    const tbody = document.getElementById('provider-list-body');
+    if (tbody) {
+      new Sortable(tbody, {
+        handle: '.drag-handle',
+        animation: 150,
+        onEnd: function (evt) {
+          // Collect new order
+          const rows = tbody.querySelectorAll('.provider-row');
+          const priorities = [];
+          rows.forEach((row, index) => {
+            priorities.push({
+              id: parseInt(row.dataset.providerId),
+              priority: index
+            });
+          });
+
+          // Send to server
+          fetchWithCsrfRetry('/admin/providers/api/providers/priority', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ priorities: priorities })
+          })
+            .then(response => {
+              if (!response.ok) {
+                return response.text().then(text => {
+                  throw new Error(`HTTP ${response.status}: ${text.substring(0, 100)}...`);
+                });
+              }
+              return response.json();
+            })
+            .then(data => {
+              if (data.success) {
+                showToast('Provider priorities updated', 'success');
+              } else {
+                showToast('Error updating priorities', 'danger');
+              }
+            })
+            .catch(error => {
+              console.error('Error:', error);
+              showToast('Error updating priorities', 'danger');
+            });
+        }
+      });
+    }
+
+    // Test provider connection
+    document.querySelectorAll('.btn-test-provider').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const providerId = this.dataset.id;
+        const originalHtml = this.innerHTML;
+        this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        this.disabled = true;
+
+        fetchWithCsrfRetry(`/admin/providers/${providerId}/test`, {
+          method: 'POST'
+        })
+          .then(response => {
+            if (!response.ok) {
+              return response.text().then(text => {
+                throw new Error(`HTTP ${response.status}: ${text.substring(0, 100)}...`);
+              });
+            }
+            return response.json();
+          })
+          .then(data => {
+            this.innerHTML = originalHtml;
+            this.disabled = false;
+
+            if (data.status === 'healthy') {
+              showToast('Provider is healthy: ' + (data.message || 'Connection successful'), 'success');
+            } else if (data.status === 'degraded') {
+              showToast('Provider is degraded: ' + (data.error || 'Unknown issue'), 'warning');
+            } else {
+              showToast('Provider is offline: ' + (data.error || 'Connection failed'), 'danger');
+            }
+
+            // Reload page to show updated health status
+            setTimeout(() => location.reload(), 1500);
+          })
+          .catch(error => {
+            this.innerHTML = originalHtml;
+            this.disabled = false;
+            console.error('Error:', error);
+            showToast('Error testing provider', 'danger');
+          });
+      });
+    });
+
+    // Delete provider
+    document.querySelectorAll('.btn-delete-provider').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const providerId = this.dataset.id;
+        if (confirm('Are you sure you want to delete this provider? This will also delete all associated models.')) {
+          fetchWithCsrfRetry(`/admin/providers/${providerId}/delete`, {
+            method: 'POST'
+          })
+            .then(response => {
+              if (!response.ok) {
+                return response.text().then(text => {
+                  throw new Error(`HTTP ${response.status}: ${text.substring(0, 100)}...`);
+                });
+              }
+              return response.json();
+            })
+            .then(data => {
+              if (data.success) {
+                showToast('Provider deleted successfully', 'success');
+                setTimeout(() => location.reload(), 1000);
+              } else {
+                showToast(data.error || 'Error deleting provider', 'danger');
+              }
+            })
+            .catch(error => {
+              console.error('Error:', error);
+              showToast('Error deleting provider', 'danger');
+            });
+        }
+      });
+    });
+
+    // Helper function to show toast notifications
+    function showToast(message, type = 'info') {
+      // Use existing toast system if available, otherwise alert
+      if (typeof Toastify !== 'undefined') {
+        Toastify({
+          text: message,
+          duration: 3000,
+          gravity: "top",
+          position: "right",
+          backgroundColor: type === 'success' ? '#198754' : type === 'danger' ? '#dc3545' : type === 'warning' ? '#ffc107' : '#0dcaf0',
+        }).showToast();
+      } else {
+        alert(message);
+      }
+    }
+  });
+</script>
+{% endblock %}

@@ -1,6 +1,7 @@
 #!/bin/bash
 # SmartLib Basic - Local Development Runner
-# This script runs the application locally using Uvicorn with auto-reload
+# This script runs the application locally using Gunicorn
+# Matches production Docker configuration for consistency
 
 # Terminal colors
 GREEN='\033[0;32m'
@@ -24,17 +25,32 @@ source .venv/bin/activate
 # Use the virtual environment's python directly
 VENV_PYTHON="./.venv/bin/python"
 
+# Load environment variables from .env.dev
+if [ -f ".env.dev" ]; then
+    echo -e "${GREEN}Loading environment from .env.dev...${NC}"
+    export $(cat .env.dev | grep -v '^#' | grep -v '^$' | xargs)
+fi
+
 # Ensure pip is installed
 if ! $VENV_PYTHON -m pip --version &> /dev/null; then
     echo -e "${YELLOW}Installing pip into virtual environment...${NC}"
     $VENV_PYTHON -m ensurepip --upgrade
 fi
 
-# Check if uvicorn and a2wsgi are installed, if not, install them
-if ! $VENV_PYTHON -c "import uvicorn" &> /dev/null || ! $VENV_PYTHON -c "import a2wsgi" &> /dev/null; then
-    echo -e "${YELLOW}Installing uvicorn and a2wsgi...${NC}"
-    $VENV_PYTHON -m pip install uvicorn a2wsgi
+# Check if gunicorn is installed, if not, install it
+if ! $VENV_PYTHON -c "import gunicorn" &> /dev/null; then
+    echo -e "${YELLOW}Installing gunicorn...${NC}"
+    $VENV_PYTHON -m pip install gunicorn
 fi
 
-echo -e "${GREEN}Starting Uvicorn with auto-reload on port 8000...${NC}"
-$VENV_PYTHON -m uvicorn asgi:asgi_app --reload --port 8000
+# Use GUNICORN_TIMEOUT from env (set in .env.dev, default 300 for long-running agent tasks)
+GUNICORN_TIMEOUT="${GUNICORN_TIMEOUT:-300}"
+
+echo -e "${GREEN}Starting Gunicorn on port 8000 (timeout: ${GUNICORN_TIMEOUT}s)...${NC}"
+echo -e "${YELLOW}Note: --reload is disabled to avoid interrupting SSE streaming connections.${NC}"
+echo -e "${YELLOW}      Restart this script manually when you change Python files.${NC}"
+
+$VENV_PYTHON -m gunicorn app:app \
+    --bind 0.0.0.0:8000 \
+    --workers 1 \
+    --timeout "$GUNICORN_TIMEOUT"

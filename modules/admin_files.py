@@ -103,18 +103,6 @@ def _delete_vectors(doc_ids, user_id, knowledge_id) -> int:
 
     logging.info("Vector deletion for provider %s is not implemented.", vector_provider)
     return 0
-            deleted_count = result.get("deleted_count", 0)
-            logging.info("Deleted %s vector entries via worker from collection %s", deleted_count, collection_name)
-            return deleted_count
-        else:
-            error = result.get("error", "Unknown error")
-            logging.error("Worker failed to delete vectors: %s", error)
-            return 0
-            
-    except Exception as delete_exc:
-        logging.error("Failed removing vectors for doc_ids %s: %s", doc_ids, delete_exc, exc_info=True)
-        # Don't raise - allow file deletion to proceed even if vector deletion fails
-        return 0
 
 
 @files_bp.route('/delete/<int:file_id>', methods=['DELETE'])

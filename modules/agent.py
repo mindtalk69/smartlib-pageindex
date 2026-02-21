@@ -46,11 +46,10 @@ agent_db_session = db.session
 from dotenv import load_dotenv
 from typing import TypedDict, Optional, Tuple, List, Dict, Any, Callable, Annotated, Sequence, Union, TypedDict
 import operator
-from langchain_postgres.vectorstores import DistanceStrategy # Import DistanceStrategy
-from langgraph.errors import GraphInterrupt # Import GraphInterrupt
-import asyncio # Keep asyncio
+from langgraph.errors import GraphInterrupt  # Import GraphInterrupt
+import asyncio  # Keep asyncio
 import logging
-from uuid import uuid4 # Import uuid4
+from uuid import uuid4  # Import uuid4
 from threading import Lock
 
 
@@ -58,7 +57,6 @@ from threading import Lock
 from modules.selfquery import (
     metadata_field_info,
     document_content_description,
-    get_self_query_retriever_postgres,
     _replace_contain_with_ilike,
     _filter_out_no_filter,
 )

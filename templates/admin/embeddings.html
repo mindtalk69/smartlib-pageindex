@@ -12,21 +12,32 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h4 class="card-title">Select Default Embedding Model</h4>
-                <p class="text-muted mb-0">Choose the embedding model to use for document vectorization. Changes take
-                    effect immediately for new content processing.</p>
+                <h4 class="card-title">Embedding Model</h4>
+                <p class="text-muted mb-0">
+                    SmartLib BASIC uses a single local embedding model that runs entirely on the CPU —
+                    no API key or internet connection required after the first download.
+                </p>
             </div>
             <div class="card-body">
 
                 {% if current_model and models.get(current_model) %}
                 <div class="alert alert-light-info color-info">
                     <i class="bi bi-info-circle me-1"></i>
-                    <strong>Current Model:</strong> {{ models[current_model].name }} ({{ models[current_model].type }})
+                    <strong>Active Model:</strong> {{ models[current_model].name }} ({{ models[current_model].type }})
+                </div>
+                {% endif %}
+
+                {% if cache_dir %}
+                <div class="alert alert-light-secondary mb-3 py-2">
+                    <i class="bi bi-folder2-open me-1"></i>
+                    <strong>Local cache directory:</strong>
+                    <code class="ms-1">{{ cache_dir }}</code>
                 </div>
                 {% endif %}
 
                 <form id="embedding-model-form">
                     {% for model_key, model_info in models.items() %}
+                    {% set is_cached = cache_status.get(model_key, False) %}
                     <div class="card border mb-3 shadow-none">
                         <div class="card-body p-3">
                             <div class="form-check">
@@ -34,10 +45,23 @@
                                     value="{{ model_key }}" id="model_{{ loop.index }}" {{ 'checked' if
                                     model_key==current_model else '' }}>
                                 <label class="form-check-label w-100" for="model_{{ loop.index }}">
-                                    <div class="d-flex justify-content-between align-items-center">
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                                         <h6 class="mb-1 text-primary">{{ model_info.name }}</h6>
-                                        <span class="badge bg-light-secondary text-secondary">{{ model_info.type
-                                            }}</span>
+                                        <div class="d-flex gap-2 align-items-center">
+                                            <span class="badge bg-light-secondary text-secondary">{{ model_info.type
+                                                }}</span>
+                                            {% if is_cached %}
+                                            <span class="badge bg-light-success text-success"
+                                                id="cache-badge-{{ loop.index }}">
+                                                <i class="bi bi-check-circle me-1"></i>Cached locally
+                                            </span>
+                                            {% else %}
+                                            <span class="badge bg-light-warning text-warning"
+                                                id="cache-badge-{{ loop.index }}">
+                                                <i class="bi bi-cloud-download me-1"></i>Not cached
+                                            </span>
+                                            {% endif %}
+                                        </div>
                                     </div>
                                     <div class="small text-muted mb-2">
                                         <i class="bi bi-hdd me-1"></i> Size: {{ model_info.size }}
@@ -47,6 +71,24 @@
                                     <p class="mb-0 text-dark small">{{ model_info.description }}</p>
                                 </label>
                             </div>
+
+                            {% if not is_cached %}
+                            <div class="mt-2 ms-4">
+                                <button type="button" class="btn btn-sm btn-outline-primary download-btn"
+                                    data-model="{{ model_key }}" data-badge-id="cache-badge-{{ loop.index }}"
+                                    id="download-btn-{{ loop.index }}">
+                                    <span class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                                    <i class="bi bi-cloud-download me-1"></i>Download &amp; Cache
+                                </button>
+                                <small class="text-muted ms-2">Downloads once, then loads from disk.</small>
+                            </div>
+                            {% else %}
+                            <div class="mt-2 ms-4">
+                                <small class="text-success"><i class="bi bi-check-circle me-1"></i>Model is available
+                                    offline — loads from <code>{{ cache_dir }}</code></small>
+                            </div>
+                            {% endif %}
+
                         </div>
                     </div>
                     {% endfor %}
@@ -69,53 +111,71 @@
 
 {% block admin_scripts %}
 <script>
+    // Save selection
     document.getElementById('embedding-model-form').addEventListener('submit', function (e) {
         e.preventDefault();
-
         const selectedModel = document.querySelector('input[name="embedding_model"]:checked');
-        if (!selectedModel) {
-            alert('Please select an embedding model');
-            return;
-        }
+        if (!selectedModel) { alert('Please select an embedding model'); return; }
 
         const saveButton = document.getElementById('save-button');
         const spinner = saveButton.querySelector('.spinner-border');
-
-        // Show loading state
         saveButton.disabled = true;
         spinner.classList.remove('d-none');
 
-        // Send request using fetchWithCsrfRetry
         fetchWithCsrfRetry('/admin/embeddings/set-default', {
             method: 'POST',
-            // fetchWithCsrfRetry sets the Content-Type to application/json if body is stringified json
-            // and handles the X-CSRFToken header automatically.
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model_name: selectedModel.value
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model_name: selectedModel.value })
         })
-            .then(response => response.json())
+            .then(r => r.json())
             .then(data => {
-                if (data.status === 'success') {
-                    // Success - reload the page to show updated current model
-                    location.reload();
-                } else {
-                    // Error
-                    alert('Error: ' + (data.message || 'Unknown error occurred'));
-                }
+                if (data.status === 'success') { location.reload(); }
+                else { alert('Error: ' + (data.message || 'Unknown error occurred')); }
             })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Network error occurred. Please try again.');
+            .catch(() => alert('Network error occurred. Please try again.'))
+            .finally(() => { saveButton.disabled = false; spinner.classList.add('d-none'); });
+    });
+
+    // Download & Cache buttons
+    document.querySelectorAll('.download-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const modelId = btn.dataset.model;
+            const badgeId = btn.dataset.badgeId;
+            const spinner = btn.querySelector('.spinner-border');
+
+            btn.disabled = true;
+            spinner.classList.remove('d-none');
+            btn.querySelector('i').classList.add('d-none');
+
+            fetchWithCsrfRetry('/admin/embeddings/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model_name: modelId })
             })
-            .finally(() => {
-                // Hide loading state
-                saveButton.disabled = false;
-                spinner.classList.add('d-none');
-            });
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const badge = document.getElementById(badgeId);
+                        if (badge) {
+                            badge.className = 'badge bg-light-success text-success';
+                            badge.innerHTML = '<i class="bi bi-check-circle me-1"></i>Cached locally';
+                        }
+                        btn.parentElement.innerHTML =
+                            '<small class="text-success"><i class="bi bi-check-circle me-1"></i>Model cached successfully. Reload page to refresh.</small>';
+                    } else {
+                        alert('Download failed: ' + (data.message || 'Unknown error'));
+                        btn.disabled = false;
+                        spinner.classList.add('d-none');
+                        btn.querySelector('i').classList.remove('d-none');
+                    }
+                })
+                .catch(err => {
+                    alert('Network error: ' + err);
+                    btn.disabled = false;
+                    spinner.classList.add('d-none');
+                    btn.querySelector('i').classList.remove('d-none');
+                });
+        });
     });
 </script>
 {% endblock %}

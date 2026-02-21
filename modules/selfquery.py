@@ -338,12 +338,11 @@ metadata_field_info = [
 
 document_content_description = "Content chunks from various documents."
 
-def get_self_query_retriever_postgres():
+def get_self_query_retriever():
     """
-    Sets up and returns a SelfQueryRetriever using PGVector.
-    SQLite version - returns None since PGVector is not available.
+    Sets up and returns a SelfQueryRetriever.
+    Returns None for BASIC edition.
     """
-    logger.warning("PGVector is not available in SQLite version. SelfQueryRetriever for PostgreSQL is disabled.")
     return None, None
 
 def _replace_contain_with_ilike(obj):

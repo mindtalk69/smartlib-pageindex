@@ -1,8 +1,14 @@
 from celery import Celery
 import logging
 import os
+import sys
 from datetime import timedelta
 from flask import current_app
+
+# Ensure project root is in sys.path for robust imports in child processes
+project_root = os.path.abspath(os.path.dirname(__file__))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 # Get the broker URL from environment variables
 # Use a default for local development if not set
@@ -37,8 +43,20 @@ _flask_app = None
 def _get_flask_app():
     global _flask_app
     if _flask_app is None:
-        from app import create_app
-        _flask_app = create_app()
+        # IMPORTANT: app.py forces multiprocessing start method to 'spawn',
+        # so worker child processes start fresh and do NOT inherit the parent's
+        # sys.path. We must insert the project root here, inside this function,
+        # so it runs in the spawned process before the import.
+        project_root = os.path.abspath(os.path.dirname(__file__))
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+            logger.info("[Celery Worker] Inserted project root into sys.path: %s", project_root)
+        try:
+            from app import create_app
+            _flask_app = create_app()
+        except ImportError as e:
+            logger.error("[Celery Worker] Failed to import 'app' module: %s (sys.path=%s)", e, sys.path)
+            raise
     return _flask_app
 
 

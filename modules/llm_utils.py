@@ -220,15 +220,29 @@ def get_embedding_function():
                     current_model,
                 )
                 try:
-                    from langchain_huggingface.embeddings import HuggingFaceEmbeddings  
-                     # Fallback to HuggingFace for local models
+                    from langchain_huggingface.embeddings import HuggingFaceEmbeddings
+
+                    # Resolve local cache directory so the model is persisted to disk
+                    # and not re-downloaded on every process start.
+                    _data_dir = os.getenv("DATA_VOLUME_PATH", "data")
+                    _cache_dir = os.getenv(
+                        "EMBEDDING_CACHE_DIR",
+                        os.path.abspath(os.path.join(_data_dir, "hf_cache")),
+                    )
+                    os.makedirs(_cache_dir, exist_ok=True)
+                    logging.info(
+                        "HuggingFace model cache directory: %s", _cache_dir
+                    )
+
                     logging.info(f"Initializing HuggingFace Embeddings model: {current_model}")
                     embedding_function = HuggingFaceEmbeddings(
                         model_name=current_model,
                         model_kwargs=model_kwargs,
-                        encode_kwargs=encode_kwargs,                        
+                        encode_kwargs=encode_kwargs,
+                        cache_folder=_cache_dir,
                     )
                     logging.info("Embeddings model initialized successfully.")
+
                 except Exception as e:
                     logging.error(f"Error initializing embeddings model: {e}", exc_info=True)
                     raise RuntimeError("Failed to initialize embedding model.") from e
@@ -270,7 +284,7 @@ def warmup_embedding_model(sample_text: str | None = None, *, force: bool = Fals
         return False
 
 
-def get_llm(model_name=None, streaming=False, temperature=None):
+def get_llm(model_name=None, streaming=False, temperature=None, api_key=None, endpoint=None, api_version=None):
     """
     Gets a cached LLM instance.
     If model_name is not provided, it reads the default from the ModelConfig table.
@@ -293,6 +307,19 @@ def get_llm(model_name=None, streaming=False, temperature=None):
                     temperature = default_model_obj['temperature']
                 if not streaming and default_model_obj.get('streaming'):
                     streaming = bool(default_model_obj['streaming'])
+                
+                # Extract provider details if available
+                provider_data = default_model_obj.get('provider')
+                if isinstance(provider_data, dict):
+                    if api_key is None:
+                        api_key = provider_data.get('api_key')
+                    if endpoint is None:
+                        endpoint = provider_data.get('base_url')
+                    if api_version is None:
+                        # Extract api_version from config if present
+                        provider_config = provider_data.get('config', {})
+                        if isinstance(provider_config, dict):
+                            api_version = provider_config.get('api_version')
             else:
                 from flask import current_app
                 logging.info(f"get_llm: Condition for using DB model failed. default_model_obj: {default_model_obj}")
@@ -305,7 +332,14 @@ def get_llm(model_name=None, streaming=False, temperature=None):
             logging.info(f"get_llm: Exception reading default model, falling back to app config: {azure_deployment}")
 
     # Use the caching mechanism
-    return get_or_create_llm_for_deployment(azure_deployment, streaming=streaming, temperature=temperature)
+    return get_or_create_llm_for_deployment(
+        azure_deployment, 
+        streaming=streaming, 
+        temperature=temperature,
+        api_key=api_key,
+        endpoint=endpoint,
+        api_version=api_version
+    )
 
 
 # --- LLM cache + invalidate helpers (minimal reload support) ---
@@ -314,7 +348,7 @@ def get_llm(model_name=None, streaming=False, temperature=None):
 # then backend calls `invalidate_llm()` to force the next request to recreate the LLM client.
 _llm_cache = {}
 
-def get_or_create_llm_for_deployment(deployment_name: str, streaming: bool = False, temperature=None):
+def get_or_create_llm_for_deployment(deployment_name: str, streaming: bool = False, temperature=None, api_key=None, endpoint=None, api_version=None):
     """
     Return a cached AzureChatOpenAI instance for the given deployment_name, creating and caching
     it on first use. Use this in code paths where you want per-deployment instances while avoiding
@@ -331,12 +365,12 @@ def get_or_create_llm_for_deployment(deployment_name: str, streaming: bool = Fal
         else:
             logging.info(f"LLM for {key} found in cache, but with different settings. Re-creating.")
 
-    # Get config from Flask app context
-    azure_key = _current_app.config.get("AZURE_OPENAI_API_KEY")
-    azure_endpoint = _current_app.config.get("AZURE_OPENAI_ENDPOINT")
-    api_version = _current_app.config.get("AZURE_OPENAI_API_VERSION")
+    # Get config from Flask app context if explicit keys are not provided
+    azure_key = api_key or _current_app.config.get("AZURE_OPENAI_API_KEY")
+    azure_endpoint = endpoint or _current_app.config.get("AZURE_OPENAI_ENDPOINT")
+    api_version_to_use = api_version or _current_app.config.get("AZURE_OPENAI_API_VERSION")
 
-    if not all([azure_key, azure_endpoint, api_version, key]):
+    if not all([azure_key, azure_endpoint, api_version_to_use, key]):
         raise ValueError("Missing Azure configuration for LLM.")
 
     logging.info(f"Creating and caching LLM for deployment: {key}")
@@ -346,7 +380,7 @@ def get_or_create_llm_for_deployment(deployment_name: str, streaming: bool = Fal
         azure_deployment=key,
         azure_endpoint=azure_endpoint,
         api_key=azure_key,
-        api_version=api_version,
+        api_version=api_version_to_use,
         temperature=temp_value,
         streaming=streaming,
     )

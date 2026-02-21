@@ -21,7 +21,8 @@
             <div class="sidebar-header position-relative">
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="logo">
-                        <a href="{{ url_for('admin.dashboard') }}"><span class="fs-4 fw-bold">SmartLib</span></a>
+                        <a class="submenu-link" href="{{ url_for('admin.dashboard') }}"><span
+                                class="fs-4 fw-bold">SmartLib</span></a>
                     </div>
                     <div class="theme-toggle d-flex gap-2  align-items-center mt-2">
                         <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -63,7 +64,7 @@
                     <li class="sidebar-title">Menu</li>
 
                     <li class="sidebar-item {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
-                        <a href="{{ url_for('admin.dashboard') }}" class='sidebar-link'>
+                        <a class="submenu-link" href="{{ url_for('admin.dashboard') }}" class='sidebar-link'>
                             <i class="bi bi-grid-fill"></i>
                             <span>Dashboard</span>
                         </a>
@@ -81,22 +82,24 @@
                             class="submenu {% if 'admin_users' in request.endpoint or 'admin_groups' in request.endpoint or 'change_password' in request.endpoint %}active{% endif %}">
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin_users.user_management' %}active{% endif %}">
-                                <a href="{{ url_for('admin_users.user_management') }}">Users</a>
+                                <a class="submenu-link" href="{{ url_for('admin_users.user_management') }}">Users</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin_users.password_reset_requests' %}active{% endif %}">
-                                <a href="{{ url_for('admin_users.password_reset_requests') }}">Reset Requests</a>
+                                <a class="submenu-link"
+                                    href="{{ url_for('admin_users.password_reset_requests') }}">Reset Requests</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin_user_groups.user_groups' %}active{% endif %}">
-                                <a href="{{ url_for('admin_user_groups.user_groups') }}">User Groups</a>
+                                <a class="submenu-link" href="{{ url_for('admin_user_groups.user_groups') }}">User
+                                    Groups</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin_groups.groups' %}active{% endif %}">
-                                <a href="{{ url_for('admin_groups.groups') }}">Groups</a>
+                                <a class="submenu-link" href="{{ url_for('admin_groups.groups') }}">Groups</a>
                             </li>
                             <li class="submenu-item {% if request.endpoint == 'change_password' %}active{% endif %}">
-                                <a href="{{ url_for('change_password') }}">Change Password</a>
+                                <a class="submenu-link" href="{{ url_for('change_password') }}">Change Password</a>
                             </li>
                         </ul>
                     </li>
@@ -113,35 +116,41 @@
                             class="submenu {% if 'admin_files' in request.endpoint or 'admin_downloads' in request.endpoint or 'admin_folder_upload' in request.endpoint or 'admin_libraries' in request.endpoint or 'admin_catalogs' in request.endpoint or 'category_management' in request.endpoint or 'admin_knowledges' in request.endpoint or 'admin_languages' in request.endpoint %}active{% endif %}">
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin_files.file_management' %}active{% endif %}">
-                                <a href="{{ url_for('admin_files.file_management') }}">Files</a>
+                                <a class="submenu-link" href="{{ url_for('admin_files.file_management') }}">Files</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin_downloads.download_management' %}active{% endif %}">
-                                <a href="{{ url_for('admin_downloads.download_management') }}">URL Downloads</a>
+                                <a class="submenu-link" href="{{ url_for('admin_downloads.download_management') }}">URL
+                                    Downloads</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin_folder_upload.folder_upload' %}active{% endif %}">
-                                <a href="{{ url_for('admin_folder_upload.folder_upload') }}">Folder Upload</a>
+                                <a class="submenu-link" href="{{ url_for('admin_folder_upload.folder_upload') }}">Folder
+                                    Upload</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin_libraries.library_management' %}active{% endif %}">
-                                <a href="{{ url_for('admin_libraries.library_management') }}">Libraries</a>
+                                <a class="submenu-link"
+                                    href="{{ url_for('admin_libraries.library_management') }}">Libraries</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin_catalogs.catalog_management' %}active{% endif %}">
-                                <a href="{{ url_for('admin_catalogs.catalog_management') }}">Catalogs</a>
+                                <a class="submenu-link"
+                                    href="{{ url_for('admin_catalogs.catalog_management') }}">Catalogs</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin.category_management' %}active{% endif %}">
-                                <a href="{{ url_for('admin.category_management') }}">Categories</a>
+                                <a class="submenu-link" href="{{ url_for('admin.category_management') }}">Categories</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin_knowledges.knowledge_management' %}active{% endif %}">
-                                <a href="{{ url_for('admin_knowledges.knowledge_management') }}">Knowledge Base</a>
+                                <a class="submenu-link"
+                                    href="{{ url_for('admin_knowledges.knowledge_management') }}">Knowledge Base</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin_languages.language_management' %}active{% endif %}">
-                                <a href="{{ url_for('admin_languages.language_management') }}">LLM Languages</a>
+                                <a class="submenu-link" href="{{ url_for('admin_languages.language_management') }}">LLM
+                                    Languages</a>
                             </li>
                         </ul>
                     </li>
@@ -149,42 +158,53 @@
                     <li class="sidebar-title">AI & Connectivity</li>
 
                     <li
-                        class="sidebar-item has-sub {% if 'vector' in request.endpoint or 'ocr' in request.endpoint or 'visual_grounding' in request.endpoint or 'admin_models' in request.endpoint or 'admin_embeddings' in request.endpoint %}active{% endif %}">
+                        class="sidebar-item has-sub {% if 'vector' in request.endpoint or 'ocr' in request.endpoint or 'visual_grounding' in request.endpoint or 'admin_models' in request.endpoint or 'admin_providers' in request.endpoint or 'admin_embeddings' in request.endpoint %}active{% endif %}">
                         <a href="#" class='sidebar-link'>
                             <i class="bi bi-cpu-fill"></i>
                             <span>AI Services</span>
                         </a>
                         <ul
-                            class="submenu {% if 'vector' in request.endpoint or 'ocr' in request.endpoint or 'visual_grounding' in request.endpoint or 'admin_models' in request.endpoint or 'admin_embeddings' in request.endpoint %}active{% endif %}">
+                            class="submenu {% if 'vector' in request.endpoint or 'ocr' in request.endpoint or 'visual_grounding' in request.endpoint or 'admin_models' in request.endpoint or 'admin_providers' in request.endpoint or 'admin_embeddings' in request.endpoint %}active{% endif %}">
                             <li
                                 class="submenu-item {% if 'vector_reference_logs' in request.endpoint %}active{% endif %}">
-                                <a href="{{ url_for('vector_reference_logs.list_vector_reference_logs') }}">Vector
+                                <a class="submenu-link"
+                                    href="{{ url_for('vector_reference_logs.list_vector_reference_logs') }}">Vector
                                     References</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin.vector_store_settings' %}active{% endif %}">
-                                <a href="{{ url_for('admin.vector_store_settings') }}">Vector Settings</a>
+                                <a class="submenu-link" href="{{ url_for('admin.vector_store_settings') }}">Vector
+                                    Settings</a>
                             </li>
                             <li class="submenu-item {% if request.endpoint == 'admin.ocr_settings' %}active{% endif %}">
-                                <a href="{{ url_for('admin.ocr_settings') }}">OCR Settings</a>
+                                <a class="submenu-link" href="{{ url_for('admin.ocr_settings') }}">OCR Settings</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin_visual_grounding.visual_grounding_activities' %}active{% endif %}">
-                                <a href="{{ url_for('admin_visual_grounding.visual_grounding_activities') }}">Visual
+                                <a class="submenu-link"
+                                    href="{{ url_for('admin_visual_grounding.visual_grounding_activities') }}">Visual
                                     Grounding Activity</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin.visual_grounding_settings' %}active{% endif %}">
-                                <a href="{{ url_for('admin.visual_grounding_settings') }}">Visual Grounding
+                                <a class="submenu-link" href="{{ url_for('admin.visual_grounding_settings') }}">Visual
+                                    Grounding
                                     Settings</a>
                             </li>
                             <li
+                                class="submenu-item {% if request.endpoint == 'admin_providers.list_providers' %}active{% endif %}">
+                                <a class="submenu-link" href="{{ url_for('admin_providers.list_providers') }}">LLM
+                                    Providers</a>
+                            </li>
+                            <li
                                 class="submenu-item {% if request.endpoint == 'admin_models.model_management' %}active{% endif %}">
-                                <a href="{{ url_for('admin_models.model_management') }}">LLM Models</a>
+                                <a class="submenu-link" href="{{ url_for('admin_models.model_management') }}">LLM
+                                    Models</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin_embeddings.embedding_models' %}active{% endif %}">
-                                <a href="{{ url_for('admin_embeddings.embedding_models') }}">Embedding Models</a>
+                                <a class="submenu-link"
+                                    href="{{ url_for('admin_embeddings.embedding_models') }}">Embedding Models</a>
                             </li>
                         </ul>
                     </li>
@@ -201,36 +221,39 @@
                             class="submenu {% if 'admin_messages' in request.endpoint or 'admin_feedback' in request.endpoint or 'admin_settings' in request.endpoint or 'logo_settings' in request.endpoint or 'reset_data' in request.endpoint %}active{% endif %}">
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin_messages.message_viewer' %}active{% endif %}">
-                                <a href="{{ url_for('admin_messages.message_viewer') }}">Message History</a>
+                                <a class="submenu-link" href="{{ url_for('admin_messages.message_viewer') }}">Message
+                                    History</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin_feedback.feedback_list' %}active{% endif %}">
-                                <a href="{{ url_for('admin_feedback.feedback_list') }}">Feedback</a>
+                                <a class="submenu-link"
+                                    href="{{ url_for('admin_feedback.feedback_list') }}">Feedback</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin.admin_reset_data' %}active{% endif %}">
-                                <a href="{{ url_for('admin.admin_reset_data') }}">Reset Data</a>
+                                <a class="submenu-link" href="{{ url_for('admin.admin_reset_data') }}">Reset Data</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin_settings.settings_page' %}active{% endif %}">
-                                <a href="{{ url_for('admin_settings.settings_page') }}">App Settings</a>
+                                <a class="submenu-link" href="{{ url_for('admin_settings.settings_page') }}">App
+                                    Settings</a>
                             </li>
                             <li
                                 class="submenu-item {% if request.endpoint == 'admin.logo_settings' %}active{% endif %}">
-                                <a href="{{ url_for('admin.logo_settings') }}">Logo Settings</a>
+                                <a class="submenu-link" href="{{ url_for('admin.logo_settings') }}">Logo Settings</a>
                             </li>
                         </ul>
                     </li>
 
                     <li class="sidebar-item">
-                        <a href="{{ url_for('index') }}" class='sidebar-link'>
+                        <a class="submenu-link" href="{{ url_for('index') }}" class='sidebar-link'>
                             <i class="bi bi-box-arrow-left"></i>
                             <span>Back to App</span>
                         </a>
                     </li>
 
                     <li class="sidebar-item">
-                        <a href="{{ url_for('logout') }}" class='sidebar-link'>
+                        <a class="submenu-link" href="{{ url_for('logout') }}" class='sidebar-link'>
                             <i class="bi bi-box-arrow-right"></i>
                             <span>Logout</span>
                         </a>
@@ -257,7 +280,8 @@
                     <div class="col-12 col-md-6 order-md-2 order-first">
                         <nav aria-label="breadcrumb" class="breadcrumb-header float-start float-lg-end">
                             <ol class="breadcrumb">
-                                <li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Admin</a>
+                                <li class="breadcrumb-item"><a class="submenu-link"
+                                        href="{{ url_for('admin.dashboard') }}">Admin</a>
                                 </li>
                                 {% block breadcrumb %}
                                 {% block admin_breadcrumb %}

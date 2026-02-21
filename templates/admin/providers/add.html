@@ -1,0 +1,215 @@
+{% extends "admin/layout_mazer.html" %}
+
+{% block admin_title %}Add LLM Provider{% endblock %}
+
+{% block admin_breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('admin_providers.list_providers') }}">LLM Providers</a></li>
+<li class="breadcrumb-item active" aria-current="page">Add Provider</li>
+{% endblock %}
+
+{% block admin_content %}
+<div class="card">
+    <div class="card-header">
+        <h4 class="card-title">Add New LLM Provider</h4>
+    </div>
+    <div class="card-body">
+        <form id="add-provider-form" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Provider Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="name" name="name" required
+                            placeholder="e.g., Azure OpenAI Production">
+                        <small class="text-muted">Unique name to identify this provider</small>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="provider_type" class="form-label">Provider Type <span
+                                class="text-danger">*</span></label>
+                        <select class="form-select" id="provider_type" name="provider_type" required>
+                            <option value="">Select provider type...</option>
+                            <option value="azure_openai">Azure OpenAI</option>
+                            <option value="ollama">Ollama</option>
+                            <option value="openai">OpenAI</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="base_url" class="form-label">Base URL</label>
+                        <input type="url" class="form-control" id="base_url" name="base_url"
+                            placeholder="e.g., https://your-resource.openai.azure.com">
+                        <small class="text-muted" id="url-hint">API endpoint URL</small>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="api_key" class="form-label">API Key</label>
+                        <input type="password" class="form-control" id="api_key" name="api_key"
+                            placeholder="Enter API key">
+                        <small class="text-muted">Leave empty for local providers like Ollama</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="priority" class="form-label">Priority</label>
+                        <input type="number" class="form-control" id="priority" name="priority" value="0" min="0">
+                        <small class="text-muted">Lower number = higher priority</small>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">Status</label>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="is_active" name="is_active" checked>
+                            <label class="form-check-label" for="is_active">Active</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="config" class="form-label">Configuration (JSON)</label>
+                <textarea class="form-control font-monospace" id="config" name="config" rows="5"
+                    placeholder='{"api_version": "2024-02-15-preview", "test_deployment": "gpt-4o-mini"}'></textarea>
+                <small class="text-muted">Optional provider-specific configuration in JSON format</small>
+            </div>
+
+            <div class="alert alert-info" id="provider-hints" style="display: none;">
+                <strong>Configuration Hints:</strong>
+                <div id="hint-content"></div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <a href="{{ url_for('admin_providers.list_providers') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left me-1"></i> Cancel
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg me-1"></i> Add Provider
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block admin_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('add-provider-form');
+        const providerTypeSelect = document.getElementById('provider_type');
+        const hintsDiv = document.getElementById('provider-hints');
+        const hintContent = document.getElementById('hint-content');
+        const baseUrlInput = document.getElementById('base_url');
+        const urlHint = document.getElementById('url-hint');
+
+        // Provider-specific hints
+        const hints = {
+            'azure_openai': {
+                url: 'https://your-resource.openai.azure.com',
+                urlHint: 'Azure OpenAI endpoint (e.g., https://your-resource.openai.azure.com)',
+                config: '{\n  "api_version": "2024-02-15-preview",\n  "test_deployment": "gpt-4o-mini"\n}',
+                hint: '<ul><li>Base URL should be your Azure OpenAI endpoint</li><li>API key is required</li><li>Add "api_version" and "test_deployment" in config for testing</li></ul>'
+            },
+            'ollama': {
+                url: 'http://localhost:11434',
+                urlHint: 'Ollama API endpoint (default: http://localhost:11434)',
+                config: '{}',
+                hint: '<ul><li>Base URL defaults to http://localhost:11434</li><li>No API key needed for local Ollama</li><li>Ensure Ollama is running before testing</li></ul>'
+            },
+            'openai': {
+                url: 'https://api.openai.com/v1',
+                urlHint: 'OpenAI API endpoint (default: https://api.openai.com/v1)',
+                config: '{\n  "model": "gpt-3.5-turbo"\n}',
+                hint: '<ul><li>Base URL defaults to https://api.openai.com/v1</li><li>API key is required</li><li>Add default "model" in config</li></ul>'
+            }
+        };
+
+        // Update hints when provider type changes
+        providerTypeSelect.addEventListener('change', function () {
+            const type = this.value;
+            if (type && hints[type]) {
+                if (baseUrlInput) baseUrlInput.placeholder = hints[type].url;
+                if (urlHint) urlHint.textContent = hints[type].urlHint;
+                const configInput = document.getElementById('config');
+                if (configInput) configInput.placeholder = hints[type].config;
+                if (hintContent) hintContent.innerHTML = hints[type].hint;
+                if (hintsDiv) hintsDiv.style.display = 'block';
+            } else {
+                if (hintsDiv) hintsDiv.style.display = 'none';
+            }
+        });
+
+        // Form submission
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const formData = new FormData(form);
+            const data = {
+                name: formData.get('name'),
+                provider_type: formData.get('provider_type'),
+                base_url: formData.get('base_url'),
+                api_key: formData.get('api_key'),
+                priority: formData.get('priority'),
+                is_active: document.getElementById('is_active').checked ? 'true' : 'false',
+                config: formData.get('config')
+            };
+
+            // Validate JSON config if provided
+            if (data.config) {
+                try {
+                    JSON.parse(data.config);
+                } catch (e) {
+                    alert('Invalid JSON in configuration field');
+                    return;
+                }
+            }
+
+            // Submit via AJAX
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalHtml = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Adding...';
+            submitBtn.disabled = true;
+
+            const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+
+            fetch('/admin/providers/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = '/admin/providers';
+                    } else {
+                        alert(data.error || 'Error adding provider');
+                        submitBtn.innerHTML = originalHtml;
+                        submitBtn.disabled = false;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error adding provider');
+                    submitBtn.innerHTML = originalHtml;
+                    submitBtn.disabled = false;
+                });
+        });
+    });
+</script>
+{% endblock %}

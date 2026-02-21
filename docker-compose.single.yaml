@@ -1,33 +1,45 @@
-version: '3.8'
-
 services:
   smartlib:
-    image: smartlib-basic:latest
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.single
+    image: smartlib-basic:latest
+    container_name: smartlib-basic
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/home/data
+      # Persistent data: SQLite DB, vector store, uploaded files, HF model cache
+      - smartlib_data:/home/data
+      # Custom logo / static overrides (optional)
+      - ./static/img:/app/static/img
     env_file:
       - .env.dev
     environment:
+      # All broker/backend URLs point to the embedded Redis inside this container
+      - CELERY_BROKER_URL=redis://localhost:6379/0
+      - CELERY_RESULT_BACKEND=redis://localhost:6379/0
+      - STREAM_BUS_URL=redis://localhost:6379/0
       - APP_EDITION=BASIC
       - VECTOR_STORE_PROVIDER=sqlite-vec
       - SQLALCHEMY_DATABASE_URI=sqlite:////home/data/smartlib.db
-      - CELERY_BROKER_URL=sqlite:////home/data/celery.db
-      - CELERY_RESULT_BACKEND=sqlite:////home/data/celery.db
       - LOCAL_MODE=true
-      - DEFAULT_EMBEDDING_MODEL=text-embedding-3-small
+      - DEFAULT_EMBEDDING_MODEL=Qwen/Qwen3-Embedding-0.6B
+      - EMBEDDING_CACHE_DIR=/home/data/hf_cache
       - EMBEDDING_WARMUP_ENABLED=false
       - AGENT_TASK_TIMEOUT=240
+      - GUNICORN_TIMEOUT=300
       - IS_ENABLED_OCR=1
-      - IS_OCR_LOCAL=false
+      - IS_OCR_LOCAL=true
       - DOCLING_EXPORT_TYPE=MARKDOWN
+      - SKIP_DATA_MOUNT_CHECK=true
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 30s
       timeout: 10s
+      start_period: 30s
       retries: 3
+
+volumes:
+  smartlib_data:
+    driver: local

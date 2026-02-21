@@ -36,7 +36,7 @@
           <tr data-id="{{ m.id }}">
             <td>{{ m.id }}</td>
             <td>{{ m.name }}</td>
-            <td>{{ m.provider }}</td>
+            <td>{{ m.provider_obj.name if m.provider_obj else m.provider }}</td>
             <td><small>{{ m.deployment_name }}</small></td>
             <td>{{ m.temperature if m.temperature is not none else '' }}</td>
             <td>
@@ -92,11 +92,11 @@
         </div>
         <div class="mb-3">
           <label class="form-label">Provider</label>
-          <select name="provider" id="model-provider" class="form-select">
-            <option value="azure_openai">Azure OpenAI</option>
-            <option value="openai">OpenAI</option>
-            <option value="local">Local</option>
-            <option value="other">Other</option>
+          <select name="provider_id" id="model-provider" class="form-select" required>
+            <option value="">-- Select Provider --</option>
+            {% for p in providers %}
+            <option value="{{ p.id }}">{{ p.name }} ({{ p.provider_type }})</option>
+            {% endfor %}
           </select>
         </div>
         <div class="mb-3">
@@ -219,7 +219,7 @@
               const m = res.model;
               document.getElementById('model-id').value = m.id;
               document.getElementById('model-name').value = m.name;
-              document.getElementById('model-provider').value = m.provider || 'azure_openai';
+              document.getElementById('model-provider').value = m.provider_id || '';
               document.getElementById('model-deployment').value = m.deployment_name;
               document.getElementById('model-temperature').value = m.temperature || '';
               document.getElementById('model-streaming').value = m.streaming ? 'true' : 'false';
@@ -276,7 +276,7 @@
       const id = document.getElementById('model-id').value;
       const payload = {
         name: document.getElementById('model-name').value,
-        provider: document.getElementById('model-provider').value,
+        provider_id: document.getElementById('model-provider').value,
         deployment_name: document.getElementById('model-deployment').value,
         temperature: document.getElementById('model-temperature').value || null,
         streaming: document.getElementById('model-streaming').value === 'true',

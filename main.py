@@ -27,6 +27,7 @@ from modules.login_azure import init_login_azure
 from modules.admin import init_admin, admin_bp
 from modules.view_document import init_view_document
 from modules.about import init_about
+from modules.api_auth import init_api_auth
 # Remove celery imports, context is handled in celery_app.ContextTask
 import modules.query
 import logging
@@ -184,6 +185,7 @@ def create_app():
     init_admin(app)
     init_view_document(app)
     init_about(app)
+    init_api_auth(app)
     modules.query.init_query(app)
 
     # Register feedback API blueprint

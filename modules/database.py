@@ -361,6 +361,51 @@ class AppSettings(db.Model):
     key = db.Column(db.String, primary_key=True)
     value = db.Column(db.Text, nullable=False)
 
+# --- LLM Provider configuration table ---
+class LLMProvider(db.Model):
+    """LLM Provider configuration table for managing multiple LLM providers"""
+    __tablename__ = 'llm_providers'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    provider_type = db.Column(db.String(50), nullable=False)  # 'azure_openai', 'ollama', 'openai'
+    base_url = db.Column(db.String(500))  # API endpoint
+    api_key = db.Column(db.String(500))  # Encrypted API key
+    is_active = db.Column(db.Boolean, default=True)
+    is_default = db.Column(db.Boolean, default=False)  # Default provider flag
+    priority = db.Column(db.Integer, default=0)  # Lower = higher priority
+    config = db.Column(JSON, default={})  # Provider-specific configuration
+    last_health_check = db.Column(db.DateTime)
+    health_status = db.Column(db.String(20))  # 'healthy', 'degraded', 'offline'
+    error_message = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=db.func.now())
+    updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
+
+    # Relationships
+    models = db.relationship('ModelConfig', backref='provider_obj', lazy='dynamic', cascade='all, delete-orphan')
+
+    def to_dict(self, include_sensitive=False):
+        """Serialize provider to dictionary for API responses"""
+        data = {
+            'id': self.id,
+            'name': self.name,
+            'provider_type': self.provider_type,
+            'base_url': self.base_url,
+            'is_active': self.is_active,
+            'is_default': self.is_default,
+            'priority': self.priority,
+            'config': self.config or {},
+            'last_health_check': self.last_health_check.isoformat() if self.last_health_check else None,
+            'health_status': self.health_status,
+            'error_message': self.error_message,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'model_count': self.models.count() if self.models else 0
+        }
+        if include_sensitive:
+            data['api_key'] = self.api_key
+        return data
+
 # --- Model configuration table for managing LLM deployments ---
 class ModelConfig(db.Model):
     """
@@ -368,9 +413,10 @@ class ModelConfig(db.Model):
     """
     __tablename__ = 'model_configs'
     id = db.Column(db.Integer, primary_key=True)
+    provider_id = db.Column(db.Integer, db.ForeignKey('llm_providers.id'), nullable=True)  # NULL for legacy records
     name = db.Column(db.String(128), nullable=False, unique=True)  # Friendly name
     deployment_name = db.Column(db.String(256), nullable=False)   # e.g., Azure deployment id / model alias
-    provider = db.Column(db.String(64), nullable=False, default='azure_openai')  # e.g., azure_openai, local
+    provider = db.Column(db.String(64), nullable=False, default='azure_openai')  # Legacy field for backward compatibility
     temperature = db.Column(db.Float, nullable=True)
     streaming = db.Column(db.Boolean, nullable=False, default=False)
     description = db.Column(db.Text, nullable=True)
@@ -378,12 +424,26 @@ class ModelConfig(db.Model):
     created_by = db.Column(db.String, db.ForeignKey('users.user_id'), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
 
-    def to_dict(self):
+    # Add unique constraint for provider + deployment
+    __table_args__ = (
+        db.UniqueConstraint('provider_id', 'deployment_name', name='uix_provider_deployment'),
+    )
+
+    def to_dict(self, include_sensitive=False):
+        # Get the full provider object with API key if available
+        provider_dict = None
+        if self.provider_obj:
+            provider_dict = self.provider_obj.to_dict(include_sensitive=include_sensitive)
+        elif self.provider:
+            # Fallback for legacy records without provider_id
+            provider_dict = {'provider_type': self.provider}
+        
         return {
             "id": self.id,
+            "provider_id": self.provider_id,
             "name": self.name,
             "deployment_name": self.deployment_name,
-            "provider": self.provider,
+            "provider": provider_dict,  # Now includes full provider with API key if include_sensitive=True
             "temperature": self.temperature,
             "streaming": self.streaming,
             "description": self.description,
@@ -394,8 +454,9 @@ class ModelConfig(db.Model):
 
 # --- Helper functions for ModelConfig management ---
 def get_models():
-    """Return all model configs ordered by name."""
-    return ModelConfig.query.order_by(ModelConfig.name).all()
+    """Return all model configs ordered by name with provider relationship loaded."""
+    from sqlalchemy.orm import joinedload
+    return ModelConfig.query.options(joinedload(ModelConfig.provider_obj)).order_by(ModelConfig.name).all()
 
 def get_model_by_id(model_id):
     """Return a single ModelConfig by its ID."""
@@ -409,13 +470,14 @@ def get_model_by_deployment(deployment_name: str):
     return ModelConfig.query.filter_by(deployment_name=deployment_name).first()
 
 
-def create_model(name, deployment_name, provider='azure_openai', temperature=None, streaming=False, description=None, created_by=None, set_as_default=False):
+def create_model(name, deployment_name, provider='azure_openai', temperature=None, streaming=False, description=None, created_by=None, set_as_default=False, provider_id=None):
 
     """Create a new ModelConfig. If set_as_default is True, unset other defaults."""
     new_model = ModelConfig(
         name=name,
         deployment_name=deployment_name,
         provider=provider,
+        provider_id=provider_id,  # Add provider_id
         temperature=temperature,
         streaming=streaming,
         description=description,
@@ -440,7 +502,7 @@ def create_model(name, deployment_name, provider='azure_openai', temperature=Non
 def update_model(model_id, **kwargs):
     """
     Update fields on a ModelConfig.
-    Allowed kwargs: name, deployment_name, provider, temperature, streaming, description, is_default
+    Allowed kwargs: name, deployment_name, provider, provider_id, temperature, streaming, description, is_default
     """
     model = db.session.get(ModelConfig, model_id)
     if not model:
@@ -451,7 +513,7 @@ def update_model(model_id, **kwargs):
         if is_default:
             # Clear other defaults first
             ModelConfig.query.update({ModelConfig.is_default: False})
-        for field in ['name', 'deployment_name', 'provider', 'temperature', 'streaming', 'description', 'is_default']:
+        for field in ['name', 'deployment_name', 'provider', 'provider_id', 'temperature', 'streaming', 'description', 'is_default']:
             if field in kwargs:
                 setattr(model, field, kwargs[field])
         db.session.commit()
@@ -462,7 +524,11 @@ def update_model(model_id, **kwargs):
         raise
 
 def set_default_model(model_id):
-    """Set a specific model as the global default; clears previous default."""
+    """Set a specific model as the global default; clears previous default.
+    
+    Also automatically sets this model as the default multimodal model
+    if no multimodal model is currently configured.
+    """
     model = db.session.get(ModelConfig, model_id)
     if not model:
         logging.warning(f"Attempted to set default for non-existent ModelConfig ID: {model_id}")
@@ -473,11 +539,68 @@ def set_default_model(model_id):
         model.is_default = True
         db.session.commit()
         logging.info(f"ModelConfig ID {model_id} set as default.")
+        
+        # Also set as multimodal model if none is currently configured
+        try:
+            setting = db.session.get(AppSettings, 'multimodal_model_id')
+            if not setting or not setting.value:
+                # No multimodal model configured, set this one
+                if not setting:
+                    setting = AppSettings(key='multimodal_model_id', value=str(model_id))
+                    db.session.add(setting)
+                else:
+                    setting.value = str(model_id)
+                db.session.commit()
+                logging.info(f"ModelConfig ID {model_id} also set as multimodal model (none was configured).")
+            else:
+                logging.debug(f"Multimodal model already configured (ID: {setting.value}), not overwriting.")
+        except Exception as mm_err:
+            logging.warning(f"Could not auto-set multimodal model: {mm_err}")
+            # Don't fail the whole operation if multimodal setting fails
+        
         return True
     except Exception as e:
         db.session.rollback()
         logging.error(f"Error setting default ModelConfig {model_id}: {e}", exc_info=True)
         raise
+
+def set_default_provider(provider_id):
+    """Set a specific provider as the default; clears previous default."""
+    provider = db.session.get(LLMProvider, provider_id)
+    if not provider:
+        logging.warning(f"Attempted to set default for non-existent LLMProvider ID: {provider_id}")
+        return False
+    try:
+        # Clear existing defaults in one statement
+        LLMProvider.query.update({LLMProvider.is_default: False})
+        # Set new default
+        provider.is_default = True
+        db.session.commit()
+        logging.info(f"LLMProvider ID {provider_id} ({provider.name}) set as default.")
+        return True
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error setting default LLMProvider {provider_id}: {e}", exc_info=True)
+        raise
+
+def get_default_provider():
+    """Return the default LLMProvider or None if not set."""
+    try:
+        default = LLMProvider.query.filter_by(is_default=True, is_active=True).first()
+        if default:
+            logging.info(f"Found default provider: ID={default.id}, Name={default.name}")
+            return default
+        else:
+            # Fallback to highest priority active provider
+            fallback = LLMProvider.query.filter_by(is_active=True).order_by(LLMProvider.priority.asc()).first()
+            if fallback:
+                logging.info(f"No default provider set, using highest priority: {fallback.name}")
+                return fallback
+            logging.info("No default or active provider found")
+            return None
+    except Exception as e:
+        logging.error(f"Error getting default provider: {e}", exc_info=True)
+        return None
 
 def get_multimodal_model_id():
     """Return the stored multimodal ModelConfig ID, or None if not configured."""
@@ -522,7 +645,7 @@ def get_default_model():
         default = ModelConfig.query.filter_by(is_default=True).first()
         if default:
             logging.info(f"--- Found default model in DB: ID={default.id}, Name={default.name}, is_default={default.is_default} ---")
-            return default.to_dict()
+            return default.to_dict(include_sensitive=True)
         else:
             logging.info("--- No default model found with is_default=True in DB ---")
             return None
