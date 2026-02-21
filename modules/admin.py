@@ -1132,6 +1132,11 @@ class SettingsForm(FlaskForm):
         'Azure Document Intelligence Endpoint',
         validators=[Optional(), URL(require_tld=True, message="Provide a valid https endpoint.")],
     )
+    api_key = StringField(
+        'Azure Document Intelligence API Key',
+        validators=[Optional()],
+        render_kw={'placeholder': 'Enter your API key (BASIC edition only)', 'autocomplete': 'off'},
+    )
     dummy = HiddenField('dummy')  # Retain dummy for compatibility
 
     def validate(self, extra_validators=None):
@@ -1265,6 +1270,7 @@ def ocr_settings():
                 'is_auto_ocr',
                 'ocr_mode',
                 'doc_intelligence_endpoint',
+                'doc_intelligence_key',  # Store API key in DB for BASIC edition
             ])
         ).all()
         settings = {s.key: s.value for s in settings_query}
@@ -1275,6 +1281,7 @@ def ocr_settings():
         settings.setdefault('is_auto_ocr', '0')
         settings.setdefault('ocr_mode', 'default')
         settings.setdefault('doc_intelligence_endpoint', '')
+        settings.setdefault('doc_intelligence_key', '')
     except Exception as e:
         logging.error(f"Error fetching OCR settings: {traceback.format_exc()}")
         flash('Error loading OCR settings.', 'danger')
@@ -1282,14 +1289,15 @@ def ocr_settings():
             'is_enabled_ocr': '0',
             'ocr_mode': 'default',
             'doc_intelligence_endpoint': '',
+            'doc_intelligence_key': '',
         }
 
-    legacy_key_setting = db.session.get(AppSettings, 'doc_intelligence_key')
+    # BASIC edition only - API key stored in database
     key_env_available = bool(
         os.environ.get('DOC_INTELLIGENCE_KEY')
         or os.environ.get('AZURE_DOCUMENT_INTELLIGENCE_KEY')
     )
-    legacy_key_present = bool(legacy_key_setting and legacy_key_setting.value)
+    legacy_key_present = bool(settings.get('doc_intelligence_key'))
 
     if form.validate_on_submit():
         try:
@@ -1297,25 +1305,21 @@ def ocr_settings():
             is_auto_ocr = request.form.get('is_auto_ocr', '0')
             ocr_mode = form.ocr_mode.data
             endpoint = form.endpoint.data or ''
+            api_key = form.api_key.data or ''
 
-            if ocr_mode == 'azure':
-                key_available = bool(
-                    os.environ.get('DOC_INTELLIGENCE_KEY')
-                    or os.environ.get('AZURE_DOCUMENT_INTELLIGENCE_KEY')
+            if ocr_mode == 'azure' and not api_key:
+                flash(
+                    'Please provide an API key for Azure Document Intelligence.',
+                    'danger',
                 )
-                if not key_available:
-                    flash(
-                        'Configure DOC_INTELLIGENCE_KEY as a Key Vault reference before '
-                        'enabling Azure Document Intelligence.',
-                        'danger',
-                    )
-                    return redirect(url_for('admin.ocr_settings'))
+                return redirect(url_for('admin.ocr_settings'))
 
             settings_to_update = {
                 'is_enabled_ocr': is_enabled_ocr,
                 'is_auto_ocr': is_auto_ocr,
                 'ocr_mode': ocr_mode,
                 'doc_intelligence_endpoint': endpoint,
+                'doc_intelligence_key': api_key,  # Store API key in DB (BASIC edition)
             }
 
             for key_name, value in settings_to_update.items():
@@ -1326,20 +1330,13 @@ def ocr_settings():
                     new_setting = AppSettings(key=key_name, value=value)
                     db.session.add(new_setting)
 
-            if legacy_key_setting:
-                db.session.delete(legacy_key_setting)
-                legacy_key_present = False
-
             db.session.commit()
 
             current_app.config['IS_ENABLED_OCR'] = is_enabled_ocr == '1'
             current_app.config['IS_AUTO_OCR'] = is_auto_ocr == '1'
             current_app.config['OCR_MODE'] = ocr_mode
             current_app.config['DOC_INTELLIGENCE_ENDPOINT'] = endpoint
-            current_app.config['DOC_INTELLIGENCE_KEY'] = (
-                os.environ.get('DOC_INTELLIGENCE_KEY')
-                or os.environ.get('AZURE_DOCUMENT_INTELLIGENCE_KEY')
-            )
+            current_app.config['DOC_INTELLIGENCE_KEY'] = api_key
 
             flash('OCR settings updated successfully.', 'success')
         except Exception as e:
@@ -1351,6 +1348,7 @@ def ocr_settings():
     if request.method == 'GET':
         form.ocr_mode.data = settings.get('ocr_mode', 'default')
         form.endpoint.data = settings.get('doc_intelligence_endpoint', '')
+        form.api_key.data = settings.get('doc_intelligence_key', '')
 
     return render_template(
         'admin/settings_ocr.html',
@@ -1358,7 +1356,6 @@ def ocr_settings():
         is_enabled_ocr=settings.get('is_enabled_ocr', '0') == '1',
         is_auto_ocr=settings.get('is_auto_ocr', '0') == '1',
         key_env_available=key_env_available,
-        legacy_key_present=legacy_key_present,
     )
 # --- Reset Global Vector Store Route ---
 @admin_bp.route('/reset_global_vector_store', methods=['POST'])
@@ -1648,8 +1645,8 @@ def vector_store_settings():
     try:
         settings_keys = [
             'VECTOR_STORE_PROVIDER', 'VECTOR_STORE_MODE', 'vector_store_mode',
-            'CHROMA_COLLECTION_NAME',
             'PGVECTOR_CONNECTION_STRING', 'PGVECTOR_COLLECTION_NAME',
+            'SQLITE_VECTOR_TABLE_NAME',
         ]
         settings_query = AppSettings.query.filter(AppSettings.key.in_(settings_keys)).all()
         settings = {s.key: s.value for s in settings_query}

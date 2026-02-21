@@ -116,7 +116,7 @@ def init_index(app):
         active_language = get_active_language_name()
 
         # Get vector store provider from config
-        vector_store_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb')
+        vector_store_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'sqlite-vec')
 
         return render_template(
             'index.html',
@@ -190,3 +190,53 @@ def init_index(app):
             "message_count": message_count,
             "uploaded_docs_count": uploaded_docs_count
         })
+
+    # React App routes at /app/
+    @app.route('/app/')
+    @app.route('/app/<path:path>')
+    def react_app(path=None):
+        """Serve React app at /app/ route."""
+        from flask import send_from_directory
+        import os
+
+        react_dist_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist')
+
+        # Serve index.html for all routes (React Router)
+        return send_from_directory(react_dist_dir, 'index.html')
+
+    # Serve React app static assets
+    @app.route('/app/assets/<path:filename>')
+    def react_assets(filename):
+        """Serve React app static assets."""
+        from flask import send_from_directory
+        import os
+
+        react_dist_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist')
+        assets_dir = os.path.join(react_dist_dir, 'assets')
+
+        return send_from_directory(assets_dir, filename)
+
+    # Admin React App routes at /admin-app/
+    @app.route('/admin-app/')
+    @app.route('/admin-app/<path:path>')
+    def admin_react_app(path=None):
+        """Serve admin React app at /admin-app/ route."""
+        from flask import send_from_directory
+        import os
+
+        admin_dist_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'admin-frontend', 'dist')
+
+        # Serve index.html for all routes (React Router)
+        return send_from_directory(admin_dist_dir, 'index.html')
+
+    # Serve admin React app static assets
+    @app.route('/admin-app/assets/<path:filename>')
+    def admin_react_assets(filename):
+        """Serve admin React app static assets."""
+        from flask import send_from_directory
+        import os
+
+        admin_dist_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'admin-frontend', 'dist')
+        assets_dir = os.path.join(admin_dist_dir, 'assets')
+
+        return send_from_directory(assets_dir, filename)

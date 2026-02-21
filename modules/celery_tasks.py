@@ -24,8 +24,8 @@ FILE_PROCESS_TASK = "modules.upload_processing.async_process_single_file"
 AGENT_TASK = "modules.agent.invoke_agent_graph"
 AGENT_STREAMING_TASK = "modules.agent.invoke_agent_graph_streaming"
 DOCUMENT_CHUNKS_TASK = "modules.vector_tasks.fetch_document_chunks"
-LIST_CHROMA_STORES_TASK = "modules.vector_tasks.list_chroma_stores"
-DELETE_CHROMA_COLLECTION_TASK = "modules.vector_tasks.delete_chroma_collection"
+LIST_VECTOR_STORES_TASK = "modules.vector_tasks.list_vector_stores"
+DELETE_VECTOR_STORE_TASK = "modules.vector_tasks.delete_vector_store"
 DELETE_DOCUMENT_VECTORS_TASK = "modules.vector_tasks.delete_document_vectors"
 RESUME_AGENT_TASK = "modules.agent.resume_agent_graph"
 
@@ -236,24 +236,25 @@ def fetch_document_chunks(persist_directory: str, collection_name: str, document
     )
 
 
-def list_chroma_stores(base_path: str | None = None):
-    """List local Chroma stores via worker task."""
+def list_vector_stores():
+    """List vector stores via worker task."""
     return _send_task_and_wait(
-        LIST_CHROMA_STORES_TASK,
-        {"base_path": base_path},
+        LIST_VECTOR_STORES_TASK,
+        {},
     )
 
 
-def delete_chroma_collection_via_worker(persist_directory: str, collection_name: str) -> bool:
-    """Delete a Chroma collection via worker task."""
-    result = _send_task_and_wait(
-        DELETE_CHROMA_COLLECTION_TASK,
-        {
-            "persist_directory": persist_directory,
-            "collection_name": collection_name,
-        },
+def delete_vector_store_via_worker(provider: str, **kwargs) -> bool:
+    """Delete a vector store via worker task.
+
+    For sqlite-vec: Deletes records from the document_vectors table.
+    For PGVector: Deletes records from the PGVector collection.
+    For ChromaDB (legacy): Deletes the Chroma collection.
+    """
+    return _send_task_and_wait(
+        DELETE_VECTOR_STORE_TASK,
+        {"provider": provider, **kwargs},
     )
-    return bool(result)
 
 
 def delete_document_vectors_via_worker(

@@ -57,14 +57,17 @@ def view_document(library_id, document_id):
 
     # Get collection name based on vector store provider
     import os
-    vector_provider = os.environ.get('VECTOR_STORE_PROVIDER', 'chromadb')
+    vector_provider = os.environ.get('VECTOR_STORE_PROVIDER', 'sqlite-vec')
 
+    # Collection name configuration based on provider
     if vector_provider == 'pgvector':
-        # PGVector uses underscore (PostgreSQL convention)
         base_collection_name = current_app.config.get('PGVECTOR_COLLECTION_NAME', 'documents_vectors')
-    else:
-        # ChromaDB uses hyphen (original convention)
+    elif vector_provider == 'chromadb':
+        # Legacy ChromaDB support (backward compatibility only)
         base_collection_name = current_app.config.get('CHROMA_COLLECTION_NAME', 'documents-vectors')
+    else:
+        # sqlite-vec uses table name, not collection name
+        base_collection_name = current_app.config.get('SQLITE_VECTOR_TABLE_NAME', 'document_vectors')
 
     persist_directory = None
 

@@ -201,10 +201,9 @@ class Config:
     PGVECTOR_TABLE_NAME = os.environ.get('PGVECTOR_TABLE_NAME', 'document_vectors')
     PGVECTOR_EMBEDDING_DIMENSION = int(os.environ.get('PGVECTOR_EMBEDDING_DIMENSION', '1536'))
 
-    # DEPRECATED: ChromaDB settings (kept for backward compatibility during migration)
-    LOCAL_VECTOR_STORE_BASE_PATH = os.environ.get('VECTOR_STORE_BASE_PATH', os.path.join(DATA_VOLUME_PATH, 'chroma'))
-    CHROMA_COLLECTION_NAME = os.environ.get('CHROMA_COLLECTION_NAME', 'documents-vectors')
+    # VECTOR_STORE_MODE is used for backward compatibility with existing deployments
     VECTOR_STORE_MODE = os.environ.get('VECTOR_STORE_MODE', 'knowledge').lower()
+
     # Build full version string with edition suffix (e.g., 1.1.26-ENT or 1.1.26-BASIC)
     APP_VERSION = os.environ.get('APP_VERSION') or f"{BUILD_VERSION}-{APP_EDITION}"
 

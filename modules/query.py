@@ -504,7 +504,7 @@ def init_query(app):
 
         vector_store_config = {
             "mode": vector_store_mode,
-            "backend": current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb'),
+            "backend": current_app.config.get('VECTOR_STORE_PROVIDER', 'sqlite-vec'),
             "user_id": current_user.get_id(),
             "knowledge_id": knowledge_id_filter,
             "library_id": library_id_filter,
@@ -518,10 +518,9 @@ def init_query(app):
             extra_kwargs["db_message_id_for_stream"] = db_message_id_for_stream
             extra_kwargs["user_id_for_stream"] = current_user.get_id()
 
-        # Wake worker before ChromaDB queries to handle Azure App Service cold starts
+        # Wake worker before queries to handle Azure App Service cold starts
         # This ensures the worker is active and can access the shared Azure Files mount
-        if vector_store_config.get("backend") == "chromadb":
-            wake_worker(timeout=5.0)  # Quick ping, don't block long
+        wake_worker(timeout=5.0)  # Quick ping, don't block long
 
         task_timeout = current_app.config.get('AGENT_TASK_TIMEOUT', 120)
 

@@ -33,23 +33,13 @@ from langchain.retrievers.self_query.base import SelfQueryRetriever
 from langchain_openai import AzureChatOpenAI
 
 # Conditional import: Vector store providers
-# sqlite-vec is the default for BASIC edition
-# ChromaDB is deprecated but kept for backward compatibility
+# sqlite-vec is the default and only vector store for BASIC edition
 try:
     from langchain_community.vectorstores import SQLiteVec
     SQLITE_VEC_AVAILABLE = True
 except ImportError:
     SQLiteVec = None
     SQLITE_VEC_AVAILABLE = False
-
-try:
-    from langchain_chroma import Chroma
-    from chromadb.errors import InternalError as ChromaInternalError
-    CHROMA_AVAILABLE = True
-except ImportError:
-    Chroma = None
-    ChromaInternalError = None
-    CHROMA_AVAILABLE = False
 
 agent_db_session = db.session
 
@@ -480,7 +470,7 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
             query = enhanced_query
     # --- End Query Enhancement ---
 
-    vector_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb')
+    vector_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'sqlite-vec')
     app_default_vector_store_mode = current_app.config.get('VECTOR_STORE_MODE', 'user')
 
     logging.info(
@@ -507,7 +497,7 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
     if vector_provider == 'pgvector':
         from modules.pgvector_utils import get_pg_vector_store
         collection_name = current_app.config.get('PGVECTOR_COLLECTION_NAME', 'documents_vectors')
-        
+
         logging.info(f"[PGVector DEBUG] Using collection: {collection_name}")
         try:
             store = get_pg_vector_store(embed_func, collection_name=collection_name)
@@ -548,70 +538,6 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
         except Exception as e:
             logging.error(f"[sqlite-vec DEBUG] Error initializing sqlite-vec: {e}")
             return {"documents": [], "structured_query": "Error initializing sqlite-vec.", "error": str(e)}
-    elif vector_provider == 'chromadb':
-        # Runtime check: Ensure ChromaDB is available
-        if not CHROMA_AVAILABLE:
-            error_msg = (
-                f"ChromaDB not installed but VECTOR_STORE_PROVIDER={vector_provider}. "
-                f"Install with: pip install chromadb langchain-chroma"
-            )
-            logging.error(error_msg)
-            return {
-                "documents": [],
-                "structured_query": "ChromaDB not available",
-                "error": error_msg
-            }
-
-        requested_mode = mode_for_operation or app_default_vector_store_mode
-
-        if requested_mode not in {'global', 'knowledge', 'user'}:
-            if knowledge_id:
-                requested_mode = 'knowledge'
-            elif user_id:
-                requested_mode = 'user'
-            else:
-                requested_mode = 'global'
-
-        if requested_mode == 'user' and not user_id:
-            logging.warning(
-                "User-scoped vector store requested without user_id; "
-                "falling back to global store."
-            )
-            requested_mode = 'global'
-        if requested_mode == 'knowledge' and not knowledge_id:
-            logging.warning(
-                "Knowledge-scoped vector store requested without knowledge_id; "
-                "falling back to global store."
-            )
-            requested_mode = 'global'
-
-        persist_dir = get_lc_store_path(user_id, knowledge_id, requested_mode)
-        if not persist_dir or not os.path.exists(persist_dir):
-            logging.warning(f"Chroma directory not found or path is None: {persist_dir}. Retrieval will likely fail.")
-            return {
-                "documents": [],
-                "structured_query": "Vector store not found.",
-                "error": f"Vector store not found at {persist_dir}."
-            }
-        chroma_collection_name = current_app.config.get('CHROMA_COLLECTION_NAME', 'documents-vectors')
-        import re
-
-        def sanitize_collection_name(name: str) -> str:
-            cleaned = name.strip()
-            cleaned = re.sub(r'\s+', '_', cleaned)
-            if not re.match(r'^[a-zA-Z0-9](?:[a-zA-Z0-9._-]{1,510}[a-zA-Z0-9])$', cleaned):
-                raise ValueError(f"Invalid Chroma collection name: {cleaned}")
-            return cleaned
-
-        if chroma_collection_name:
-            chroma_collection_name = sanitize_collection_name(chroma_collection_name)
-
-        chroma_kwargs = {
-            "embedding_function": embed_func,
-            "persist_directory": str(persist_dir),
-            "collection_name": chroma_collection_name,
-        }
-        store = Chroma(**chroma_kwargs)
     else:
         logging.error(f"Unsupported VECTOR_STORE_PROVIDER: {vector_provider}")
         return {"documents": [], "structured_query": "Unsupported vector store provider.", "error": f"Unsupported vector store provider: {vector_provider}"}
@@ -631,63 +557,11 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
             elif vector_provider == 'sqlite-vec':
                 # sqlite-vec uses standard LangChain filter dict
                 search_kwargs = {'k': k_docs, 'filter': explicit_filters}
-            elif vector_provider == 'chromadb':
-                if len(explicit_filters) > 1:
-                    chroma_filter = {'$and': [{k: v} for k, v in explicit_filters.items()]}
-                else:
-                    chroma_filter = explicit_filters
-                search_kwargs = {'k': k_docs, 'filter': chroma_filter}
 
             retrieved_docs: List[Document] = []
             manual_filter_fallback_used = False
-            last_chroma_error: Optional[Exception] = None
 
-            if vector_provider == 'chromadb' and ChromaInternalError is not None:
-                max_attempts = 2
-                for attempt in range(1, max_attempts + 1):
-                    try:
-                        retrieved_docs = store.similarity_search(query, **search_kwargs)
-                        last_chroma_error = None
-                        break
-                    except ChromaInternalError as chroma_exc:
-                        last_chroma_error = chroma_exc
-                        logging.warning(
-                            "[RAG] Chroma InternalError during similarity_search (attempt %s/%s): %s",
-                            attempt,
-                            max_attempts,
-                            chroma_exc,
-                        )
-                        if attempt == max_attempts:
-                            break
-                        time.sleep(0.4)
-                        store = Chroma(**chroma_kwargs)
-                if last_chroma_error is not None and not retrieved_docs:
-                    logging.warning(
-                        "[RAG] Falling back to manual metadata filter after Chroma InternalError: %s",
-                        last_chroma_error,
-                    )
-                    try:
-                        unfiltered_docs = store.similarity_search(query, k=k_docs * 3)
-                    except Exception as fallback_exc:
-                        logging.error(
-                            "[RAG] Manual fallback retrieval failed: %s",
-                            fallback_exc,
-                            exc_info=True,
-                        )
-                        unfiltered_docs = []
-                    else:
-                        filtered_docs: List[Document] = []
-                        for doc in unfiltered_docs:
-                            if all(doc.metadata.get(key) == value for key, value in explicit_filters.items()):
-                                filtered_docs.append(doc)
-                        retrieved_docs = filtered_docs
-                        manual_filter_fallback_used = True
-                        logging.info(
-                            "[RAG] Manual filter fallback produced %d documents",
-                            len(retrieved_docs),
-                        )
-            else:
-                retrieved_docs = store.similarity_search(query, **search_kwargs)
+            retrieved_docs = store.similarity_search(query, **search_kwargs)
 
             structured_query_string = f"Direct search with filters: {explicit_filters}"
             if manual_filter_fallback_used:
@@ -709,7 +583,7 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
             if vector_provider == 'pgvector':
                 chosen_strategy = (search_strategy or "similarity").lower()
             else:
-                # Default to similarity for Chroma as well to avoid brittle metadata filtering
+                # Default to similarity for sqlite-vec to avoid brittle metadata filtering
                 chosen_strategy = (search_strategy or "similarity").lower()
 
             logging.info(

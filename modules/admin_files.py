@@ -84,15 +84,23 @@ def _sanitize_collection_name(raw_value: str) -> str:
 
 def _delete_vectors(doc_ids, user_id, knowledge_id) -> int:
     """Delete vectors via Celery worker to avoid Azure Files sync issues.
-    
-    Previously this function directly accessed ChromaDB, which caused
-    sync issues on Azure when both web and worker containers tried to
-    access the same Azure Files mount. Now it delegates to the worker.
+
+    For sqlite-vec (BASIC Edition): Vectors are deleted automatically via database cascade deletes.
+    For PGVector (Enterprise Edition): Vectors are deleted via database operations.
+    For ChromaDB (legacy): Delegation to worker for file-based vector deletion.
     """
     if not doc_ids:
         return 0
 
-    vector_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb')
+    vector_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'sqlite-vec')
+
+    # sqlite-vec and PGVector handle deletion via database cascade deletes
+    # No manual vector deletion needed
+    if vector_provider in ('sqlite-vec', 'pgvector'):
+        logging.info("Vector deletion for provider %s is handled by database cascade deletes.", vector_provider)
+        return 0
+
+    # Legacy ChromaDB support
     if vector_provider != 'chromadb':
         logging.info("Vector deletion for provider %s is not implemented.", vector_provider)
         return 0
@@ -112,19 +120,27 @@ def _delete_vectors(doc_ids, user_id, knowledge_id) -> int:
         logging.info("Vector store directory %s does not exist; skipping vector deletion", persist_dir)
         return 0
 
-    collection_name = _sanitize_collection_name(current_app.config.get('CHROMA_COLLECTION_NAME', 'documents-vectors'))
+    # Get collection name based on vector provider
+    vector_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'sqlite-vec')
+    if vector_provider == 'chromadb':
+        # Legacy ChromaDB support
+        collection_name = _sanitize_collection_name(current_app.config.get('CHROMA_COLLECTION_NAME', 'documents-vectors'))
+    else:
+        # sqlite-vec and pgvector don't use this function
+        logging.info("Vector provider %s does not use admin_files vector cleanup", vector_provider)
+        return 0
 
     # Use Celery worker for ChromaDB access to avoid Azure Files sync issues
     try:
         from modules.celery_tasks import delete_document_vectors_via_worker
-        
+
         result = delete_document_vectors_via_worker(
             persist_directory=str(persist_dir),
             collection_name=collection_name,
             doc_ids=doc_ids,
             timeout=30.0,
         )
-        
+
         if result.get("success"):
             deleted_count = result.get("deleted_count", 0)
             logging.info("Deleted %s vector entries via worker from collection %s", deleted_count, collection_name)

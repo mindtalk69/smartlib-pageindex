@@ -1114,7 +1114,10 @@ def get_lc_store_path(user_id=None, knowledge_id=None, mode_param=None): # Renam
         mode = 'user' 
         
     logger.info(f"VECTOR_STORE_MODE: {mode}")
-    
+
+    # sqlite-vec uses a single shared database, no per-user/knowledge subdirectories needed
+    # This function is kept for backward compatibility with ChromaDB-based deployments
+    # For sqlite-vec (BASIC edition default), this returns None as vectors are in the main DB
     base_path = None
     try:
         from flask import current_app
@@ -1123,7 +1126,7 @@ def get_lc_store_path(user_id=None, knowledge_id=None, mode_param=None): # Renam
             if configured:
                 base_path = Path(configured)
     except Exception as cfg_exc:
-        logger.debug(f"Falling back to default Chroma base path: {cfg_exc}")
+        logger.debug(f"Falling back to default base path: {cfg_exc}")
 
     if base_path is None:
         base_path = Path('data') / 'chroma'
