@@ -1,6 +1,7 @@
 # ============================================================================
 # WEB ULTRALIGHT REQUIREMENTS.TXT - Target: ~200-300MB footprint
 # Flask web-only container with API-based embeddings (no local doc processing)
+# sqlite-vec for vector storage (embedded vectors in SQLite)
 # ============================================================================
 
 # Core Web Framework
@@ -24,23 +25,21 @@ alembic==1.15.2
 openai==1.100.2
 tiktoken==0.9.0
 langchain-openai==0.2.10
+
+# LangChain Core
 langchain>=0.3.18
 langchain-community>=0.3.17
-langchain-chroma>=0.1.4
-langchain-postgres>=0.0.6
 langgraph-checkpoint>=2.0.25
 langgraph-prebuilt>=0.1.8
 langgraph-supervisor>=0.0.19
 langgraph-sdk>=0.1.66
-chromadb>=0.5.23
-pgvector>=0.2.5
+
+# Vector Store - sqlite-vec (embedded vectors in SQLite, no ChromaDB)
+sqlite-vec>=0.1.1
 
 # Document loading handled by worker container (remote API only)
 # Visual grounding preview requires lightweight Docling reader
-
 docling-core~=2.29
-# Strictly limit to datamodel loader; skips heavy OCR extras
-# docling meta package pulls converters we don't need on web
 
 # HTTP & Utilities (minimal)
 httpx==0.28.1
@@ -50,8 +49,6 @@ pydantic==2.11.4
 
 # Microsoft Authentication (needed for MS login)
 msal==1.30.0
-
-# Vector database interactions handled via worker microservice
 
 # Additional dependencies
 lark==1.2.2
@@ -70,18 +67,20 @@ pandas==2.2.3
 # ============================================================================
 # REMOVED FOR SIZE OPTIMIZATION:
 # ============================================================================
-# - sentence-transformers (~200MB with dependencies)
+# - sentence-transformers (~200MB with dependencies) - in worker only
 # - langchain-huggingface (legacy package; replaced by langchain-community embeddings)
-# - scikit-learn (~50MB)
-# - PyMuPDF (~50MB)
-# - pdfminer.six (~20MB)
-# - Most other ML and document processing libraries
+# - scikit-learn (~50MB) - in worker only
+# - PyMuPDF (~50MB) - in worker only
+# - pdfminer.six (~20MB) - in worker only
+# - pgvector, langchain-postgres - using sqlite-vec instead
+# - torch, torchvision - in worker only
 #
 # Functionality now provides:
 # - Web interface and API
 # - OpenAI API-based embeddings (text-embedding-3-small)
 # - Task submission to worker
-# - Database operations
+# - Database operations (SQLite)
+# - Vector storage (sqlite-vec)
 # - User authentication and admin interface
 #
 # Expected size: ~200-300MB

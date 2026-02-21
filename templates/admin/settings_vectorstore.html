@@ -30,10 +30,10 @@
                 <input type="hidden" name="provider" value="pgvector">
                 {% elif app_edition == 'BASIC' %}
                 <div class="alert alert-secondary py-2">
-                    <i class="bi bi-box-seam me-2"></i> Basic Edition: <strong>ChromaDB</strong> is the enforced
+                    <i class="bi bi-box-seam me-2"></i> Basic Edition: <strong>sqlite-vec</strong> is the enforced
                     provider.
                 </div>
-                <input type="hidden" name="provider" value="chromadb">
+                <input type="hidden" name="provider" value="sqlite-vec">
                 {% else %}
                 {# Fallback for unknown edition or dev mode: Show all options #}
                 {% for subfield in form.provider %}
@@ -51,13 +51,8 @@
                 {% endif %}
             </div>
 
-            {# --- Store Mode --- #}
-            {% if app_edition == 'BASIC' or not app_edition %}
-            <div class="mb-3" id="store-mode-group">
-                {{ render_field_stacked(form.store_mode, class="form-select", label_visible=true) }}
-                <small class="form-text text-muted">Determines how local stores (ChromaDB) are organized.</small>
-            </div>
-            {% endif %}
+            {# --- Store Mode (Deprecated for sqlite-vec) --- #}
+            {# sqlite-vec uses a single database, no mode selection needed #}
 
             <div id="pgvector-fields" style="display: none;">
                 <h5 class="mt-4 mb-3">PGVector Settings</h5>
@@ -91,10 +86,21 @@
                 </div>
             </div>
 
-            <div id="chromadb-fields" style="display: none;">
-                <h5 class="mt-4 mb-3">ChromaDB Settings</h5>
+            <div id="sqlite-vec-fields" style="display: none;">
+                <h5 class="mt-4 mb-3">sqlite-vec Settings</h5>
+                <div class="alert alert-info py-2">
+                    <i class="bi bi-info-circle me-2"></i> sqlite-vec uses the main SQLite database for vector storage.
+                    No additional configuration needed.
+                </div>
                 <div class="mb-3">
-                    {{ render_field_stacked(form.chroma_collection, label_visible=true) }}
+                    <label class="form-label">Database Path</label>
+                    <input type="text" class="form-control-plaintext" readonly
+                        value="{{ current_settings.get('SQLALCHEMY_DATABASE_URI', 'sqlite:///app.db') }}"
+                        aria-describedby="sqliteVecHelp">
+                    <div id="sqliteVecHelp" class="form-text">
+                        Vectors are stored in the <code>{{ current_settings.get('SQLITE_VECTOR_TABLE_NAME', 'document_vectors') }}</code>
+                        table within the main SQLite database.
+                    </div>
                 </div>
             </div>
 
@@ -115,59 +121,20 @@
         <p class="text-muted mb-4">Manage existing vector store data. Deleting a collection is permanent and cannot be
             undone.</p>
 
-        {# --- ChromaDB Management Section --- #}
+        {# --- sqlite-vec Management Section --- #}
         {% if app_edition == 'BASIC' or not app_edition %}
-        <div id="chromadb-management-section"
-            style="display: {% if current_settings.get('VECTOR_STORE_PROVIDER') == 'chromadb' %}block{% else %}none{% endif %};">
-            <h5>ChromaDB Storage Management</h5>
-            <p>The following ChromaDB stores and collections were found in the
-                <code>{{ chroma_base_path or 'data/chroma' }}</code> directory. You can delete individual collections,
-                which are
-                typically tied to the current embedding model ({{ current_embedding }}).
+        <div id="sqlite-vec-management-section"
+            style="display: {% if current_settings.get('VECTOR_STORE_PROVIDER') == 'sqlite-vec' %}block{% else %}none{% endif %};">
+            <h5>sqlite-vec Storage Management</h5>
+            <p>Vectors are stored in the main SQLite database in the
+                <code>{{ current_settings.get('SQLITE_VECTOR_TABLE_NAME', 'document_vectors') }}</code> table.
             </p>
-
-            {% if chroma_stores_info %}
-            {% for store_info in chroma_stores_info %}
-            <div class="card border mb-3 shadow-none">
-                <div class="card-header bg-light">
-                    Store Scope: <strong>{{ store_info.scope }}</strong>
-                    <small class="text-muted d-block">Path: {{ store_info.path }}</small>
-                </div>
-                <div class="card-body">
-                    {% if store_info.collections %}
-                    <ul class="list-group list-group-flush">
-                        {% for collection in store_info.collections %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                            <div>
-                                <span class="fw-bold">{{ collection.name }}</span>
-                                <span class="badge bg-secondary rounded-pill ms-2">{{ collection.count }} items</span>
-                            </div>
-                            <form method="POST" action="{{ url_for('admin.delete_chroma_collection') }}"
-                                onsubmit="return confirm('Are you sure you want to delete the collection \'{{ collection.name }}\'? This is irreversible.');">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="hidden" name="store_path" value="{{ store_info.path }}">
-                                <input type="hidden" name="collection_name" value="{{ collection.name }}">
-                                <button type="submit" class="btn btn-danger btn-sm">
-                                    <i class="bi bi-trash"></i> Delete
-                                </button>
-                            </form>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                    {% elif store_info.error %}
-                    <p class="text-danger mb-0">Could not inspect store: {{ store_info.error }}</p>
-                    {% else %}
-                    <p class="text-muted mb-0">No collections found in this store.</p>
-                    {% endif %}
-                </div>
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                To reset the vector store, delete all records from the document_vectors table or delete the entire
+                SQLite database file. The database file is located at:
+                <code>{{ current_settings.get('SQLALCHEMY_DATABASE_URI', 'sqlite:///app.db') }}</code>
             </div>
-            {% endfor %}
-            {% else %}
-            <div class="alert alert-warning">
-                <i class="bi bi-exclamation-triangle me-2"></i>
-                No ChromaDB stores found in <code>{{ chroma_base_path or 'data/chroma' }}</code>.
-            </div>
-            {% endif %}
         </div>
         {% endif %}
 
@@ -217,23 +184,19 @@
 
         // Get references to the sections
         const pgvectorFields = document.getElementById('pgvector-fields');
-        const chromadbFields = document.getElementById('chromadb-fields');
-        const storeModeGroup = document.getElementById('store-mode-group'); // Get the store mode group
+        const sqliteVecFields = document.getElementById('sqlite-vec-fields');
 
-        // Hide all provider-specific sections and the store mode group initially
+        // Hide all provider-specific sections initially
         if (pgvectorFields) pgvectorFields.style.display = 'none';
-        if (chromadbFields) chromadbFields.style.display = 'none';
-        if (storeModeGroup) storeModeGroup.style.display = 'none'; // Hide store mode initially
+        if (sqliteVecFields) sqliteVecFields.style.display = 'none';
 
 
         // Show the relevant sections based on the provider
         if (provider === 'pgvector') {
             if (pgvectorFields) pgvectorFields.style.display = 'block';
-            // Keep storeModeGroup hidden for pgvector
         }
-        else if (provider === 'chromadb') {
-            if (chromadbFields) chromadbFields.style.display = 'block';
-            if (storeModeGroup) storeModeGroup.style.display = 'block'; // Show store mode for chromadb
+        else if (provider === 'sqlite-vec') {
+            if (sqliteVecFields) sqliteVecFields.style.display = 'block';
         }
     }
 
@@ -242,14 +205,14 @@
     document.querySelectorAll('input[name="provider"]').forEach(radio => {
         radio.addEventListener('change', function () {
             const provider = this.value;
-            const chromaManagement = document.getElementById('chromadb-management-section');
+            const sqliteVecManagement = document.getElementById('sqlite-vec-management-section');
             const pgvectorReset = document.getElementById('pgvector-reset-section');
 
-            if (chromaManagement) chromaManagement.style.display = 'none';
+            if (sqliteVecManagement) sqliteVecManagement.style.display = 'none';
             if (pgvectorReset) pgvectorReset.style.display = 'none';
 
-            if (provider === 'chromadb') {
-                if (chromaManagement) chromaManagement.style.display = 'block';
+            if (provider === 'sqlite-vec') {
+                if (sqliteVecManagement) sqliteVecManagement.style.display = 'block';
             } else if (provider === 'pgvector') {
                 if (pgvectorReset) pgvectorReset.style.display = 'block';
             }

@@ -32,25 +32,24 @@ from langchain.chains.query_constructor.schema import AttributeInfo
 from langchain.retrievers.self_query.base import SelfQueryRetriever
 from langchain_openai import AzureChatOpenAI
 
-# Conditional import: ChromaDB only needed for BASIC edition or when VECTOR_STORE_PROVIDER=chromadb
+# Conditional import: Vector store providers
+# sqlite-vec is the default for BASIC edition
+# ChromaDB is deprecated but kept for backward compatibility
+try:
+    from langchain_community.vectorstores import SQLiteVec
+    SQLITE_VEC_AVAILABLE = True
+except ImportError:
+    SQLiteVec = None
+    SQLITE_VEC_AVAILABLE = False
+
 try:
     from langchain_chroma import Chroma
     from chromadb.errors import InternalError as ChromaInternalError
     CHROMA_AVAILABLE = True
-except ImportError:  # pragma: no cover - optional dependency for Enterprise edition
+except ImportError:
     Chroma = None
     ChromaInternalError = None
     CHROMA_AVAILABLE = False
-    # Only log warning if chromadb is actually needed
-    app_edition = os.environ.get('APP_EDITION', 'BASIC')
-    vector_store_provider = os.environ.get('VECTOR_STORE_PROVIDER', 'chromadb')
-    if app_edition == 'BASIC' or vector_store_provider == 'chromadb':
-        import logging
-        logging.getLogger(__name__).warning(
-            "ChromaDB not available but APP_EDITION=%s or VECTOR_STORE_PROVIDER=%s. "
-            "Install with: pip install chromadb langchain-chroma",
-            app_edition, vector_store_provider
-        )
 
 agent_db_session = db.session
 
@@ -515,6 +514,40 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
         except Exception as e:
             logging.error(f"[PGVector DEBUG] Error initializing PGVector: {e}")
             return {"documents": [], "structured_query": "Error initializing PGVector.", "error": str(e)}
+    elif vector_provider == 'sqlite-vec':
+        # sqlite-vec uses the main SQLite database
+        if not SQLITE_VEC_AVAILABLE:
+            error_msg = "sqlite-vec not installed. Install with: pip install sqlite-vec"
+            logging.error(error_msg)
+            return {"documents": [], "structured_query": "sqlite-vec not available", "error": error_msg}
+
+        from langchain_community.vectorstores import SQLiteVec
+
+        db_uri = current_app.config.get('SQLALCHEMY_DATABASE_URI')
+        if not db_uri or not db_uri.startswith('sqlite:///'):
+            error_msg = f"Expected sqlite:/// URI for sqlite-vec, got: {db_uri}"
+            logging.error(error_msg)
+            return {"documents": [], "structured_query": "Invalid database URI", "error": error_msg}
+
+        db_path = db_uri.replace('sqlite:///', '', 1)
+        if not os.path.isabs(db_path):
+            db_path = os.path.join(basedir, db_path)
+
+        vector_dimension = current_app.config.get('SQLITE_VECTOR_DIMENSION', 1536)
+        table_name = current_app.config.get('SQLITE_VECTOR_TABLE_NAME', 'document_vectors')
+
+        logging.info(f"[sqlite-vec DEBUG] Using database: {db_path}, table: {table_name}, dimension: {vector_dimension}")
+
+        try:
+            store = SQLiteVec(
+                connection_string=f"sqlite:///{db_path}",
+                embeddings=embed_func,
+                table_name=table_name,
+                vector_dimension=vector_dimension,
+            )
+        except Exception as e:
+            logging.error(f"[sqlite-vec DEBUG] Error initializing sqlite-vec: {e}")
+            return {"documents": [], "structured_query": "Error initializing sqlite-vec.", "error": str(e)}
     elif vector_provider == 'chromadb':
         # Runtime check: Ensure ChromaDB is available
         if not CHROMA_AVAILABLE:
@@ -594,6 +627,9 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
             retrieval_mode = "direct_filters"
 
             if vector_provider == 'pgvector':
+                search_kwargs = {'k': k_docs, 'filter': explicit_filters}
+            elif vector_provider == 'sqlite-vec':
+                # sqlite-vec uses standard LangChain filter dict
                 search_kwargs = {'k': k_docs, 'filter': explicit_filters}
             elif vector_provider == 'chromadb':
                 if len(explicit_filters) > 1:

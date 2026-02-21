@@ -75,7 +75,8 @@ class Config:
     if APP_EDITION == 'ENT':
         VECTOR_STORE_PROVIDER = os.environ.get('VECTOR_STORE_PROVIDER', 'pgvector')
     else:
-        VECTOR_STORE_PROVIDER = os.environ.get('VECTOR_STORE_PROVIDER', 'chromadb')
+        # BASIC edition now uses sqlite-vec instead of chromadb
+        VECTOR_STORE_PROVIDER = os.environ.get('VECTOR_STORE_PROVIDER', 'sqlite-vec')
 
     print(f"DEBUG [config.py]: VECTOR_STORE_PROVIDER set to: {VECTOR_STORE_PROVIDER}")
 
@@ -115,7 +116,7 @@ class Config:
         if os.path.exists(sqlite_path):
             print(f"WARNING [config.py]: SQLite file '{sqlite_path}' exists but Enterprise mode uses PostgreSQL. Consider deleting it.")
     else:
-        # SQLite / ChromaDB mode (Basic tier)
+        # SQLite / sqlite-vec mode (Basic tier)
         sqlite_path = os.path.join(DATA_VOLUME_PATH, 'app.db')
         uri_env = os.environ.get('SQLALCHEMY_DATABASE_URI')
         if uri_env and uri_env.startswith('sqlite:///'):
@@ -125,6 +126,14 @@ class Config:
             SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.normpath(sqlite_target)}"
         else:
             SQLALCHEMY_DATABASE_URI = uri_env or f'sqlite:///{sqlite_path}'
+
+    # --- sqlite-vec Configuration ---
+    # Path to sqlite-vec extension binary (for loading in SQLite)
+    SQLITE_VECTOR_EXTENSION_PATH = os.environ.get('SQLITE_VECTOR_EXTENSION_PATH', '')
+    # Vector dimension for sqlite-vec (must match embedding model output)
+    SQLITE_VECTOR_DIMENSION = int(os.environ.get('SQLITE_VECTOR_DIMENSION', '1536'))
+    # Table name for document vectors in sqlite-vec
+    SQLITE_VECTOR_TABLE_NAME = os.environ.get('SQLITE_VECTOR_TABLE_NAME', 'document_vectors')
 
     # --- Feature Flags (Load from env or default) ---
     # Example: Set FEATURE_AZURE_LOGIN_ENABLED=False in .env.dev or system env to disable
@@ -180,23 +189,22 @@ class Config:
 
     
     # --- Vector Store Configuration ---
-    # Base path for local vector stores (ChromaDB)    
-    LOCAL_VECTOR_STORE_BASE_PATH = os.environ.get('VECTOR_STORE_BASE_PATH', os.path.join(DATA_VOLUME_PATH, 'chroma'))
+    # sqlite-vec uses the main SQLite database (SQLALCHEMY_DATABASE_URI)
+    # Vector dimension is configured via SQLITE_VECTOR_DIMENSION (default 1536 for OpenAI embeddings)
+    SQLITE_VECTOR_EXTENSION_PATH = os.environ.get('SQLITE_VECTOR_EXTENSION_PATH', '')
+    SQLITE_VECTOR_DIMENSION = int(os.environ.get('SQLITE_VECTOR_DIMENSION', '1536'))
+    SQLITE_VECTOR_TABLE_NAME = os.environ.get('SQLITE_VECTOR_TABLE_NAME', 'document_vectors')
 
-    # ChromaDB specific settings
-    CHROMA_COLLECTION_NAME = os.environ.get('CHROMA_COLLECTION_NAME', 'documents-vectors') # Default collection name
-
-    # PGVector specific settings (keep these)
-    # Use the same connection string as SQLALCHEMY_DATABASE_URI for pgvector, or allow override
+    # PGVector specific settings (keep these for Enterprise tier)
     PGVECTOR_CONNECTION_STRING = os.environ.get('PGVECTOR_CONNECTION_STRING', SQLALCHEMY_DATABASE_URI)
-    PGVECTOR_COLLECTION_NAME = os.environ.get('PGVECTOR_COLLECTION_NAME', 'documents_vectors')  # Deprecated, kept for compatibility
-    # New PGVectorStore settings (table-based API)
+    PGVECTOR_COLLECTION_NAME = os.environ.get('PGVECTOR_COLLECTION_NAME', 'documents_vectors')
     PGVECTOR_TABLE_NAME = os.environ.get('PGVECTOR_TABLE_NAME', 'document_vectors')
     PGVECTOR_EMBEDDING_DIMENSION = int(os.environ.get('PGVECTOR_EMBEDDING_DIMENSION', '1536'))
 
-    # Keep VECTOR_STORE_MODE for structuring local paths (ChromaDB)
-    VECTOR_STORE_MODE = os.environ.get('VECTOR_STORE_MODE', 'knowledge').lower() # e.g., knowledge, user, global
-    print(f"DEBUG [config.py]: Config.VECTOR_STORE_MODE set to: {VECTOR_STORE_MODE}")
+    # DEPRECATED: ChromaDB settings (kept for backward compatibility during migration)
+    LOCAL_VECTOR_STORE_BASE_PATH = os.environ.get('VECTOR_STORE_BASE_PATH', os.path.join(DATA_VOLUME_PATH, 'chroma'))
+    CHROMA_COLLECTION_NAME = os.environ.get('CHROMA_COLLECTION_NAME', 'documents-vectors')
+    VECTOR_STORE_MODE = os.environ.get('VECTOR_STORE_MODE', 'knowledge').lower()
     # Build full version string with edition suffix (e.g., 1.1.26-ENT or 1.1.26-BASIC)
     APP_VERSION = os.environ.get('APP_VERSION') or f"{BUILD_VERSION}-{APP_EDITION}"
 

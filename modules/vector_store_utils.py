@@ -3,6 +3,7 @@ import logging
 import os
 import re
 # PGVectorStore utilities imported when needed (lazy import to avoid circular deps)
+# SQLiteVec utilities imported from langchain_community.vectorstores
 
 from langchain_community.vectorstores.utils import filter_complex_metadata
 from modules.llm_utils import get_lc_store_path, get_embedding_function
@@ -91,7 +92,7 @@ def log_vector_reference(file_id, url_download_id, chunk_index):
 
 def process_and_store_chunks(splits, user_id, embedding_function, logger, file_id=None, url_download_id=None, knowledge_id=None, new_uuid_indexes=None):
     """
-    Processes document splits, creates/updates a Langchain Chroma or pgvector vector store,
+    Processes document splits, creates/updates a Langchain sqlite-vec or pgvector vector store,
     and saves it locally. Also records vector references in the database.
 
     Args:
@@ -111,7 +112,7 @@ def process_and_store_chunks(splits, user_id, embedding_function, logger, file_i
         logger.warning("process_and_store_chunks called with no splits.")
         return 0
 
-    vector_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb')
+    vector_provider = current_app.config.get('VECTOR_STORE_PROVIDER', 'sqlite-vec')
     store_mode = current_app.config.get('VECTOR_STORE_MODE', 'knowledge')
     logger.info(f"Processing {len(splits)} chunks for vector store provider: {vector_provider}")
 
@@ -184,50 +185,47 @@ def process_and_store_chunks(splits, user_id, embedding_function, logger, file_i
                 # Re-raise the exception so the calling function can handle rollback etc.
                 raise
 
-        # --- ChromaDB ---
-        elif vector_provider == 'chromadb':
-            from langchain_chroma import Chroma
-            # Read configured collection name (fallback to langchain_collection)
-            raw_collection_name = current_app.config.get('CHROMA_COLLECTION_NAME', 'documents-vectors') or 'documents-vectors'
-            # Normalize and sanitize to conform to Chroma's expected pattern:
-            #  - Trim whitespace
-            #  - Replace internal spaces with underscores
-            #  - Validate allowed characters and length
-            collection_name = str(raw_collection_name).strip().replace(' ', '_')
-            if not re.match(r'^[A-Za-z0-9._-]{3,512}$', collection_name):
-                logger.warning(f"Configured CHROMA_COLLECTION_NAME '{raw_collection_name}' is invalid for Chroma. Falling back to 'documents-vectors'.")
-                collection_name = 'documents-vectors'
-            # Determine persist directory using helper function and mode
-            persist_directory_obj = get_lc_store_path(user_id=user_id, knowledge_id=knowledge_id)
-            if not persist_directory_obj:
-                 raise ValueError("Could not determine ChromaDB store path.")
-            persist_directory = str(persist_directory_obj)
- 
-            # Ensure directory exists
-            os.makedirs(persist_directory, exist_ok=True)
-            logger.info(f"Initializing ChromaDB at {persist_directory}, Collection: {collection_name}")
- 
-            # Initialize Chroma store. It will load if exists, create if not.
-            chroma_store = Chroma(
-                collection_name=collection_name,
-                embedding_function=embedding_function,
-                persist_directory=persist_directory
-            )
-            logger.info(f"Adding {len(splits)} documents to ChromaDB in batches.")
+        # --- sqlite-vec ---
+        elif vector_provider == 'sqlite-vec':
+            from langchain_community.vectorstores import SQLiteVec
 
-            # ChromaDB has a max batch size. Let's process in smaller chunks.
-            batch_size = 5000  # A safe batch size below the typical limit of ~5461
+            # Get the SQLite database path from the main database URI
+            db_uri = current_app.config.get('SQLALCHEMY_DATABASE_URI')
+            # Extract path from sqlite:/// URI
+            if db_uri.startswith('sqlite:///'):
+                db_path = db_uri.replace('sqlite:///', '', 1)
+                if not os.path.isabs(db_path):
+                    db_path = os.path.join(basedir, db_path)
+            else:
+                raise ValueError(f"Expected sqlite:/// URI, got: {db_uri}")
+
+            # Get configuration settings
+            vector_dimension = current_app.config.get('SQLITE_VECTOR_DIMENSION', 1536)
+            table_name = current_app.config.get('SQLITE_VECTOR_TABLE_NAME', 'document_vectors')
+
+            logger.info(f"Initializing sqlite-vec at {db_path}, Table: {table_name}, Dimension: {vector_dimension}")
+
+            # Initialize sqlite-vec store
+            # SQLiteVec handles table creation, vector quantization, and indexing automatically
+            sqlite_vec_store = SQLiteVec(
+                connection_string=f"sqlite:///{db_path}",
+                embeddings=embedding_function,
+                table_name=table_name,
+                vector_dimension=vector_dimension,
+            )
+
+            logger.info(f"Adding {len(splits)} documents to sqlite-vec in batches.")
+
+            # Add documents with batching to avoid memory issues
+            batch_size = 1000  # Conservative batch size for sqlite-vec
             for i in range(0, len(splits), batch_size):
                 batch_splits = splits[i:i + batch_size]
-                # Also batch the IDs if they exist
                 batch_ids = new_uuid_indexes[i:i + batch_size] if new_uuid_indexes else None
-                
-                logger.info(f"Processing batch {i // batch_size + 1}/{(len(splits) + batch_size - 1) // batch_size}...")
-                chroma_store.add_documents(documents=batch_splits, ids=batch_ids)
 
-            # Persisting might be implicit in newer versions, but can be called explicitly if needed.
-            # chroma_store.persist()
-            logger.info(f"Finished adding/updating documents in ChromaDB collection '{collection_name}' at {persist_directory}")
+                logger.info(f"Processing batch {i // batch_size + 1}/{(len(splits) + batch_size - 1) // batch_size}...")
+                sqlite_vec_store.add_documents(documents=batch_splits, ids=batch_ids)
+
+            logger.info(f"Finished adding/updating documents in sqlite-vec table '{table_name}' at {db_path}")
 
         else:
             logger.error(f"Unsupported VECTOR_STORE_PROVIDER: {vector_provider}")

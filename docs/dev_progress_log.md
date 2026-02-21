@@ -1,5 +1,67 @@
 # SmartLib Dev Progress Log
 
+## 2026-02-21 – Migrated from ChromaDB to sqlite-vec for BASIC Edition
+
+### Summary
+Replaced ChromaDB with sqlite-vec as the vector storage backend for BASIC edition, simplifying deployment and reducing dependencies.
+
+### Changes Made
+
+**1. Requirements Updates:**
+- Removed: `chromadb`, `langchain-chroma`, `pgvector`, `langchain-postgres`
+- Added: `sqlite-vec>=0.1.1`
+- Updated torch to CPU-specific versions: `torch==2.2.2+cpu`, `torchvision==0.17.2+cpu`
+
+**2. Configuration Changes (`config.py`):**
+- Changed default `VECTOR_STORE_PROVIDER` from `chromadb` to `sqlite-vec`
+- Added new settings:
+  - `SQLITE_VECTOR_EXTENSION_PATH`
+  - `SQLITE_VECTOR_DIMENSION` (default: 1536)
+  - `SQLITE_VECTOR_TABLE_NAME` (default: `document_vectors`)
+
+**3. Vector Store Utils (`modules/vector_store_utils.py`):**
+- Replaced ChromaDB initialization with `SQLiteVec` from `langchain_community.vectorstores`
+- Same API: `add_documents()`, `similarity_search()`
+- Vectors now stored in main SQLite database instead of separate Chroma directories
+
+**4. Agent Module (`modules/agent.py`):**
+- Added sqlite-vec import and initialization branch
+- Updated retrieval logic to handle sqlite-vec filters
+- Removed ChromaDB-specific error handling
+
+**5. Admin UI (`modules/admin.py`, `templates/admin/settings_vectorstore.html`):**
+- Updated form to show sqlite-vec settings
+- Removed ChromaDB collection management UI
+- Added sqlite-vec reset option
+
+**6. Dockerfiles:**
+- Removed `chroma-hnswlib` compilation step
+- Simplified build process
+
+### Files Modified
+- `requirements-web.txt` - Removed chromadb, langchain-chroma, pgvector
+- `requirements-worker.txt` - Same + updated torch CPU versions
+- `requirements-web-extras.txt` - Updated torch CPU versions
+- `config.py` - Added sqlite-vec configuration
+- `modules/vector_store_utils.py` - Replaced ChromaDB with SQLiteVec
+- `modules/agent.py` - Added sqlite-vec support
+- `modules/admin.py` - Updated admin UI
+- `templates/admin/settings_vectorstore.html` - Updated template
+- `Dockerfile.web`, `Dockerfile.worker` - Removed chroma-hnswlib
+
+### Benefits
+- **Simpler deployment**: Single SQLite database, no separate vector store
+- **Smaller image**: ~200-300MB savings (no ChromaDB dependencies)
+- **Easier configuration**: No collection names, persist directories, or mode settings
+- **Better performance**: Direct SQL queries, no network overhead
+
+### Migration Notes
+- Existing ChromaDB data is NOT automatically migrated
+- To migrate: export from ChromaDB, import to sqlite-vec via script
+- Default embedding changed to `Qwen3-Embedding-0.6B` (API-based)
+
+---
+
 ## 2025-12-12 – Fixed OOM During Embedding Generation (Batch Processing)
 
 ### Summary

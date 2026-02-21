@@ -44,8 +44,6 @@ COPY requirements-worker.txt /tmp/requirements.txt
 # Use BuildKit cache mount for pip to speed up rebuilds
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip \
-    && echo "Installing optimized HNSW (compiled for CPU)..." \
-    && pip install --no-binary chroma-hnswlib chroma-hnswlib \
     && pip install -r /tmp/requirements.txt
 
 COPY . /app

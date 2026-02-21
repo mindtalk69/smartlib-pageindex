@@ -14,7 +14,6 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy import func, case, distinct # Import func, case, and distinct for aggregation/queries
 from pathlib import Path # Import Path for directory scanning
 from modules.admin_embeddings import EMBEDDING_MODELS # Import available models
-from modules.celery_tasks import list_chroma_stores, delete_chroma_collection_via_worker
 from extensions import db # Correct: Import db from extensions.py
 # Import SQLAlchemy Models and rewritten functions
 from modules.database import (
@@ -1609,30 +1608,20 @@ class VectorStoreSettingsForm(FlaskForm):
     provider = RadioField(
         'Vector Store Provider',
         choices=[
-            ('chromadb', 'ChromaDB (Local Persistence)'), # Updated
+            ('sqlite-vec', 'sqlite-vec (SQLite Embedded Vectors)'),
             ('pgvector', 'PGVector (PostgreSQL Extension)')
         ],
-        default='chromadb', # Updated default
+        default='sqlite-vec',
         validators=[DataRequired()]
     )
-    store_mode = SelectField( # Keep for local stores (ChromaDB)
-        'Local Store Mode (ChromaDB)',
-        choices=[
-            ('knowledge', 'Per Knowledge ID'),
-            ('user', 'Per User'),
-            ('global', 'Global Single Store')
-        ],
-        default='knowledge',
-        validators=[DataRequired()]
+    # sqlite-vec uses a single database, no mode selection needed
+    # --- sqlite-vec Specific ---
+    # No additional configuration needed - uses main SQLite database
+    sqlite_table = StringField(
+        'sqlite-vec Table Name',
+        default='document_vectors',
+        validators=[Optional()]
     )
-    # --- ChromaDB Specific ---
-    chroma_collection = StringField(
-        'ChromaDB Collection Name',
-        default='documents-vectors',
-        validators=[Optional()] # Required if provider is chromadb
-    )
-    # You might not need a configurable base path if LOCAL_VECTOR_STORE_BASE_PATH is sufficient
-    # chroma_base_path = StringField('ChromaDB Base Path (Overrides Default)', validators=[Optional()])
 
     # --- PGVector Specific ---
     pg_connection = StringField(
@@ -1673,11 +1662,9 @@ def vector_store_settings():
             # Enterprise edition: PGVector is enforced, ignore DB setting
             settings['VECTOR_STORE_PROVIDER'] = 'pgvector'
         else:
-            settings.setdefault('VECTOR_STORE_PROVIDER', current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb'))
-        
-        settings.setdefault('VECTOR_STORE_MODE', 'knowledge')
-        settings.setdefault('vector_store_mode', 'knowledge')
-        settings.setdefault('CHROMA_COLLECTION_NAME', 'documents-vectors')
+            settings.setdefault('VECTOR_STORE_PROVIDER', current_app.config.get('VECTOR_STORE_PROVIDER', 'sqlite-vec'))
+
+        settings.setdefault('SQLITE_VECTOR_TABLE_NAME', 'document_vectors')
         # Default to the active config (env var) if not set in DB
         settings.setdefault('PGVECTOR_CONNECTION_STRING', current_app.config.get('PGVECTOR_CONNECTION_STRING', ''))
         # Always use environment variable for PGVector (single source of truth)
@@ -1688,30 +1675,23 @@ def vector_store_settings():
         flash('Error loading vector store settings.', 'danger')
         # Use safe defaults on error - get app_edition for provider logic
         app_edition = current_app.config.get('APP_EDITION', 'BASIC')
-        provider = 'pgvector' if app_edition == 'ENT' else current_app.config.get('VECTOR_STORE_PROVIDER', 'chromadb')
+        provider = 'pgvector' if app_edition == 'ENT' else current_app.config.get('VECTOR_STORE_PROVIDER', 'sqlite-vec')
         settings = {
-            'VECTOR_STORE_PROVIDER': provider, 
-            'VECTOR_STORE_MODE': 'knowledge',
-            'vector_store_mode': 'knowledge',
-            'CHROMA_COLLECTION_NAME': 'documents-vectors',
-            'PGVECTOR_CONNECTION_STRING': current_app.config.get('PGVECTOR_CONNECTION_STRING', ''), 
+            'VECTOR_STORE_PROVIDER': provider,
+            'SQLITE_VECTOR_TABLE_NAME': 'document_vectors',
+            'PGVECTOR_CONNECTION_STRING': current_app.config.get('PGVECTOR_CONNECTION_STRING', ''),
             'PGVECTOR_COLLECTION_NAME': 'documents-vectors'
         }
 
     # app_edition already set in try block or except block above
 
-    # --- ChromaDB Inspection (if provider is chromadb) ---
+    # --- sqlite-vec Info (if provider is sqlite-vec) ---
     current_embedding = None
-    chroma_stores_info = []
-    chroma_base_path = None
-    if settings.get('VECTOR_STORE_PROVIDER') == 'chromadb':
-        worker_result = list_chroma_stores()
-        if worker_result:
-            chroma_stores_info = worker_result.get('stores', [])
-            current_embedding = worker_result.get('embedding')
-            chroma_base_path = worker_result.get('base_path')
-        else:
-            flash("Unable to inspect Chroma collections. Ensure the worker container is running.", "warning")
+    sqlite_db_path = None
+    sqlite_table_name = None
+    if settings.get('VECTOR_STORE_PROVIDER') == 'sqlite-vec':
+        sqlite_db_path = current_app.config.get('SQLALCHEMY_DATABASE_URI', 'sqlite:///app.db')
+        sqlite_table_name = settings.get('SQLITE_VECTOR_TABLE_NAME', 'document_vectors')
 
     if current_embedding is None:
         from modules.llm_utils import get_current_embedding_model
@@ -1721,25 +1701,22 @@ def vector_store_settings():
     if form.validate_on_submit(): # POST
         try:
             provider = form.provider.data
-            store_mode = form.store_mode.data
-            chroma_collection = form.chroma_collection.data or 'documents-vectors'
+            sqlite_table = form.sqlite_table.data or 'document_vectors'
             pg_collection = form.pg_collection.data or 'documents_vectors'
             submitted_pg_conn = form.pg_connection.data
 
             # Validation based on provider
-            if provider == 'chromadb' and not chroma_collection:
-                 flash('ChromaDB Collection Name is required.', 'danger')
             if provider == 'pgvector' and not submitted_pg_conn and not settings.get('PGVECTOR_CONNECTION_STRING'):
                  flash('PGVector Connection String is required.', 'danger')
             if provider == 'pgvector' and not pg_collection:
                  flash('PGVector Collection Name is required.', 'danger')
-                 
+
             settings_to_update = {
                 'VECTOR_STORE_PROVIDER': provider,
-                'CHROMA_COLLECTION_NAME': chroma_collection,
+                'SQLITE_VECTOR_TABLE_NAME': sqlite_table,
                 'PGVECTOR_COLLECTION_NAME': pg_collection,
             }
-                    
+
             # Update non-connection string settings
             for key_name, value in settings_to_update.items():
                 setting = db.session.get(AppSettings, key_name)
@@ -1747,14 +1724,6 @@ def vector_store_settings():
                     setting.value = value
                 else:
                     db.session.add(AppSettings(key=key_name, value=value))
-
-            # Explicitly update both vector store mode keys for consistency
-            for key_name in ['vector_store_mode', 'VECTOR_STORE_MODE']:
-                setting = AppSettings.query.filter_by(key=key_name).first()
-                if setting:
-                    setting.value = store_mode
-                else:
-                    db.session.add(AppSettings(key=key_name, value=store_mode))
 
             # Conditionally update PGVector connection string
             pg_conn_key = 'PGVECTOR_CONNECTION_STRING'
@@ -1777,24 +1746,21 @@ def vector_store_settings():
 
             # Update other live app config values
             current_app.config['VECTOR_STORE_PROVIDER'] = provider
-            current_app.config['VECTOR_STORE_MODE'] = store_mode
-            current_app.config['vector_store_mode'] = store_mode
-            current_app.config['CHROMA_COLLECTION_NAME'] = chroma_collection
+            current_app.config['SQLITE_VECTOR_TABLE_NAME'] = sqlite_table
             current_app.config['PGVECTOR_COLLECTION_NAME'] = pg_collection
 
             flash('Vector store settings updated successfully.', 'success')
             return redirect(url_for('admin.vector_store_settings')) # Redirect after POST
-            
+
         except Exception as e:
             db.session.rollback()
             logging.error(f"Error updating vector store settings: {traceback.format_exc()}")
             flash(f'An error occurred while saving settings: {str(e)}', 'danger')
             pass
-        
+
     # GET Request: Populate form and placeholder
-    form.provider.data = settings.get('VECTOR_STORE_PROVIDER', 'chromadb')
-    form.store_mode.data = settings.get('vector_store_mode', settings.get('VECTOR_STORE_MODE', 'knowledge'))
-    form.chroma_collection.data = settings.get('CHROMA_COLLECTION_NAME', 'documents-vectors')
+    form.provider.data = settings.get('VECTOR_STORE_PROVIDER', 'sqlite-vec')
+    form.sqlite_table.data = settings.get('SQLITE_VECTOR_TABLE_NAME', 'document_vectors')
     form.pg_collection.data = settings.get('PGVECTOR_COLLECTION_NAME', 'documents_vectors')
 
     # Handle placeholder for connection string
@@ -1820,8 +1786,8 @@ def vector_store_settings():
         knowledges=knowledges,
         users=users,
         current_settings=settings,
-        chroma_stores_info=chroma_stores_info,
-        chroma_base_path=chroma_base_path,
+        sqlite_db_path=sqlite_db_path,
+        sqlite_table_name=sqlite_table_name,
         current_embedding=current_embedding,
         app_edition=app_edition,
     )
@@ -1831,26 +1797,28 @@ def vector_store_settings():
 import shutil
 from modules.llm_utils import get_lc_store_path # Import helper
 
-@admin_bp.route('/settings/vectorstore/delete_collection', methods=['POST'])
+@admin_bp.route('/settings/vectorstore/reset/sqlite-vec', methods=['POST'])
 @login_required
-def delete_chroma_collection():
-    if not current_user.is_admin: return jsonify({"error": "Admin access required"}), 403
+def reset_sqlite_vec():
+    """Reset sqlite-vec by deleting the document_vectors table data."""
+    if not current_user.is_admin:
+        return jsonify({"error": "Admin access required"}), 403
 
-    store_path = request.form.get('store_path')
-    collection_name = request.form.get('collection_name')
-
-    if not store_path or not collection_name:
-        flash("Invalid request. Store path and collection name are required.", "danger")
+    confirm_text = request.form.get('confirm_text')
+    if confirm_text != 'RESET SQLITE-VEC':
+        flash("Confirmation text did not match. No action taken.", "warning")
         return redirect(url_for('admin.vector_store_settings'))
 
     try:
-        if delete_chroma_collection_via_worker(store_path, collection_name):
-            flash(f"Successfully requested deletion of collection '{collection_name}' from store '{Path(store_path).name}'.", "success")
-        else:
-            flash("Vector worker unavailable. Could not delete collection.", "warning")
+        # Delete all records from the document_vectors table
+        from modules.database import VectorReference
+        VectorReference.query.delete()
+        db.session.commit()
+        flash("sqlite-vec vector store has been reset. All vectors deleted.", "success")
     except Exception as e:
-        flash(f"Error deleting collection '{collection_name}': {e}", "danger")
-        logging.error(f"Error deleting Chroma collection '{collection_name}' from path '{store_path}': {e}", exc_info=True)
+        db.session.rollback()
+        flash(f"Error resetting sqlite-vec: {e}", "danger")
+        logging.error(f"Error resetting sqlite-vec: {e}", exc_info=True)
 
     return redirect(url_for('admin.vector_store_settings'))
 
