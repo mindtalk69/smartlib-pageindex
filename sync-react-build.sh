@@ -16,13 +16,17 @@ cp -r frontend/dist/* static/react/
 echo "✅ React build synced to static/react/"
 
 # Check if Docker container is running and sync to it
-if docker ps | grep -q smartlib-web; then
-    echo "🐳 Docker container detected, syncing to container..."
-    docker cp static/react/. smartlib-web-1:/app/static/react/
+if docker ps | grep -q smartlib-basic-web; then
+    echo "🐳 3-container setup detected, syncing to web container..."
+    docker cp static/react/. smartlib-basic-web-1:/app/static/react/
     echo "✅ Synced to Docker container!"
     echo "🔄 Restarting web container..."
     docker compose restart web > /dev/null 2>&1
     echo "✅ Web container restarted!"
+elif docker ps | grep -q "smartlib-basic$"; then
+    echo "🐳 Single container detected, syncing..."
+    docker cp static/react/. smartlib-basic:/app/static/react/
+    echo "✅ Synced to single container!"
 else
     echo "ℹ️  No Docker container running, skipping container sync"
 fi

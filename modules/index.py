@@ -196,25 +196,23 @@ def init_index(app):
     @app.route('/app/<path:path>')
     def react_app(path=None):
         """Serve React app at /app/ route."""
-        from flask import send_from_directory
         import os
-
-        react_dist_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist')
-
-        # Serve index.html for all routes (React Router)
-        return send_from_directory(react_dist_dir, 'index.html')
+        # sync-react-build.sh copies frontend/dist -> static/react/
+        # Fallback to frontend/dist for local dev without the sync script
+        react_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'react')
+        if not os.path.exists(os.path.join(react_dir, 'index.html')):
+            react_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist')
+        return send_from_directory(react_dir, 'index.html')
 
     # Serve React app static assets
     @app.route('/app/assets/<path:filename>')
     def react_assets(filename):
         """Serve React app static assets."""
-        from flask import send_from_directory
         import os
-
-        react_dist_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist')
-        assets_dir = os.path.join(react_dist_dir, 'assets')
-
-        return send_from_directory(assets_dir, filename)
+        react_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'react')
+        if not os.path.isdir(os.path.join(react_dir, 'assets')):
+            react_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist')
+        return send_from_directory(os.path.join(react_dir, 'assets'), filename)
 
     # Admin React App routes at /admin-app/
     @app.route('/admin-app/')
