@@ -98,10 +98,37 @@
                         value="{{ current_settings.get('SQLALCHEMY_DATABASE_URI', 'sqlite:///app.db') }}"
                         aria-describedby="sqliteVecHelp">
                     <div id="sqliteVecHelp" class="form-text">
-                        Vectors are stored in the <code>{{ current_settings.get('SQLITE_VECTOR_TABLE_NAME', 'document_vectors') }}</code>
+                        Vectors are stored in the
+                        <code>{{ current_settings.get('SQLITE_VECTOR_TABLE_NAME', 'document_vectors') }}</code>
                         table within the main SQLite database.
                     </div>
                 </div>
+            </div>
+
+            {# --- Vector Store Mode --- #}
+            <hr class="my-4">
+            <div class="mb-3">
+                <label class="form-label fw-bold">{{ form.vector_store_mode.label }}</label>
+                <p class="text-muted small mb-2">
+                    Controls how the chat interface scopes document search. Changing this takes effect immediately for
+                    new queries.
+                </p>
+                {% for subfield in form.vector_store_mode %}
+                <div class="form-check mb-2">
+                    {{ subfield(class="form-check-input") }}
+                    {{ subfield.label(class="form-check-label") }}
+                    {% if subfield.data == 'user' %}
+                    <span class="badge bg-secondary ms-1">default</span>
+                    {% elif subfield.data == 'knowledge' %}
+                    <span class="badge bg-info ms-1">shows Knowledge dropdown</span>
+                    {% elif subfield.data == 'global' %}
+                    <span class="badge bg-primary ms-1">shows globe icon</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                {% if form.vector_store_mode.errors %}
+                <div class="invalid-feedback d-block">{{ form.vector_store_mode.errors|join(' ') }}</div>
+                {% endif %}
             </div>
 
             <div class="mt-4">
@@ -132,8 +159,23 @@
             <div class="alert alert-info">
                 <i class="bi bi-info-circle me-2"></i>
                 To reset the vector store, delete all records from the document_vectors table or delete the entire
-                SQLite database file. The database file is located at:
-                <code>{{ current_settings.get('SQLALCHEMY_DATABASE_URI', 'sqlite:///app.db') }}</code>
+                SQLite database file.
+            </div>
+
+            <div class="alert alert-danger mt-3">
+                <form method="POST" action="{{ url_for('admin.reset_sqlite_vec') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <p class="mb-2">This will delete ALL data from the sqlite-vec table: <strong>{{
+                            current_settings.get('SQLITE_VECTOR_TABLE_NAME', 'document_vectors') }}</strong></p>
+                    <div class="mb-3">
+                        <label for="sqlite-reset-confirm" class="form-label">To confirm, type exactly: <strong>RESET
+                                SQLITE-VEC</strong></label>
+                        <input type="text" id="sqlite-reset-confirm" name="confirm_text" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-exclamation-octagon me-1"></i> Reset sqlite-vec Data
+                    </button>
+                </form>
             </div>
         </div>
         {% endif %}

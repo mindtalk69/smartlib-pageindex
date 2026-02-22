@@ -34,11 +34,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install Python 3.11 and system dependencies
+# Install Python 3.11 and system dependencies.
+# Ubuntu 22.04 ships python3.11 in its repos but python3-pip is linked to python3.10.
+# We bootstrap pip explicitly for 3.11 using get-pip.py to avoid version mismatch.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.11 \
-    python3-pip \
-    python3-dev \
+    python3.11-dev \
+    python3.11-distutils \
     build-essential \
     curl \
     git \
@@ -55,7 +57,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     supervisor \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean \
-    && ln -s /usr/bin/python3.11 /usr/bin/python
+    # Bootstrap pip for python3.11 specifically
+    && curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11 \
+    # Make python3.11 the default python/pip
+    && ln -sf /usr/bin/python3.11 /usr/bin/python3 \
+    && ln -sf /usr/bin/python3.11 /usr/bin/python \
+    && ln -sf /usr/local/bin/pip3 /usr/local/bin/pip
 
 # ─── Stage 3: Install Python dependencies ──────────────────────────────────
 FROM base AS python

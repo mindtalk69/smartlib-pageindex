@@ -759,12 +759,12 @@ def init_upload(app):
 
                 tasks.append(task_info)
 
-                # Mark old completed tasks for removal (older than 1 hour)
+                # Mark old completed tasks for removal (older than 60 seconds)
                 if result.state in ['SUCCESS', 'FAILURE']:
                     # Get result timestamp if available
                     if hasattr(result, 'date_done') and result.date_done:
                         age = current_time - result.date_done
-                        if age.total_seconds() > 3600:  # 1 hour
+                        if age.total_seconds() > 60:  # 60 seconds
                             tasks_to_remove.append(task_id_str)
                             meta_to_remove.append(task_id_str)
 

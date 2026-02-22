@@ -1633,6 +1633,18 @@ class VectorStoreSettingsForm(FlaskForm):
         description='PostgreSQL table name. Read-only for Enterprise edition.'
     )
 
+    # --- Vector Store Mode ---
+    vector_store_mode = RadioField(
+        'Vector Store Mode',
+        choices=[
+            ('user',      'User  — each user has their own private vector space'),
+            ('knowledge', 'Knowledge  — scope search to a selected knowledge base (shows Knowledge dropdown)'),
+            ('global',    'Global  — all users share one vector space (shows globe icon)'),
+        ],
+        default='user',
+        validators=[DataRequired()]
+    )
+
 
 # --- New Route for Vector Store Settings ---
 @admin_bp.route('/settings/vectorstore', methods=['GET', 'POST'])
@@ -1650,6 +1662,12 @@ def vector_store_settings():
         ]
         settings_query = AppSettings.query.filter(AppSettings.key.in_(settings_keys)).all()
         settings = {s.key: s.value for s in settings_query}
+        # Normalise: prefer lowercase key 'vector_store_mode', fall back to env/config
+        if 'vector_store_mode' not in settings:
+            settings['vector_store_mode'] = settings.get(
+                'VECTOR_STORE_MODE',
+                current_app.config.get('VECTOR_STORE_MODE', 'user')
+            )
         
         # Get App Edition early - needed for provider logic
         app_edition = current_app.config.get('APP_EDITION', 'BASIC')
@@ -1708,10 +1726,13 @@ def vector_store_settings():
             if provider == 'pgvector' and not pg_collection:
                  flash('PGVector Collection Name is required.', 'danger')
 
+            vector_store_mode = form.vector_store_mode.data or 'user'
+
             settings_to_update = {
                 'VECTOR_STORE_PROVIDER': provider,
                 'SQLITE_VECTOR_TABLE_NAME': sqlite_table,
                 'PGVECTOR_COLLECTION_NAME': pg_collection,
+                'vector_store_mode': vector_store_mode,
             }
 
             # Update non-connection string settings
@@ -1745,6 +1766,7 @@ def vector_store_settings():
             current_app.config['VECTOR_STORE_PROVIDER'] = provider
             current_app.config['SQLITE_VECTOR_TABLE_NAME'] = sqlite_table
             current_app.config['PGVECTOR_COLLECTION_NAME'] = pg_collection
+            current_app.config['VECTOR_STORE_MODE'] = vector_store_mode
 
             flash('Vector store settings updated successfully.', 'success')
             return redirect(url_for('admin.vector_store_settings')) # Redirect after POST
@@ -1759,6 +1781,7 @@ def vector_store_settings():
     form.provider.data = settings.get('VECTOR_STORE_PROVIDER', 'sqlite-vec')
     form.sqlite_table.data = settings.get('SQLITE_VECTOR_TABLE_NAME', 'document_vectors')
     form.pg_collection.data = settings.get('PGVECTOR_COLLECTION_NAME', 'documents_vectors')
+    form.vector_store_mode.data = settings.get('vector_store_mode', 'user')
 
     # Handle placeholder for connection string
     if settings.get('PGVECTOR_CONNECTION_STRING', ''):
@@ -1807,17 +1830,37 @@ def reset_sqlite_vec():
         return redirect(url_for('admin.vector_store_settings'))
 
     try:
-        # Delete all records from the document_vectors table
+        from flask import current_app
+        import sqlite3
+        
+        # 1. Delete all VectorReference tracking rows
         from modules.database import VectorReference
         VectorReference.query.delete()
         db.session.commit()
-        flash("sqlite-vec vector store has been reset. All vectors deleted.", "success")
+
+        # 2. Delete all records from the actual sqlite-vec table
+        db_uri = current_app.config.get('SQLALCHEMY_DATABASE_URI', '')
+        db_path = db_uri.replace('sqlite:///', '', 1)
+        table_name = current_app.config.get('SQLITE_VECTOR_TABLE_NAME', 'document_vectors')
+        
+        if db_path:
+            conn = sqlite3.connect(db_path)
+            cur = conn.cursor()
+            # Check if the table exists before attempting to delete
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+            if cur.fetchone():
+                cur.execute(f"DELETE FROM {table_name}")
+                conn.commit()
+            conn.close()
+
+        flash(f"sqlite-vec vector store has been reset. All vectors deleted from {table_name}.", "success")
     except Exception as e:
         db.session.rollback()
         flash(f"Error resetting sqlite-vec: {e}", "danger")
         logging.error(f"Error resetting sqlite-vec: {e}", exc_info=True)
 
     return redirect(url_for('admin.vector_store_settings'))
+
 
 @admin_bp.route('/settings/vectorstore/reset/pgvector', methods=['POST'])
 @login_required

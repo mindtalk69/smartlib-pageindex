@@ -736,6 +736,12 @@ def create_app():
 app = create_app()
 
 
+@app.route('/health')
+def health():
+    """Simple health check endpoint for Docker/load balancer use."""
+    return jsonify({"status": "healthy"}), 200
+
+
 if __name__ == "__main__":
     # This block runs the Flask app with the built-in development server,
     # which is great for local development (e.g., `python app.py`).

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -65,6 +65,23 @@ export function UploadPage() {
         logo_url?: string;
         app_name?: string;
     }>({});
+    const autoDismissedRef = useRef<Set<string>>(new Set());
+
+    useEffect(() => {
+        // Auto-dismiss SUCCESS tasks after a 5 second delay so the user can see them finish
+        activeTasks.forEach((task) => {
+            if (task.status === "SUCCESS" && !autoDismissedRef.current.has(task.task_id)) {
+                autoDismissedRef.current.add(task.task_id);
+                setTimeout(() => {
+                    handleTaskComplete(task.task_id);
+                    fetch(`/api/upload-status/${task.task_id}/dismiss`, {
+                        method: "POST",
+                        credentials: "include",
+                    }).catch(console.error);
+                }, 5000);
+            }
+        });
+    }, [activeTasks]);
 
     useEffect(() => {
         fetchLibraries();
@@ -132,13 +149,7 @@ export function UploadPage() {
             if (response.ok) {
                 const data = await response.json();
                 const tasks = data.tasks || [];
-                const active = tasks.filter(
-                    (t: UploadTask) =>
-                        t.status === "PENDING" ||
-                        t.status === "STARTED" ||
-                        t.status === "PROGRESS",
-                );
-                setActiveTasks(active);
+                setActiveTasks(tasks);
             }
         } catch (error) {
             console.error("Failed to fetch upload status:", error);

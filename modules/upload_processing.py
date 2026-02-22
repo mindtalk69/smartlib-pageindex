@@ -204,94 +204,16 @@ def process_uploaded_file(
             except Exception as e:
                 logger.warning(f"Progress callback failed: {e}")
 
-    # --- Visual Grounding Setup ---
-    converter = None
-    dl_doc_saved = False
-    target_json_path_str = None
-    dl_doc = None
-    saved_dl_meta = None
-
-    from docling.datamodel.pipeline_options import (
-        AcceleratorDevice,
-        AcceleratorOptions,
-        PdfPipelineOptions,
-    )
-
-    IS_CUDA = Is_cuda_available()
-
-    if not IS_CUDA:
-            accelerator_options = AcceleratorOptions(
-                num_threads=8,
-                device=AcceleratorDevice.CPU,
-                )
-    else:
-          accelerator_options = AcceleratorOptions(
-                     num_threads=8,
-                     device=AcceleratorDevice.CUDA,
-                     cuda_use_flash_attention2=True)
-
-
-    logger.info(f"enable_visual_grounding : {enable_visual_grounding}")
-    report_progress('Initializing document processor...', 5)
-
-    if enable_visual_grounding:
-
-        try:
-            # Create PdfPipelineOptions instance for visual grounding
-            vg_pipeline_options = PdfPipelineOptions(
-                generate_page_images=True,
-                images_scale=2.0,
-            )
-            vg_pipeline_options.accelerator_options = accelerator_options # Explicitly set accelerator options
-
-            converter = DocumentConverter(
-                format_options={
-                    InputFormat.PDF: PdfFormatOption(
-                        pipeline_options=vg_pipeline_options,
-                    )
-                }
-            )
-            logger.info(f"Initialized VISUAL GROUNDING DocumentConverter with image generation enabled. CUDA : {IS_CUDA}")
-        except Exception as conv_e:
-            logger.error(f"Failed to initialize DocumentConverter for visual grounding: {conv_e}", exc_info=True)
-    else:
-
-        try:
-            pipeline_options = PdfPipelineOptions()
-            pipeline_options.accelerator_options = accelerator_options
-
-            converter = DocumentConverter(
-                format_options={
-                    InputFormat.PDF: PdfFormatOption(
-                        pipeline_options=pipeline_options,
-                    )
-                }
-            )
-            logger.info(f"Initialized DocumentConverter without image generation. CUDA : {IS_CUDA}") # Corrected log message
-        except Exception as conv_e:
-            logger.error(f"Failed to initialize DocumentConverter: {conv_e}", exc_info=True) # Corrected log message
-            return {'success': False, 'message': f'Failed to initialize document converter: {str(conv_e)}'} # Corrected log message
-
-    # Start Converter - This line seems redundant now as converter is initialized above
-    # converter = DocumentConverter()
-    # logger.info("Initialized default DocumentConverter")
-
-    # --- PDF/Image-Only Detection ---
-    file_ext = os.path.splitext(filename)[1].lower()
-    IS_PDF_IMAGE_ONLY = False
-    if file_ext == ".pdf":
-        IS_PDF_IMAGE_ONLY = is_image_only_pdf(file_path)
-    logger.info(f"PDF is image-only: {IS_PDF_IMAGE_ONLY}")
-
-    # --- OCR Settings ---
+    # --- OCR Settings (read FIRST before any heavy model loading) ---
+    # This determines whether we need Docling/CUDA at all.
     IS_AUTO_OCR = False
     IS_ENABLED_OCR = False
-    IS_OCR_LOCAL = True
+    IS_OCR_LOCAL = True  # default: local OCR
     if app_config and 'AppSettings' in app_config:
-        AppSettings = app_config['AppSettings']
-        is_auto_ocr_setting = AppSettings.query.filter_by(key='is_auto_ocr').first()
-        is_enabled_ocr_setting = AppSettings.query.filter_by(key='is_enabled_ocr').first()
-        selected_ocr_setting = AppSettings.query.filter_by(key='ocr_mode').first()
+        _AppSettings = app_config['AppSettings']
+        is_auto_ocr_setting = _AppSettings.query.filter_by(key='is_auto_ocr').first()
+        is_enabled_ocr_setting = _AppSettings.query.filter_by(key='is_enabled_ocr').first()
+        selected_ocr_setting = _AppSettings.query.filter_by(key='ocr_mode').first()
         IS_AUTO_OCR = is_auto_ocr_setting.value == '1' if is_auto_ocr_setting else False
         IS_ENABLED_OCR = (
             is_enabled_ocr_setting.value == '1'
@@ -311,6 +233,79 @@ def process_uploaded_file(
             if app_config
             else True
         )
+    logger.info(f"[OCR] Mode resolved: IS_ENABLED_OCR={IS_ENABLED_OCR}, IS_AUTO_OCR={IS_AUTO_OCR}, IS_OCR_LOCAL={IS_OCR_LOCAL}")
+
+    # --- PDF/Image-Only Detection ---
+    file_ext = os.path.splitext(filename)[1].lower()
+    IS_PDF_IMAGE_ONLY = False
+    if file_ext == ".pdf":
+        IS_PDF_IMAGE_ONLY = is_image_only_pdf(file_path)
+    logger.info(f"PDF is image-only: {IS_PDF_IMAGE_ONLY}")
+
+    # --- Visual Grounding & DocumentConverter Setup ---
+    # When Azure Doc Intelligence is the OCR mode (IS_OCR_LOCAL=False), we do NOT
+    # initialize the DocumentConverter here — Azure handles conversion directly.
+    # This avoids loading RapidOCR/CUDA when it will never be used.
+    converter = None
+    dl_doc_saved = False
+    target_json_path_str = None
+    dl_doc = None
+    saved_dl_meta = None
+
+    from docling.datamodel.pipeline_options import (
+        AcceleratorDevice,
+        AcceleratorOptions,
+        PdfPipelineOptions,
+    )
+
+    IS_CUDA = Is_cuda_available()
+    accelerator_options = AcceleratorOptions(
+        num_threads=8,
+        device=AcceleratorDevice.CUDA if IS_CUDA else AcceleratorDevice.CPU,
+        **(dict(cuda_use_flash_attention2=True) if IS_CUDA else {}),
+    )
+
+    logger.info(f"enable_visual_grounding={enable_visual_grounding}, IS_CUDA={IS_CUDA}, IS_OCR_LOCAL={IS_OCR_LOCAL}")
+    report_progress('Initializing document processor...', 5)
+
+    # Only initialize the Docling DocumentConverter when we'll actually use it
+    # (local OCR or visual grounding). Skip entirely for Azure Doc Intelligence path.
+    needs_docling_converter = IS_OCR_LOCAL or enable_visual_grounding
+    if needs_docling_converter:
+        if enable_visual_grounding:
+            try:
+                vg_pipeline_options = PdfPipelineOptions(
+                    generate_page_images=True,
+                    images_scale=2.0,
+                )
+                vg_pipeline_options.accelerator_options = accelerator_options
+                converter = DocumentConverter(
+                    format_options={
+                        InputFormat.PDF: PdfFormatOption(
+                            pipeline_options=vg_pipeline_options,
+                        )
+                    }
+                )
+                logger.info(f"Initialized VISUAL GROUNDING DocumentConverter. CUDA={IS_CUDA}")
+            except Exception as conv_e:
+                logger.error(f"Failed to initialize DocumentConverter for visual grounding: {conv_e}", exc_info=True)
+        else:
+            try:
+                pipeline_options = PdfPipelineOptions()
+                pipeline_options.accelerator_options = accelerator_options
+                converter = DocumentConverter(
+                    format_options={
+                        InputFormat.PDF: PdfFormatOption(
+                            pipeline_options=pipeline_options,
+                        )
+                    }
+                )
+                logger.info(f"Initialized DocumentConverter (local OCR). CUDA={IS_CUDA}")
+            except Exception as conv_e:
+                logger.error(f"Failed to initialize DocumentConverter: {conv_e}", exc_info=True)
+                return {'success': False, 'message': f'Failed to initialize document converter: {str(conv_e)}'}
+    else:
+        logger.info("[OCR] Azure Doc Intelligence mode — skipping Docling/RapidOCR initialization.")
 
     # --- Visual Grounding Save DoclingDocument ---
     IS_VISUAL_GROUNDING_COMPLETED = False
@@ -432,84 +427,75 @@ def process_uploaded_file(
     api_key = None
     is_az_doci = False  # Flag to track if Azure Doc Intelligence was used
 
-    # OCR for image-only PDF (only when IS_AUTO_OCR is enabled AND the PDF is actually image-only)
+    # Check if Azure Document Intelligence is selected (IS_OCR_LOCAL == False)
+    # Azure Doc Intelligence handles both text and image-based PDFs, so we check credentials
+    # regardless of IS_AUTO_OCR or IS_PDF_IMAGE_ONLY flags
+    if IS_OCR_LOCAL == False and app_config and 'AppSettings' in app_config:
+        AppSettings = app_config['AppSettings']
+        api_endpoint_setting = AppSettings.query.filter_by(key='doc_intelligence_endpoint').first()
+        api_key_setting = AppSettings.query.filter_by(key='doc_intelligence_key').first()
+        api_endpoint = api_endpoint_setting.value if api_endpoint_setting else None
+        api_key = api_key_setting.value if api_key_setting else None
+        if not api_endpoint:
+            api_endpoint = os.getenv("DOC_INTELLIGENCE_ENDPOINT")
+        if not api_key:
+            api_key = os.getenv("DOC_INTELLIGENCE_KEY")
+        if not all([api_endpoint, api_key]):
+            logger.error("Azure DOC INTELLIGENCE credentials or endpoints are missing")
+        else:
+            docling_export_type_str = 'MARKDOWN' # Force markdown for Azure DocInt
+            is_az_doci = True
+            logger.info("Azure DOC INTELLIGENCE credentials found. Will attempt Azure OCR for all PDFs.")
+
+    # OCR for image-only PDF or when OCR is manually enabled (local OCR path)
     # IS_AUTO_OCR means "automatically apply OCR only to image-only PDFs"
     should_apply_ocr = IS_ENABLED_OCR and (
         (IS_AUTO_OCR and IS_PDF_IMAGE_ONLY) or  # Auto mode: only for image-only PDFs
         (not IS_AUTO_OCR)  # Manual mode: apply to all (legacy behavior)
     )
-    
-    if should_apply_ocr and app_config and 'AppSettings' in app_config:
-        logger.info(f"[OCR] Enabling OCR for PDF (IS_AUTO_OCR={IS_AUTO_OCR}, IS_PDF_IMAGE_ONLY={IS_PDF_IMAGE_ONLY})")
 
-        # if visual grounding applied we can not used docintteligence unless it works like schema from docling to display grounding
-        if IS_OCR_LOCAL == False:
-            AppSettings = app_config['AppSettings']
-            api_endpoint_setting = AppSettings.query.filter_by(key='doc_intelligence_endpoint').first()
-            api_key_setting = AppSettings.query.filter_by(key='doc_intelligence_key').first()
-            api_endpoint = api_endpoint_setting.value if api_endpoint_setting else None
-            api_key = api_key_setting.value if api_key_setting else None
-            if not api_endpoint:
-                api_endpoint = os.getenv("DOC_INTELLIGENCE_ENDPOINT")
-            if not api_key:
-                api_key = os.getenv("DOC_INTELLIGENCE_KEY")
-            if not all([api_endpoint, api_key]):
-                logger.error("Azure DOC INTELLIGENCE credentials or endpoints are missing")
-            else:
-                docling_export_type_str = 'MARKDOWN' # Force markdown for Azure DocInt
-                logger.info("Azure DOC INTELLIGENCE credentials found. Will attempt Azure OCR")
+    # Apply local OCR (RapidOCR) when needed and Azure is not selected
+    if should_apply_ocr and IS_OCR_LOCAL and app_config and 'AppSettings' in app_config:
+        logger.info(f"[OCR] Enabling local OCR for PDF (IS_AUTO_OCR={IS_AUTO_OCR}, IS_PDF_IMAGE_ONLY={IS_PDF_IMAGE_ONLY})")
+        # Preparing docling pipeline for local OCR
+        from docling.datamodel.pipeline_options import (
+                PdfPipelineOptions,
+                RapidOcrOptions
+            )
+        # Configure local OCR for PDFs whenever local OCR is enabled (not only for image-only PDFs)
+        pipeline_options = PdfPipelineOptions()
+        pipeline_options.accelerator_options = accelerator_options
+        # Enable OCR and table structure extraction so Docling runs OCR even if selectable text exists
+        pipeline_options.do_ocr = True
+        pipeline_options.do_table_structure = True
+        pipeline_options.table_structure_options.do_cell_matching = True
+        # Prefer RapidOCR for local OCR when available
+        try:
+            ocr_options = RapidOcrOptions(force_full_page_ocr=True)
+            logger.info("Configuring local OCR with RapidOCR for PDFs")
+        except Exception as ocr_e:
+            ocr_options = None
+
+        if ocr_options:
+            pipeline_options.ocr_options = ocr_options
+            converter = DocumentConverter(
+                format_options={
+                    InputFormat.PDF: PdfFormatOption(
+                        pipeline_options=pipeline_options,
+                    )
+                }
+            )
+            logger.info("Re-initialized converter with local OCR enabled for PDFs.")
         else:
-                 # Preparing docling pipeline for local OCR
-                from docling.datamodel.pipeline_options import (
-                        PdfPipelineOptions,
-                        RapidOcrOptions
-                    )
-                # Configure local OCR for PDFs whenever local OCR is enabled (not only for image-only PDFs)
-                pipeline_options = PdfPipelineOptions()
-                pipeline_options.accelerator_options = accelerator_options
-                # Enable OCR and table structure extraction so Docling runs OCR even if selectable text exists
-                pipeline_options.do_ocr = True
-                pipeline_options.do_table_structure = True
-                pipeline_options.table_structure_options.do_cell_matching = True
-                # Prefer RapidOCR for local OCR when available
-                try:
-                    ocr_options = RapidOcrOptions(force_full_page_ocr=True)
-                    logger.info("Configuring local OCR with RapidOCR for PDFs")
-                except Exception as ocr_e:
-                    ocr_options = None
-
-                if ocr_options:
-                    pipeline_options.ocr_options = ocr_options
-                    converter = DocumentConverter(
-                        format_options={
-                            InputFormat.PDF: PdfFormatOption(
-                                pipeline_options=pipeline_options,
-                            )
-                        }
-                    )
-                    logger.info("Re-initialized converter with local OCR enabled for PDFs.")
-                else:
-                    logger.error("OCR options unavailable; proceeding without OCR-enabled converter for PDFs.")
+            logger.error("OCR options unavailable; proceeding without OCR-enabled converter for PDFs.")
     elif IS_ENABLED_OCR and IS_AUTO_OCR and not IS_PDF_IMAGE_ONLY:
         logger.info(f"[OCR] Skipping OCR - PDF has extractable text (IS_PDF_IMAGE_ONLY=False)")
 
 
     if docling_export_type_str == 'DOC_CHUNKS':
-        EMBED_MODEL_ID = get_embedding_model_name()
-        tokenizer_model_id = EMBED_MODEL_ID
-
-        # List of known Azure OpenAI embedding model names that are not on HuggingFace
-        azure_embedding_models = ["text-embedding-3-small", "text-embedding-3-large"]
-
-        # If the selected model is an Azure model, we can't load its tokenizer from HuggingFace.
-        # For the purpose of chunking with HybridChunker, we can use a standard tokenizer
-        # as a proxy for token counting. 'bert-base-uncased' is a safe default.
-        if EMBED_MODEL_ID in azure_embedding_models:
-            logger.info(f"Selected embedding model '{EMBED_MODEL_ID}' is an Azure model. Using 'sentence-transformers/all-MiniLM-L6-v2' as a proxy tokenizer for chunking.")
-            tokenizer_model_id = "sentence-transformers/all-MiniLM-L6-v2"
-        elif tokenizer_model_id == "all-MiniLM-L6-v2":
-            logger.info(f"Selected embedding model is 'all-MiniLM-L6-v2'. Using 'sentence-transformers/all-MiniLM-L6-v2' for tokenizer.")
-            tokenizer_model_id = "sentence-transformers/all-MiniLM-L6-v2"
+        # Use all-MiniLM-L6-v2 tokenizer for chunking - lightweight (~90MB) and already cached
+        # This avoids downloading any additional LLM/embedding models for tokenization
+        tokenizer_model_id = "all-MiniLM-L6-v2"
 
         try:
             tokenizer = AutoTokenizer.from_pretrained(tokenizer_model_id)
@@ -1057,7 +1043,14 @@ def async_process_single_file(self, temp_file_path_from_route, original_filename
     task_app_config = {
         'DOCLING_EXPORT_TYPE': current_app.config.get('DOCLING_EXPORT_TYPE', 'MARKDOWN'),
         'VISUAL_GROUNDING_DOC_STORE_PATH': current_app.config.get('VISUAL_GROUNDING_DOC_STORE_PATH', 'data/doc_store'),
-        'AppSettings': AppSettings, # AppSettings model class
+        'AppSettings': AppSettings,  # AppSettings model class for DB queries
+        # Env-based fallbacks so process_uploaded_file can read OCR defaults
+        # even if the corresponding AppSettings DB rows don't exist yet.
+        'IS_ENABLED_OCR': current_app.config.get('IS_ENABLED_OCR', os.environ.get('IS_ENABLED_OCR', '0')) in ('1', 'true', True, 1),
+        'IS_AUTO_OCR': current_app.config.get('IS_AUTO_OCR', os.environ.get('IS_AUTO_OCR', '0')) in ('1', 'true', True, 1),
+        'OCR_MODE': current_app.config.get('OCR_MODE', os.environ.get('OCR_MODE', 'default')),
+        'VECTOR_STORE_MODE': current_app.config.get('VECTOR_STORE_MODE', 'user'),
+        'DATA_VOLUME_PATH': current_app.config.get('DATA_VOLUME_PATH', '/home/data'),
     }
 
     knowledge_id = int(knowledge_id_str) if knowledge_id_str and knowledge_id_str != 'None' else None

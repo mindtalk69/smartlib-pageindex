@@ -70,11 +70,11 @@ def fetch_document_chunks(persist_directory: str, collection_name: str, document
 
             table_name = current_app.config.get('SQLITE_VECTOR_TABLE_NAME', 'document_vectors')
 
-            # Initialize SQLiteVec store
-            store = SQLiteVec(
-                connection_string=f"sqlite:///{db_path}",
-                embeddings=embed_func,
+            from modules.vector_store_utils import make_sqlite_vec_store
+            store = make_sqlite_vec_store(
+                db_path=db_path,
                 table_name=table_name,
+                embedding_function=embed_func,
             )
 
             # Query by metadata filter - try multiple field names

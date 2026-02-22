@@ -151,6 +151,11 @@ celery.conf.update(
     # Restart worker after N tasks to prevent memory leaks
     worker_max_tasks_per_child=100,
     
+    # Worker pool — default 'solo' for single-container GPU deployments.
+    # 'solo' runs tasks in the same process: no forking, no CUDA re-initialization crash.
+    # Override with CELERY_WORKER_POOL=prefork for multi-worker (non-GPU) deployments.
+    worker_pool=os.environ.get('CELERY_WORKER_POOL', 'solo'),
+    
     # Result expiry
     result_expires=3600,
     

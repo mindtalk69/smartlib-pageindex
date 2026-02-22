@@ -527,11 +527,11 @@ def perform_retrieval(query: str, tool_call_config: Dict[str, Any]) -> Dict[str,
         logging.info(f"[sqlite-vec DEBUG] Using database: {db_path}, table: {table_name}, dimension: {vector_dimension}")
 
         try:
-            store = SQLiteVec(
-                connection_string=f"sqlite:///{db_path}",
-                embeddings=embed_func,
+            from modules.vector_store_utils import make_sqlite_vec_store
+            store = make_sqlite_vec_store(
+                db_path=db_path,
                 table_name=table_name,
-                vector_dimension=vector_dimension,
+                embedding_function=embed_func,
             )
         except Exception as e:
             logging.error(f"[sqlite-vec DEBUG] Error initializing sqlite-vec: {e}")

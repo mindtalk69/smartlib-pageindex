@@ -46,9 +46,10 @@ langgraph-sdk>=0.1.66
 # Vector Store - sqlite-vec (embedded vectors in SQLite)
 sqlite-vec>=0.1.1
 
-# Local Embeddings - Qwen3-Embedding-0.6B via API (no local torch needed)
-# Remove torch/sentence-transformers if using API-only embeddings
+# Local Embeddings - Qwen3-Embedding-0.6B running locally on GPU
+# sentence-transformers is required by langchain-huggingface for local model loading
 langchain-huggingface>=0.1.2
+sentence-transformers>=2.6.0
 
 # HTTP & Utilities (minimal)
 httpx==0.28.1
@@ -81,7 +82,7 @@ azure-ai-documentintelligence
 # ============================================================================
 # NOTES:
 # ============================================================================
-# - Using Qwen3-Embedding-0.6B via API (no local torch/sentence-transformers)
+# - Using Qwen3-Embedding-0.6B locally on GPU (requires sentence-transformers)
 # - sqlite-vec for vector storage (embedded in SQLite, no PostgreSQL)
 # - RapidOCR for local OCR processing
 # - Docling for document parsing

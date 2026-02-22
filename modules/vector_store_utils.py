@@ -13,6 +13,42 @@ import json
 
 logger = logging.getLogger(__name__)
 
+
+def make_sqlite_vec_store(db_path: str, table_name: str, embedding_function) -> "SQLiteVec":
+    """Create a SQLiteVec store with the correct constructor signature.
+
+    langchain_community.vectorstores.SQLiteVec requires:
+      - a raw sqlite3 connection (NOT a connection_string)
+      - row_factory = sqlite3.Row so column names work in fetchone()
+      - the sqlite_vec extension loaded before passing the connection
+
+    Args:
+        db_path: Absolute path to the SQLite database file.
+        table_name: Name of the vector table (will be created if not exists).
+        embedding_function: LangChain Embeddings instance.
+
+    Returns:
+        Initialized SQLiteVec instance ready for add_documents/similarity_search.
+    """
+    import sqlite3
+
+    import sqlite_vec as _sqlite_vec
+    from langchain_community.vectorstores import SQLiteVec
+
+    connection = sqlite3.connect(db_path)
+    connection.row_factory = sqlite3.Row  # Required for .fetchone()['column'] access
+    connection.enable_load_extension(True)
+    _sqlite_vec.load(connection)
+    connection.enable_load_extension(False)
+
+    return SQLiteVec(
+        table=table_name,
+        connection=connection,
+        embedding=embedding_function,
+        db_file=db_path,
+    )
+
+
 # Attempt to import tenacity for retry logic
 try:
     from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -205,13 +241,10 @@ def process_and_store_chunks(splits, user_id, embedding_function, logger, file_i
 
             logger.info(f"Initializing sqlite-vec at {db_path}, Table: {table_name}, Dimension: {vector_dimension}")
 
-            # Initialize sqlite-vec store
-            # SQLiteVec handles table creation, vector quantization, and indexing automatically
-            sqlite_vec_store = SQLiteVec(
-                connection_string=f"sqlite:///{db_path}",
-                embeddings=embedding_function,
+            sqlite_vec_store = make_sqlite_vec_store(
+                db_path=db_path,
                 table_name=table_name,
-                vector_dimension=vector_dimension,
+                embedding_function=embedding_function,
             )
 
             logger.info(f"Adding {len(splits)} documents to sqlite-vec in batches.")

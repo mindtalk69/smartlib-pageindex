@@ -1,0 +1,51 @@
+services:
+  smartlib-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    image: smartlib-gpu:latest
+    container_name: smartlib-gpu
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persistent data only — no source bind-mounts in production
+      - smartlib_gpu_data:/home/data
+      # Custom logo override (optional, safe to keep in prod)
+      - ./static/img:/app/static/img
+    env_file:
+      - .env
+    environment:
+      - CELERY_BROKER_URL=redis://localhost:6379/0
+      - CELERY_RESULT_BACKEND=redis://localhost:6379/0
+      - STREAM_BUS_URL=redis://localhost:6379/0
+      - APP_EDITION=BASIC
+      - VECTOR_STORE_PROVIDER=sqlite-vec
+      - SQLALCHEMY_DATABASE_URI=sqlite:////home/data/smartlib.db
+      - LOCAL_MODE=true
+      - DEFAULT_EMBEDDING_MODEL=Qwen/Qwen3-Embedding-0.6B
+      - EMBEDDING_CACHE_DIR=/home/data/hf_cache
+      - EMBEDDING_WARMUP_ENABLED=false
+      - AGENT_TASK_TIMEOUT=240
+      - GUNICORN_TIMEOUT=300
+      - IS_ENABLED_OCR=1
+      - IS_OCR_LOCAL=true
+      - DOCLING_EXPORT_TYPE=MARKDOWN
+      - SKIP_DATA_MOUNT_CHECK=true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+volumes:
+  smartlib_gpu_data:
+    driver: local

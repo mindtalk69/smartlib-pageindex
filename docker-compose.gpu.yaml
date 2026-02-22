@@ -10,8 +10,12 @@ services:
     volumes:
       # Persistent data: SQLite DB, vector store, uploaded files, HF model cache
       - smartlib_gpu_data:/home/data
-      # Custom logo / static overrides (optional)
-      - ./static/img:/app/static/img
+      # Dev: bind-mount source dirs so edits are reflected instantly (no rebuild needed)
+      - ./modules:/app/modules
+      - ./templates:/app/templates
+      - ./static:/app/static
+      # Dev: bind-mount frontend dist to pick up React builds instantly
+      - ./frontend/dist:/app/frontend/dist
     env_file:
       - .env.dev
     environment:
