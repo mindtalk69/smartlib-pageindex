@@ -25,11 +25,9 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
-import { DataTablePagination, DataTableToolbar } from '@/components/data-table'
+import { DataTablePagination } from '@/components/data-table'
 import { useFilesColumns } from './files-columns'
-import { useFiles } from './files-provider'
-import { DataTableBulkActions } from './data-table-bulk-actions'
-import { FilesDialogs } from './files-dialogs'
+import { useFilesContext } from './files-provider'
 
 type DataTableProps = {
   search: Record<string, unknown>
@@ -38,25 +36,22 @@ type DataTableProps = {
 
 export function FilesTable({ search, navigate }: DataTableProps) {
   const {
-    open,
-    setOpen,
-    currentRow,
-    setCurrentRow,
-    deleteFile,
-    selectedRows,
-    setSelectedRows,
-    pagination,
-    setPagination,
     files,
     isLoading,
     total,
-  } = useFiles()
+  } = useFilesContext()
 
   // Local UI-only states
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const columns = useFilesColumns({ navigate })
+  const columns = useFilesColumns()
+
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    pageIndex: 0,
+    pageSize: 10,
+  })
 
   // Sync pagination with URL
   useEffect(() => {
@@ -66,7 +61,7 @@ export function FilesTable({ search, navigate }: DataTableProps) {
       pageIndex: pageFromUrl - 1,
       pageSize: pageSizeFromUrl,
     })
-  }, [search.page, search.pageSize, setPagination])
+  }, [search.page, search.pageSize])
 
   // Sync URL when pagination changes
   useEffect(() => {
@@ -88,10 +83,8 @@ export function FilesTable({ search, navigate }: DataTableProps) {
       columnFilters,
       columnVisibility,
     },
-    enableRowSelection: true,
     onPaginationChange: setPagination,
     onColumnFiltersChange: setColumnFilters,
-    onRowSelectionChange: setSelectedRows,
     onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,
     getPaginationRowModel: getPaginationRowModel(),
@@ -142,14 +135,9 @@ export function FilesTable({ search, navigate }: DataTableProps) {
   return (
     <div
       className={cn(
-        'max-sm:has-[div[role="toolbar"]]:mb-16',
         'flex flex-1 flex-col gap-4'
       )}
     >
-      <DataTableToolbar
-        table={table}
-        searchPlaceholder='Filter files...'
-      />
       <div className='overflow-hidden rounded-md border'>
         <Table>
           <TableHeader>
@@ -181,7 +169,6 @@ export function FilesTable({ search, navigate }: DataTableProps) {
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  data-state={row.getIsSelected() && 'selected'}
                   className='group/row'
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -215,8 +202,6 @@ export function FilesTable({ search, navigate }: DataTableProps) {
         </Table>
       </div>
       <DataTablePagination table={table} className='mt-auto' />
-      <DataTableBulkActions table={table} />
-      <FilesDialogs />
     </div>
   )
 }

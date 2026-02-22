@@ -21,6 +21,14 @@ RUN npm install --silent
 COPY frontend/ ./
 RUN npm run build
 
+# ─── Stage 1c: Build admin-frontend/ React app (served at /app-admin/) ───────
+FROM node:20-alpine AS admin_frontend
+WORKDIR /app
+COPY admin-frontend/package.json admin-frontend/package-lock.json* ./
+RUN npm install --silent
+COPY admin-frontend/ ./
+RUN npm run build
+
 # ─── Stage 2: Python base ───────────────────────────────────────────────────
 FROM python:3.11-slim AS base
 
@@ -77,6 +85,9 @@ COPY --from=assets /app/static/dist /app/static/dist
 
 # Copy built frontend/ React app (served at /app/)
 COPY --from=frontend /app/dist /app/frontend/dist
+
+# Copy built admin-frontend/ React app (served at /app-admin/)
+COPY --from=admin_frontend /app/dist /app/admin-frontend/dist
 
 # Copy supervisord configuration
 COPY supervisord.conf /etc/supervisor/conf.d/smartlib.conf

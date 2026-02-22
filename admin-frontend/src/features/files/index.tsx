@@ -8,7 +8,6 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { FilesTable } from './components/files-table'
 import { FilesProvider } from './components/files-provider'
-import { FilesDialogs } from './components/files-dialogs'
 
 const route = getRouteApi('/_authenticated/files/')
 
@@ -31,14 +30,12 @@ export function Files() {
           <div>
             <h2 className='text-2xl font-bold tracking-tight'>Files</h2>
             <p className='text-muted-foreground'>
-              Manage uploaded files and document processing.
+              View uploaded files and document processing.
             </p>
           </div>
         </div>
         <FilesTable search={search} navigate={navigate} />
       </Main>
-
-      <FilesDialogs />
     </FilesProvider>
   )
 }

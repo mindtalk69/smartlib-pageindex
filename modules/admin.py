@@ -340,14 +340,15 @@ def init_admin(app):
     app.register_blueprint(languages_bp)
     from modules.admin_messages import messages_bp
     app.register_blueprint(messages_bp)
-    from modules.admin_users import users_bp
+    from modules.admin_users import users_bp, api_users_bp
     app.register_blueprint(users_bp)
+    app.register_blueprint(api_users_bp)
     from modules.admin_vector_references import vector_references_bp
     app.register_blueprint(vector_references_bp)
-    from modules.admin_files import files_bp
+    from modules.admin_files import files_bp, api_files_bp
     app.register_blueprint(files_bp)
-    from modules.admin_downloads import downloads_bp
-    app.register_blueprint(downloads_bp)
+    app.register_blueprint(api_files_bp)
+    
     # Register models admin blueprint (ModelConfig CRUD / default selection)
     try:
         from modules.admin_models import models_bp

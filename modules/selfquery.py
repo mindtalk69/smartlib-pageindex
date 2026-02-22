@@ -334,6 +334,16 @@ metadata_field_info = [
         description="A list of group names associated with the document, often related to access or department.",
         type="list[string]",
     ),
+    AttributeInfo(
+        name="brand_manufacturer_organization",
+        description="The name of the brand, manufacturer, or organization associated with the document (e.g., 'Sony', 'Dell', 'Siemens', 'WHO')",
+        type="string",
+    ),
+    AttributeInfo(
+        name="product_model_name_service",
+        description="The product name, model number, or service name mentioned in the document (e.g., 'Bravia X90J', 'XPS 13', 'S7-1200', 'COVID-19 Report')",
+        type="string",
+    ),
 ]
 
 document_content_description = "Content chunks from various documents."

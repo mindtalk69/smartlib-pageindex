@@ -666,9 +666,17 @@ def create_app():
     app.register_blueprint(admin_feedback_bp)
 
     # Register admin folder upload blueprint
-    from modules.admin_folder_upload import admin_folder_upload_bp
+    from modules.admin_folder_upload import admin_folder_upload_bp, api_folder_upload_bp
 
     app.register_blueprint(admin_folder_upload_bp)
+    app.register_blueprint(api_folder_upload_bp)
+
+    # Register admin downloads blueprint
+    from modules.admin_downloads import downloads_bp, api_downloads_bp
+
+    app.register_blueprint(downloads_bp)
+    app.register_blueprint(api_downloads_bp)
+
 
     # Register admin providers blueprint
     from modules.admin_providers import admin_providers_bp

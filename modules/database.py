@@ -115,6 +115,8 @@ class UploadedFile(db.Model):
     __tablename__ = 'uploaded_files'
     is_ocr = db.Column(db.Boolean, default=False)
     is_az_doci = db.Column(db.Boolean, default=False)
+    brand_manufacturer_organization = db.Column(db.String(255), nullable=True)
+    product_model_name_service = db.Column(db.String(255), nullable=True)
     file_id = db.Column(db.Integer, primary_key=True) # AUTOINCREMENT is default for Integer PK
     user_id = db.Column(db.String, db.ForeignKey('users.user_id'), nullable=False)
     library_id = db.Column(db.Integer, db.ForeignKey('libraries.library_id'), nullable=True)
@@ -244,6 +246,8 @@ class Knowledge(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False, unique=True)
     description = db.Column(db.Text, nullable=True)
+    brand_manufacturer_organization = db.Column(db.String(255), nullable=True)
+    product_model_name_service = db.Column(db.String(255), nullable=True)
     # Remove direct category_id foreign key
     # category_id = db.Column(db.Integer, db.ForeignKey('categories.id', ondelete='SET NULL'), nullable=True)
     created_by_user_id = db.Column(db.String, db.ForeignKey('users.user_id'), nullable=False)
@@ -354,6 +358,8 @@ class Document(db.Model):
     dl_meta = db.Column(JSON, nullable=True)
     docling_json_path = db.Column(db.Text, nullable=True)
     content_preview = db.Column(db.Text, nullable=True)
+    brand_manufacturer_organization = db.Column(db.String(255), nullable=True)
+    product_model_name_service = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
 
 class AppSettings(db.Model):
@@ -1890,7 +1896,7 @@ def add_vector_reference(file_id, url_download_id, chunk_index):
         logging.error(f"Error adding vector reference for chunk {chunk_index}: {e}")
         raise
 
-def add_document(id, source, library_id, knowledge_id, dl_meta, content_preview, docling_json_path=None):
+def add_document(id, source, library_id, knowledge_id, dl_meta, content_preview, docling_json_path=None, brand=None, product=None):
     new_document = Document(
         id=id,
         source=source,
@@ -1898,7 +1904,9 @@ def add_document(id, source, library_id, knowledge_id, dl_meta, content_preview,
         knowledge_id=knowledge_id,
         dl_meta=dl_meta,
         content_preview=content_preview,
-        docling_json_path=docling_json_path
+        docling_json_path=docling_json_path,
+        brand_manufacturer_organization=brand,
+        product_model_name_service=product
     )
     try:
         db.session.add(new_document)        

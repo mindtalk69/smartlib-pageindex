@@ -394,17 +394,20 @@
 
 .agent-bubble {
   align-self: flex-start;
-  /* Align agent bubbles to the left (start) */
-  background: var(--bs-tertiary-bg, #f0f2f5);
-  /* Use a theme-aware subtle background, with a light fallback */
+  background: var(--bs-body-bg, #f8fafc);
+  /* Light, clean background */
+  border: 1px solid var(--bs-border-color-translucent, rgba(0, 0, 0, 0.08));
   color: var(--bs-body-color);
   max-width: 85%;
   width: 100%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  /* Very subtle shadow for depth */
 }
 
 [data-bs-theme="dark"] .agent-bubble {
-  background: var(--bs-tertiary-bg, #2c2f33);
-  /* Darker fallback for dark theme */
+  background: rgba(255, 255, 255, 0.03);
+  /* Translucent dark bg */
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 /* Message Footer Styles */
@@ -808,4 +811,187 @@
   /* "auto" or "thin" */
   scrollbar-color: var(--bs-border-color) transparent;
   /* thumb color track color */
+}
+
+/* --- Modern Typography (Chat Prose) --- */
+
+.chat-prose {
+  color: var(--bs-body-color);
+  line-height: 1.5;
+  font-size: 0.95rem;
+  max-width: 100%;
+  white-space: normal !important;
+  /* Force normal wrapping, avoid double-spacing from pre-wrap */
+}
+
+.chat-prose>*:first-child {
+  margin-top: 0;
+}
+
+.chat-prose>*:last-child {
+  margin-bottom: 0;
+}
+
+.chat-prose p {
+  margin-bottom: 0.6rem;
+  /* Even tighter spacing */
+}
+
+.chat-prose h1,
+.chat-prose h2,
+.chat-prose h3,
+.chat-prose h4,
+.chat-prose h5,
+.chat-prose h6 {
+  color: var(--bs-heading-color);
+  margin-top: 0.8rem;
+  margin-bottom: 0.3rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.chat-prose h1 {
+  font-size: 1.35rem;
+}
+
+.chat-prose h2 {
+  font-size: 1.2rem;
+}
+
+.chat-prose h3 {
+  font-size: 1.1rem;
+}
+
+.chat-prose h4 {
+  font-size: 1rem;
+}
+
+.chat-prose ul,
+.chat-prose ol {
+  margin-bottom: 0.6rem;
+  padding-left: 0;
+  /* Reset padding, we use margin on Li or pseudo-elements */
+  list-style: none !important;
+  /* We'll use pseudo-elements for bulletproof rendering */
+}
+
+.chat-prose li {
+  margin-bottom: 0.25rem;
+  position: relative;
+  padding-left: 1.5rem;
+  display: block !important;
+}
+
+.chat-prose ul>li::before {
+  content: "\2022";
+  /* Bullet point */
+  position: absolute;
+  left: 0.4rem;
+  color: var(--bs-primary);
+  font-weight: bold;
+}
+
+.chat-prose ol {
+  counter-reset: item;
+}
+
+.chat-prose ol>li::before {
+  content: counter(item) ".";
+  counter-increment: item;
+  position: absolute;
+  left: 0;
+  width: 1.2rem;
+  text-align: right;
+  color: var(--bs-primary);
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.chat-prose li>ul,
+.chat-prose li>ol {
+  margin-top: 0.2rem;
+  margin-bottom: 0;
+}
+
+.chat-prose blockquote {
+  border-left: 4px solid var(--bs-primary-border-subtle);
+  padding-left: 1rem;
+  color: var(--bs-secondary-color);
+  font-style: italic;
+  margin: 1.5rem 0;
+}
+
+/* Inline Code */
+.chat-prose code:not(pre code) {
+  background-color: var(--bs-tertiary-bg);
+  color: var(--bs-primary-text-emphasis);
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.25rem;
+  font-family: var(--bs-font-monospace);
+  font-size: 0.875rem;
+}
+
+/* Code Blocks */
+.chat-prose pre {
+  background-color: var(--bs-dark);
+  color: #fff;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin: 1.25rem 0;
+  overflow-x: auto;
+  font-family: var(--bs-font-monospace);
+  line-height: 1.45;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.chat-prose pre code {
+  background-color: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.875rem;
+}
+
+/* Tables */
+.chat-prose table {
+  width: 100%;
+  margin-bottom: 1rem;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.chat-prose th,
+.chat-prose td {
+  padding: 0.5rem;
+  border: 1px solid var(--bs-border-color);
+}
+
+.chat-prose th {
+  background-color: var(--bs-tertiary-bg);
+  font-weight: 600;
+  text-align: left;
+}
+
+/* Links */
+.chat-prose a {
+  color: var(--bs-primary);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+
+.chat-prose a:hover {
+  border-bottom-color: var(--bs-primary);
+}
+
+/* Theme Adjustments */
+[data-bs-theme="dark"] .chat-prose pre {
+  background-color: #0d1117;
+  /* GitHub Dark style */
+  border-color: var(--bs-border-color);
+}
+
+[data-bs-theme="dark"] .chat-prose code:not(pre code) {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--bs-primary-text-emphasis);
 }

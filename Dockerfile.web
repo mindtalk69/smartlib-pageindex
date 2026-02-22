@@ -8,6 +8,20 @@ COPY vite.config.js ./
 COPY static ./static
 RUN npm run build
 
+FROM node:20-alpine AS frontend
+WORKDIR /app
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install --silent
+COPY frontend/ ./
+RUN npm run build
+
+FROM node:20-alpine AS admin_frontend
+WORKDIR /app
+COPY admin-frontend/package.json admin-frontend/package-lock.json* ./
+RUN npm install --silent
+COPY admin-frontend/ ./
+RUN npm run build
+
 FROM python:3.11-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -19,23 +33,23 @@ WORKDIR /app
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       build-essential \
-       git \
-       curl \
-       libffi-dev \
-       libpq-dev \
-       libjpeg-dev \
-       zlib1g-dev \
-       libpng-dev \
-       libfreetype6-dev \
-       liblcms2-dev \
-       libtiff-dev \
-       libwebp-dev \
-       libxml2-dev \
-       libxslt1-dev \
-       libssl-dev \
-       pkg-config \
-       openssh-server \
+    build-essential \
+    git \
+    curl \
+    libffi-dev \
+    libpq-dev \
+    libjpeg-dev \
+    zlib1g-dev \
+    libpng-dev \
+    libfreetype6-dev \
+    liblcms2-dev \
+    libtiff-dev \
+    libwebp-dev \
+    libxml2-dev \
+    libxslt1-dev \
+    libssl-dev \
+    pkg-config \
+    openssh-server \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure SSH for Azure App Service access
@@ -61,11 +75,13 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip \
     && pip install -r /tmp/requirements.txt \
     && if [ "$INSTALL_WEB_EXTRAS" = "true" ]; then \
-        pip install --extra-index-url https://download.pytorch.org/whl/cpu -r /tmp/requirements-extras.txt; \
+    pip install --extra-index-url https://download.pytorch.org/whl/cpu -r /tmp/requirements-extras.txt; \
     fi
 
 COPY . /app
 COPY --from=assets /app/static/dist /app/static/dist
+COPY --from=frontend /app/dist /app/frontend/dist
+COPY --from=admin_frontend /app/dist /app/admin-frontend/dist
 
 RUN chmod +x docker-entrypoint.sh
 

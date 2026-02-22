@@ -1184,9 +1184,13 @@ Answer:"""
                 context_str = "\n\n---\n\n".join(context_chunks)
                 context_source = "retrieved"
                 generation_prompt_text = f"""Please answer in {language}.
-You are a helpful assistant. Answer the user's question based ONLY on the provided sources.
-For each piece of information you use from a source, you MUST cite it by adding the source number in brackets, like [1], [2], etc.
-If the sources do not contain an answer, state that you could not find the information in the available documents. Do not make up information.
+You are a highly accurate and helpful AI assistant. Answer the user's question based ONLY on the provided context information.
+Follow these rules strictly:
+1. Use the provided context to answer. If the answer is not in the context, clearly state that you don't know based on available documents.
+2. For every fact or claim you make, you MUST cite the source by its ID in brackets, e.g., [1] or [2]. Place these citations immediately after the relevant sentence or clause.
+3. Keep your output structured and professional.
+4. Do not include any information that is not supported by the context.
+5. Do not include generic follow-up questions in your main text response; they will be generated separately.
 
 Context:
 {context_str}
@@ -1199,12 +1203,8 @@ Answer:"""
                 context_str = "No relevant information was found in the document database for your query."
                 context_source = "none"
                 generation_prompt_text = f"""Please answer in {language}.
-You are a helpful assistant. Answer the user's question based ONLY on the provided sources.
-For each piece of information you use from a source, you MUST cite it by adding the source number in brackets, like [1], [2], etc.
-If the sources do not contain an answer, state that you could not find the information in the available documents. Do not make up information.
-
-Context:
-{context_str}
+You are a helpful assistant. Since no specific documents were found, explain that clearly. 
+If there is previous conversation context, you may use it to clarify why no results were found or offer general assistance.
 
 Question: {question}
 
@@ -1215,6 +1215,13 @@ Answer:"""
             def _response_indicates_no_answer(text: str | None) -> bool:
                 if not text:
                     return False
+                # If it has citations [1], [2] etc, it definitely found info
+                if re.search(r'\[\d+\]', text):
+                    return False
+                # If it's substantial in length, it's likely a real answer
+                if len(text.strip()) > 300:
+                    return False
+                    
                 lowered = text.lower()
                 phrases = (
                     "could not find",
@@ -1225,6 +1232,8 @@ Answer:"""
                     "tidak menemukan",
                     "tidak dapat menemukan",
                     "tidak menemukan informasi",
+                    "i don't know",
+                    "info not available",
                 )
                 return any(phrase in lowered for phrase in phrases)
 
@@ -1241,6 +1250,20 @@ Answer:"""
                     if any(tok in content for tok in tokens):
                         return True
                 return False
+
+            # CHECK: Did the previous agent node already provide a good answer?
+            # If the last message is an AIMessage with content and NO tool calls, 
+            # and it doesn't indicate "no answer", we can skip re-generation.
+            if messages and isinstance(messages[-1], AIMessage):
+                last_msg = messages[-1]
+                if last_msg.content and not getattr(last_msg, "tool_calls", None):
+                    if not _response_indicates_no_answer(last_msg.content):
+                        logging.info("Previous agent node already provided a substantial answer. Skipping redundant generation.")
+                        return {
+                            "messages": messages,
+                            "generation_context_source": "retrieved" if documents else "none",
+                            "usage_metadata": state.get("usage_metadata", {})
+                        }
 
             llm_message_content = [{"type": "text", "text": generation_prompt_text}]
             if image_base64 and image_mime_type:
@@ -1328,22 +1351,6 @@ Answer:"""
 
             import re
 
-            def _response_indicates_no_answer(text: str | None) -> bool:
-                if not text:
-                    return False
-                lowered = text.lower()
-                phrases = (
-                    "could not find",
-                    "unable to find",
-                    "cannot find",
-                    "no information",
-                    "information not found",
-                    "tidak menemukan",
-                    "tidak dapat menemukan",
-                    "tidak menemukan informasi",
-                )
-                return any(phrase in lowered for phrase in phrases)
-
             def _context_mentions_query(query: str | None, docs: List[Document]) -> bool:
                 if not query:
                     return False
@@ -1357,6 +1364,31 @@ Answer:"""
                     if any(tok in content for tok in tokens):
                         return True
                 return False
+
+            def _response_indicates_no_answer(text: str | None) -> bool:
+                if not text:
+                    return False
+                # If it has citations [1], [2] etc, it definitely found info
+                if re.search(r'\[\d+\]', text):
+                    return False
+                # If it's substantial in length, it's likely a real answer
+                if len(text.strip()) > 300:
+                    return False
+                    
+                lowered = text.lower()
+                phrases = (
+                    "could not find",
+                    "unable to find",
+                    "cannot find",
+                    "no information",
+                    "information not found",
+                    "tidak menemukan",
+                    "tidak dapat menemukan",
+                    "tidak menemukan informasi",
+                    "i don't know",
+                    "info not available",
+                )
+                return any(phrase in lowered for phrase in phrases)
 
             if (
                 retrieved_docs
@@ -1579,14 +1611,18 @@ Answer:"""
                     language = get_active_language_name()
                     # Build a safe, explicit prompt using context_str (avoid mixing f-strings with .format)
                     qgen_system_prompt = (
-                        f"Please respond in {language}.\n"
-                        f"Based on these documents, suggest 3 specific follow-up questions:\n"
-                        f"Documents:\n{context_str}\n\n"
-                        f"Questions:"
+                        f"You are a helpful assistant that suggests follow-up questions based on documents. "
+                        f"Please respond in {language}.\n\n"
+                        f"Your task is to suggest exactly 3 relevant and diverse follow-up questions that help the user explore the topic deeper.\n\n"
+                        f"IMPORTANT: Return ONLY a valid JSON array of strings. Do not include any conversational text like 'Certainly!' or 'Here are the questions'.\n"
+                        f"FORMAT EXAMPLE: [\"Question 1?\", \"Question 2?\", \"Question 3?\"]"
                     )
+                    
+                    user_context_summary = f"User asked: {query_text[:200]}\n\nDocuments:\n{context_str[:2000]}"
+                    
                     messages_for_qgen = [
                         SystemMessage(content=qgen_system_prompt),
-                        HumanMessage(content="Suggest follow-up questions:")
+                        HumanMessage(content=f"Based on this context, suggest 3 questions:\n\n{user_context_summary}")
                     ]
                     llm_response = llm.invoke(messages_for_qgen)
                     raw_q_content = getattr(llm_response, "content", "") or ""
@@ -1596,26 +1632,39 @@ Answer:"""
                     suggested_questions = []
                     try:
                         import json as _json
+                        # Extract JSON array if surrounded by chatter
+                        json_match = re.search(r'\[\s*".*?"\s*(?:,\s*".*?"\s*)*\]', raw_q_content, re.DOTALL)
+                        if json_match:
+                            raw_q_content = json_match.group(0)
+                        
                         stripped = raw_q_content.strip()
                         if stripped.startswith('['):
                             parsed = _json.loads(stripped)
                             if isinstance(parsed, list):
                                 suggested_questions = [q.strip() for q in parsed if isinstance(q, str)][:3]
-                        else:
+                        
+                        if not suggested_questions:
+                            # Robust line parsing fallback
                             for line in raw_q_content.splitlines():
                                 line = line.strip()
-                                if not line:
+                                if not line or len(line) < 10: # Skip very short lines or empty ones
                                     continue
+                                # Skip common conversational intros
+                                if any(intro in line.lower() for intro in ["certainly", "here are", "suggested", "follow-up"]):
+                                    if not line.endswith('?'): # If it doesn't end with ? it's almost certainly chatter
+                                        continue
+                                
                                 # Remove common numbering/bullets and surrounding quotes
-                                clean = re.sub(r'^[\d\-\.\)\s]+', '', line).strip().strip('"\'').strip()
-                                if clean and not clean.endswith('?'):
-                                    clean += '?'
-                                if clean and clean not in suggested_questions:
-                                    suggested_questions.append(clean)
-                                if len(suggested_questions) >= 3:
-                                    break
+                                clean = re.sub(r'^[\d\-\.\)\s•\*]+', '', line).strip().strip('"\'').strip()
+                                if clean and len(clean) > 5:
+                                    if not clean.endswith('?'):
+                                        clean += '?'
+                                    if clean not in suggested_questions:
+                                        suggested_questions.append(clean)
+                                    if len(suggested_questions) >= 3:
+                                        break
                     except Exception as e_parse:
-                        logging.warning(f"[format_rag_response] Failed to parse follow-up questions JSON: {e_parse}")
+                        logging.warning(f"[format_rag_response] Error parsing follow-up questions: {e_parse}")
                         # Fallback to simple line-splitting parsing
                         for line in raw_q_content.splitlines():
                             line = line.strip()

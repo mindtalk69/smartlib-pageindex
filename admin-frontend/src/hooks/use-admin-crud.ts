@@ -3,13 +3,13 @@
  * Provides reusable CRUD operations for any admin resource
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { toast } from 'sonner'
 import type { ApiResponse, PaginatedResponse } from '@/lib/api-client'
 
 interface UseAdminCrudOptions<T, CreateInput = Partial<T>, UpdateInput = Partial<T>> {
   /** Fetch all items with pagination */
-  fetchAll: (params?: { page?: number; per_page?: number; search?: string }) => Promise<PaginatedResponse<T>>
+  fetchAll: (params?: { page?: number; per_page?: number; search?: string }) => Promise<ApiResponse<PaginatedResponse<T>>>
   /** Fetch single item by ID */
   fetchById: (id: string) => Promise<ApiResponse<T>>
   /** Create new item */
@@ -94,10 +94,10 @@ export function useAdminCrud<T extends { id: string }, CreateInput = Partial<T>,
     try {
       const response = await fetchAll({ page, per_page: perPage })
 
-      if (response.success) {
-        setItems(response.data || [])
-        setTotal(response.total || 0)
-        setTotalPages(response.total_pages || 0)
+      if (response.success && response.data) {
+        setItems(response.data.items || [])
+        setTotal(response.data.total || 0)
+        setTotalPages(response.data.total_pages || 0)
       } else {
         setError(response.error || 'Failed to fetch items')
         setItems([])
@@ -111,10 +111,10 @@ export function useAdminCrud<T extends { id: string }, CreateInput = Partial<T>,
     }
   }, [fetchAll, page, perPage])
 
-  // Initial load
-  useState(() => {
+  // Initial load and re-fetch on dependency change
+  useEffect(() => {
     loadItems()
-  })
+  }, [loadItems])
 
   // Refresh data
   const refresh = useCallback(async () => {

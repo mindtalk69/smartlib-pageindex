@@ -1,17 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { PlaceholderPage } from '@/components/placeholder-page'
+import { UrlDownloads } from '@/features/url-downloads'
 
 export const Route = createFileRoute('/_authenticated/url-downloads/')({
-  component: () => (
-    <PlaceholderPage
-      title="URL Downloads"
-      description="Download content from URLs for processing."
-      features={[
-        "Download files from URLs",
-        "Batch URL processing",
-        "Download history tracking",
-        "Support for multiple file types",
-      ]}
-    />
-  ),
+  component: UrlDownloads,
 })

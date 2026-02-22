@@ -197,44 +197,36 @@ def init_index(app):
     def react_app(path=None):
         """Serve React app at /app/ route."""
         import os
+        from flask import send_from_directory
+        
         # sync-react-build.sh copies frontend/dist -> static/react/
         # Fallback to frontend/dist for local dev without the sync script
         react_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'react')
         if not os.path.exists(os.path.join(react_dir, 'index.html')):
             react_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist')
+            
+        # If the path points to an actual file (like assets/script.js or images/logo.png), serve it
+        if path and os.path.isfile(os.path.join(react_dir, path)):
+            return send_from_directory(react_dir, path)
+            
         return send_from_directory(react_dir, 'index.html')
 
-    # Serve React app static assets
-    @app.route('/app/assets/<path:filename>')
-    def react_assets(filename):
-        """Serve React app static assets."""
-        import os
-        react_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'react')
-        if not os.path.isdir(os.path.join(react_dir, 'assets')):
-            react_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist')
-        return send_from_directory(os.path.join(react_dir, 'assets'), filename)
-
-    # Admin React App routes at /admin-app/
-    @app.route('/admin-app/')
-    @app.route('/admin-app/<path:path>')
+    # Admin React App routes at /app-admin/
+    @app.route('/app-admin/')
+    @app.route('/app-admin/<path:path>')
     def admin_react_app(path=None):
-        """Serve admin React app at /admin-app/ route."""
+        """Serve admin React app at /app-admin/ route."""
         from flask import send_from_directory
         import os
 
-        admin_dist_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'admin-frontend', 'dist')
+        # Check static/admin-react first (copied by sync-admin-build.sh)
+        admin_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'admin-react')
+        if not os.path.exists(os.path.join(admin_dir, 'index.html')):
+            admin_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'admin-frontend', 'dist')
 
-        # Serve index.html for all routes (React Router)
-        return send_from_directory(admin_dist_dir, 'index.html')
+        # If the path points to an actual file (like assets/, images/, fonts/), serve it
+        if path and os.path.isfile(os.path.join(admin_dir, path)):
+            return send_from_directory(admin_dir, path)
 
-    # Serve admin React app static assets
-    @app.route('/admin-app/assets/<path:filename>')
-    def admin_react_assets(filename):
-        """Serve admin React app static assets."""
-        from flask import send_from_directory
-        import os
-
-        admin_dist_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'admin-frontend', 'dist')
-        assets_dir = os.path.join(admin_dist_dir, 'assets')
-
-        return send_from_directory(assets_dir, filename)
+        # Serve index.html for all other routes (React Router fallback)
+        return send_from_directory(admin_dir, 'index.html')

@@ -42,6 +42,20 @@ COPY vite.config.js ./
 COPY static ./static
 RUN npm run build
 
+FROM node:20-alpine AS frontend
+WORKDIR /app
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install --silent
+COPY frontend/ ./
+RUN npm run build
+
+FROM node:20-alpine AS admin_frontend
+WORKDIR /app
+COPY admin-frontend/package.json admin-frontend/package-lock.json* ./
+RUN npm install --silent
+COPY admin-frontend/ ./
+RUN npm run build
+
 # Main Python image
 FROM base AS python
 
@@ -55,6 +69,8 @@ COPY . /app
 
 # Copy built frontend assets from node stage
 COPY --from=node /app/static/dist /app/static/dist
+COPY --from=frontend /app/dist /app/frontend/dist
+COPY --from=admin_frontend /app/dist /app/admin-frontend/dist
 
 # Setup data directory
 RUN mkdir -p /home/data && chmod 777 /home/data

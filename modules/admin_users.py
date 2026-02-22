@@ -279,3 +279,184 @@ def deny_password_reset_request(request_id):
         flash('Unable to update the request. Please try again.', 'danger')
 
     return redirect(url_for('admin_users.password_reset_requests'))
+
+# --- API Endpoints for React Frontend ---
+
+from flask import jsonify, request
+
+api_users_bp = Blueprint('api_admin_users', __name__, url_prefix='/api/admin/users')
+
+@api_users_bp.route('', methods=['GET'])
+@api_users_bp.route('/', methods=['GET'])
+@login_required
+def api_list_users():
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Admin access required'}), 403
+    
+    try:
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+        search = request.args.get('search', '').strip()
+        
+        query = User.query
+        if search:
+            query = query.filter(
+                (User.username.ilike(f'%{search}%')) | 
+                (User.user_id.ilike(f'%{search}%'))
+            )
+            
+        pagination = query.order_by(User.username).paginate(page=page, per_page=per_page, error_out=False)
+        
+        items = []
+        for u in pagination.items:
+            items.append({
+                'id': u.user_id,
+                'user_id': u.user_id,
+                'username': u.username,
+                'email': getattr(u, 'email', None),
+                'is_admin': u.is_admin,
+                'is_disabled': u.is_disabled,
+                'created_at': u.created_at.isoformat() if hasattr(u, 'created_at') and u.created_at else None
+            })
+            
+        return jsonify({
+            'success': True,
+            'data': {
+                'items': items,
+                'total': pagination.total,
+                'page': pagination.page,
+                'per_page': pagination.per_page,
+                'total_pages': pagination.pages
+            }
+        })
+    except Exception as e:
+        logging.error(f"API list_users error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_users_bp.route('/<string:user_id>', methods=['GET'])
+@login_required
+def api_get_user(user_id):
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Admin access required'}), 403
+    
+    u = db.session.get(User, user_id)
+    if not u:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+    return jsonify({
+        'success': True,
+        'data': {
+            'id': u.user_id,
+            'user_id': u.user_id,
+            'username': u.username,
+            'email': getattr(u, 'email', None),
+            'is_admin': u.is_admin,
+            'is_disabled': u.is_disabled,
+            'created_at': u.created_at.isoformat() if hasattr(u, 'created_at') and u.created_at else None
+        }
+    })
+
+@api_users_bp.route('/<string:user_id>', methods=['PUT', 'PATCH'])
+@login_required
+def api_update_user(user_id):
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Admin access required'}), 403
+        
+    u = db.session.get(User, user_id)
+    if not u:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+    try:
+        # Prevent self-disable or self-remove admin
+        if user_id == current_user.get_id():
+            if 'is_admin' in data and not data['is_admin']:
+                return jsonify({'success': False, 'error': 'Cannot remove your own admin status'}), 400
+            if 'is_disabled' in data and data['is_disabled']:
+                return jsonify({'success': False, 'error': 'Cannot disable your own account'}), 400
+
+        if 'is_admin' in data:
+            u.is_admin = bool(data['is_admin'])
+            
+        if 'is_disabled' in data:
+            target_disabled = bool(data['is_disabled'])
+            if u.is_disabled != target_disabled:
+                # toggle_user_disabled_status handles the actual toggle
+                success, error = toggle_user_disabled_status(user_id)
+                if not success:
+                    return jsonify({'success': False, 'error': error}), 400
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': u.user_id,
+                'user_id': u.user_id,
+                'username': u.username,
+                'is_admin': u.is_admin,
+                'is_disabled': u.is_disabled,
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"API update_user error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_users_bp.route('/<string:user_id>', methods=['DELETE'])
+@login_required
+def api_delete_user(user_id):
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Admin access required'}), 403
+        
+    if user_id == current_user.get_id():
+        return jsonify({'success': False, 'error': 'Cannot delete your own account'}), 400
+        
+    u = db.session.get(User, user_id)
+    if not u:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+    try:
+        db.session.delete(u)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"API delete_user error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_users_bp.route('/<string:user_id>/reset-password', methods=['POST'])
+@login_required
+def api_reset_password(user_id):
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Admin access required'}), 403
+        
+    u = db.session.get(User, user_id)
+    if not u:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+    if u.auth_provider and u.auth_provider.lower() != 'local':
+        return jsonify({'success': False, 'error': 'Password resets are only available for local accounts.'}), 400
+        
+    try:
+        temp_password = _generate_temp_password()
+        u.password_hash = generate_password_hash(temp_password)
+        db.session.commit()
+        
+        _close_pending_request_for_user(
+            u.user_id,
+            current_user.get_id(),
+            "Password reset from API.",
+        )
+        return jsonify({
+            'success': True, 
+            'message': f"Temporary password generated",
+            'temp_password': temp_password
+        })
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"API reset_password error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500

@@ -16,16 +16,16 @@ class ChatUI {
       ...options
     };
     this.readyPromise = new Promise((resolve) => { // Create a promise
-    // Removed this.messageHistory - ChatCore is the source of truth
-    
-    // Define methods as class properties (arrow functions)
-    this._setupStyles = () => {
-      const styleId = 'chat-ui-styles';
-      if (document.getElementById(styleId)) return;
+      // Removed this.messageHistory - ChatCore is the source of truth
 
-      const style = document.createElement('style');
-      style.id = styleId;
-      style.textContent = `
+      // Define methods as class properties (arrow functions)
+      this._setupStyles = () => {
+        const styleId = 'chat-ui-styles';
+        if (document.getElementById(styleId)) return;
+
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
         /* Base bubble styles */
         .${this.config.bubbleClass} {
           max-width: 85%;
@@ -293,217 +293,217 @@ class ChatUI {
           transition: opacity 0.2s ease-in-out;
         }
       `;
-      document.head.appendChild(style);
-    };
+        document.head.appendChild(style);
+      };
 
-    this._setupEventListeners = () => {
-      console.log('[ChatUI] Setting up event listeners...'); // Log listener setup start
-      window.addEventListener('messageAdded', (e) => {
-        // FIX: Extract the actual message object from the event detail
-        console.log('[ChatUI] Received messageAdded event detail:', e.detail); // Log received event detail
-        if (e.detail && e.detail.message) {
-          this.renderSingleMessage(e.detail.message); // Pass e.detail.message
-        }
-      });
-      window.addEventListener('messageUpdated', (e) => {
-        console.log('[ChatUI] messageUpdated listener FIRED!'); // Add this line
-        console.log('[ChatUI] Received messageUpdated event detail:', e.detail);
-        // FIX: Check for e.detail.message and pass that to the update function
-        if (e.detail && e.detail.message && e.detail.message.id) {
-          this.updateRenderedMessage(e.detail.message); // Pass the message object
-      } else {
-          console.warn('[ChatUI] Received messageUpdated event, but detail is not a valid message object:', e.detail);
-      }
-      });
-      window.addEventListener('chatCleared', () => {
-        if (this.container) {
-          this.container.innerHTML = '';
-          console.log('[ChatUI] Chat cleared via chatCleared event.');
-        }
-      });
-      console.log('[ChatUI] Event listeners for messageAdded/Updated attached.'); // Log listener setup end
-      // Other UI event listeners
-      if (this.container) {
-        this.container.addEventListener('click', (e) => {
-          // --- ADDED: Handle visual evidence icon click via delegation ---
-          const visualEvidenceButton = e.target.closest('.visual-evidence-icon');
-          if (visualEvidenceButton) {
-            console.log('[ChatUI] Delegated click: Visual evidence icon CLICKED. Element:', visualEvidenceButton, 'Dataset:', visualEvidenceButton.dataset);
-            e.preventDefault();
-            e.stopPropagation();
-
-            const documentId = visualEvidenceButton.dataset.documentId;
-            const pageNo = visualEvidenceButton.dataset.pageNo;
-            const rawBboxString = visualEvidenceButton.dataset.rawBbox;
-            const bboxString = visualEvidenceButton.dataset.bbox;
-            const doclingJsonPath = visualEvidenceButton.dataset.doclingJsonPath;
-
-            if (documentId && pageNo !== undefined) {
-              let parsedRawBbox = null;
-              let parsedDisplayBbox = null;
-
-              if (rawBboxString) {
-                try {
-                  parsedRawBbox = JSON.parse(rawBboxString);
-                } catch (parseError) {
-                  console.warn('[ChatUI] Unable to parse raw bbox payload:', parseError, 'Payload:', rawBboxString);
-                }
-              }
-
-              if (bboxString) {
-                try {
-                  parsedDisplayBbox = JSON.parse(bboxString);
-                } catch (parseError) {
-                  console.warn('[ChatUI] Unable to parse display bbox payload:', parseError, 'Payload:', bboxString);
-                }
-              }
-
-              if (!doclingJsonPath) {
-                console.warn('[ChatUI] Visual evidence requested without a docling path.', { documentId, pageNo });
-                alert('Visual evidence is unavailable for this citation.');
-                return;
-              }
-
-              if (!parsedDisplayBbox || !Array.isArray(parsedDisplayBbox) || parsedDisplayBbox.length !== 4) {
-                console.warn('[ChatUI] Missing or invalid display bbox payload.', { documentId, pageNo, bboxString });
-                alert('Unable to show visual evidence because the bounding box is missing.');
-                return;
-              }
-
-              this._showVisualEvidenceModal(documentId, pageNo, {
-                rawBbox: parsedRawBbox,
-                displayBbox: parsedDisplayBbox,
-                doclingJsonPath,
-              });
-            } else {
-              console.warn('[ChatUI] Missing data attributes on visual evidence icon for modal display.', { documentId, pageNo, rawBboxString, bboxString });
-              alert('Cannot show visual evidence: data missing from icon.');
-            }
-            return;
-          }
-          // --- END ADDED ---
-
-          // --- ADDED: Handle citation popover click ---
-          const citationLink = e.target.closest('.citation-popover-trigger');
-          if (citationLink) {
-            e.preventDefault();
-            const docId = citationLink.dataset.docId;
-            const libraryId = citationLink.dataset.libraryId;
-            this._showCitationPopover(citationLink, docId, libraryId);
-            return;
-          }
-          // --- END ADDED ---
-
-
-          if (e.target.classList.contains('followup-question')) {
-            this._handleFollowupQuestion(e.target.dataset.question);
-          }
-
-          
-
-          // Handle suggested question pill click
-          if (e.target.classList.contains('suggested-question-pill')) {
-            // This handles clicks on pills rendered by _renderFooter,
-            // which appear INSIDE an agent's chat bubble.
-            const originalQuestion = e.target.dataset.question || e.target.textContent.trim(); // Use data-question if available
-            
-            const prefixes = {
-                "English": "Regarding the previous information, ",
-                "Indonesian": "Mengenai informasi sebelumnya, "
-            };
-
-            const activeLanguage = window.active_language || "English";
-            const prefix = prefixes[activeLanguage] || prefixes["English"];
-
-            let dfNameContext = "the previous information"; // Default context
-            const suggestionsContainer = e.target.closest('.suggested-questions-minimal');
-            const sourceType = suggestionsContainer ? suggestionsContainer.dataset.sourceType : null;
-
-            if (sourceType === 'dataframe') {
-                dfNameContext = "the analyzed data";
-            } else if (sourceType === 'rag') {
-                dfNameContext = "the retrieved documents";
-            }
-            
-            const contextualizedQuestion = `${prefix}${originalQuestion}`;
-
-            const input = document.getElementById('query-input');
-            // Fade out the suggestions gracefully
-            const suggestions = e.target.closest('.suggested-questions-minimal');
-            if (suggestions) {
-              suggestions.classList.add('fade-out');
-              setTimeout(() => {
-                // Check if suggestions still exist and have a parent before trying to remove
-                // This prevents errors if the user clicks multiple suggestions rapidly
-                if (suggestions && suggestions.parentNode && suggestions.classList.contains('fade-out')) {
-                  suggestions.parentNode.removeChild(suggestions);
-                }
-              }, 400); // match transition duration
-            }
-            if (input) {
-              input.value = contextualizedQuestion; // Use the contextualized question
-              // Optionally, trigger send
-              const sendBtn = document.getElementById('send-btn');
-              if (sendBtn) {
-                sendBtn.click();
-              }
-            }
-          }
-          // Handle copy chart button click
-          if (e.target.closest('.copy-chart-btn')) {
-            const button = e.target.closest('.copy-chart-btn');
-            const chartContainer = button.closest('.generated-chart-container');
-            const imgElement = chartContainer ? chartContainer.querySelector('img') : null;
-            if (imgElement) {
-              this._copyChartToClipboard(imgElement.src);
-            }
-          }
-          // Handle download chart button click
-          if (e.target.closest('.download-chart-btn')) {
-             // Similar logic for download if you add it
+      this._setupEventListeners = () => {
+        console.log('[ChatUI] Setting up event listeners...'); // Log listener setup start
+        window.addEventListener('messageAdded', (e) => {
+          // FIX: Extract the actual message object from the event detail
+          console.log('[ChatUI] Received messageAdded event detail:', e.detail); // Log received event detail
+          if (e.detail && e.detail.message) {
+            this.renderSingleMessage(e.detail.message); // Pass e.detail.message
           }
         });
-        // Add listeners for feedback, copy, citations etc. here if needed
-      }
-    };
+        window.addEventListener('messageUpdated', (e) => {
+          console.log('[ChatUI] messageUpdated listener FIRED!'); // Add this line
+          console.log('[ChatUI] Received messageUpdated event detail:', e.detail);
+          // FIX: Check for e.detail.message and pass that to the update function
+          if (e.detail && e.detail.message && e.detail.message.id) {
+            this.updateRenderedMessage(e.detail.message); // Pass the message object
+          } else {
+            console.warn('[ChatUI] Received messageUpdated event, but detail is not a valid message object:', e.detail);
+          }
+        });
+        window.addEventListener('chatCleared', () => {
+          if (this.container) {
+            this.container.innerHTML = '';
+            console.log('[ChatUI] Chat cleared via chatCleared event.');
+          }
+        });
+        console.log('[ChatUI] Event listeners for messageAdded/Updated attached.'); // Log listener setup end
+        // Other UI event listeners
+        if (this.container) {
+          this.container.addEventListener('click', (e) => {
+            // --- ADDED: Handle visual evidence icon click via delegation ---
+            const visualEvidenceButton = e.target.closest('.visual-evidence-icon');
+            if (visualEvidenceButton) {
+              console.log('[ChatUI] Delegated click: Visual evidence icon CLICKED. Element:', visualEvidenceButton, 'Dataset:', visualEvidenceButton.dataset);
+              e.preventDefault();
+              e.stopPropagation();
 
-    this._loadMessages = () => {
-      try {
-        const saved = localStorage.getItem('chatMessages');
-        if (saved) {
-          // This approach is problematic with ChatCore managing state.
-          // Prefer initializing messages via ChatCore from init-conversation.js
-          console.warn("[ChatUI] _loadMessages from localStorage might conflict with ChatCore state.");
-          // const messages = JSON.parse(saved);
-          // messages.forEach(msg => this.renderSingleMessage(msg));
+              const documentId = visualEvidenceButton.dataset.documentId;
+              const pageNo = visualEvidenceButton.dataset.pageNo;
+              const rawBboxString = visualEvidenceButton.dataset.rawBbox;
+              const bboxString = visualEvidenceButton.dataset.bbox;
+              const doclingJsonPath = visualEvidenceButton.dataset.doclingJsonPath;
+
+              if (documentId && pageNo !== undefined) {
+                let parsedRawBbox = null;
+                let parsedDisplayBbox = null;
+
+                if (rawBboxString) {
+                  try {
+                    parsedRawBbox = JSON.parse(rawBboxString);
+                  } catch (parseError) {
+                    console.warn('[ChatUI] Unable to parse raw bbox payload:', parseError, 'Payload:', rawBboxString);
+                  }
+                }
+
+                if (bboxString) {
+                  try {
+                    parsedDisplayBbox = JSON.parse(bboxString);
+                  } catch (parseError) {
+                    console.warn('[ChatUI] Unable to parse display bbox payload:', parseError, 'Payload:', bboxString);
+                  }
+                }
+
+                if (!doclingJsonPath) {
+                  console.warn('[ChatUI] Visual evidence requested without a docling path.', { documentId, pageNo });
+                  alert('Visual evidence is unavailable for this citation.');
+                  return;
+                }
+
+                if (!parsedDisplayBbox || !Array.isArray(parsedDisplayBbox) || parsedDisplayBbox.length !== 4) {
+                  console.warn('[ChatUI] Missing or invalid display bbox payload.', { documentId, pageNo, bboxString });
+                  alert('Unable to show visual evidence because the bounding box is missing.');
+                  return;
+                }
+
+                this._showVisualEvidenceModal(documentId, pageNo, {
+                  rawBbox: parsedRawBbox,
+                  displayBbox: parsedDisplayBbox,
+                  doclingJsonPath,
+                });
+              } else {
+                console.warn('[ChatUI] Missing data attributes on visual evidence icon for modal display.', { documentId, pageNo, rawBboxString, bboxString });
+                alert('Cannot show visual evidence: data missing from icon.');
+              }
+              return;
+            }
+            // --- END ADDED ---
+
+            // --- ADDED: Handle citation popover click ---
+            const citationLink = e.target.closest('.citation-popover-trigger');
+            if (citationLink) {
+              e.preventDefault();
+              const docId = citationLink.dataset.docId;
+              const libraryId = citationLink.dataset.libraryId;
+              this._showCitationPopover(citationLink, docId, libraryId);
+              return;
+            }
+            // --- END ADDED ---
+
+
+            if (e.target.classList.contains('followup-question')) {
+              this._handleFollowupQuestion(e.target.dataset.question);
+            }
+
+
+
+            // Handle suggested question pill click
+            if (e.target.classList.contains('suggested-question-pill')) {
+              // This handles clicks on pills rendered by _renderFooter,
+              // which appear INSIDE an agent's chat bubble.
+              const originalQuestion = e.target.dataset.question || e.target.textContent.trim(); // Use data-question if available
+
+              const prefixes = {
+                "English": "Regarding the previous information, ",
+                "Indonesian": "Mengenai informasi sebelumnya, "
+              };
+
+              const activeLanguage = window.active_language || "English";
+              const prefix = prefixes[activeLanguage] || prefixes["English"];
+
+              let dfNameContext = "the previous information"; // Default context
+              const suggestionsContainer = e.target.closest('.suggested-questions-minimal');
+              const sourceType = suggestionsContainer ? suggestionsContainer.dataset.sourceType : null;
+
+              if (sourceType === 'dataframe') {
+                dfNameContext = "the analyzed data";
+              } else if (sourceType === 'rag') {
+                dfNameContext = "the retrieved documents";
+              }
+
+              const contextualizedQuestion = `${prefix}${originalQuestion}`;
+
+              const input = document.getElementById('query-input');
+              // Fade out the suggestions gracefully
+              const suggestions = e.target.closest('.suggested-questions-minimal');
+              if (suggestions) {
+                suggestions.classList.add('fade-out');
+                setTimeout(() => {
+                  // Check if suggestions still exist and have a parent before trying to remove
+                  // This prevents errors if the user clicks multiple suggestions rapidly
+                  if (suggestions && suggestions.parentNode && suggestions.classList.contains('fade-out')) {
+                    suggestions.parentNode.removeChild(suggestions);
+                  }
+                }, 400); // match transition duration
+              }
+              if (input) {
+                input.value = contextualizedQuestion; // Use the contextualized question
+                // Optionally, trigger send
+                const sendBtn = document.getElementById('send-btn');
+                if (sendBtn) {
+                  sendBtn.click();
+                }
+              }
+            }
+            // Handle copy chart button click
+            if (e.target.closest('.copy-chart-btn')) {
+              const button = e.target.closest('.copy-chart-btn');
+              const chartContainer = button.closest('.generated-chart-container');
+              const imgElement = chartContainer ? chartContainer.querySelector('img') : null;
+              if (imgElement) {
+                this._copyChartToClipboard(imgElement.src);
+              }
+            }
+            // Handle download chart button click
+            if (e.target.closest('.download-chart-btn')) {
+              // Similar logic for download if you add it
+            }
+          });
+          // Add listeners for feedback, copy, citations etc. here if needed
         }
-      } catch (e) {
-        console.error('Failed to load messages:', e);
-      }
-    };
+      };
+
+      this._loadMessages = () => {
+        try {
+          const saved = localStorage.getItem('chatMessages');
+          if (saved) {
+            // This approach is problematic with ChatCore managing state.
+            // Prefer initializing messages via ChatCore from init-conversation.js
+            console.warn("[ChatUI] _loadMessages from localStorage might conflict with ChatCore state.");
+            // const messages = JSON.parse(saved);
+            // messages.forEach(msg => this.renderSingleMessage(msg));
+          }
+        } catch (e) {
+          console.error('Failed to load messages:', e);
+        }
+      };
 
 
-    /**
-     * Enhances known map URLs in HTML content to display a preview/icon.
-     * @param {string} htmlContent - The HTML content of the message.
-     * @returns {string} - HTML content with map links enhanced.
-     */
-    this._enhanceMapLinks = (htmlContent) => {
-      // TODO: Secure API Key - In production, fetch this from backend or config
-      const GOOGLE_STATIC_MAPS_API_KEY = 'AIzaSyAYOirmwrAJeXSNg5VGIBnVlr8xZ2VzqFs'; // REPLACE THIS
+      /**
+       * Enhances known map URLs in HTML content to display a preview/icon.
+       * @param {string} htmlContent - The HTML content of the message.
+       * @returns {string} - HTML content with map links enhanced.
+       */
+      this._enhanceMapLinks = (htmlContent) => {
+        // TODO: Secure API Key - In production, fetch this from backend or config
+        const GOOGLE_STATIC_MAPS_API_KEY = 'AIzaSyAYOirmwrAJeXSNg5VGIBnVlr8xZ2VzqFs'; // REPLACE THIS
 
-      console.log("[ChatUI _enhanceMapLinks] Received HTML content:", htmlContent); // DEBUG
+        console.log("[ChatUI _enhanceMapLinks] Received HTML content:", htmlContent); // DEBUG
 
-      // Regex 1: For external map services (Google, OSM, Bing, Apple) - finds plain URLs
-      const externalMapUrlRegex = /(?<!href=")(?<!src=")(?<!">)(https?:\/\/(?:www\.)?(?:maps\.google\.com[^\s<'">]+|google\.com\/maps[^\s<'">]+|openstreetmap\.org[^\s<'">]+|bing\.com\/maps[^\s<'">]+|maps\.apple\.com[^\s<'">]+))/gi;
+        // Regex 1: For external map services (Google, OSM, Bing, Apple) - finds plain URLs
+        const externalMapUrlRegex = /(?<!href=")(?<!src=")(?<!">)(https?:\/\/(?:www\.)?(?:maps\.google\.com[^\s<'">]+|google\.com\/maps[^\s<'">]+|openstreetmap\.org[^\s<'">]+|bing\.com\/maps[^\s<'">]+|maps\.apple\.com[^\s<'">]+))/gi;
 
-      // Regex 2: For existing <a> tags pointing to local static maps
-      const localStaticMapLinkRegex = /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?\/static\/maps\/[^"']+?\.(?:html|htm))\1[^>]*>(.*?)<\/a>/gi;
-      
-      let matchCount = 0;
+        // Regex 2: For existing <a> tags pointing to local static maps
+        const localStaticMapLinkRegex = /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?\/static\/maps\/[^"']+?\.(?:html|htm))\1[^>]*>(.*?)<\/a>/gi;
 
-      // --- Process External Map URLs First ---
-      let processedHtml = htmlContent.replace(externalMapUrlRegex, (url) => {
+        let matchCount = 0;
+
+        // --- Process External Map URLs First ---
+        let processedHtml = htmlContent.replace(externalMapUrlRegex, (url) => {
           matchCount++;
           console.log("[ChatUI _enhanceMapLinks] Matched EXTERNAL URL:", url); // DEBUG
           const safeUrl = window.escapeHtml(url); // Use global escapeHtml
@@ -561,11 +561,11 @@ class ChatUI {
                   </a>
               </div>
           `;
-      });
+        });
 
-      // --- Process Local Static Map Links ---
-      // This will replace existing <a> tags that match the pattern
-      processedHtml = processedHtml.replace(localStaticMapLinkRegex, (match, quote, href, linkText) => {
+        // --- Process Local Static Map Links ---
+        // This will replace existing <a> tags that match the pattern
+        processedHtml = processedHtml.replace(localStaticMapLinkRegex, (match, quote, href, linkText) => {
           matchCount++;
           console.log("[ChatUI _enhanceMapLinks] Matched LOCAL STATIC MAP LINK. Href:", href, "Link Text:", linkText); // DEBUG
           const safeHref = window.escapeHtml(href);
@@ -583,58 +583,57 @@ class ChatUI {
                   </a>
               </div>
           `;
-      });
+        });
 
-      if (matchCount === 0) {
-        console.log("[ChatUI _enhanceMapLinks] No map URLs matched the regex."); // DEBUG
-    }
-    return processedHtml;
-    };
-
-
-
-    /**
-     * Renders a single message bubble and appends it to the container.
-     * @param {object} message - The message object from ChatCore.
-     */
-    this.renderSingleMessage = (message) => {
-      console.log('[ChatUI] renderSingleMessage called with:', message); // Log function call
-      // --- Add detailed check for the early return condition ---
-      if (!this.container) console.error('[ChatUI] renderSingleMessage: this.container is null or undefined!');
-      if (!message) console.error('[ChatUI] renderSingleMessage: message object is null or undefined!');
-      if (message && !message.role) console.error('[ChatUI] renderSingleMessage: message.role is missing!');
-      if (!this.container || !message || !message.role) return; // Basic validation
-      // --- End detailed check ---
-      console.log('[ChatUI] Container exists:', this.container); // Log container check
-      console.log('[ChatUI] Creating bubble element...'); // Log step
-      let bubble; // Declare bubble variable
-      try {
-        bubble = document.createElement('div');
-      } catch (e) {
-        console.error('[ChatUI] Error creating bubble element:', e);
-        return; // Stop if creation fails
-      }
-      // const bubble = document.createElement('div'); // REMOVE: Redeclaration error
-      // --- IMPORTANT: Add the message ID to the bubble element ---
-      bubble.id = message.id || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`; // Assign ID or generate one
-      bubble.className = `${this.config.bubbleClass} ${
-        message.role === 'user' ? this.config.userBubbleClass :
-        message.role === 'agent' ? this.config.agentBubbleClass :
-        message.role === 'error' ? 'error-bubble' : // Add error style if needed
-        this.config.systemBubbleClass
-      }`;
-      bubble.dataset.messageId = message.id; // Add data attribute for feedback handler
+        if (matchCount === 0) {
+          console.log("[ChatUI _enhanceMapLinks] No map URLs matched the regex."); // DEBUG
+        }
+        return processedHtml;
+      };
 
 
-      // Start with the text content
-      let textContentHtml = message.content || '';
-      if (message.role !== 'user') { // For agent/system, enhance map links
+
+      /**
+       * Renders a single message bubble and appends it to the container.
+       * @param {object} message - The message object from ChatCore.
+       */
+      this.renderSingleMessage = (message) => {
+        console.log('[ChatUI] renderSingleMessage called with:', message); // Log function call
+        // --- Add detailed check for the early return condition ---
+        if (!this.container) console.error('[ChatUI] renderSingleMessage: this.container is null or undefined!');
+        if (!message) console.error('[ChatUI] renderSingleMessage: message object is null or undefined!');
+        if (message && !message.role) console.error('[ChatUI] renderSingleMessage: message.role is missing!');
+        if (!this.container || !message || !message.role) return; // Basic validation
+        // --- End detailed check ---
+        console.log('[ChatUI] Container exists:', this.container); // Log container check
+        console.log('[ChatUI] Creating bubble element...'); // Log step
+        let bubble; // Declare bubble variable
+        try {
+          bubble = document.createElement('div');
+        } catch (e) {
+          console.error('[ChatUI] Error creating bubble element:', e);
+          return; // Stop if creation fails
+        }
+        // const bubble = document.createElement('div'); // REMOVE: Redeclaration error
+        // --- IMPORTANT: Add the message ID to the bubble element ---
+        bubble.id = message.id || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`; // Assign ID or generate one
+        bubble.className = `${this.config.bubbleClass} ${message.role === 'user' ? this.config.userBubbleClass :
+            message.role === 'agent' ? this.config.agentBubbleClass :
+              message.role === 'error' ? 'error-bubble' : // Add error style if needed
+                this.config.systemBubbleClass
+          }`;
+        bubble.dataset.messageId = message.id; // Add data attribute for feedback handler
+
+
+        // Start with the text content
+        let textContentHtml = message.content || '';
+        if (message.role !== 'user') { // For agent/system, enhance map links
           textContentHtml = this._enhanceMapLinks(textContentHtml);
-      }
-      
-      // Prepare chart HTML if chart data exists in metadata
-      let chartHtml = '';
-      if (message.metadata && message.metadata.chart_image_base64 && message.metadata.chart_image_mime_type) {
+        }
+
+        // Prepare chart HTML if chart data exists in metadata
+        let chartHtml = '';
+        if (message.metadata && message.metadata.chart_image_base64 && message.metadata.chart_image_mime_type) {
           console.log('[ChatUI] Chart data found in metadata, preparing chart HTML.');
           chartHtml = `<div class="generated-chart-container my-2" style="position: relative;">
                               <img src="data:${message.metadata.chart_image_mime_type};base64,${message.metadata.chart_image_base64}" alt="Generated chart" style="max-width: 100%; height: auto; border: 1px solid #ccc; border-radius: 8px; display: block; margin: 0 auto;">
@@ -645,11 +644,11 @@ class ChatUI {
                                 <!-- Add download button here if desired -->
                               </div>
                             </div>`;
-      }
+        }
 
-      // --- NEW: Prepare Map Image HTML ---
-      let mapImageHtml = '';
-      if (message.metadata && message.metadata.map_image_base64 && message.metadata.map_image_mime_type) {
+        // --- NEW: Prepare Map Image HTML ---
+        let mapImageHtml = '';
+        if (message.metadata && message.metadata.map_image_base64 && message.metadata.map_image_mime_type) {
           console.log('[ChatUI] Map image data found in metadata, preparing map image HTML.');
           mapImageHtml = `<div class="generated-map-container my-3 text-center">
                               <img src="data:${message.metadata.map_image_mime_type};base64,${message.metadata.map_image_base64}" 
@@ -657,278 +656,279 @@ class ChatUI {
                                    style="max-width: 100%; max-height: 400px; height: auto; border: 1px solid #ccc; border-radius: 8px; display: inline-block; margin-bottom: 10px;">
                               <!-- The map link itself will be part of the textContentHtml and handled by _enhanceMapLinks -->
                           </div>`;
-      }
-      // --- END NEW ---
-
-
-      
-
-      // Safely render markdown content
-      // Combine chart (if any) and text content
-      // User messages might already be HTML (for image previews), agent messages are processed text
-      let finalHtmlContent;
-      if (message.role === 'user') {
-        finalHtmlContent = textContentHtml; // User content is already HTML or escaped text
-      } else {
-        // Enhance agent/system content for citations before combining with chart
-        let enhancedTextContent = this._enhanceMapLinks(textContentHtml); // First enhance maps
-        if (message.metadata && message.metadata.citations) {
-            enhancedTextContent = this._enhanceCitationsWithVisualEvidence(enhancedTextContent, message.metadata.citations);
         }
-        // Prepend map image, then chart, then the enhanced text content
-        finalHtmlContent = mapImageHtml + chartHtml + enhancedTextContent;
-      }
+        // --- END NEW ---
 
-      bubble.innerHTML = `
+
+
+
+        // Safely render markdown content
+        // Combine chart (if any) and text content
+        // User messages might already be HTML (for image previews), agent messages are processed text
+        let finalHtmlContent;
+        if (message.role === 'user') {
+          finalHtmlContent = textContentHtml; // User content is already HTML or escaped text
+        } else {
+          // Enhance agent/system content for citations before combining with chart
+          let enhancedTextContent = this._enhanceMapLinks(textContentHtml); // First enhance maps
+          if (message.metadata && message.metadata.citations) {
+            enhancedTextContent = this._enhanceCitationsWithVisualEvidence(enhancedTextContent, message.metadata.citations);
+          }
+          // Prepend map image, then chart, then the enhanced text content
+          finalHtmlContent = mapImageHtml + chartHtml + enhancedTextContent;
+        }
+
+        bubble.innerHTML = `
         ${message.role === 'agent' ? `<div class="stream-progress" data-stream-progress="${bubble.id}" hidden><div class="stream-progress-bar"></div><span class="stream-progress-label">Streaming…</span></div>` : ''}
-        <div class="bubble-content">${finalHtmlContent}</div>
+        <div class="bubble-content"><div class="chat-prose">${finalHtmlContent}</div></div>
         ${message.role === 'agent' ? `<div class="message-footer">${this._renderFooter(message)}</div>` : ''}
       `;
 
-      // --- FIX: Call _appendConfirmationButtons for new messages ---
-      // Call this *after* setting innerHTML but *before* appending, or just after appending.
-      this._appendConfirmationButtons(bubble, message);
+        // --- FIX: Call _appendConfirmationButtons for new messages ---
+        // Call this *after* setting innerHTML but *before* appending, or just after appending.
+        this._appendConfirmationButtons(bubble, message);
 
-      // Animate fade-in for suggestions if present
-      if (message.role === 'agent') {
-        const footer = bubble.querySelector('.message-footer');
-        if (footer) {
-          const suggestionsElement = footer.querySelector('.suggested-questions-minimal');
-          if (suggestionsElement) {
-            // If 'fade-in' is meant for initial appearance, CSS can handle it,
-            // or it can be added here if it's a dynamic effect.
-            // For now, let's assume it's for an initial effect.
-            suggestionsElement.style.opacity = '0'; // Start transparent
-            requestAnimationFrame(() => { // Ensure it's applied after DOM update
-              suggestionsElement.style.transition = 'opacity 0.4s ease-in-out';
-              suggestionsElement.style.opacity = '1'; // Fade in
-            });
+        // Animate fade-in for suggestions if present
+        if (message.role === 'agent') {
+          const footer = bubble.querySelector('.message-footer');
+          if (footer) {
+            const suggestionsElement = footer.querySelector('.suggested-questions-minimal');
+            if (suggestionsElement) {
+              // If 'fade-in' is meant for initial appearance, CSS can handle it,
+              // or it can be added here if it's a dynamic effect.
+              // For now, let's assume it's for an initial effect.
+              suggestionsElement.style.opacity = '0'; // Start transparent
+              requestAnimationFrame(() => { // Ensure it's applied after DOM update
+                suggestionsElement.style.transition = 'opacity 0.4s ease-in-out';
+                suggestionsElement.style.opacity = '1'; // Fade in
+              });
+            }
           }
         }
-      }
 
-      console.log('[ChatUI] Appending bubble to container:', this.container); // Log step
-      this.container.appendChild(bubble);
-      console.log('[ChatUI] Bubble appended. Scrolling...'); // Log step
-      this.scrollToBottom(); // Scroll after adding
-    };
+        console.log('[ChatUI] Appending bubble to container:', this.container); // Log step
+        this.container.appendChild(bubble);
+        console.log('[ChatUI] Bubble appended. Scrolling...'); // Log step
+        this.scrollToBottom(); // Scroll after adding
+      };
 
-    /**
-     * Appends confirmation buttons if required by message metadata.
-     * @param {HTMLElement} bubble - The message bubble element.
-     * @param {object} message - The message object.
-     */
-    this._appendConfirmationButtons = (bubble, message) => {
+      /**
+       * Appends confirmation buttons if required by message metadata.
+       * @param {HTMLElement} bubble - The message bubble element.
+       * @param {object} message - The message object.
+       */
+      this._appendConfirmationButtons = (bubble, message) => {
         // Check for the new hil_options structure
         if (message.metadata && message.metadata.confirmation_required === true && Array.isArray(message.metadata.hil_options)) {
-            console.log(`[ChatUI] Appending HIL confirmation buttons for message ID: ${message.id}`);
-            
-            const buttonContainer = document.createElement('div');
-            buttonContainer.className = 'confirmation-buttons mt-3 d-flex flex-wrap gap-2';
+          console.log(`[ChatUI] Appending HIL confirmation buttons for message ID: ${message.id}`);
 
-            // Dynamically create buttons from the backend response
-            message.metadata.hil_options.forEach(option => {
-                const button = document.createElement('button');
-                // Use the 'confirm-btn' class to match the listener in query-form.js
-                button.className = 'btn btn-sm btn-outline-primary confirm-btn'; 
-                button.textContent = option.display_text;
-                // Set the dataset attributes that resumeQuery in query-form.js expects
-                button.dataset.confirmation = option.payload; // 'yes' or 'no'
-                button.dataset.threadId = message.metadata.thread_id;
-                buttonContainer.appendChild(button);
-            });
+          const buttonContainer = document.createElement('div');
+          buttonContainer.className = 'confirmation-buttons mt-3 d-flex flex-wrap gap-2';
 
-            const contentElement = bubble.querySelector('.bubble-content');
-            if (contentElement) {
-                // Place buttons right after the main text content for visibility
-                contentElement.insertAdjacentElement('afterend', buttonContainer);
-            } else {
-                bubble.appendChild(buttonContainer); // Fallback
-            }
+          // Dynamically create buttons from the backend response
+          message.metadata.hil_options.forEach(option => {
+            const button = document.createElement('button');
+            // Use the 'confirm-btn' class to match the listener in query-form.js
+            button.className = 'btn btn-sm btn-outline-primary confirm-btn';
+            button.textContent = option.display_text;
+            // Set the dataset attributes that resumeQuery in query-form.js expects
+            button.dataset.confirmation = option.payload; // 'yes' or 'no'
+            button.dataset.threadId = message.metadata.thread_id;
+            buttonContainer.appendChild(button);
+          });
+
+          const contentElement = bubble.querySelector('.bubble-content');
+          if (contentElement) {
+            // Place buttons right after the main text content for visibility
+            contentElement.insertAdjacentElement('afterend', buttonContainer);
+          } else {
+            bubble.appendChild(buttonContainer); // Fallback
+          }
         }
-    };
+      };
 
-    /**
-     * Updates the content of an already rendered message bubble.
-     * Used for streaming responses.
-     * @param {object} message - The updated message object from ChatCore.
-     */
-    this.updateRenderedMessage = (message) => {
-      // Check if message object itself is passed directly (as it should be from ChatCore)
-      if (!this.container || !message || !message.id) {
+      /**
+       * Updates the content of an already rendered message bubble.
+       * Used for streaming responses.
+       * @param {object} message - The updated message object from ChatCore.
+       */
+      this.updateRenderedMessage = (message) => {
+        // Check if message object itself is passed directly (as it should be from ChatCore)
+        if (!this.container || !message || !message.id) {
           console.warn('[ChatUI] updateRenderedMessage: Invalid arguments', { container: !!this.container, message });
           return;
-      }
-
-      
-      const bubble = document.getElementById(message.id);
-      console.log(`[ChatUI] updateRenderedMessage: Attempting update for ID ${message.id}. Found bubble:`, bubble); // Log attempt and found bubble
-      if (bubble && !bubble.dataset.messageId) {
-        bubble.dataset.messageId = message.id; // Ensure data attribute is present on update too
-      }
-
-      const typewriterStates = window.TYPEWRITER_STATES;
-      const typewriterActive = Boolean(typewriterStates && typewriterStates.has(message.id));
-
-      if (bubble) {
-        if (typewriterActive) {
-          return;
         }
-        const contentElement = bubble.querySelector('.bubble-content'); // Find the content area
-        if (contentElement) {
-          const newContent = message.content || '';
-          const rawContent = message.content || ''; // Use rawContent for clarity
-          console.log(`[ChatUI] updateRenderedMessage: Updating content for ID ${message.id} to:`, newContent); // Log new content
-          // Use DOMPurify if available and configured in ChatCore
-          let finalHtmlContent = '';
-          try {
-            // --- NEW: Prepare Map Image HTML for update ---
-            let mapImageHtmlForUpdate = '';
-            if (message.metadata && message.metadata.map_image_base64 && message.metadata.map_image_mime_type) {
+
+
+        const bubble = document.getElementById(message.id);
+        console.log(`[ChatUI] updateRenderedMessage: Attempting update for ID ${message.id}. Found bubble:`, bubble); // Log attempt and found bubble
+        if (bubble && !bubble.dataset.messageId) {
+          bubble.dataset.messageId = message.id; // Ensure data attribute is present on update too
+        }
+
+        const typewriterStates = window.TYPEWRITER_STATES;
+        const typewriterActive = Boolean(typewriterStates && typewriterStates.has(message.id));
+
+        if (bubble) {
+          if (typewriterActive) {
+            return;
+          }
+          // Select the .chat-prose div directly if it exists, otherwise the .bubble-content
+          const contentElement = bubble.querySelector('.bubble-content .chat-prose') || bubble.querySelector('.bubble-content');
+          if (contentElement) {
+            const newContent = message.content || '';
+            const rawContent = message.content || ''; // Use rawContent for clarity
+            console.log(`[ChatUI] updateRenderedMessage: Updating content for ID ${message.id} to:`, newContent); // Log new content
+            // Use DOMPurify if available and configured in ChatCore
+            let finalHtmlContent;
+            try {
+              // --- NEW: Prepare Map Image HTML for update ---
+              let mapImageHtmlForUpdate = '';
+              if (message.metadata && message.metadata.map_image_base64 && message.metadata.map_image_mime_type) {
                 console.log('[ChatUI updateRenderedMessage] Map image data found, preparing map image HTML.');
                 mapImageHtmlForUpdate = `<div class="generated-map-container my-3 text-center">
                                             <img src="data:${message.metadata.map_image_mime_type};base64,${message.metadata.map_image_base64}" 
                                                  alt="Map preview" 
                                                  style="max-width: 100%; max-height: 400px; height: auto; border: 1px solid #ccc; border-radius: 8px; display: inline-block; margin-bottom: 10px;">
                                         </div>`;
-            }
-            // --- END NEW ---
+              }
+              // --- END NEW ---
 
-            let chartHtmlForUpdate = '';
-            if (message.metadata && message.metadata.chart_image_base64 && message.metadata.chart_image_mime_type) {
+              let chartHtmlForUpdate = '';
+              if (message.metadata && message.metadata.chart_image_base64 && message.metadata.chart_image_mime_type) {
                 chartHtmlForUpdate = `<div class="generated-chart-container my-2" style="position: relative;">
                                         <img src="data:${message.metadata.chart_image_mime_type};base64,${message.metadata.chart_image_base64}" alt="Generated chart" style="max-width: 100%; height: auto; border: 1px solid #ccc; border-radius: 8px; display: block; margin: 0 auto;">
                                         <div class="chart-actions"> <button class="icon-btn copy-chart-btn" title="Copy Chart" aria-label="Copy Chart"><i class="bi bi-clipboard-plus"></i></button> </div>
                                       </div>`;
-            }
+              }
 
-            // For agent/system messages, content from ChatCore is already HTML (Markdown parsed & sanitized)
-            if (message.role === 'agent' || message.role === 'system') {
+              // For agent/system messages, content from ChatCore is already HTML (Markdown parsed & sanitized)
+              if (message.role === 'agent' || message.role === 'system') {
                 let enhancedContent = this._enhanceMapLinks(rawContent); // Enhance for maps
                 if (message.metadata && message.metadata.citations) {
-                    enhancedContent = this._enhanceCitationsWithVisualEvidence(enhancedContent, message.metadata.citations);
+                  enhancedContent = this._enhanceCitationsWithVisualEvidence(enhancedContent, message.metadata.citations);
                 }
                 // Combine: map image, then chart, then text
                 finalHtmlContent = mapImageHtmlForUpdate + chartHtmlForUpdate + enhancedContent;
-            } else { // For user messages, content is typically already HTML or plain text
+              } else { // For user messages, content is typically already HTML or plain text
                 finalHtmlContent = rawContent;
+              }
+              console.log('[ChatUI] updateRenderedMessage: Content parsed and sanitized.');
+            } catch (e) {
+              console.error('[ChatUI] updateRenderedMessage: Error processing message content:', e);
+              finalHtmlContent = 'Error displaying content.'; // Fallback content
             }
-            console.log('[ChatUI] updateRenderedMessage: Content parsed and sanitized.');
-          } catch (e) {
-            console.error('[ChatUI] updateRenderedMessage: Error processing message content:', e);
-            finalHtmlContent = 'Error displaying content.'; // Fallback content
-          }
-          console.log("[ChatUI updateRenderedMessage] finalHtmlContent to be set for bubble content:", finalHtmlContent); // DEBUG
-          // FIX 2: Update only the contentElement's innerHTML
-          contentElement.innerHTML = finalHtmlContent;
-          // FIX 3: Remove incorrect appendChild call
-          console.log(`[ChatUI] updateRenderedMessage: Content element updated for ID ${message.id}.`);
-        this.scrollToBottom(); // Keep scrolled down during streaming
-        // --- ADDED: Update the footer as well ---
-        const footerElement = bubble.querySelector('.message-footer');
-        if (footerElement && message.metadata) { // Check if footer exists and metadata is available
-          console.log(`[ChatUI] updateRenderedMessage: Re-rendering footer for ID ${message.id} with metadata:`, message.metadata);
-          // --- ADDED try...catch ---
-          try {
-            const newFooterHTML = this._renderFooter(message); // Generate footer HTML
-            console.log(`[ChatUI] updateRenderedMessage: Generated new footer HTML for ID ${message.id}:`, newFooterHTML); // Log the generated HTML
-            footerElement.innerHTML = newFooterHTML; // Apply the new HTML
-            console.log(`[ChatUI] updateRenderedMessage: Successfully updated footer HTML DOM for ID ${message.id}.`);
-          } catch (renderError) {
-            console.error(`[ChatUI] updateRenderedMessage: Error calling _renderFooter or setting innerHTML for ID ${message.id}:`, renderError);
+            console.log("[ChatUI updateRenderedMessage] finalHtmlContent to be set for bubble content:", finalHtmlContent); // DEBUG
+            // FIX 2: Update only the contentElement's innerHTML
+            contentElement.innerHTML = finalHtmlContent;
+            // FIX 3: Remove incorrect appendChild call
+            console.log(`[ChatUI] updateRenderedMessage: Content element updated for ID ${message.id}.`);
+            this.scrollToBottom(); // Keep scrolled down during streaming
+            // --- ADDED: Update the footer as well ---
+            const footerElement = bubble.querySelector('.message-footer');
+            if (footerElement && message.metadata) { // Check if footer exists and metadata is available
+              console.log(`[ChatUI] updateRenderedMessage: Re-rendering footer for ID ${message.id} with metadata:`, message.metadata);
+              // --- ADDED try...catch ---
+              try {
+                const newFooterHTML = this._renderFooter(message); // Generate footer HTML
+                console.log(`[ChatUI] updateRenderedMessage: Generated new footer HTML for ID ${message.id}:`, newFooterHTML); // Log the generated HTML
+                footerElement.innerHTML = newFooterHTML; // Apply the new HTML
+                console.log(`[ChatUI] updateRenderedMessage: Successfully updated footer HTML DOM for ID ${message.id}.`);
+              } catch (renderError) {
+                console.error(`[ChatUI] updateRenderedMessage: Error calling _renderFooter or setting innerHTML for ID ${message.id}:`, renderError);
+              }
+            } else {
+              console.log(`[ChatUI] updateRenderedMessage: Footer element not found or no metadata for ID ${message.id}.`);
+            }
+
+            // --- ADDED: Check and append confirmation buttons on update too ---
+            // This ensures buttons appear even if the HIL message comes via update (less common)
+            this._appendConfirmationButtons(bubble, message);
+          } else {
+            console.warn(`[ChatUI] Could not find .bubble-content in message ID ${message.id} for update.`);
           }
         } else {
-            console.log(`[ChatUI] updateRenderedMessage: Footer element not found or no metadata for ID ${message.id}.`);
+          // Bubble might not be rendered yet if update comes too fast, ChatCore handles the state.
+          // console.warn(`[ChatUI] Could not find message bubble with ID ${message.id} for update.`);
         }
+      };
 
-        // --- ADDED: Check and append confirmation buttons on update too ---
-        // This ensures buttons appear even if the HIL message comes via update (less common)
-        this._appendConfirmationButtons(bubble, message);
-        } else {
-          console.warn(`[ChatUI] Could not find .bubble-content in message ID ${message.id} for update.`);
+      /**
+       * Scrolls the chat container to the bottom.
+       */
+      this.scrollToBottom = () => {
+        if (this.container) {
+          // Simpler, direct scroll for testing
+          this.container.scrollTop = this.container.scrollHeight;
+          // console.log(`[ChatUI] scrollToBottom: scrollTop set to ${this.container.scrollHeight}`); // Optional debug
         }
-      } else {
-         // Bubble might not be rendered yet if update comes too fast, ChatCore handles the state.
-         // console.warn(`[ChatUI] Could not find message bubble with ID ${message.id} for update.`);
-      }
-    };
+      };
 
-    /**
-     * Scrolls the chat container to the bottom.
-     */
-    this.scrollToBottom = () => {
-      if (this.container) {
-        // Simpler, direct scroll for testing
+      // --- DEPRECATED: Replaced by renderSingleMessage triggered by ChatCore event ---
+      /*
+      this.addMessage = (message) => {
+        this.messageHistory.push(message);
+        this._renderMessages();
+        return this.messageHistory.length - 1;
+      };
+      */
+
+      // --- DEPRECATED: Replaced by renderSingleMessage/updateRenderedMessage ---
+      /*
+      this._renderMessages = () => {
+        if (!this.container) return;
+        
+        // Ensure container has proper dimensions
+        this.container.style.minHeight = '400px';
+        this.container.style.maxHeight = 'calc(100vh - 200px)';
+        this.container.style.overflowY = 'auto';
+        
+        this.container.innerHTML = '';
+        this.messageHistory.forEach(msg => {
+          const bubble = document.createElement('div');
+          bubble.className = `${this.config.bubbleClass} ${
+            msg.role === 'user' ? this.config.userBubbleClass : 
+            msg.role === 'agent' ? this.config.agentBubbleClass : 
+            this.config.systemBubbleClass
+          }`;
+          
+          // Safely render markdown content
+          const content = msg.content || '';
+          bubble.innerHTML = `
+            <div class="message-content">${marked.parse(content)}</div>
+            ${msg.role === 'agent' ? `<div class="message-footer">${this._renderFooter(msg)}</div>` : ''}
+          `;
+          
+          this.container.appendChild(bubble);
+        });
+        
+        // Scroll to bottom after rendering
         this.container.scrollTop = this.container.scrollHeight;
-        // console.log(`[ChatUI] scrollToBottom: scrollTop set to ${this.container.scrollHeight}`); // Optional debug
-      }
-    };
+      };
+      */
 
-    // --- DEPRECATED: Replaced by renderSingleMessage triggered by ChatCore event ---
-    /*
-    this.addMessage = (message) => {
-      this.messageHistory.push(message);
-      this._renderMessages();
-      return this.messageHistory.length - 1;
-    };
-    */
-
-    // --- DEPRECATED: Replaced by renderSingleMessage/updateRenderedMessage ---
-    /*
-    this._renderMessages = () => {
-      if (!this.container) return;
-      
-      // Ensure container has proper dimensions
-      this.container.style.minHeight = '400px';
-      this.container.style.maxHeight = 'calc(100vh - 200px)';
-      this.container.style.overflowY = 'auto';
-      
-      this.container.innerHTML = '';
-      this.messageHistory.forEach(msg => {
-        const bubble = document.createElement('div');
-        bubble.className = `${this.config.bubbleClass} ${
-          msg.role === 'user' ? this.config.userBubbleClass : 
-          msg.role === 'agent' ? this.config.agentBubbleClass : 
-          this.config.systemBubbleClass
-        }`;
-        
-        // Safely render markdown content
-        const content = msg.content || '';
-        bubble.innerHTML = `
-          <div class="message-content">${marked.parse(content)}</div>
-          ${msg.role === 'agent' ? `<div class="message-footer">${this._renderFooter(msg)}</div>` : ''}
-        `;
-        
-        this.container.appendChild(bubble);
-      });
-      
-      // Scroll to bottom after rendering
-      this.container.scrollTop = this.container.scrollHeight;
-    };
-    */
-
-    // Wait for DOM to be fully ready before querying
-    const checkContainer = () => {
-      console.log(`[ChatUI] checkContainer: Attempting querySelector('${containerSelector}')`); // Log the attempt
-      const element = document.querySelector(containerSelector);
-      if (!element) {
-        console.log(`[ChatUI] checkContainer: Element NOT found. Retrying...`); // Log failure
-        setTimeout(checkContainer, 100); // Retry
-      } else {
-        this.container = element; // Assign only if found
-        this._setupStyles();
-        this._setupEventListeners();
-        console.log('[ChatUI] Container found, setup complete.'); // Log successful setup
-        // _loadMessages is deprecated. Initial messages should be added
-        // via chatCore.addMessage in init-conversation.js, which will
-        // trigger the 'messageAdded' event listener we set up.
-        // this._loadMessages();
-        this.isReady = true; // Set ready flag
-        resolve(); // Resolve the promise
-      }
-    };
-    checkContainer();
-  }); // End of promise definition
+      // Wait for DOM to be fully ready before querying
+      const checkContainer = () => {
+        console.log(`[ChatUI] checkContainer: Attempting querySelector('${containerSelector}')`); // Log the attempt
+        const element = document.querySelector(containerSelector);
+        if (!element) {
+          console.log(`[ChatUI] checkContainer: Element NOT found. Retrying...`); // Log failure
+          setTimeout(checkContainer, 100); // Retry
+        } else {
+          this.container = element; // Assign only if found
+          this._setupStyles();
+          this._setupEventListeners();
+          console.log('[ChatUI] Container found, setup complete.'); // Log successful setup
+          // _loadMessages is deprecated. Initial messages should be added
+          // via chatCore.addMessage in init-conversation.js, which will
+          // trigger the 'messageAdded' event listener we set up.
+          // this._loadMessages();
+          this.isReady = true; // Set ready flag
+          resolve(); // Resolve the promise
+        }
+      };
+      checkContainer();
+    }); // End of promise definition
   }
 
   _setupStyles() {
@@ -1175,17 +1175,17 @@ class ChatUI {
           <div class="citations-minimal mt-1" style="width:100%;display:block;">
             <div class="citation-list" style="width:100%;display:block;">
               ${citations.map(cite => {
-                const sourceText = window.escapeHtml(`${cite.source || 'Source'}${cite.page ? ` (p.${cite.page})` : ''}`);
-                // Get library_id from the citation object itself for robustness
-                const libraryId = cite.library_id;
-                if (cite.document_id && cite.document_id !== 'N/A' && libraryId) {
-                  return `<a href="#" class="citation-popover-trigger" data-doc-id="${encodeURIComponent(cite.document_id)}" data-library-id="${libraryId}" data-cite-id="${cite.id}" title="Click to view source text">[${cite.id}] ${sourceText}</a>`;
-                } else {
-                  // Otherwise, just display the text as a non-clickable span.
-                  // The visual evidence icon for inline citations is handled separately by _enhanceCitationsWithVisualEvidence.
-                  return `<span>[${cite.id}] ${sourceText}</span>`;
-                }
-              }).join(', ')}
+        const sourceText = window.escapeHtml(`${cite.source || 'Source'}${cite.page ? ` (p.${cite.page})` : ''}`);
+        // Get library_id from the citation object itself for robustness
+        const libraryId = cite.library_id;
+        if (cite.document_id && cite.document_id !== 'N/A' && libraryId) {
+          return `<a href="#" class="citation-popover-trigger" data-doc-id="${encodeURIComponent(cite.document_id)}" data-library-id="${libraryId}" data-cite-id="${cite.id}" title="Click to view source text">[${cite.id}] ${sourceText}</a>`;
+        } else {
+          // Otherwise, just display the text as a non-clickable span.
+          // The visual evidence icon for inline citations is handled separately by _enhanceCitationsWithVisualEvidence.
+          return `<span>[${cite.id}] ${sourceText}</span>`;
+        }
+      }).join(', ')}
             </div>
           </div>
         </div>
@@ -1223,7 +1223,7 @@ class ChatUI {
 
   _enhanceCitationsWithVisualEvidence(contentHtml, citations) {
     if (!citations || citations.length === 0) {
-        return contentHtml;
+      return contentHtml;
     }
 
     const tempDiv = document.createElement('div');
@@ -1234,181 +1234,181 @@ class ChatUI {
     const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, null, false);
     let node;
     while ((node = walker.nextNode())) {
-        textNodes.push(node);
+      textNodes.push(node);
     }
 
     textNodes.forEach((textNode) => {
-        let match;
-        let lastIndex = 0;
-        const parent = textNode.parentNode;
-        if (!parent) {
-            return;
+      let match;
+      let lastIndex = 0;
+      const parent = textNode.parentNode;
+      if (!parent) {
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      citationRegex.lastIndex = 0;
+
+      while ((match = citationRegex.exec(textNode.nodeValue)) !== null) {
+        if (match.index > lastIndex) {
+          fragment.appendChild(
+            document.createTextNode(textNode.nodeValue.substring(lastIndex, match.index))
+          );
         }
 
-        const fragment = document.createDocumentFragment();
-        citationRegex.lastIndex = 0;
+        const citeNumber = parseInt(match[1], 10);
+        const citationData = citations.find((c) => c.id === citeNumber);
+        const documentId = citationData?.document_id;
+        const pageNumber = citationData?.page;
+        const displayBbox = Array.isArray(citationData?.bbox) ? citationData.bbox : null;
+        const rawBbox = citationData?.raw_bbox ?? null;
+        const doclingJsonPath = citationData?.docling_json_path || null;
+        const libraryId = citationData?.library_id ?? null;
+        const hasVisualEvidence = Boolean(
+          citationData?.has_visual_evidence === true &&
+          documentId &&
+          displayBbox &&
+          doclingJsonPath &&
+          pageNumber !== undefined &&
+          pageNumber !== null
+        );
 
-        while ((match = citationRegex.exec(textNode.nodeValue)) !== null) {
-            if (match.index > lastIndex) {
-                fragment.appendChild(
-                    document.createTextNode(textNode.nodeValue.substring(lastIndex, match.index))
-                );
-            }
+        let citeElement;
+        if (documentId && libraryId) {
+          citeElement = document.createElement('a');
+          citeElement.href = `/view_document/${libraryId}/${encodeURIComponent(documentId)}`;
+          citeElement.target = '_blank';
+          citeElement.className = 'inline-citation-link';
+          citeElement.textContent = match[0];
+        } else {
+          citeElement = document.createElement('span');
+          citeElement.className = 'inline-citation';
+          citeElement.textContent = match[0];
+        }
+        fragment.appendChild(citeElement);
 
-            const citeNumber = parseInt(match[1], 10);
-            const citationData = citations.find((c) => c.id === citeNumber);
-            const documentId = citationData?.document_id;
-            const pageNumber = citationData?.page;
-            const displayBbox = Array.isArray(citationData?.bbox) ? citationData.bbox : null;
-            const rawBbox = citationData?.raw_bbox ?? null;
-            const doclingJsonPath = citationData?.docling_json_path || null;
-            const libraryId = citationData?.library_id ?? null;
-            const hasVisualEvidence = Boolean(
-              citationData?.has_visual_evidence === true &&
-              documentId &&
-              displayBbox &&
-              doclingJsonPath &&
-              pageNumber !== undefined &&
-              pageNumber !== null
-            );
+        if (hasVisualEvidence) {
+          const iconWrapper = document.createElement('span');
+          iconWrapper.className = 'visual-evidence-icon ms-1';
+          iconWrapper.setAttribute('role', 'button');
+          iconWrapper.setAttribute('tabindex', '0');
+          iconWrapper.title = 'Show visual evidence';
 
-            let citeElement;
-            if (documentId && libraryId) {
-                citeElement = document.createElement('a');
-                citeElement.href = `/view_document/${libraryId}/${encodeURIComponent(documentId)}`;
-                citeElement.target = '_blank';
-                citeElement.className = 'inline-citation-link';
-                citeElement.textContent = match[0];
-            } else {
-                citeElement = document.createElement('span');
-                citeElement.className = 'inline-citation';
-                citeElement.textContent = match[0];
-            }
-            fragment.appendChild(citeElement);
+          iconWrapper.dataset.documentId = documentId;
+          iconWrapper.dataset.pageNo = String(pageNumber);
+          iconWrapper.dataset.bbox = JSON.stringify(displayBbox);
+          if (rawBbox) {
+            iconWrapper.dataset.rawBbox = JSON.stringify(rawBbox);
+          }
+          iconWrapper.dataset.doclingJsonPath = doclingJsonPath;
 
-            if (hasVisualEvidence) {
-                const iconWrapper = document.createElement('span');
-                iconWrapper.className = 'visual-evidence-icon ms-1';
-                iconWrapper.setAttribute('role', 'button');
-                iconWrapper.setAttribute('tabindex', '0');
-                iconWrapper.title = 'Show visual evidence';
+          const icon = document.createElement('i');
+          icon.className = 'bi bi-image';
+          iconWrapper.appendChild(icon);
 
-                iconWrapper.dataset.documentId = documentId;
-                iconWrapper.dataset.pageNo = String(pageNumber);
-                iconWrapper.dataset.bbox = JSON.stringify(displayBbox);
-                if (rawBbox) {
-                  iconWrapper.dataset.rawBbox = JSON.stringify(rawBbox);
-                }
-                iconWrapper.dataset.doclingJsonPath = doclingJsonPath;
-
-                const icon = document.createElement('i');
-                icon.className = 'bi bi-image';
-                iconWrapper.appendChild(icon);
-
-                fragment.appendChild(iconWrapper);
-            }
-
-            lastIndex = citationRegex.lastIndex;
+          fragment.appendChild(iconWrapper);
         }
 
-        if (lastIndex < textNode.nodeValue.length) {
-            fragment.appendChild(document.createTextNode(textNode.nodeValue.substring(lastIndex)));
-        }
+        lastIndex = citationRegex.lastIndex;
+      }
 
-        if (fragment.childNodes.length > 0) {
-            parent.replaceChild(fragment, textNode);
-        }
+      if (lastIndex < textNode.nodeValue.length) {
+        fragment.appendChild(document.createTextNode(textNode.nodeValue.substring(lastIndex)));
+      }
+
+      if (fragment.childNodes.length > 0) {
+        parent.replaceChild(fragment, textNode);
+      }
     });
 
     return tempDiv.innerHTML;
   }
 
-_showCitationPopover(targetElement, docId, libraryId) {
+  _showCitationPopover(targetElement, docId, libraryId) {
     // Check if a popover is already shown for this element and destroy it to toggle
     const existingPopover = bootstrap.Popover.getInstance(targetElement);
     if (existingPopover) {
-        existingPopover.dispose();
-        return;
+      existingPopover.dispose();
+      return;
     }
 
     // Show a temporary "Loading..." popover
     const loadingPopover = new bootstrap.Popover(targetElement, {
-        title: 'Loading Source...',
-        content: '<div class="d-flex justify-content-center"><div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div></div>',
-        html: true,
-        placement: 'top',
-        trigger: 'manual'
+      title: 'Loading Source...',
+      content: '<div class="d-flex justify-content-center"><div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div></div>',
+      html: true,
+      placement: 'top',
+      trigger: 'manual'
     });
     loadingPopover.show();
 
     // Fetch the content from the backend
     fetch(`/api/get_document_chunk?document_id=${docId}&library_id=${libraryId}`)
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(err => { throw new Error(err.error || 'Failed to load source.') });
-            }
-            return response.json();
-        })
-        .then(data => {
-            loadingPopover.dispose();
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(err => { throw new Error(err.error || 'Failed to load source.') });
+        }
+        return response.json();
+      })
+      .then(data => {
+        loadingPopover.dispose();
 
-            if (data.error) {
-                throw new Error(data.error);
-            }
+        if (data.error) {
+          throw new Error(data.error);
+        }
 
-            const content = data.content ? window.escapeHtml(data.content) : 'Content not found.';
-            const source = data.source ? window.escapeHtml(data.source) : 'Unknown Source';
-            const popoverTitle = `Source: ${source}`;
-            
-            const finalPopover = new bootstrap.Popover(targetElement, {
-                title: popoverTitle,
-                content: `<div class="citation-popover-content" style="max-height: 480px; overflow-y: auto;"><pre style="white-space: pre-wrap; word-wrap: break-word;">${content}</pre></div>`,
-                html: true,
-                placement: 'top',
-                trigger: 'manual',
-                customClass: 'citation-popover'
-            });
-            finalPopover.show();
+        const content = data.content ? window.escapeHtml(data.content) : 'Content not found.';
+        const source = data.source ? window.escapeHtml(data.source) : 'Unknown Source';
+        const popoverTitle = `Source: ${source}`;
 
-            // Hide the popover when clicking outside of it
-            const hidePopover = (e) => {
-                const popoverElement = document.querySelector('.popover');
-                if (popoverElement && !popoverElement.contains(e.target) && targetElement && !targetElement.contains(e.target)) {
-                    if (finalPopover && typeof finalPopover.dispose === 'function') {
-                        finalPopover.dispose();
-                    }
-                    document.removeEventListener('click', hidePopover);
-                }
-            };
-            setTimeout(() => document.addEventListener('click', hidePopover), 0);
-        })
-        .catch(error => {
-            console.error('Error fetching citation content:', error);
-            loadingPopover.dispose();
-            const errorPopover = new bootstrap.Popover(targetElement, { title: 'Error', content: error.message || 'Could not load source text.', html: true, placement: 'top', trigger: 'manual', customClass: 'citation-popover' });
-            errorPopover.show();
-            setTimeout(() => errorPopover.dispose(), 3000);
+        const finalPopover = new bootstrap.Popover(targetElement, {
+          title: popoverTitle,
+          content: `<div class="citation-popover-content" style="max-height: 480px; overflow-y: auto;"><pre style="white-space: pre-wrap; word-wrap: break-word;">${content}</pre></div>`,
+          html: true,
+          placement: 'top',
+          trigger: 'manual',
+          customClass: 'citation-popover'
         });
-}
+        finalPopover.show();
 
-_showVisualEvidenceModal(documentId, pageNo, options = {}) {
+        // Hide the popover when clicking outside of it
+        const hidePopover = (e) => {
+          const popoverElement = document.querySelector('.popover');
+          if (popoverElement && !popoverElement.contains(e.target) && targetElement && !targetElement.contains(e.target)) {
+            if (finalPopover && typeof finalPopover.dispose === 'function') {
+              finalPopover.dispose();
+            }
+            document.removeEventListener('click', hidePopover);
+          }
+        };
+        setTimeout(() => document.addEventListener('click', hidePopover), 0);
+      })
+      .catch(error => {
+        console.error('Error fetching citation content:', error);
+        loadingPopover.dispose();
+        const errorPopover = new bootstrap.Popover(targetElement, { title: 'Error', content: error.message || 'Could not load source text.', html: true, placement: 'top', trigger: 'manual', customClass: 'citation-popover' });
+        errorPopover.show();
+        setTimeout(() => errorPopover.dispose(), 3000);
+      });
+  }
+
+  _showVisualEvidenceModal(documentId, pageNo, options = {}) {
     const { rawBbox, displayBbox, doclingJsonPath } = options || {};
     console.log('[ChatUI] _showVisualEvidenceModal called with:', { documentId, pageNo, rawBbox, displayBbox, doclingJsonPath });
 
     if (!documentId) {
-        console.error('Missing document identifier for visual evidence.');
-        alert('Could not load visual evidence: missing document reference.');
-        return;
+      console.error('Missing document identifier for visual evidence.');
+      alert('Could not load visual evidence: missing document reference.');
+      return;
     }
     if (pageNo === undefined || pageNo === null || pageNo === '') {
-        console.error('Missing page number for visual evidence.', { pageNo });
-        alert('Could not load visual evidence: missing page reference.');
-        return;
+      console.error('Missing page number for visual evidence.', { pageNo });
+      alert('Could not load visual evidence: missing page reference.');
+      return;
     }
     if (!doclingJsonPath) {
-        console.error('Missing docling JSON path for visual evidence.');
-        alert('Visual evidence is unavailable for this citation.');
-        return;
+      console.error('Missing docling JSON path for visual evidence.');
+      alert('Visual evidence is unavailable for this citation.');
+      return;
     }
 
     const apiUrlObj = new URL('/api/visual_evidence', window.location.origin);
@@ -1418,15 +1418,15 @@ _showVisualEvidenceModal(documentId, pageNo, options = {}) {
 
     const bboxPayload = rawBbox ? JSON.stringify(rawBbox) : (displayBbox ? JSON.stringify(displayBbox) : null);
     if (bboxPayload) {
-        apiUrlObj.searchParams.set('bbox', bboxPayload);
+      apiUrlObj.searchParams.set('bbox', bboxPayload);
     }
     const apiUrl = apiUrlObj.toString();
     console.log('[ChatUI] Visual evidence API URL:', apiUrl);
-    
+
     let modalElement = document.getElementById('visualEvidenceModal');
     if (!modalElement) {
-        modalElement = document.createElement('div');
-        modalElement.innerHTML = `
+      modalElement = document.createElement('div');
+      modalElement.innerHTML = `
             <div class="modal fade" id="visualEvidenceModal" tabindex="-1" aria-labelledby="visualEvidenceModalLabel" aria-hidden="true">
               <div class="modal-dialog modal-lg modal-dialog-centered">
                 <div class="modal-content">
@@ -1442,11 +1442,11 @@ _showVisualEvidenceModal(documentId, pageNo, options = {}) {
               </div>
             </div>
         `;
-        document.body.appendChild(modalElement.firstElementChild);
-        modalElement = document.getElementById('visualEvidenceModal');
-        console.log('[ChatUI] Dynamically created and fetched visualEvidenceModal element:', modalElement);
+      document.body.appendChild(modalElement.firstElementChild);
+      modalElement = document.getElementById('visualEvidenceModal');
+      console.log('[ChatUI] Dynamically created and fetched visualEvidenceModal element:', modalElement);
     } else {
-        console.log('[ChatUI] Found existing visualEvidenceModal element:', modalElement);
+      console.log('[ChatUI] Found existing visualEvidenceModal element:', modalElement);
     }
 
     const modalImage = modalElement.querySelector('#visualEvidenceImage');
@@ -1454,61 +1454,61 @@ _showVisualEvidenceModal(documentId, pageNo, options = {}) {
     const modalTitle = modalElement.querySelector('#visualEvidenceModalLabel');
 
     if (modalTitle) {
-        modalTitle.textContent = `Visual Evidence (Page ${pageNo})`;
+      modalTitle.textContent = `Visual Evidence (Page ${pageNo})`;
     } else {
-        console.warn('[ChatUI] Modal title element not found.');
+      console.warn('[ChatUI] Modal title element not found.');
     }
 
     if (modalImage) {
-        modalImage.src = '';
-        modalImage.style.display = 'none';
+      modalImage.src = '';
+      modalImage.style.display = 'none';
     } else {
-        console.warn('[ChatUI] Modal image element not found.');
+      console.warn('[ChatUI] Modal image element not found.');
     }
     if (modalLoading) {
-        modalLoading.style.display = 'block';
+      modalLoading.style.display = 'block';
     } else {
-        console.warn('[ChatUI] Modal loading spinner element not found.');
+      console.warn('[ChatUI] Modal loading spinner element not found.');
     }
 
     const bsModal = bootstrap.Modal.getOrCreateInstance(modalElement);
     if (bsModal) {
-        bsModal.show();
+      bsModal.show();
     } else {
-        console.error('[ChatUI] Failed to get or create Bootstrap modal instance. Is Bootstrap JS loaded?');
-        return;
+      console.error('[ChatUI] Failed to get or create Bootstrap modal instance. Is Bootstrap JS loaded?');
+      return;
     }
 
     console.log('[ChatUI] Fetching visual evidence from:', apiUrl);
     fetch(apiUrl)
-        .then((response) => {
-            console.log('[ChatUI] Received response from /api/visual_evidence:', response);
-            if (!response.ok) {
-                throw new Error(`HTTP error ${response.status} fetching visual evidence.`);
-            }
-            return response.blob();
-        })
-        .then((blob) => {
-            console.log('[ChatUI] Received blob for visual evidence. Creating object URL.');
-            const imageUrl = URL.createObjectURL(blob);
-            if (modalImage) {
-                modalImage.src = imageUrl;
-                modalImage.style.display = 'block';
-                modalImage.onload = () => URL.revokeObjectURL(imageUrl);
-            }
-            if (modalLoading) {
-                modalLoading.style.display = 'none';
-            }
-        })
-        .catch((error) => {
-            console.error('[ChatUI] Error fetching/displaying visual evidence:', error);
-            if (modalImage) {
-                modalImage.alt = 'Error loading visual evidence.';
-            }
-            if (modalLoading) {
-                modalLoading.style.display = 'none';
-            }
-        });
+      .then((response) => {
+        console.log('[ChatUI] Received response from /api/visual_evidence:', response);
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status} fetching visual evidence.`);
+        }
+        return response.blob();
+      })
+      .then((blob) => {
+        console.log('[ChatUI] Received blob for visual evidence. Creating object URL.');
+        const imageUrl = URL.createObjectURL(blob);
+        if (modalImage) {
+          modalImage.src = imageUrl;
+          modalImage.style.display = 'block';
+          modalImage.onload = () => URL.revokeObjectURL(imageUrl);
+        }
+        if (modalLoading) {
+          modalLoading.style.display = 'none';
+        }
+      })
+      .catch((error) => {
+        console.error('[ChatUI] Error fetching/displaying visual evidence:', error);
+        if (modalImage) {
+          modalImage.alt = 'Error loading visual evidence.';
+        }
+        if (modalLoading) {
+          modalLoading.style.display = 'none';
+        }
+      });
   }
 
   async _copyChartToClipboard(base64ImageSrc) {

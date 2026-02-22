@@ -206,6 +206,59 @@ def init_api_auth(app):
             logger.error(f"API config error: {e}", exc_info=True)
             return jsonify({'error': str(e)}), 500
 
+    @app.route('/api/knowledges', methods=['GET'])
+    def api_knowledges():
+        """
+        Return knowledges accessible to the current user, along with the vector store mode.
+        Returns: {knowledges: [...], knowledge_libraries_map: {...}, mode: '...'}
+        """
+        from flask import current_app
+        from flask_login import current_user
+        from modules.database import Knowledge, UserGroup, Group
+
+        if not current_user.is_authenticated:
+            return jsonify({'knowledges': [], 'knowledge_libraries_map': {}, 'mode': 'user'}), 401
+
+        try:
+            vector_store_mode = current_app.config.get('VECTOR_STORE_MODE', 'user')
+            
+            knowledge_libraries_map = {}
+            knowledges_list = []
+            
+            if vector_store_mode == 'knowledge':
+                if getattr(current_user, "is_admin", False):
+                    # Admin gets everything
+                    knowledges = Knowledge.query.order_by(Knowledge.name).all()
+                else:
+                    user_id = current_user.get_id()
+                    knowledges = []
+                    if user_id:
+                        user_group_ids = [ug.group_id for ug in UserGroup.query.filter_by(user_id=user_id).all()]
+                        if user_group_ids:
+                            knowledges = Knowledge.query.join(Knowledge.groups).filter(
+                                Group.group_id.in_(user_group_ids)
+                            ).distinct().order_by(Knowledge.name).all()
+                            
+                for k in knowledges:
+                    knowledges_list.append({"id": k.id, "name": k.name})
+                    # Use 'id' and 'name' for the library entries explicitly as frontend expects
+                    knowledge_libraries_map[str(k.id)] = {
+                        "name": k.name,
+                        "libraries": [
+                            {"id": lib.library_id, "name": lib.name}
+                            for lib in k.libraries
+                        ]
+                    }
+
+            return jsonify({
+                'knowledges': knowledges_list,
+                'knowledge_libraries_map': knowledge_libraries_map,
+                'mode': vector_store_mode
+            })
+        except Exception as e:
+            logger.error(f"API knowledges error: {e}", exc_info=True)
+            return jsonify({'error': str(e)}), 500
+
     @app.route('/api/branding', methods=['GET'])
     def api_branding():
         """

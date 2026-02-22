@@ -50,6 +50,13 @@ admin_folder_upload_bp = Blueprint(
     url_prefix="/admin/folder_upload"
 )
 
+# Also register at /api/admin/folder_upload for frontend use
+api_folder_upload_bp = Blueprint(
+    "api_admin_folder_upload",
+    __name__,
+    url_prefix="/api/admin/folder_upload"
+)
+
 @admin_folder_upload_bp.route("/", methods=["GET"])
 @login_required
 def folder_upload():
@@ -378,4 +385,27 @@ def process_folder_upload_task(job_id):
     job.log += f"Job finished at {datetime.datetime.utcnow().isoformat()} UTC. Success: {success_count}, Errors: {error_count}\n"
     db.session.commit()
 
-# Remove the old registration function and call
+# API routes for frontend (mirroring the admin routes)
+@api_folder_upload_bp.route("/upload", methods=["POST"])
+@login_required
+def api_upload_folder():
+    """API endpoint for folder upload - wraps the admin upload_folder function."""
+    return upload_folder()
+
+@api_folder_upload_bp.route("/jobs", methods=["GET"])
+@login_required
+def api_list_jobs():
+    """API endpoint for listing jobs - wraps the admin list_jobs function."""
+    return list_jobs()
+
+@api_folder_upload_bp.route("/job/<int:job_id>/cancel", methods=["POST"])
+@login_required
+def api_cancel_job(job_id):
+    """API endpoint for canceling jobs - wraps the admin cancel_job function."""
+    return cancel_job(job_id)
+
+@api_folder_upload_bp.route("/job/<int:job_id>", methods=["GET"])
+@login_required
+def api_job_details(job_id):
+    """API endpoint for job details - wraps the admin job_details function."""
+    return job_details(job_id)

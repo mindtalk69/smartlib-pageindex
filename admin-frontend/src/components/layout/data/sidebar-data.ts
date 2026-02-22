@@ -30,7 +30,7 @@ export const sidebarData: SidebarData = {
   user: {
     name: 'Admin',
     email: 'admin@smartlib.com',
-    avatar: '/avatars/admin.jpg',
+    avatar: undefined, // Use fallback initials instead of missing image
   },
   teams: [
     {

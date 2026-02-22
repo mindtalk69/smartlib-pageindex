@@ -1,0 +1,376 @@
+
+> shadcn-admin@2.2.1 build
+> tsc -b && vite build
+
+src/components/admin/admin-dialog.tsx(82,5): error TS2322: Type 'Resolver<input<T>, any, output<T>>' is not assignable to type 'Resolver<output<T>, any, output<T>>'.
+  Types of parameters 'values' and 'values' are incompatible.
+    Type 'output<T>' is not assignable to type 'input<T>'.
+      Type 'unknown' is not assignable to type 'input<T>'.
+src/components/admin/admin-dialog.tsx(83,5): error TS2322: Type 'output<T>' is not assignable to type 'AsyncDefaultValues<output<T>> | DefaultValues<output<T>> | undefined'.
+  Type 'Record<string, unknown>' is not assignable to type 'AsyncDefaultValues<output<T>> | DefaultValues<output<T>> | undefined'.
+src/components/admin/admin-dialog.tsx(108,33): error TS2345: Argument of type 'string' is not assignable to parameter of type 'Path<output<T>>'.
+src/components/admin/admin-dialog.tsx(119,33): error TS2345: Argument of type 'string' is not assignable to parameter of type 'Path<output<T>>'.
+src/components/admin/admin-dialog.tsx(128,15): error TS2322: Type 'readonly PathValueImpl<output<T>, Path<output<T>>>[]' is not assignable to type 'boolean | undefined'.
+src/components/admin/admin-dialog.tsx(129,78): error TS2345: Argument of type 'boolean' is not assignable to parameter of type 'PathValueImpl<output<T>, never>'.
+src/components/admin/admin-dialog.tsx(171,45): error TS2345: Argument of type '(data: output<T>) => void' is not assignable to parameter of type 'SubmitHandler<TFieldValues>'.
+  Types of parameters 'data' and 'data' are incompatible.
+    Type 'TFieldValues' is not assignable to type 'output<T>'.
+      Type 'FieldValues' is not assignable to type 'output<T>'.
+src/components/admin/admin-dialog.tsx(176,19): error TS2322: Type 'Control<output<T>, any, TFieldValues>' is not assignable to type 'Control<output<T>, any, output<T>>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<output<T>, any, TFieldValues> | undefined' is not assignable to type 'Resolver<output<T>, any, output<T>> | undefined'.
+      Type 'Resolver<output<T>, any, TFieldValues>' is not assignable to type 'Resolver<output<T>, any, output<T>>'.
+        Type 'ResolverResult<output<T>, TFieldValues> | Promise<ResolverResult<output<T>, TFieldValues>>' is not assignable to type 'ResolverResult<output<T>, output<T>> | Promise<ResolverResult<output<T>, output<T>>>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<output<T>, output<T>> | Promise<ResolverResult<output<T>, output<T>>>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<output<T>>'.
+              Type 'TFieldValues' is not assignable to type 'output<T>'.
+                Type 'FieldValues' is not assignable to type 'output<T>'.
+src/components/admin/admin-table.tsx(45,50): error TS2312: An interface can only extend an object type or intersection of object types with statically known members.
+src/components/data-table/pagination.tsx(93,16): error TS2367: This comparison appears to be unintentional because the types 'number | "ellipsis"' and '"..."' have no overlap.
+src/components/sign-out-dialog.tsx(13,11): error TS2339: Property 'auth' does not exist on type 'AuthState'.
+src/features/catalogs/components/catalogs-action-dialog.tsx(74,9): error TS2353: Object literal may only specify known properties, and 'context_text' does not exist in type '{ item_type?: string | undefined; context?: string | undefined; }'.
+src/features/catalogs/components/catalogs-action-dialog.tsx(79,36): error TS2339: Property 'description' does not exist on type 'ApiResponse<{ description: string; }>'.
+src/features/catalogs/components/catalogs-action-dialog.tsx(80,45): error TS2339: Property 'description' does not exist on type 'ApiResponse<{ description: string; }>'.
+src/features/catalogs/components/catalogs-dialogs.tsx(29,13): error TS2739: Type 'Catalog' is missing the following properties from type 'Catalog': created_by_username, created_at
+src/features/catalogs/components/catalogs-dialogs.tsx(41,13): error TS2739: Type 'Catalog' is missing the following properties from type 'Catalog': created_by_username, created_at
+src/features/catalogs/components/catalogs-provider.tsx(51,5): error TS2322: Type '(params?: { page?: number; per_page?: number; search?: string; } | undefined) => Promise<ApiResponse<PaginatedResponse<Catalog>>>' is not assignable to type '(params?: { page?: number | undefined; per_page?: number | undefined; search?: string | undefined; } | undefined) => Promise<PaginatedResponse<Catalog>>'.
+  Type 'Promise<ApiResponse<PaginatedResponse<Catalog>>>' is not assignable to type 'Promise<PaginatedResponse<Catalog>>'.
+    Type 'ApiResponse<PaginatedResponse<Catalog>>' is missing the following properties from type 'PaginatedResponse<Catalog>': items, total, page, per_page
+src/features/catalogs/components/catalogs-table.tsx(56,40): error TS2322: Type 'NavigateFn' is not assignable to type '(opts: { to: string; search?: Record<string, unknown> | undefined; }) => void'.
+  Types of parameters 'opts' and 'opts' are incompatible.
+    Type '{ to: string; search?: Record<string, unknown> | undefined; }' is not assignable to type '{ search: true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>); replace?: boolean | undefined; }'.
+      Types of property 'search' are incompatible.
+        Type 'Record<string, unknown> | undefined' is not assignable to type 'true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>)'.
+          Type 'undefined' is not assignable to type 'true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>)'.
+src/features/catalogs/components/catalogs-table.tsx(79,5): error TS2322: Type 'ColumnDef<Catalog>[]' is not assignable to type 'ColumnDef<Catalog, any>[]'.
+  Type 'ColumnDef<Catalog>' is not assignable to type 'ColumnDef<Catalog, any>'.
+    Type 'ColumnDefBase<Catalog, unknown> & StringHeaderIdentifier' is not assignable to type 'ColumnDef<Catalog, any>'.
+      Type 'ColumnDefBase<Catalog, unknown> & StringHeaderIdentifier' is not assignable to type 'AccessorFnColumnDefBase<Catalog, any> & IdIdentifier<Catalog, any>'.
+        Property 'accessorFn' is missing in type 'ColumnDefBase<Catalog, unknown> & StringHeaderIdentifier' but required in type 'AccessorFnColumnDefBase<Catalog, any>'.
+src/features/catalogs/components/catalogs-table.tsx(89,5): error TS2322: Type '(rows: string[]) => void' is not assignable to type 'OnChangeFn<RowSelectionState>'.
+  Types of parameters 'rows' and 'updaterOrValue' are incompatible.
+    Type 'Updater<RowSelectionState>' is not assignable to type 'string[]'.
+      Type 'RowSelectionState' is missing the following properties from type 'string[]': length, pop, push, concat, and 28 more.
+src/features/categories/components/categories-dialogs.tsx(29,13): error TS2739: Type 'Category' is missing the following properties from type 'Category': category_id, description, created_by_username, created_at
+src/features/categories/components/categories-dialogs.tsx(41,13): error TS2739: Type 'Category' is missing the following properties from type 'Category': category_id, description, created_by_username, created_at
+src/features/categories/components/categories-provider.tsx(51,5): error TS2322: Type '(params?: { page?: number; per_page?: number; search?: string; } | undefined) => Promise<ApiResponse<PaginatedResponse<Category>>>' is not assignable to type '(params?: { page?: number | undefined; per_page?: number | undefined; search?: string | undefined; } | undefined) => Promise<PaginatedResponse<Category>>'.
+  Type 'Promise<ApiResponse<PaginatedResponse<Category>>>' is not assignable to type 'Promise<PaginatedResponse<Category>>'.
+    Type 'ApiResponse<PaginatedResponse<Category>>' is missing the following properties from type 'PaginatedResponse<Category>': items, total, page, per_page
+src/features/categories/components/categories-table.tsx(56,42): error TS2322: Type 'NavigateFn' is not assignable to type '(opts: { to: string; search?: Record<string, unknown> | undefined; }) => void'.
+  Types of parameters 'opts' and 'opts' are incompatible.
+    Type '{ to: string; search?: Record<string, unknown> | undefined; }' is not assignable to type '{ search: true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>); replace?: boolean | undefined; }'.
+      Types of property 'search' are incompatible.
+        Type 'Record<string, unknown> | undefined' is not assignable to type 'true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>)'.
+          Type 'undefined' is not assignable to type 'true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>)'.
+src/features/categories/components/categories-table.tsx(79,5): error TS2322: Type 'ColumnDef<Category>[]' is not assignable to type 'ColumnDef<Category, any>[]'.
+  Type 'ColumnDef<Category>' is not assignable to type 'ColumnDef<Category, any>'.
+    Type 'ColumnDefBase<Category, unknown> & StringHeaderIdentifier' is not assignable to type 'ColumnDef<Category, any>'.
+      Type 'ColumnDefBase<Category, unknown> & StringHeaderIdentifier' is not assignable to type 'AccessorFnColumnDefBase<Category, any> & IdIdentifier<Category, any>'.
+        Property 'accessorFn' is missing in type 'ColumnDefBase<Category, unknown> & StringHeaderIdentifier' but required in type 'AccessorFnColumnDefBase<Category, any>'.
+src/features/categories/components/categories-table.tsx(89,5): error TS2322: Type '(rows: string[]) => void' is not assignable to type 'OnChangeFn<RowSelectionState>'.
+  Types of parameters 'rows' and 'updaterOrValue' are incompatible.
+    Type 'Updater<RowSelectionState>' is not assignable to type 'string[]'.
+      Type 'RowSelectionState' is missing the following properties from type 'string[]': length, pop, push, concat, and 28 more.
+src/features/files/components/files-columns.tsx(152,33): error TS2345: Argument of type 'import("/home/mlk/smartlib-basic/admin-frontend/src/features/files/data/schema").File' is not assignable to parameter of type 'import("/home/mlk/smartlib-basic/admin-frontend/src/lib/api-client").File'.
+  Property 'created_at' is missing in type 'import("/home/mlk/smartlib-basic/admin-frontend/src/features/files/data/schema").File' but required in type 'import("/home/mlk/smartlib-basic/admin-frontend/src/lib/api-client").File'.
+src/features/files/components/files-dialogs.tsx(21,11): error TS2740: Type 'File' is missing the following properties from type 'File': file_size, upload_time, username, library_name, and 3 more.
+src/features/files/components/files-provider.tsx(48,5): error TS2322: Type '(params?: { page?: number; per_page?: number; search?: string; } | undefined) => Promise<ApiResponse<PaginatedResponse<File>>>' is not assignable to type '(params?: { page?: number | undefined; per_page?: number | undefined; search?: string | undefined; } | undefined) => Promise<PaginatedResponse<File>>'.
+  Type 'Promise<ApiResponse<PaginatedResponse<File>>>' is not assignable to type 'Promise<PaginatedResponse<File>>'.
+    Type 'ApiResponse<PaginatedResponse<File>>' is missing the following properties from type 'PaginatedResponse<File>': items, total, page, per_page
+src/features/files/components/files-provider.tsx(75,9): error TS2322: Type '(id: string) => Promise<boolean>' is not assignable to type '(id: number) => Promise<boolean>'.
+  Types of parameters 'id' and 'id' are incompatible.
+    Type 'number' is not assignable to type 'string'.
+src/features/files/components/files-table.tsx(59,37): error TS2322: Type 'NavigateFn' is not assignable to type '(opts: { to: string; search?: Record<string, unknown> | undefined; }) => void'.
+  Types of parameters 'opts' and 'opts' are incompatible.
+    Type '{ to: string; search?: Record<string, unknown> | undefined; }' is not assignable to type '{ search: true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>); replace?: boolean | undefined; }'.
+      Types of property 'search' are incompatible.
+        Type 'Record<string, unknown> | undefined' is not assignable to type 'true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>)'.
+          Type 'undefined' is not assignable to type 'true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>)'.
+src/features/files/components/files-table.tsx(84,5): error TS2322: Type 'ColumnDef<File>[]' is not assignable to type 'ColumnDef<File, any>[]'.
+  Type 'ColumnDef<File>' is not assignable to type 'ColumnDef<File, any>'.
+    Type 'ColumnDefBase<File, unknown> & StringHeaderIdentifier' is not assignable to type 'ColumnDef<File, any>'.
+      Type 'ColumnDefBase<File, unknown> & StringHeaderIdentifier' is not assignable to type 'AccessorFnColumnDefBase<File, any> & IdIdentifier<File, any>'.
+        Property 'accessorFn' is missing in type 'ColumnDefBase<File, unknown> & StringHeaderIdentifier' but required in type 'AccessorFnColumnDefBase<File, any>'.
+src/features/files/components/files-table.tsx(94,5): error TS2322: Type '(rows: string[]) => void' is not assignable to type 'OnChangeFn<RowSelectionState>'.
+  Types of parameters 'rows' and 'updaterOrValue' are incompatible.
+    Type 'Updater<RowSelectionState>' is not assignable to type 'string[]'.
+      Type 'RowSelectionState' is missing the following properties from type 'string[]': length, pop, push, concat, and 28 more.
+src/features/folder-upload/index.tsx(304,21): error TS2322: Type '{ id: string; type: "file"; webkitdirectory: string; directory: string; multiple: true; onChange: (e: ChangeEvent<HTMLInputElement, Element>) => void; required: true; }' is not assignable to type 'IntrinsicAttributes & ClassAttributes<HTMLInputElement> & InputHTMLAttributes<HTMLInputElement>'.
+  Property 'webkitdirectory' does not exist on type 'IntrinsicAttributes & ClassAttributes<HTMLInputElement> & InputHTMLAttributes<HTMLInputElement>'.
+src/features/groups/components/groups-action-dialog.tsx(74,9): error TS2353: Object literal may only specify known properties, and 'context_text' does not exist in type '{ item_type?: string | undefined; context?: string | undefined; }'.
+src/features/groups/components/groups-action-dialog.tsx(79,36): error TS2339: Property 'description' does not exist on type 'ApiResponse<{ description: string; }>'.
+src/features/groups/components/groups-action-dialog.tsx(80,45): error TS2339: Property 'description' does not exist on type 'ApiResponse<{ description: string; }>'.
+src/features/groups/components/groups-dialogs.tsx(29,13): error TS2739: Type 'Group' is missing the following properties from type '{ id: string; group_id: string; name: string; description: string; creator_name: string; created_at: string; }': creator_name, created_at
+src/features/groups/components/groups-dialogs.tsx(41,13): error TS2739: Type 'Group' is missing the following properties from type '{ id: string; group_id: string; name: string; description: string; creator_name: string; created_at: string; }': creator_name, created_at
+src/features/groups/components/groups-provider.tsx(54,5): error TS2322: Type '(params?: { page?: number; per_page?: number; search?: string; } | undefined) => Promise<ApiResponse<PaginatedResponse<Group>>>' is not assignable to type '(params?: { page?: number | undefined; per_page?: number | undefined; search?: string | undefined; } | undefined) => Promise<PaginatedResponse<{ id: string; }>>'.
+  Type 'Promise<ApiResponse<PaginatedResponse<Group>>>' is not assignable to type 'Promise<PaginatedResponse<{ id: string; }>>'.
+    Type 'ApiResponse<PaginatedResponse<Group>>' is missing the following properties from type 'PaginatedResponse<{ id: string; }>': items, total, page, per_page
+src/features/groups/components/groups-provider.tsx(55,5): error TS2322: Type '(id: string) => Promise<ApiResponse<Group>>' is not assignable to type '(id: string) => Promise<ApiResponse<{ id: string; }>>'.
+  Type 'Promise<ApiResponse<Group>>' is not assignable to type 'Promise<ApiResponse<{ id: string; }>>'.
+    Type 'ApiResponse<Group>' is not assignable to type 'ApiResponse<{ id: string; }>'.
+      Type 'Group' is not assignable to type '{ id: string; }'.
+        Types of property 'id' are incompatible.
+          Type 'string | undefined' is not assignable to type 'string'.
+            Type 'undefined' is not assignable to type 'string'.
+src/features/groups/components/groups-provider.tsx(58,5): error TS2322: Type '(data: Partial<Group>) => Promise<ApiResponse<Group>>' is not assignable to type '(data: Partial<Group>) => Promise<ApiResponse<{ id: string; }>>'.
+  Type 'Promise<ApiResponse<Group>>' is not assignable to type 'Promise<ApiResponse<{ id: string; }>>'.
+    Type 'ApiResponse<Group>' is not assignable to type 'ApiResponse<{ id: string; }>'.
+      Type 'Group' is not assignable to type '{ id: string; }'.
+        Types of property 'id' are incompatible.
+          Type 'string | undefined' is not assignable to type 'string'.
+            Type 'undefined' is not assignable to type 'string'.
+src/features/groups/components/groups-provider.tsx(75,9): error TS2322: Type '{ id: string; }[]' is not assignable to type 'Group[]'.
+  Type '{ id: string; }' is missing the following properties from type 'Group': group_id, name
+src/features/groups/components/groups-table.tsx(77,5): error TS2322: Type 'ColumnDef<{ id: string; group_id: string; name: string; description: string; creator_name: string; created_at: string; }>[]' is not assignable to type 'ColumnDef<Group, any>[]'.
+  Type 'ColumnDef<{ id: string; group_id: string; name: string; description: string; creator_name: string; created_at: string; }>' is not assignable to type 'ColumnDef<Group, any>'.
+    Type 'ColumnDefBase<{ id: string; group_id: string; name: string; description: string; creator_name: string; created_at: string; }, unknown> & StringHeaderIdentifier' is not assignable to type 'ColumnDef<Group, any>'.
+      Type 'ColumnDefBase<{ id: string; group_id: string; name: string; description: string; creator_name: string; created_at: string; }, unknown> & StringHeaderIdentifier' is not assignable to type 'AccessorFnColumnDefBase<Group, any> & IdIdentifier<Group, any>'.
+        Property 'accessorFn' is missing in type 'ColumnDefBase<{ id: string; group_id: string; name: string; description: string; creator_name: string; created_at: string; }, unknown> & StringHeaderIdentifier' but required in type 'AccessorFnColumnDefBase<Group, any>'.
+src/features/groups/components/groups-table.tsx(87,5): error TS2322: Type '(rows: string[]) => void' is not assignable to type 'OnChangeFn<RowSelectionState>'.
+  Types of parameters 'rows' and 'updaterOrValue' are incompatible.
+    Type 'Updater<RowSelectionState>' is not assignable to type 'string[]'.
+      Type 'RowSelectionState' is missing the following properties from type 'string[]': length, pop, push, concat, and 28 more.
+src/features/groups/index.tsx(14,27): error TS2345: Argument of type '"/_authenticated/groups/"' is not assignable to parameter of type 'ConstrainLiteral<"/_authenticated/groups/", "__root__" | "/_authenticated" | "/clerk" | "/_authenticated/" | "/(errors)/503" | "/(errors)/500" | "/(errors)/404" | "/(errors)/403" | "/(errors)/401" | ... 47 more ... | "/_authenticated/errors/$error">'.
+src/features/groups/index.tsx(40,38): error TS2322: Type 'UseNavigateResult<never>' is not assignable to type 'NavigateFn'.
+  Types of parameters '__0' and 'opts' are incompatible.
+    Type '{ search: true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>); replace?: boolean | undefined; }' is not assignable to type 'NavigateOptions<RouterCore<Route<Register, any, "/", "/", string, "__root__", undefined, {}, { queryClient: QueryClient; }, AnyContext, AnyContext, ... 6 more ..., undefined>, "never", false, RouterHistory, Record<...>>, never, string | undefined, never, "">'.
+      Type '{ search: true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>); replace?: boolean | undefined; }' is not assignable to type 'MakeOptionalSearchParams<RouterCore<Route<Register, any, "/", "/", string, "__root__", undefined, {}, { queryClient: QueryClient; }, AnyContext, AnyContext, ... 6 more ..., undefined>, "never", false, RouterHistory, Record<...>>, never, string | undefined>'.
+        Types of property 'search' are incompatible.
+          Type 'true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>)' is not assignable to type 'true | ParamsReducerFn<RouterCore<Route<Register, any, "/", "/", string, "__root__", undefined, {}, { queryClient: QueryClient; }, AnyContext, AnyContext, ... 6 more ..., undefined>, "never", false, RouterHistory, Record<...>>, "SEARCH", never, string | undefined> | undefined'.
+            Type 'SearchRecord' is not assignable to type 'true | ParamsReducerFn<RouterCore<Route<Register, any, "/", "/", string, "__root__", undefined, {}, { queryClient: QueryClient; }, AnyContext, AnyContext, ... 6 more ..., undefined>, "never", false, RouterHistory, Record<...>>, "SEARCH", never, string | undefined> | undefined'.
+src/features/knowledges/components/knowledges-action-dialog.tsx(95,9): error TS2353: Object literal may only specify known properties, and 'context_text' does not exist in type '{ item_type?: string | undefined; context?: string | undefined; }'.
+src/features/knowledges/components/knowledges-action-dialog.tsx(100,36): error TS2339: Property 'description' does not exist on type 'ApiResponse<{ description: string; }>'.
+src/features/knowledges/components/knowledges-action-dialog.tsx(101,45): error TS2339: Property 'description' does not exist on type 'ApiResponse<{ description: string; }>'.
+src/features/knowledges/components/knowledges-action-dialog.tsx(352,66): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/features/knowledges/components/knowledges-action-dialog.tsx(356,63): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/features/knowledges/components/knowledges-action-dialog.tsx(356,75): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/features/knowledges/components/knowledges-action-dialog.tsx(401,64): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/features/knowledges/components/knowledges-action-dialog.tsx(405,61): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/features/knowledges/components/knowledges-action-dialog.tsx(405,73): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/features/knowledges/components/knowledges-columns.tsx(162,33): error TS2345: Argument of type 'import("/home/mlk/smartlib-basic/admin-frontend/src/features/knowledges/data/schema").Knowledge' is not assignable to parameter of type 'import("/home/mlk/smartlib-basic/admin-frontend/src/lib/api-client").Knowledge'.
+  Types of property 'id' are incompatible.
+    Type 'number' is not assignable to type 'string'.
+src/features/knowledges/components/knowledges-columns.tsx(170,33): error TS2345: Argument of type 'import("/home/mlk/smartlib-basic/admin-frontend/src/features/knowledges/data/schema").Knowledge' is not assignable to parameter of type 'import("/home/mlk/smartlib-basic/admin-frontend/src/lib/api-client").Knowledge'.
+  Types of property 'id' are incompatible.
+    Type 'number' is not assignable to type 'string'.
+src/features/knowledges/components/knowledges-dialogs.tsx(29,13): error TS2740: Type 'Knowledge' is missing the following properties from type 'Knowledge': category_names, catalog_names, library_names, group_names, and 2 more.
+src/features/knowledges/components/knowledges-dialogs.tsx(41,13): error TS2740: Type 'Knowledge' is missing the following properties from type 'Knowledge': category_names, catalog_names, library_names, group_names, and 2 more.
+src/features/knowledges/components/knowledges-provider.tsx(69,5): error TS2322: Type '(params?: { page?: number; per_page?: number; search?: string; } | undefined) => Promise<ApiResponse<PaginatedResponse<Knowledge>>>' is not assignable to type '(params?: { page?: number | undefined; per_page?: number | undefined; search?: string | undefined; } | undefined) => Promise<PaginatedResponse<Knowledge>>'.
+  Type 'Promise<ApiResponse<PaginatedResponse<Knowledge>>>' is not assignable to type 'Promise<PaginatedResponse<Knowledge>>'.
+    Type 'ApiResponse<PaginatedResponse<Knowledge>>' is missing the following properties from type 'PaginatedResponse<Knowledge>': items, total, page, per_page
+src/features/knowledges/components/knowledges-provider.tsx(90,58): error TS2345: Argument of type 'PaginatedResponse<Category>' is not assignable to parameter of type 'SetStateAction<Category[]>'.
+src/features/knowledges/components/knowledges-provider.tsx(91,58): error TS2345: Argument of type 'PaginatedResponse<Catalog>' is not assignable to parameter of type 'SetStateAction<Catalog[]>'.
+src/features/knowledges/components/knowledges-provider.tsx(92,57): error TS2345: Argument of type 'PaginatedResponse<Library>' is not assignable to parameter of type 'SetStateAction<Library[]>'.
+src/features/knowledges/components/knowledges-provider.tsx(93,58): error TS2345: Argument of type 'PaginatedResponse<Group>' is not assignable to parameter of type 'SetStateAction<Group[]>'.
+src/features/knowledges/components/knowledges-provider.tsx(119,9): error TS2322: Type '(id: string, data: Partial<Knowledge>) => Promise<boolean>' is not assignable to type '(id: number, data: Partial<Knowledge>) => Promise<boolean>'.
+  Types of parameters 'id' and 'id' are incompatible.
+    Type 'number' is not assignable to type 'string'.
+src/features/knowledges/components/knowledges-provider.tsx(120,9): error TS2322: Type '(id: string) => Promise<boolean>' is not assignable to type '(id: number) => Promise<boolean>'.
+  Types of parameters 'id' and 'id' are incompatible.
+    Type 'number' is not assignable to type 'string'.
+src/features/knowledges/components/knowledges-table.tsx(58,42): error TS2322: Type 'NavigateFn' is not assignable to type '(opts: { to: string; search?: Record<string, unknown> | undefined; }) => void'.
+  Types of parameters 'opts' and 'opts' are incompatible.
+    Type '{ to: string; search?: Record<string, unknown> | undefined; }' is not assignable to type '{ search: true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>); replace?: boolean | undefined; }'.
+      Types of property 'search' are incompatible.
+        Type 'Record<string, unknown> | undefined' is not assignable to type 'true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>)'.
+          Type 'undefined' is not assignable to type 'true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>)'.
+src/features/knowledges/components/knowledges-table.tsx(83,5): error TS2322: Type 'ColumnDef<Knowledge>[]' is not assignable to type 'ColumnDef<Knowledge, any>[]'.
+  Type 'ColumnDef<Knowledge>' is not assignable to type 'ColumnDef<Knowledge, any>'.
+    Type 'ColumnDefBase<Knowledge, unknown> & StringHeaderIdentifier' is not assignable to type 'ColumnDef<Knowledge, any>'.
+      Type 'ColumnDefBase<Knowledge, unknown> & StringHeaderIdentifier' is not assignable to type 'AccessorFnColumnDefBase<Knowledge, any> & IdIdentifier<Knowledge, any>'.
+        Property 'accessorFn' is missing in type 'ColumnDefBase<Knowledge, unknown> & StringHeaderIdentifier' but required in type 'AccessorFnColumnDefBase<Knowledge, any>'.
+src/features/knowledges/components/knowledges-table.tsx(93,5): error TS2322: Type '(rows: string[]) => void' is not assignable to type 'OnChangeFn<RowSelectionState>'.
+  Types of parameters 'rows' and 'updaterOrValue' are incompatible.
+    Type 'Updater<RowSelectionState>' is not assignable to type 'string[]'.
+      Type 'RowSelectionState' is missing the following properties from type 'string[]': length, pop, push, concat, and 28 more.
+src/features/libraries/components/libraries-action-dialog.tsx(75,9): error TS2353: Object literal may only specify known properties, and 'context_text' does not exist in type '{ item_type?: string | undefined; context?: string | undefined; }'.
+src/features/libraries/components/libraries-action-dialog.tsx(80,36): error TS2339: Property 'description' does not exist on type 'ApiResponse<{ description: string; }>'.
+src/features/libraries/components/libraries-action-dialog.tsx(81,45): error TS2339: Property 'description' does not exist on type 'ApiResponse<{ description: string; }>'.
+src/features/libraries/components/libraries-dialogs.tsx(29,13): error TS2739: Type 'Library' is missing the following properties from type 'Library': description, knowledge_names, knowledge_ids, created_by_username, created_at
+src/features/libraries/components/libraries-dialogs.tsx(41,13): error TS2739: Type 'Library' is missing the following properties from type 'Library': description, knowledge_names, knowledge_ids, created_by_username, created_at
+src/features/libraries/components/libraries-provider.tsx(52,5): error TS2322: Type '(params?: { page?: number; per_page?: number; search?: string; } | undefined) => Promise<ApiResponse<PaginatedResponse<Library>>>' is not assignable to type '(params?: { page?: number | undefined; per_page?: number | undefined; search?: string | undefined; } | undefined) => Promise<PaginatedResponse<{ id: string; }>>'.
+  Type 'Promise<ApiResponse<PaginatedResponse<Library>>>' is not assignable to type 'Promise<PaginatedResponse<{ id: string; }>>'.
+    Type 'ApiResponse<PaginatedResponse<Library>>' is missing the following properties from type 'PaginatedResponse<{ id: string; }>': items, total, page, per_page
+src/features/libraries/components/libraries-provider.tsx(53,5): error TS2322: Type '(id: string) => Promise<ApiResponse<Library>>' is not assignable to type '(id: string) => Promise<ApiResponse<{ id: string; }>>'.
+  Type 'Promise<ApiResponse<Library>>' is not assignable to type 'Promise<ApiResponse<{ id: string; }>>'.
+    Type 'ApiResponse<Library>' is not assignable to type 'ApiResponse<{ id: string; }>'.
+      Type 'Library' is not assignable to type '{ id: string; }'.
+        Types of property 'id' are incompatible.
+          Type 'string | undefined' is not assignable to type 'string'.
+            Type 'undefined' is not assignable to type 'string'.
+src/features/libraries/components/libraries-provider.tsx(56,5): error TS2322: Type '(data: Partial<Library>) => Promise<ApiResponse<Library>>' is not assignable to type '(data: Partial<Library>) => Promise<ApiResponse<{ id: string; }>>'.
+  Type 'Promise<ApiResponse<Library>>' is not assignable to type 'Promise<ApiResponse<{ id: string; }>>'.
+    Type 'ApiResponse<Library>' is not assignable to type 'ApiResponse<{ id: string; }>'.
+      Type 'Library' is not assignable to type '{ id: string; }'.
+        Types of property 'id' are incompatible.
+          Type 'string | undefined' is not assignable to type 'string'.
+            Type 'undefined' is not assignable to type 'string'.
+src/features/libraries/components/libraries-provider.tsx(73,9): error TS2322: Type '{ id: string; }[]' is not assignable to type 'Library[]'.
+  Type '{ id: string; }' is missing the following properties from type 'Library': library_id, name
+src/features/libraries/components/libraries-table.tsx(58,41): error TS2322: Type 'NavigateFn' is not assignable to type '(opts: { to: string; search?: Record<string, unknown> | undefined; }) => void'.
+  Types of parameters 'opts' and 'opts' are incompatible.
+    Type '{ to: string; search?: Record<string, unknown> | undefined; }' is not assignable to type '{ search: true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>); replace?: boolean | undefined; }'.
+      Types of property 'search' are incompatible.
+        Type 'Record<string, unknown> | undefined' is not assignable to type 'true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>)'.
+          Type 'undefined' is not assignable to type 'true | SearchRecord | ((prev: SearchRecord) => SearchRecord | Partial<SearchRecord>)'.
+src/features/libraries/components/libraries-table.tsx(83,5): error TS2322: Type 'ColumnDef<Library>[]' is not assignable to type 'ColumnDef<Library, any>[]'.
+  Type 'ColumnDef<Library>' is not assignable to type 'ColumnDef<Library, any>'.
+    Type 'ColumnDefBase<Library, unknown> & StringHeaderIdentifier' is not assignable to type 'ColumnDef<Library, any>'.
+      Type 'ColumnDefBase<Library, unknown> & StringHeaderIdentifier' is not assignable to type 'AccessorFnColumnDefBase<Library, any> & IdIdentifier<Library, any>'.
+        Property 'accessorFn' is missing in type 'ColumnDefBase<Library, unknown> & StringHeaderIdentifier' but required in type 'AccessorFnColumnDefBase<Library, any>'.
+src/features/libraries/components/libraries-table.tsx(93,5): error TS2322: Type '(rows: string[]) => void' is not assignable to type 'OnChangeFn<RowSelectionState>'.
+  Types of parameters 'rows' and 'updaterOrValue' are incompatible.
+    Type 'Updater<RowSelectionState>' is not assignable to type 'string[]'.
+      Type 'RowSelectionState' is missing the following properties from type 'string[]': length, pop, push, concat, and 28 more.
+src/features/models/components/models-provider.tsx(106,23): error TS2339: Property 'setDefault' does not exist on type '{ getAll: (params?: { page?: number | undefined; per_page?: number | undefined; search?: string | undefined; } | undefined) => Promise<ApiResponse<PaginatedResponse<Model>>>; getById: (id: string) => Promise<...>; create: (data: Partial<...>) => Promise<...>; update: (id: string, data: Partial<...>) => Promise<...>;...'.
+src/features/providers/components/providers-action-dialog.tsx(55,5): error TS2322: Type 'Resolver<{ name: string; provider_type: string; base_url?: string | undefined; api_key?: string | undefined; is_active?: boolean | undefined; priority?: unknown; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>' is not assignable to type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+  Types of parameters 'options' and 'options' are incompatible.
+    Type 'ResolverOptions<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>' is not assignable to type 'ResolverOptions<{ name: string; provider_type: string; base_url?: string | undefined; api_key?: string | undefined; is_active?: boolean | undefined; priority?: unknown; }>'.
+      Type 'boolean | undefined' is not assignable to type 'boolean'.
+        Type 'undefined' is not assignable to type 'boolean'.
+src/features/providers/components/providers-action-dialog.tsx(59,37): error TS2339: Property 'provider_type' does not exist on type 'Provider'.
+src/features/providers/components/providers-action-dialog.tsx(60,32): error TS2339: Property 'base_url' does not exist on type 'Provider'.
+src/features/providers/components/providers-action-dialog.tsx(61,31): error TS2339: Property 'api_key' does not exist on type 'Provider'.
+src/features/providers/components/providers-action-dialog.tsx(62,33): error TS2339: Property 'is_active' does not exist on type 'Provider'.
+src/features/providers/components/providers-action-dialog.tsx(63,32): error TS2339: Property 'priority' does not exist on type 'Provider'.
+src/features/providers/components/providers-action-dialog.tsx(116,41): error TS2345: Argument of type '(values: ProviderForm) => Promise<void>' is not assignable to parameter of type 'SubmitHandler<TFieldValues>'.
+  Types of parameters 'values' and 'data' are incompatible.
+    Type 'TFieldValues' is not assignable to type '{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }'.
+      Type 'FieldValues' is missing the following properties from type '{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }': name, provider_type, is_active, priority
+src/features/providers/components/providers-action-dialog.tsx(120,15): error TS2322: Type 'Control<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues>' is not assignable to type 'Control<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues> | undefined' is not assignable to type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | undefined'.
+      Type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues>' is not assignable to type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+        Type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, TFieldValues> | Promise<...>' is not assignable to type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | Promise<...>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | Promise<...>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+              Type 'TFieldValues' is not assignable to type '{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }'.
+                Type 'FieldValues' is missing the following properties from type '{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }': name, provider_type, is_active, priority
+src/features/providers/components/providers-action-dialog.tsx(133,15): error TS2322: Type 'Control<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues>' is not assignable to type 'Control<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues> | undefined' is not assignable to type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | undefined'.
+      Type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues>' is not assignable to type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+        Type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, TFieldValues> | Promise<...>' is not assignable to type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | Promise<...>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | Promise<...>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+              Type 'TFieldValues' is not assignable to type '{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }'.
+                Type 'FieldValues' is missing the following properties from type '{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }': name, provider_type, is_active, priority
+src/features/providers/components/providers-action-dialog.tsx(149,15): error TS2322: Type 'Control<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues>' is not assignable to type 'Control<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues> | undefined' is not assignable to type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | undefined'.
+      Type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues>' is not assignable to type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+        Type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, TFieldValues> | Promise<...>' is not assignable to type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | Promise<...>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | Promise<...>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+              Type 'TFieldValues' is not assignable to type '{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }'.
+                Type 'FieldValues' is missing the following properties from type '{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }': name, provider_type, is_active, priority
+src/features/providers/components/providers-action-dialog.tsx(162,15): error TS2322: Type 'Control<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues>' is not assignable to type 'Control<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues> | undefined' is not assignable to type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | undefined'.
+      Type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues>' is not assignable to type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+        Type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, TFieldValues> | Promise<...>' is not assignable to type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | Promise<...>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | Promise<...>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+              Type 'TFieldValues' is not assignable to type '{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }'.
+                Type 'FieldValues' is missing the following properties from type '{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }': name, provider_type, is_active, priority
+src/features/providers/components/providers-action-dialog.tsx(179,15): error TS2322: Type 'Control<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues>' is not assignable to type 'Control<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues> | undefined' is not assignable to type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | undefined'.
+      Type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues>' is not assignable to type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+        Type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, TFieldValues> | Promise<...>' is not assignable to type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | Promise<...>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | Promise<...>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+              Type 'TFieldValues' is not assignable to type '{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }'.
+                Type 'FieldValues' is missing the following properties from type '{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }': name, provider_type, is_active, priority
+src/features/providers/components/providers-action-dialog.tsx(185,22): error TS2304: Cannot find name 'FormDescription'.
+src/features/providers/components/providers-action-dialog.tsx(187,23): error TS2304: Cannot find name 'FormDescription'.
+src/features/providers/components/providers-action-dialog.tsx(199,15): error TS2322: Type 'Control<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues>' is not assignable to type 'Control<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues> | undefined' is not assignable to type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | undefined'.
+      Type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, TFieldValues>' is not assignable to type 'Resolver<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, any, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+        Type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, TFieldValues> | Promise<...>' is not assignable to type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | Promise<...>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }, { name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }> | Promise<...>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }>'.
+              Type 'TFieldValues' is not assignable to type '{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }'.
+                Type 'FieldValues' is missing the following properties from type '{ name: string; provider_type: string; is_active: boolean; priority: number; base_url?: string | undefined; api_key?: string | undefined; }': name, provider_type, is_active, priority
+src/features/providers/components/providers-action-dialog.tsx(207,20): error TS2304: Cannot find name 'FormDescription'.
+src/features/providers/components/providers-action-dialog.tsx(209,21): error TS2304: Cannot find name 'FormDescription'.
+src/features/providers/components/providers-columns.tsx(38,23): error TS2339: Property 'is_default' does not exist on type 'Provider'.
+src/features/providers/components/providers-columns.tsx(50,46): error TS2339: Property 'provider_type' does not exist on type 'Provider'.
+src/features/providers/components/providers-columns.tsx(58,23): error TS2339: Property 'base_url' does not exist on type 'Provider'.
+src/features/providers/components/providers-columns.tsx(66,20): error TS2339: Property 'is_active' does not exist on type 'Provider'.
+src/features/providers/components/providers-columns.tsx(76,35): error TS2339: Property 'health_status' does not exist on type 'Provider'.
+src/features/providers/components/providers-columns.tsx(79,48): error TS2322: Type '"warning"' is not assignable to type '"default" | "destructive" | "outline" | "secondary" | null | undefined'.
+src/features/providers/components/providers-provider.tsx(52,5): error TS2322: Type '(params?: { page?: number; per_page?: number; search?: string; } | undefined) => Promise<ApiResponse<PaginatedResponse<Provider>>>' is not assignable to type '(params?: { page?: number | undefined; per_page?: number | undefined; search?: string | undefined; } | undefined) => Promise<PaginatedResponse<Provider>>'.
+  Type 'Promise<ApiResponse<PaginatedResponse<Provider>>>' is not assignable to type 'Promise<PaginatedResponse<Provider>>'.
+    Type 'ApiResponse<PaginatedResponse<Provider>>' is missing the following properties from type 'PaginatedResponse<Provider>': items, total, page, per_page
+src/features/providers/components/providers-table.tsx(87,5): error TS2322: Type '(rows: string[]) => void' is not assignable to type 'OnChangeFn<RowSelectionState>'.
+  Types of parameters 'rows' and 'updaterOrValue' are incompatible.
+    Type 'Updater<RowSelectionState>' is not assignable to type 'string[]'.
+      Type 'RowSelectionState' is missing the following properties from type 'string[]': length, pop, push, concat, and 28 more.
+src/features/reset-requests/components/approve-dialog.tsx(58,70): error TS2554: Expected 1 arguments, but got 2.
+src/features/reset-requests/components/approve-dialog.tsx(61,75): error TS2339: Property 'message' does not exist on type 'ApiResponse<{ success: boolean; }>'.
+src/features/reset-requests/components/data-table-row-actions.tsx(43,27): error TS2345: Argument of type '{ id: number; user_id: string; username: string; email: string | null; status: "pending" | "denied" | "completed"; created_at: string; processed_at: string | null; processed_by: string | null; request_reason: string | null; admin_notes: string | null; }' is not assignable to parameter of type 'SetStateAction<PasswordResetRequest | null>'.
+  Type '{ id: number; user_id: string; username: string; email: string | null; status: "pending" | "denied" | "completed"; created_at: string; processed_at: string | null; processed_by: string | null; request_reason: string | null; admin_notes: string | null; }' is not assignable to type 'PasswordResetRequest'.
+    Types of property 'id' are incompatible.
+      Type 'number' is not assignable to type 'string'.
+src/features/reset-requests/components/data-table-row-actions.tsx(53,27): error TS2345: Argument of type '{ id: number; user_id: string; username: string; email: string | null; status: "pending" | "denied" | "completed"; created_at: string; processed_at: string | null; processed_by: string | null; request_reason: string | null; admin_notes: string | null; }' is not assignable to parameter of type 'SetStateAction<PasswordResetRequest | null>'.
+  Type '{ id: number; user_id: string; username: string; email: string | null; status: "pending" | "denied" | "completed"; created_at: string; processed_at: string | null; processed_by: string | null; request_reason: string | null; admin_notes: string | null; }' is not assignable to type 'PasswordResetRequest'.
+    Types of property 'id' are incompatible.
+      Type 'number' is not assignable to type 'string'.
+src/features/reset-requests/components/deny-dialog.tsx(58,67): error TS2554: Expected 1 arguments, but got 2.
+src/features/reset-requests/components/reset-requests-dialogs.tsx(22,9): error TS2322: Type 'PasswordResetRequest | null' is not assignable to type '{ id: number; user_id: string; username: string; email: string | null; status: "pending" | "denied" | "completed"; created_at: string; processed_at: string | null; processed_by: string | null; request_reason: string | null; admin_notes: string | null; } | null'.
+  Type 'PasswordResetRequest' is missing the following properties from type '{ id: number; user_id: string; username: string; email: string | null; status: "pending" | "denied" | "completed"; created_at: string; processed_at: string | null; processed_by: string | null; request_reason: string | null; admin_notes: string | null; }': username, processed_at, processed_by, request_reason, admin_notes
+src/features/reset-requests/components/reset-requests-dialogs.tsx(29,9): error TS2322: Type 'PasswordResetRequest | null' is not assignable to type '{ id: number; user_id: string; username: string; email: string | null; status: "pending" | "denied" | "completed"; created_at: string; processed_at: string | null; processed_by: string | null; request_reason: string | null; admin_notes: string | null; } | null'.
+  Type 'PasswordResetRequest' is missing the following properties from type '{ id: number; user_id: string; username: string; email: string | null; status: "pending" | "denied" | "completed"; created_at: string; processed_at: string | null; processed_by: string | null; request_reason: string | null; admin_notes: string | null; }': username, processed_at, processed_by, request_reason, admin_notes
+src/features/reset-requests/components/reset-requests-table.tsx(49,5): error TS2322: Type 'ColumnDef<{ id: number; user_id: string; username: string; email: string | null; status: "pending" | "denied" | "completed"; created_at: string; processed_at: string | null; processed_by: string | null; request_reason: string | null; admin_notes: string | null; }>[]' is not assignable to type 'ColumnDef<PasswordResetRequest, any>[]'.
+  Type 'ColumnDef<{ id: number; user_id: string; username: string; email: string | null; status: "pending" | "denied" | "completed"; created_at: string; processed_at: string | null; processed_by: string | null; request_reason: string | null; admin_notes: string | null; }>' is not assignable to type 'ColumnDef<PasswordResetRequest, any>'.
+    Type 'ColumnDefBase<{ id: number; user_id: string; username: string; email: string | null; status: "pending" | "denied" | "completed"; created_at: string; processed_at: string | null; processed_by: string | null; request_reason: string | null; admin_notes: string | null; }, unknown> & StringHeaderIdentifier' is not assignable to type 'ColumnDef<PasswordResetRequest, any>'.
+      Type 'ColumnDefBase<{ id: number; user_id: string; username: string; email: string | null; status: "pending" | "denied" | "completed"; created_at: string; processed_at: string | null; processed_by: string | null; request_reason: string | null; admin_notes: string | null; }, unknown> & StringHeaderIdentifier' is not assignable to type 'AccessorFnColumnDefBase<PasswordResetRequest, any> & IdIdentifier<PasswordResetRequest, any>'.
+        Property 'accessorFn' is missing in type 'ColumnDefBase<{ id: number; user_id: string; username: string; email: string | null; status: "pending" | "denied" | "completed"; created_at: string; processed_at: string | null; processed_by: string | null; request_reason: string | null; admin_notes: string | null; }, unknown> & StringHeaderIdentifier' but required in type 'AccessorFnColumnDefBase<PasswordResetRequest, any>'.
+src/features/tasks/components/tasks-dialogs.tsx(54,17): error TS2554: Expected 1 arguments, but got 2.
+src/features/tasks/components/tasks-import-dialog.tsx(62,38): error TS2554: Expected 1 arguments, but got 2.
+src/features/users/components/users-dialogs.tsx(33,13): error TS2322: Type 'User' is not assignable to type '{ id: string; user_id: string; username: string; email: string | null; is_admin: boolean; is_disabled: boolean; created_at: string; }'.
+  Types of property 'id' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/features/users/components/users-dialogs.tsx(45,13): error TS2322: Type 'User' is not assignable to type '{ id: string; user_id: string; username: string; email: string | null; is_admin: boolean; is_disabled: boolean; created_at: string; }'.
+  Types of property 'id' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/features/users/components/users-provider.tsx(56,5): error TS2322: Type '(params?: { page?: number; per_page?: number; search?: string; } | undefined) => Promise<ApiResponse<PaginatedResponse<User>>>' is not assignable to type '(params?: { page?: number | undefined; per_page?: number | undefined; search?: string | undefined; } | undefined) => Promise<PaginatedResponse<{ id: string; }>>'.
+  Type 'Promise<ApiResponse<PaginatedResponse<User>>>' is not assignable to type 'Promise<PaginatedResponse<{ id: string; }>>'.
+    Type 'ApiResponse<PaginatedResponse<User>>' is missing the following properties from type 'PaginatedResponse<{ id: string; }>': items, total, page, per_page
+src/features/users/components/users-provider.tsx(57,5): error TS2322: Type '(id: string) => Promise<ApiResponse<User>>' is not assignable to type '(id: string) => Promise<ApiResponse<{ id: string; }>>'.
+  Type 'Promise<ApiResponse<User>>' is not assignable to type 'Promise<ApiResponse<{ id: string; }>>'.
+    Type 'ApiResponse<User>' is not assignable to type 'ApiResponse<{ id: string; }>'.
+      Type 'User' is not assignable to type '{ id: string; }'.
+        Types of property 'id' are incompatible.
+          Type 'string | undefined' is not assignable to type 'string'.
+            Type 'undefined' is not assignable to type 'string'.
+src/features/users/components/users-provider.tsx(92,5): error TS2322: Type '{ id: string; }[]' is not assignable to type 'User[]'.
+  Type '{ id: string; }' is missing the following properties from type 'User': user_id, username, email, is_admin, is_disabled
+src/features/users/components/users-table.tsx(81,5): error TS2322: Type 'ColumnDef<{ id: string; user_id: string; username: string; email: string | null; is_admin: boolean; is_disabled: boolean; created_at: string; }>[]' is not assignable to type 'ColumnDef<User, any>[]'.
+  Type 'ColumnDef<{ id: string; user_id: string; username: string; email: string | null; is_admin: boolean; is_disabled: boolean; created_at: string; }>' is not assignable to type 'ColumnDef<User, any>'.
+    Type 'ColumnDefBase<{ id: string; user_id: string; username: string; email: string | null; is_admin: boolean; is_disabled: boolean; created_at: string; }, unknown> & StringHeaderIdentifier' is not assignable to type 'ColumnDef<User, any>'.
+      Type 'ColumnDefBase<{ id: string; user_id: string; username: string; email: string | null; is_admin: boolean; is_disabled: boolean; created_at: string; }, unknown> & StringHeaderIdentifier' is not assignable to type 'AccessorFnColumnDefBase<User, any> & IdIdentifier<User, any>'.
+        Property 'accessorFn' is missing in type 'ColumnDefBase<{ id: string; user_id: string; username: string; email: string | null; is_admin: boolean; is_disabled: boolean; created_at: string; }, unknown> & StringHeaderIdentifier' but required in type 'AccessorFnColumnDefBase<User, any>'.
+src/features/users/components/users-table.tsx(236,43): error TS2322: Type '{ table: Table<User>; entityName: string; }' is not assignable to type 'IntrinsicAttributes & DataTableBulkActionsProps<User>'.
+  Property 'entityName' does not exist on type 'IntrinsicAttributes & DataTableBulkActionsProps<User>'.
+src/hooks/use-admin-crud.ts(97,20): error TS2339: Property 'success' does not exist on type 'PaginatedResponse<T>'.
+src/hooks/use-admin-crud.ts(98,27): error TS2339: Property 'data' does not exist on type 'PaginatedResponse<T>'.
+src/hooks/use-admin-crud.ts(102,27): error TS2339: Property 'error' does not exist on type 'PaginatedResponse<T>'.
+src/hooks/use-ai-description.ts(27,9): error TS2353: Object literal may only specify known properties, and 'context_text' does not exist in type '{ item_type?: string | undefined; context?: string | undefined; }'.
+src/hooks/use-ai-description.ts(32,36): error TS2339: Property 'description' does not exist on type 'ApiResponse<{ description: string; }>'.
+src/hooks/use-ai-description.ts(34,41): error TS2339: Property 'description' does not exist on type 'ApiResponse<{ description: string; }>'.
+src/hooks/use-ai-description.ts(35,23): error TS2339: Property 'description' does not exist on type 'ApiResponse<{ description: string; }>'.
+src/main.tsx(56,35): error TS2339: Property 'auth' does not exist on type 'AuthState'.
+src/routes/clerk/_authenticated/user-management.tsx(50,10): error TS2739: Type '{ children: Element[]; }' is missing the following properties from type 'UsersProviderProps': search, navigate
+src/routes/clerk/_authenticated/user-management.tsx(93,27): error TS2322: Type '{ data: { id: string; firstName: string; lastName: string; username: string; email: string; phoneNumber: string; status: "active" | "inactive" | "invited" | "suspended"; role: "admin" | "superadmin" | "cashier" | "manager"; createdAt: Date; updatedAt: Date; }[]; navigate: UseNavigateResult<...>; search: {}; }' is not assignable to type 'IntrinsicAttributes & DataTableProps'.
+  Property 'data' does not exist on type 'IntrinsicAttributes & DataTableProps'.

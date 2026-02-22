@@ -2,7 +2,7 @@ import logging
 import re
 from pathlib import Path
 
-from flask import Blueprint, jsonify, render_template, flash, current_app
+from flask import Blueprint, jsonify, render_template, flash, current_app, request
 from flask_login import login_required
 
 from modules.database import (
@@ -18,6 +18,114 @@ from modules.database import (
 from modules.llm_utils import get_lc_store_path
 
 files_bp = Blueprint('admin_files', __name__, url_prefix='/admin/files')
+
+# API blueprint for React frontend
+api_files_bp = Blueprint('api_admin_files', __name__, url_prefix='/api/admin/files')
+
+
+@api_files_bp.route('', methods=['GET'])
+@login_required
+def api_list_files():
+    """API endpoint to get all uploaded files as JSON."""
+    try:
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+
+        from modules.database import Library, Knowledge
+
+        query = (
+            UploadedFile.query
+            .join(User, UploadedFile.user_id == User.user_id)
+            .outerjoin(Library, UploadedFile.library_id == Library.library_id)
+            .outerjoin(Knowledge, UploadedFile.knowledge_id == Knowledge.id)
+            .with_entities(
+                UploadedFile.file_id,
+                UploadedFile.original_filename,
+                UploadedFile.file_size,
+                UploadedFile.upload_time,
+                User.username,
+                Library.name.label('library_name'),
+                Knowledge.name.label('knowledge_name'),
+                UploadedFile.is_ocr,
+                UploadedFile.knowledge_id,
+            )
+        )
+
+        pagination = query.order_by(UploadedFile.upload_time.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+
+        items = []
+        for row in pagination.items:
+            items.append({
+                'id': row[0],
+                'file_id': row[0],
+                'filename': row[1],
+                'file_size': row[2],
+                'upload_time': row[3].isoformat() if row[3] else None,
+                'username': row[4],
+                'library_name': row[5],
+                'knowledge_name': row[6],
+                'is_ocr': row[7],
+            })
+
+        return jsonify({
+            'success': True,
+            'items': items,
+            'total': pagination.total,
+            'page': pagination.page,
+            'per_page': pagination.per_page,
+            'total_pages': pagination.pages
+        })
+    except Exception as e:
+        logging.error(f"API list_files error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api_files_bp.route('/<int:file_id>', methods=['DELETE'])
+@login_required
+def api_delete_file(file_id: int):
+    """API endpoint to delete a file."""
+    uploaded_file = UploadedFile.query.get(file_id)
+    if not uploaded_file:
+        logging.warning("Attempt to delete missing file_id %s", file_id)
+        return jsonify({"success": False, "error": "File record not found."}), 404
+
+    try:
+        docs = (
+            Document.query
+            .filter_by(
+                source=uploaded_file.original_filename,
+                library_id=uploaded_file.library_id,
+                knowledge_id=uploaded_file.knowledge_id,
+            )
+            .all()
+        )
+        doc_ids = [str(doc.id) for doc in docs]
+
+        vector_removed = 0
+        if doc_ids:
+            vector_removed = _delete_vectors(doc_ids, uploaded_file.user_id, uploaded_file.knowledge_id)
+            for doc in docs:
+                db.session.delete(doc)
+
+        VectorReference.query.filter_by(file_id=file_id).delete(synchronize_session=False)
+        LibraryReference.query.filter_by(reference_type='file', source_id=file_id).delete(synchronize_session=False)
+        VisualGroundingActivity.query.filter_by(file_id=file_id).delete(synchronize_session=False)
+
+        db.session.delete(uploaded_file)
+        db.session.commit()
+
+        message = "File deleted successfully."
+        if vector_removed:
+            message = f"File deleted successfully. Removed {vector_removed} vector chunk(s)."
+        logging.info("Admin removed file_id %s", file_id)
+        return jsonify({"success": True, "message": message})
+    except Exception as exc:
+        logging.error("Failed to delete file_id %s: %s", file_id, exc, exc_info=True)
+        db.session.rollback()
+        return jsonify({"success": False, "error": "Failed to delete file."}), 500
+
 
 
 @files_bp.route('/')

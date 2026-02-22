@@ -847,7 +847,9 @@ def process_uploaded_file(
             library_id=library_id,
             knowledge_id=knowledge_id_int, # Use the integer version
             is_ocr=is_ocr,
-            is_az_doci=is_az_doci
+            is_az_doci=is_az_doci,
+            brand_manufacturer_organization=merged_base_metadata.get("brand_manufacturer_organization"),
+            product_model_name_service=merged_base_metadata.get("product_model_name_service")
         )
         db.session.add(uploaded_file)
         db.session.flush()  # To get file_id before commit
@@ -869,6 +871,25 @@ def process_uploaded_file(
         db.session.flush()
         library_ref_id = library_ref.reference_id
         logger.info(f"Added file_id {file_id} to library_id {library_id}")
+
+        # --- Update Library/Knowledge with Representative Metadata ---
+        try:
+            brand_val = merged_base_metadata.get("brand_manufacturer_organization")
+            product_val = merged_base_metadata.get("product_model_name_service")
+
+            if brand_val or product_val:
+                # Update Knowledge if fields are empty
+                if knowledge_id_int:
+                    knowledge_obj = db.session.get(Knowledge, knowledge_id_int)
+                    if knowledge_obj:
+                        if not knowledge_obj.brand_manufacturer_organization:
+                            knowledge_obj.brand_manufacturer_organization = brand_val
+                        if not knowledge_obj.product_model_name_service:
+                            knowledge_obj.product_model_name_service = product_val
+                
+                db.session.flush()
+        except Exception as update_err:
+            logger.warning(f"Failed to update representative metadata for library/knowledge: {update_err}")
 
         # --- Vector Store Processing ---
         # Generate UUID objects for the database PK
@@ -919,6 +940,8 @@ def process_uploaded_file(
                     dl_meta=dl_meta, # Pass the potentially complex metadata
                     content_preview=content_preview,
                     docling_json_path=json_bin_path,
+                    brand=item.metadata.get("brand_manufacturer_organization"),
+                    product=item.metadata.get("product_model_name_service"),
                 )
 
             selected_group_id = Groups_ids[0] if Groups_ids else None
