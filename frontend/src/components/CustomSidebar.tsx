@@ -187,15 +187,22 @@ export function CustomSidebar({
           rehypePlugins={[rehypeRaw]}
           components={{
             // Render inline without wrapping paragraphs
-            p: ({ children }) => <span className="inline">{children}</span>,
-            code({ className, children, ...props }) {
+            p: ({ children }: any) => <span className="inline">{children}</span>,
+            // Sidebar headers
+            h1: ({ children }: any) => <h1 className="text-sm font-bold mb-1 mt-2">{children}</h1>,
+            h2: ({ children }: any) => <h2 className="text-xs font-bold mb-1 mt-1.5">{children}</h2>,
+            // List refinements
+            ul: ({ children }: any) => <ul className="mb-2 space-y-0.5">{children}</ul>,
+            ol: ({ children }: any) => <ol className="mb-2 space-y-0.5">{children}</ol>,
+            li: ({ children }: any) => <li className="leading-tight">{children}</li>,
+            code({ className, children, ...props }: any) {
               return (
                 <code className={cn("bg-muted/50 rounded px-1 py-0.5 text-[10px]", className)} {...props}>
                   {children}
                 </code>
               )
             },
-            a({ href, children, ...props }) {
+            a({ href, children, ...props }: any) {
               if (href?.startsWith('/generated-maps/')) {
                 return (
                   <span className="inline-flex items-center gap-1 text-primary font-medium text-[10px]">
@@ -205,7 +212,7 @@ export function CustomSidebar({
               }
               return <a href={href} className="text-primary underline text-[11px]" {...props}>{children}</a>;
             }
-          }}
+          } as any}
         >
           {part}
         </ReactMarkdown>
@@ -257,7 +264,7 @@ export function CustomSidebar({
                   <>
                     {/* Message content */}
                     {msg.content ? (
-                      <div className="text-xs leading-relaxed break-words">
+                      <div className="text-xs leading-relaxed break-words chat-prose sidebar-compact">
                         {renderContentWithCitations(msg.content)}
                       </div>
                     ) : isLoading && messages[messages.length - 1]?.id === msg.id ? (

@@ -984,6 +984,16 @@
   border-bottom-color: var(--bs-primary);
 }
 
+/* Sidebar Compact Variant */
+.sidebar-compact {
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
+.sidebar-compact p {
+  margin-bottom: 0.4rem;
+}
+
 /* Theme Adjustments */
 [data-bs-theme="dark"] .chat-prose pre {
   background-color: #0d1117;

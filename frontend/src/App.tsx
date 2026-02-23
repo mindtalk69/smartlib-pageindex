@@ -2246,9 +2246,28 @@ export function App() {
                           components={{
                             // Handle our custom cite-badge elements
                             'cite-badge': CiteBadge,
-                            // Ensure paragraphs flow properly
-                            p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
-                          } as React.ComponentProps<typeof ReactMarkdown>['components']}
+                            // Headings
+                            h1: ({ children }: any) => <h1 className="text-xl font-bold mb-3 mt-4">{children}</h1>,
+                            h2: ({ children }: any) => <h2 className="text-lg font-bold mb-2 mt-3">{children}</h2>,
+                            h3: ({ children }: any) => <h3 className="text-md font-bold mb-2 mt-2">{children}</h3>,
+                            // Standard paragraph
+                            p: ({ children }: any) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
+                            // Lists
+                            ul: ({ children }: any) => <ul className="mb-3 space-y-1">{children}</ul>,
+                            ol: ({ children }: any) => <ol className="mb-3 space-y-1">{children}</ol>,
+                            li: ({ children }: any) => <li className="leading-relaxed">{children}</li>,
+                            // Code blocks
+                            code: ({ inline, children, ...props }: any) => {
+                              if (inline) {
+                                return <code className="bg-muted px-1 py-0.5 rounded text-sm font-mono" {...props}>{children}</code>;
+                              }
+                              return (
+                                <pre className="bg-muted p-3 my-3 rounded-lg overflow-x-auto border">
+                                  <code className="text-sm font-mono leading-relaxed" {...props}>{children}</code>
+                                </pre>
+                              );
+                            },
+                          } as any}
                         >
                           {processedContent}
                         </ReactMarkdown>
@@ -2283,7 +2302,7 @@ export function App() {
                           </div>
                         ) : (
                           <div className="w-full max-w-none text-foreground">
-                            <div className="message-text compact-text text-sm max-w-none text-foreground">
+                            <div className="message-text chat-prose text-sm max-w-none text-foreground">
                               {renderContentWithCitations(message.content)}
                             </div>
 

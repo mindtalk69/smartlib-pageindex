@@ -27,6 +27,10 @@ elif docker ps | grep -q "smartlib-basic$"; then
     echo "🐳 Single container detected, syncing..."
     docker cp static/react/. smartlib-basic:/app/static/react/
     echo "✅ Synced to single container!"
+elif docker ps | grep -q "smartlib-gpu$"; then
+    echo "🐳 Single container detected, syncing..."
+    docker cp static/react/. smartlib-gpu:/app/static/react/
+    echo "✅ Synced to single container!"
 else
     echo "ℹ️  No Docker container running, skipping container sync"
 fi
