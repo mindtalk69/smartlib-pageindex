@@ -192,8 +192,8 @@ export function CustomSidebar({
             h1: ({ children }: any) => <h1 className="text-sm font-bold mb-1 mt-2">{children}</h1>,
             h2: ({ children }: any) => <h2 className="text-xs font-bold mb-1 mt-1.5">{children}</h2>,
             // List refinements
-            ul: ({ children }: any) => <ul className="mb-2 space-y-0.5">{children}</ul>,
-            ol: ({ children }: any) => <ol className="mb-2 space-y-0.5">{children}</ol>,
+            ul: ({ children }: any) => <ul className="mb-1 space-y-0.5">{children}</ul>,
+            ol: ({ children }: any) => <ol className="mb-1 space-y-0.5">{children}</ol>,
             li: ({ children }: any) => <li className="leading-tight">{children}</li>,
             code({ className, children, ...props }: any) {
               return (

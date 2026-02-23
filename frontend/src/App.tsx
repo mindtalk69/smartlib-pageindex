@@ -2252,10 +2252,10 @@ export function App() {
                             h3: ({ children }: any) => <h3 className="text-md font-bold mb-2 mt-2">{children}</h3>,
                             // Standard paragraph
                             p: ({ children }: any) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
-                            // Lists
-                            ul: ({ children }: any) => <ul className="mb-3 space-y-1">{children}</ul>,
-                            ol: ({ children }: any) => <ol className="mb-3 space-y-1">{children}</ol>,
-                            li: ({ children }: any) => <li className="leading-relaxed">{children}</li>,
+                            // List refinements
+                            ul: ({ children }: any) => <ul className="mb-1 space-y-0.5">{children}</ul>,
+                            ol: ({ children }: any) => <ol className="mb-1 space-y-0.5">{children}</ol>,
+                            li: ({ children }: any) => <li className="leading-tight">{children}</li>,
                             // Code blocks
                             code: ({ inline, children, ...props }: any) => {
                               if (inline) {

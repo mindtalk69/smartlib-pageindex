@@ -833,8 +833,7 @@
 }
 
 .chat-prose p {
-  margin-bottom: 0.6rem;
-  /* Even tighter spacing */
+  margin-bottom: 0.4rem;
 }
 
 .chat-prose h1,
@@ -844,8 +843,8 @@
 .chat-prose h5,
 .chat-prose h6 {
   color: var(--bs-heading-color);
-  margin-top: 0.8rem;
-  margin-bottom: 0.3rem;
+  margin-top: 0.6rem;
+  margin-bottom: 0.2rem;
   font-weight: 700;
   line-height: 1.2;
 }
@@ -868,7 +867,7 @@
 
 .chat-prose ul,
 .chat-prose ol {
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.4rem;
   padding-left: 0;
   /* Reset padding, we use margin on Li or pseudo-elements */
   list-style: none !important;
@@ -876,7 +875,7 @@
 }
 
 .chat-prose li {
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.15rem;
   position: relative;
   padding-left: 1.5rem;
   display: block !important;
@@ -918,7 +917,7 @@
   padding-left: 1rem;
   color: var(--bs-secondary-color);
   font-style: italic;
-  margin: 1.5rem 0;
+  margin: 1rem 0;
 }
 
 /* Inline Code */

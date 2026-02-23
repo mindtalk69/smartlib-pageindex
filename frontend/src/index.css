@@ -210,7 +210,7 @@
 }
 
 .chat-prose p {
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.4rem;
 }
 
 .chat-prose h1,
@@ -220,8 +220,8 @@
 .chat-prose h5,
 .chat-prose h6 {
   color: hsl(var(--foreground));
-  margin-top: 1.25rem;
-  margin-bottom: 0.5rem;
+  margin-top: 0.6rem;
+  margin-bottom: 0.2rem;
   font-weight: 600;
   line-height: 1.2;
 }
@@ -243,20 +243,46 @@
 }
 
 .chat-prose ul {
-  list-style-type: disc !important;
-  margin-bottom: 0.75rem;
-  padding-left: 1.25rem;
+  list-style-type: none !important;
+  margin-bottom: 0.4rem;
+  padding-left: 0;
 }
 
 .chat-prose ol {
-  list-style-type: decimal !important;
-  margin-bottom: 0.75rem;
-  padding-left: 1.25rem;
+  list-style-type: none !important;
+  margin-bottom: 0.4rem;
+  padding-left: 0;
 }
 
 .chat-prose li {
-  margin-bottom: 0.2rem;
-  display: list-item !important;
+  margin-bottom: 0.15rem;
+  display: block !important;
+  position: relative;
+  padding-left: 1.5rem;
+}
+
+.chat-prose ul>li::before {
+  content: "\2022";
+  position: absolute;
+  left: 0.4rem;
+  color: hsl(var(--primary));
+  font-weight: bold;
+}
+
+.chat-prose ol {
+  counter-reset: item;
+}
+
+.chat-prose ol>li::before {
+  content: counter(item) ".";
+  counter-increment: item;
+  position: absolute;
+  left: 0;
+  width: 1.2rem;
+  text-align: right;
+  color: hsl(var(--primary));
+  font-weight: 600;
+  font-size: 0.9em;
 }
 
 .chat-prose li>ul,
@@ -270,7 +296,7 @@
   padding-left: 1rem;
   color: hsl(var(--muted-foreground));
   font-style: italic;
-  margin: 1.5rem 0;
+  margin: 1rem 0;
 }
 
 /* Inline Code */
