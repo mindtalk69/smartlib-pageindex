@@ -8,7 +8,6 @@
 | **FastAPI** | 0.115+ | Auto-generated OpenAPI docs, async support, dependency injection. Critical for production performance vs Flask. |
 | **Uvicorn** | 0.30+ | ASGI server, native async support. Use with `--workers` for production. |
 | **SQLModel** | 0.0.21+ | Unifies SQLAlchemy models + Pydantic schemas. Already adopted in this project. |
-| **SQLAdmin** | 0.18+ | Auto-generated admin UI on top of SQLModel. Reduces admin frontend work significantly. |
 | **FastAPI Pagination** | 0.12+ | Standard pagination for list endpoints. Already in use. |
 | **Pydantic** | 2.x | Data validation. Comes with FastAPI. |
 
@@ -20,14 +19,14 @@
 | **SQLAlchemy** | 2.0+ | Async support via `asyncio`. SQLModel provides compatibility layer. |
 | **aiosqlite** | 0.20+ | Async SQLite driver for FastAPI. Required for non-blocking DB operations. |
 
-### Frontend Layer
+### Admin Dashboard
 | Component | Version | Rationale |
 |-----------|---------|-----------|
-| **React** | 18.x | Current LTS. Two apps: `/app` (user) and `/admin-app` (admin). |
-| **Vite** | 5.x | Fast build tool, HMR for development. Already configured. |
-| **TanStack Query** | 5.x | Server state management, caching, auto-refetch. Ideal for REST API consumption. |
-| **React Router** | 6.x | Client-side routing for SPA. |
-| **Tailwind CSS** | 3.x | Utility-first CSS. Rapid UI development. |
+| **React** | 18.x | Custom admin frontend at `/admin-app`. Full control over UX and branding. |
+| **TanStack Query** | 5.x | Server state management for admin API calls. |
+| **React Router** | 6.x | Client-side routing for admin pages. |
+
+**Note:** SQLAdmin can be kept temporarily during development but will be replaced by custom React admin.
 
 ### Infrastructure
 | Component | Version | Rationale |
@@ -61,15 +60,14 @@
 - `/admin-app/*` → React build (admin frontend)
 - `/*` → Flask (legacy catch-all during transition)
 
-## What NOT to Use
-
-| Technology | Why Not |
-|------------|---------|
-| **PostgreSQL/PGVector** | sqlite-vec already works, no need to add complexity |
-| **FastAPI-Amis-Admin** | SQLAdmin is more mature, better SQLAlchemy integration |
-| **GraphQL** | REST is sufficient, OpenAPI auto-docs are valuable |
-| **WebSockets** | SSE or polling sufficient for this use case |
-| **Separate admin frontend** | SQLAdmin provides instant CRUD, skip custom admin UI |
+### Frontend Layer
+| Component | Version | Rationale |
+|-----------|---------|-----------|
+| **React** | 18.x | Current LTS. `/app` already great, `/admin-app` for custom admin. |
+| **Vite** | 5.x | Fast build tool, HMR for development. Already configured. |
+| **TanStack Query** | 5.x | Server state management, caching, auto-refetch. Ideal for REST API consumption. |
+| **React Router** | 6.x | Client-side routing for SPA. |
+| **Tailwind CSS** | 3.x | Utility-first CSS. Rapid UI development. |
 
 ## Confidence Levels
 

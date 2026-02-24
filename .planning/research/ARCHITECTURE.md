@@ -27,30 +27,75 @@
 │   Nginx     │────▶│   FastAPI   │────▶│   SQLite    │
 │   (port 80) │     │ (main_      │     │  + sqlite-vec│
 │             │     │  fastapi.py)│     └─────────────┘
-│             │────▶│             │
-│             │     │  + SQLAdmin │
 │             │     │  (port 8001)│
-└─────────────┘     └──────┬──────┘
-       │                   │
-       │                   ▼
-       │            ┌─────────────┐
-       │            │    Redis    │
-       │            └──────┬──────┘
-       │                   │
-       │                   ▼
-       │            ┌─────────────┐
-       │            │   Celery    │
-       │            │   Worker    │
-       │            └─────────────┘
-       │
-       │ (during migration)
-       │
-       ▼
-┌─────────────┐
-│    Flask    │
-│  (port 5000)│
-└─────────────┘
+│             │     └──────┬──────┘
+│             │            │
+│             │            ▼
+│             │     ┌─────────────┐
+│             │     │    Redis    │
+│             │     └──────┬──────┘
+│             │            │
+│             │            ▼
+│             │     ┌─────────────┐
+│             │     │   Celery    │
+│             │     │   Worker    │
+│             │     └─────────────┘
+│             │
+│             │ (during migration)
+│             │
+│             ▼
+│     ┌─────────────┐
+│     │    Flask    │
+│     │  (port 5000)│
+│     └──────┬──────┘
+│            │
+│            ▼
+│     ┌─────────────┐
+│     │ React /app  │
+│     │  (existing) │
+│     └─────────────┘
+│
+└──▶ React Builds
+     - /app (user)
+     - /admin-app (admin)
 ```
+
+**Nginx Routing:**
+- `/api/v1/*` → FastAPI (new API endpoints)
+- `/admin-app/*` → React admin build
+- `/app/*` → React user build (or Flask during transition)
+- `/*` → Flask (legacy catch-all during transition)
+
+**Migration Path for /app:**
+1. Initially: /app calls Flask (proven working)
+2. Phase 2: FastAPI endpoints compatible with /app API contracts
+3. Phase 5: Feature flag to switch /app to FastAPI
+4. Final: All /app API calls → FastAPI, Flask deprecated
+
+## Flask to FastAPI Migration Strategy
+
+**Key Insight:** The fastest path is to analyze existing Flask endpoints in `app.py` and `main.py`, then create equivalent FastAPI endpoints.
+
+**Flask Endpoints to Analyze:**
+1. Read `app.py` - main Flask application with all routes
+2. Read `main.py` - additional routes
+3. Identify all `@app.route` decorators
+4. Map each Flask route to FastAPI equivalent
+
+**Migration Approach:**
+```
+Flask Route → FastAPI Router
+@app.route('/api/xyz', methods=['POST']) → @router.post('/api/v1/xyz')
+Flask request.json → FastAPI Body()
+Flask jsonify() → FastAPI return dict
+Flask @login_required → FastAPI Depends(get_current_user)
+```
+
+**Files to Analyze First:**
+1. `app.py` - All Flask routes (primary)
+2. `main.py` - Additional routes
+3. `modules/` - Shared logic to reuse
+4. `config.py` - Configuration to port
 
 ## Component Boundaries
 
@@ -69,17 +114,18 @@
 - `modules/auth.py` - JWT authentication (new)
 - `api/v1/*.py` - Domain-specific routers (new)
 
-### 2. Admin Dashboard (SQLAdmin)
-**Location:** `main_fastapi.py` (embedded)
+### 2. Admin Frontend (/admin-app)
+**Location:** `admin-frontend/`
 
 **Responsibilities:**
-- CRUD UI for all database models
+- Custom React admin UI to replace SQLAdmin
 - User management
 - System configuration
+- LLM provider/model management
 
 **Files to Create/Modify:**
-- `main_fastapi.py` - Admin views already configured
-- Potentially extract to `admin/views.py` if grows too large
+- React components in `admin-frontend/src/`
+- API client using TanStack Query
 
 ### 3. Frontend - User App (/app)
 **Location:** `frontend/`
@@ -90,9 +136,15 @@
 - RAG chat interface
 - User profile
 
+**Migration Strategy:**
+- Currently calls Flask (existing, working)
+- Phase 2: Ensure FastAPI has compatible endpoints
+- Phase 5: Gradual switchover via feature flag
+- Eventually: All API calls to FastAPI
+
 **Files to Create/Modify:**
-- React components in `frontend/src/`
-- API client using TanStack Query
+- Existing React components (already working)
+- API client configuration (base URL switch)
 
 ### 4. Frontend - Admin App (/admin-app)
 **Location:** `admin-frontend/`

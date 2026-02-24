@@ -112,7 +112,24 @@
 
 ---
 
-## Pitfall 7: Skipping Verification Steps
+## Pitfall 8: Agent Complexity - Async/Sync Mismatch
+
+**Description:** The LangGraph/LangChain agent code is complex and may be synchronous while FastAPI expects async for streaming to React.
+
+**Warning Signs:**
+- Agent blocks the event loop during RAG queries
+- Streaming responses don't work with async React frontend
+- Celery tasks called synchronously from FastAPI
+
+**Prevention Strategy:**
+- Run agent in separate thread/process (`run_in_executor`)
+- Use Celery for async agent execution with task status polling
+- Implement Server-Sent Events (SSE) for streaming responses
+- Keep agent logic isolated in `modules/agent.py` - don't mix with routes
+
+**Phase:** Phase 4 (RAG Integration) - but design in Phase 1
+
+## Pitfall 9: Skipping Verification Steps
 
 **Description:** Assuming FastAPI endpoints work because they "look right" without testing.
 
@@ -130,6 +147,23 @@
 **Phase:** All phases - verification gates
 
 ---
+
+## Pitfall 10: Not Analyzing Flask Code First
+
+**Description:** Creating FastAPI endpoints without first understanding the existing Flask routes and their behavior.
+
+**Warning Signs:**
+- FastAPI endpoints have different request/response shapes than Flask
+- React /app breaks because API contracts changed
+- Missing business logic that was in Flask routes
+
+**Prevention Strategy:**
+- First: Read and document all `@app.route` decorators in `app.py` and `main.py`
+- Create a route mapping table: Flask route → FastAPI endpoint
+- Keep API contracts identical during migration
+- Test /app with FastAPI using feature flag before full switchover
+
+**Phase:** Phase 1 (API Foundation) - this is the critical first step
 
 ## Migration-Specific Checklist
 

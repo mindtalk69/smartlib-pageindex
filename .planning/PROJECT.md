@@ -73,7 +73,7 @@ Users can upload documents (including OCR processing), organize them into librar
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | SQLModel for models | Unify SQLAlchemy models with Pydantic schemas, eliminate code duplication | ✓ Good — already implemented |
-| SQLAdmin for admin UI | Instant CRUD admin interface, reduces custom admin frontend work | ✓ Good — partially configured |
+| Custom React Admin Frontend | Replace SQLAdmin with polished custom UI at /admin-app for better UX and branding | ⚠️ Revisit — more work but better user experience |
 | FastAPI + Uvicorn | Async support, auto-generated OpenAPI docs, better production performance | ✓ Good — driver for migration |
 | Keep Flask during migration | Production cannot go down, gradual migration safer | — Pending |
 | CRUDRouter pattern | Standardized API endpoints for all models | — Pending completion |

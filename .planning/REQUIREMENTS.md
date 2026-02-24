@@ -56,19 +56,28 @@
 
 ### Frontend - User App (/app)
 
-- [ ] **FEA-01**: React app connects to FastAPI backend
-- [ ] **FEA-02**: Document upload UI with progress indicator
-- [ ] **FEA-03**: Library/Knowledge management UI
-- [ ] **FEA-04**: RAG chat interface with streaming responses
-- [ ] **FEA-05**: Conversation history view
+- [ ] **FEA-01**: React app (/app) already working with Flask - maintain compatibility
+- [ ] **FEA-02**: Document upload UI with progress indicator (existing, migrate to FastAPI)
+- [ ] **FEA-03**: Library/Knowledge management UI (existing, migrate to FastAPI)
+- [ ] **FEA-04**: RAG chat interface with streaming responses (existing, migrate to FastAPI)
+- [ ] **FEA-05**: Conversation history view (existing, migrate to FastAPI)
+
+### Frontend - Admin App (/admin-app)
+
+- [ ] **FEA-06**: Custom React admin frontend replaces SQLAdmin
+- [ ] **FEA-07**: Admin dashboard with system statistics
+- [ ] **FEA-08**: User management UI (enable/disable, set roles)
+- [ ] **FEA-09**: LLM provider management UI
+- [ ] **FEA-10**: Model configuration management UI
 
 ### Coexistence
 
 - [ ] **COX-01**: Nginx routes /api/v1/* to FastAPI
-- [ ] **COX-02**: Nginx routes /admin to SQLAdmin
-- [ ] **COX-03**: Nginx routes /app to React build
-- [ ] **COX-04**: Flask remains functional for legacy routes
+- [ ] **COX-02**: Nginx routes /admin-app to React admin build
+- [ ] **COX-03**: Nginx routes /app to React build (or Flask during transition)
+- [ ] **COX-04**: Flask remains functional for legacy /app routes during migration
 - [ ] **COX-05**: Both apps share same SQLite database safely
+- [ ] **COX-06**: Gradual migration path: /app calls Flask first, then FastAPI endpoints
 
 ---
 
@@ -149,15 +158,21 @@
 | FEA-03 | Phase 2 | Pending |
 | FEA-04 | Phase 2 | Pending |
 | FEA-05 | Phase 2 | Pending |
+| FEA-06 | Phase 3 | Pending |
+| FEA-07 | Phase 3 | Pending |
+| FEA-08 | Phase 3 | Pending |
+| FEA-09 | Phase 3 | Pending |
+| FEA-10 | Phase 3 | Pending |
 | COX-01 | Phase 5 | Pending |
 | COX-02 | Phase 5 | Pending |
 | COX-03 | Phase 5 | Pending |
 | COX-04 | Phase 5 | Pending |
 | COX-05 | Phase 5 | Pending |
+| COX-06 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 42 total
-- Mapped to phases: 42
+- v1 requirements: 47 total
+- Mapped to phases: 47
 - Unmapped: 0 ✓
 
 ---
