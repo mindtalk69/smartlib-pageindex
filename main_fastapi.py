@@ -113,16 +113,28 @@ admin.add_view(LLMPromptAdmin)
 admin.add_view(LLMLanguageAdmin)
 
 # Register CRUD API Routers (Turbo API)
-models = [
+# Models with user ownership filtering
+user_owned_models = [
+    (UploadedFile, "/files", "user_id"),
+    (MessageHistory, "/messages", "user_id"),
+]
+
+# Models without user ownership (global or admin-managed)
+global_models = [
     (User, "/users"), (Group, "/groups"), (Library, "/libraries"),
-    (Knowledge, "/knowledges"), (UploadedFile, "/files"),
-    (MessageHistory, "/messages"), (LLMProvider, "/providers"),
+    (Knowledge, "/knowledges"), (LLMProvider, "/providers"),
     (ModelConfig, "/models"), (AppSettings, "/settings"),
     (LLMPrompt, "/prompts"), (LLMLanguage, "/languages")
 ]
 
-for model, prefix in models:
-    crud = CRUDRouter(model, prefix=prefix)
+# Register user-owned models with filtering
+for model, prefix, user_field in user_owned_models:
+    crud = CRUDRouter(model, prefix=prefix, user_field=user_field, require_auth=True)
+    app.include_router(crud.router, prefix="/api/v1")
+
+# Register global models (auth required but no user filtering)
+for model, prefix in global_models:
+    crud = CRUDRouter(model, prefix=prefix, require_auth=True)
     app.include_router(crud.router, prefix="/api/v1")
 
 # Auth endpoints
