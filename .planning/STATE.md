@@ -3,7 +3,7 @@
 **Project:** SmartLib BASIC - FastAPI Migration
 **Current Phase:** Phase 1 (API Foundation)
 **Last Updated:** 2026-02-25
-**Progress:** Wave 1/5 complete
+**Progress:** Wave 2/5 complete
 
 ---
 
@@ -41,16 +41,16 @@ See: .planning/PROJECT.md (updated 2026-02-24)
 
 **Plans:**
 - Wave 1: Authentication Layer (auth.py, schemas.py, JWT endpoints) ✓ COMPLETE
-- Wave 2: CRUDRouter Enhancement (auth integration, pagination) — NEXT
-- Wave 3: Config & Branding Endpoints
+- Wave 2: CRUDRouter Enhancement (auth integration, pagination) ✓ COMPLETE
+- Wave 3: Config & Branding Endpoints — NEXT
 - Wave 4: Admin User Management API
 - Wave 5: Integration Testing
 
-**Wave 1 Decisions:**
-- JWT token expiry: 7 days
-- Password hashing: bcrypt via passlib
-- SECRET_KEY: Hardcoded for dev (TODO: move to env)
-- CORS origins: localhost:3000, 5173, 5174
+**Wave 2 Decisions:**
+- CRUDRouter: require_auth=True by default
+- User ownership filtering for UploadedFile, MessageHistory
+- Admin users bypass ownership checks
+- Pagination: page=1, size=50 defaults
 
 **Execution:** Run `/gsd:execute-phase 1` to start implementation
 
