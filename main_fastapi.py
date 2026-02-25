@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqladmin import Admin, ModelView
-from database_fastapi import sync_engine, init_db, get_db
+from database_fastapi import engine, init_db, get_db
 from modules.models import (
     User, Group, Library, Knowledge, UploadedFile,
     MessageHistory, LLMProvider, ModelConfig, AppSettings, LLMPrompt,
@@ -52,7 +52,7 @@ app.add_middleware(
 )
 
 # Setup SQLAdmin
-admin = Admin(app, sync_engine)
+admin = Admin(app, engine)
 
 class UserAdmin(ModelView, model=User):
     column_list = [User.user_id, User.username, User.email, User.is_admin]
@@ -140,13 +140,13 @@ for model, prefix in global_models:
 
 # Auth endpoints
 @app.post("/api/v1/auth/login", response_model=Token)
-async def login(login_data: UserLogin, db = Depends(get_db)):
+def login(login_data: UserLogin, db = Depends(get_db)):
     """
     Login with email and password.
 
     Returns JWT access token for authenticated user.
     """
-    user = await authenticate_user_async(login_data.email, login_data.password, db)
+    user = authenticate_user_async(login_data.email, login_data.password, db)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -163,14 +163,14 @@ async def login(login_data: UserLogin, db = Depends(get_db)):
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/api/v1/auth/register", response_model=UserResponse)
-async def register(register_data: UserRegister, db = Depends(get_db)):
+def register(register_data: UserRegister, db = Depends(get_db)):
     """
     Register a new user account.
 
     Creates a new user with the given username, email, and password.
     """
     # Check if email already exists
-    existing_user = await db.exec(select(User).where(User.email == register_data.email))
+    existing_user = db.exec(select(User).where(User.email == register_data.email))
     if existing_user.first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -178,7 +178,7 @@ async def register(register_data: UserRegister, db = Depends(get_db)):
         )
 
     # Check if username already exists
-    existing_username = await db.exec(select(User).where(User.username == register_data.username))
+    existing_username = db.exec(select(User).where(User.username == register_data.username))
     if existing_username.first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -197,8 +197,8 @@ async def register(register_data: UserRegister, db = Depends(get_db)):
     )
 
     db.add(user)
-    await db.commit()
-    await db.refresh(user)
+    db.commit()
+    db.refresh(user)
 
     return UserResponse(
         user_id=user.user_id,
@@ -268,7 +268,7 @@ async def get_branding():
 
 # Admin User Management endpoints
 @app.get("/api/v1/admin/users")
-async def list_admin_users(
+def list_admin_users(
     db = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
     skip: int = 0,
@@ -281,7 +281,7 @@ async def list_admin_users(
     """
     from sqlmodel import select
     statement = select(User).offset(skip).limit(limit)
-    result = await db.exec(statement)
+    result = db.exec(statement)
     users = result.all()
     return {
         "users": [
@@ -299,7 +299,7 @@ async def list_admin_users(
     }
 
 @app.get("/api/v1/admin/users/{user_id}")
-async def get_admin_user(
+def get_admin_user(
     user_id: str,
     db = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
@@ -309,7 +309,7 @@ async def get_admin_user(
     """
     from sqlmodel import select
     statement = select(User).where(User.user_id == user_id)
-    result = await db.exec(statement)
+    result = db.exec(statement)
     user = result.first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -323,7 +323,7 @@ async def get_admin_user(
     }
 
 @app.put("/api/v1/admin/users/{user_id}")
-async def update_admin_user(
+def update_admin_user(
     user_id: str,
     update_data: dict,
     db = Depends(get_db),
@@ -336,7 +336,7 @@ async def update_admin_user(
     """
     from sqlmodel import select
     statement = select(User).where(User.user_id == user_id)
-    result = await db.exec(statement)
+    result = db.exec(statement)
     user = result.first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -348,8 +348,8 @@ async def update_admin_user(
         user.is_disabled = update_data["is_disabled"]
 
     db.add(user)
-    await db.commit()
-    await db.refresh(user)
+    db.commit()
+    db.refresh(user)
 
     return {
         "user_id": user.user_id,
@@ -361,7 +361,7 @@ async def update_admin_user(
     }
 
 @app.post("/api/v1/admin/users/{user_id}/reset-password")
-async def admin_reset_password(
+def admin_reset_password(
     user_id: str,
     db = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
@@ -374,7 +374,7 @@ async def admin_reset_password(
     """
     from sqlmodel import select
     statement = select(User).where(User.user_id == user_id)
-    result = await db.exec(statement)
+    result = db.exec(statement)
     user = result.first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -383,7 +383,7 @@ async def admin_reset_password(
     return {"message": "Password reset initiated. Email will be sent to user."}
 
 @app.get("/api/v1/admin/stats")
-async def get_admin_stats(
+def get_admin_stats(
     db = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
@@ -395,11 +395,11 @@ async def get_admin_stats(
     from sqlmodel import select, func
     from modules.models import UploadedFile, Library, Knowledge, MessageHistory
 
-    user_count = await db.exec(select(func.count(User.user_id)))
-    file_count = await db.exec(select(func.count(UploadedFile.file_id)))
-    library_count = await db.exec(select(func.count(Library.library_id)))
-    knowledge_count = await db.exec(select(func.count(Knowledge.id)))
-    message_count = await db.exec(select(func.count(MessageHistory.message_id)))
+    user_count = db.exec(select(func.count(User.user_id))).one()
+    file_count = db.exec(select(func.count(UploadedFile.file_id))).one()
+    library_count = db.exec(select(func.count(Library.library_id))).one()
+    knowledge_count = db.exec(select(func.count(Knowledge.id))).one()
+    message_count = db.exec(select(func.count(MessageHistory.message_id))).one()
 
     return {
         "users": user_count,
