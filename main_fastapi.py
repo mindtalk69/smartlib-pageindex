@@ -234,6 +234,37 @@ async def logout(current_user: User = Depends(get_current_user)):
     """
     return {"message": "Successfully logged out. Please discard your token."}
 
+# Config & Branding endpoints
+@app.get("/api/v1/config")
+async def get_config(current_user: User = Depends(get_current_user)):
+    """
+    Return app configuration relevant to the frontend.
+
+    Returns: {vector_store_mode, visual_grounding_enabled, is_admin, username}
+    """
+    import os
+    return {
+        "vector_store_mode": os.environ.get("VECTOR_STORE_MODE", "user"),
+        "visual_grounding_enabled": os.environ.get("VISUAL_GROUNDING_ENABLED", "false").lower() == "true",
+        "is_admin": current_user.is_admin,
+        "username": current_user.username or "",
+    }
+
+@app.get("/api/v1/branding")
+async def get_branding():
+    """
+    Return branding info (app name, logo URL) from AppSettings.
+
+    Public endpoint - no auth required.
+    Returns: {app_name, logo_url}
+    """
+    # For now, return default branding
+    # Can be extended to read from AppSettings table
+    return {
+        "app_name": "SmartLib",
+        "logo_url": None,
+    }
+
 add_pagination(app)
 
 @app.get("/")
