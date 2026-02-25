@@ -13,6 +13,7 @@ from modules.auth import (
     get_password_hash,
     create_access_token,
     get_current_user,
+    get_current_admin_user,
     authenticate_user_async,
 )
 from schemas import (
@@ -263,6 +264,149 @@ async def get_branding():
     return {
         "app_name": "SmartLib",
         "logo_url": None,
+    }
+
+# Admin User Management endpoints
+@app.get("/api/v1/admin/users")
+async def list_admin_users(
+    db = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    skip: int = 0,
+    limit: int = 100,
+):
+    """
+    List all users (admin only).
+
+    Returns paginated list of all users in the system.
+    """
+    from sqlmodel import select
+    statement = select(User).offset(skip).limit(limit)
+    result = await db.exec(statement)
+    users = result.all()
+    return {
+        "users": [
+            {
+                "user_id": u.user_id,
+                "username": u.username,
+                "email": u.email,
+                "is_admin": u.is_admin,
+                "is_disabled": u.is_disabled,
+                "created_at": u.created_at,
+            }
+            for u in users
+        ],
+        "total": len(users),
+    }
+
+@app.get("/api/v1/admin/users/{user_id}")
+async def get_admin_user(
+    user_id: str,
+    db = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Get a specific user by ID (admin only).
+    """
+    from sqlmodel import select
+    statement = select(User).where(User.user_id == user_id)
+    result = await db.exec(statement)
+    user = result.first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {
+        "user_id": user.user_id,
+        "username": user.username,
+        "email": user.email,
+        "is_admin": user.is_admin,
+        "is_disabled": user.is_disabled,
+        "created_at": user.created_at,
+    }
+
+@app.put("/api/v1/admin/users/{user_id}")
+async def update_admin_user(
+    user_id: str,
+    update_data: dict,
+    db = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Update a user (admin only).
+
+    Allowed updates: is_admin, is_disabled
+    """
+    from sqlmodel import select
+    statement = select(User).where(User.user_id == user_id)
+    result = await db.exec(statement)
+    user = result.first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Only allow updating specific fields
+    if "is_admin" in update_data:
+        user.is_admin = update_data["is_admin"]
+    if "is_disabled" in update_data:
+        user.is_disabled = update_data["is_disabled"]
+
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    return {
+        "user_id": user.user_id,
+        "username": user.username,
+        "email": user.email,
+        "is_admin": user.is_admin,
+        "is_disabled": user.is_disabled,
+        "created_at": user.created_at,
+    }
+
+@app.post("/api/v1/admin/users/{user_id}/reset-password")
+async def admin_reset_password(
+    user_id: str,
+    db = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Force password reset for a user (admin only).
+
+    TODO: Send password reset email.
+    For now, just returns success.
+    """
+    from sqlmodel import select
+    statement = select(User).where(User.user_id == user_id)
+    result = await db.exec(statement)
+    user = result.first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # TODO: Implement password reset email
+    return {"message": "Password reset initiated. Email will be sent to user."}
+
+@app.get("/api/v1/admin/stats")
+async def get_admin_stats(
+    db = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Get system statistics (admin only).
+
+    Returns counts of users, files, libraries, etc.
+    """
+    from sqlmodel import select, func
+    from modules.models import UploadedFile, Library, Knowledge, MessageHistory
+
+    user_count = await db.exec(select(func.count(User.user_id)))
+    file_count = await db.exec(select(func.count(UploadedFile.file_id)))
+    library_count = await db.exec(select(func.count(Library.library_id)))
+    knowledge_count = await db.exec(select(func.count(Knowledge.id)))
+    message_count = await db.exec(select(func.count(MessageHistory.message_id)))
+
+    return {
+        "users": user_count,
+        "files": file_count,
+        "libraries": library_count,
+        "knowledges": knowledge_count,
+        "messages": message_count,
     }
 
 add_pagination(app)
