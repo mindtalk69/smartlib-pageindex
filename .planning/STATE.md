@@ -2,7 +2,8 @@
 
 **Project:** SmartLib BASIC - FastAPI Migration
 **Current Phase:** Phase 1 (API Foundation)
-**Last Updated:** 2026-02-24
+**Last Updated:** 2026-02-25
+**Progress:** Wave 1/5 complete
 
 ---
 
@@ -20,7 +21,7 @@ See: .planning/PROJECT.md (updated 2026-02-24)
 
 ### Phase 1: API Foundation
 
-**Status:** Planned (Ready to Execute)
+**Status:** In Progress (Wave 1 complete)
 
 **Goal:** Analyze Flask endpoints and create FastAPI equivalents with CRUD API, authentication, and admin API
 
@@ -39,11 +40,17 @@ See: .planning/PROJECT.md (updated 2026-02-24)
 7. Pagination working on all list endpoints
 
 **Plans:**
-- Wave 1: Authentication Layer (auth.py, schemas.py, JWT endpoints)
-- Wave 2: CRUDRouter Enhancement (auth integration, pagination)
+- Wave 1: Authentication Layer (auth.py, schemas.py, JWT endpoints) ✓ COMPLETE
+- Wave 2: CRUDRouter Enhancement (auth integration, pagination) — NEXT
 - Wave 3: Config & Branding Endpoints
 - Wave 4: Admin User Management API
 - Wave 5: Integration Testing
+
+**Wave 1 Decisions:**
+- JWT token expiry: 7 days
+- Password hashing: bcrypt via passlib
+- SECRET_KEY: Hardcoded for dev (TODO: move to env)
+- CORS origins: localhost:3000, 5173, 5174
 
 **Execution:** Run `/gsd:execute-phase 1` to start implementation
 
