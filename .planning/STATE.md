@@ -1,9 +1,9 @@
 # STATE.md - SmartLib BASIC FastAPI Migration
 
 **Project:** SmartLib BASIC - FastAPI Migration
-**Current Phase:** Phase 1 (API Foundation)
-**Last Updated:** 2026-02-25 - Phase 1 Complete
-**Progress:** Wave 5/5 complete
+**Current Phase:** Phase 2 (Frontend User App)
+**Last Updated:** 2026-02-25 - Phase 2 Wave 1 Complete
+**Progress:** Phase 2 Wave 1/6 complete
 
 ---
 
@@ -13,53 +13,56 @@ See: .planning/PROJECT.md (updated 2026-02-24)
 
 **Core value:** Users can upload documents, organize them into libraries/knowledges, and get intelligent answers to questions by querying document vectors via embedding-based retrieval.
 
-**Current focus:** Phase 1 - API Foundation
+**Current focus:** Phase 2 - Frontend User App (/app) - Migrating React frontend from Flask to FastAPI
 
 ---
 
 ## Active Phase
 
-### Phase 1: API Foundation
+### Phase 2: Frontend User App (/app)
 
-**Status:** COMPLETE (All 5 waves complete)
+**Status:** IN PROGRESS (Wave 1 complete, Wave 2 pending checkpoint decision)
 
-**Goal:** Analyze Flask endpoints and create FastAPI equivalents with CRUD API, authentication, and admin API
-
-**Requirements:**
-- API-01, API-02, API-03, API-04, API-05
-- AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05
-- ADM-01, ADM-02
+**Goal:** Migrate existing React /app frontend from Flask session-based auth to FastAPI JWT with gradual transition
 
 **Success Criteria:**
-1. Flask endpoints analyzed and documented (app.py, main.py) ✓
-2. All 11 SQLModel models have working CRUD endpoints at /api/v1/* ✓
-3. OpenAPI docs at /docs show all endpoints with request/response schemas ✓
-4. JWT authentication protects all protected endpoints ✓
-5. Admin API endpoints ready for custom React admin frontend ✓
-6. CORS configured for frontend domains ✓
-7. Pagination working on all list endpoints ✓
+1. React /app continues working during migration ✓ (Wave 1)
+2. FastAPI compatible endpoints at /api/* ✓ (Wave 1)
+3. Register/login via FastAPI with JWT (Wave 2 - pending)
+4. Upload with progress via FastAPI (Wave 3)
+5. Manage Libraries/Knowledges via FastAPI (Wave 3)
+6. Celery tasks triggered correctly (Wave 3)
+7. View files list via FastAPI (Wave 4)
+8. Delete files via FastAPI (Wave 4)
+9. RAG chat history via FastAPI (Wave 5)
+10. Password reset flow working (Wave 6)
+11. Nginx routing configured ✓ (Wave 1)
 
 **Plans:**
-- Wave 1: Authentication Layer (auth.py, schemas.py, JWT endpoints) ✓ COMPLETE
-- Wave 2: CRUDRouter Enhancement (auth integration, pagination) ✓ COMPLETE
-- Wave 3: Config & Branding Endpoints ✓ COMPLETE
-- Wave 4: Admin User Management API ✓ COMPLETE
-- Wave 5: Integration Testing ✓ COMPLETE
+- Wave 1: API Compatibility Analysis & Nginx Bridge ✓ COMPLETE
+- Wave 2: Authentication Migration (checkpoint decision pending)
+- Wave 3: Document Upload Migration
+- Wave 4: File Management
+- Wave 5: RAG Chat Migration
+- Wave 6: Password Reset & Final Integration
 
-**Wave 4 Decisions:**
-- All /api/v1/admin/* endpoints require admin role
-- User updates limited to is_admin, is_disabled fields
-- Password reset: returns success, email sending TODO
-- Stats: aggregated counts from all major tables
+**Wave 1 Deliverables:**
+- `API_CONTRACTS.md` - 34 Flask API endpoints documented
+- `main_fastapi.py` - 8 Flask-compatible endpoints added
+- `nginx.conf` - Dual-backend routing configured
+- `wave-1-SUMMARY.md` - Wave 1 completion summary
 
-**Wave 5 Notes:**
-- All auth endpoints tested and working
-- CRUD endpoints verified with pagination
-- Admin access control verified (403 for non-admin)
-- OpenAPI docs accessible at /docs with 33 endpoints
-- Bug fix: Admin stats endpoint now returns scalar counts
+**Wave 1 Notes:**
+- All auth endpoints documented with request/response schemas
+- FastAPI compatibility layer returns Flask-compatible format
+- Nginx configured for path-based routing
+- Known limitation: Libraries/knowledges simplified (no permission filtering yet)
 
-**Execution:** Run `/gsd:execute-phase 2` to start Phase 2
+**Checkpoint Decision:** Migration strategy for Wave 2
+- Option A: Dual-auth bridge (recommended, lower risk)
+- Option B: Hard cut to JWT (faster, higher risk)
+
+**Execution:** Present checkpoint decision to user before Wave 2
 
 ---
 
@@ -101,12 +104,16 @@ See: .planning/PROJECT.md (updated 2026-02-24)
 - Parallel execution for independent plans
 - Research enabled before each phase
 - Plan checker and verifier enabled
+- **2026-02-25:** Phase 2 Wave 1 - Path-based nginx routing (no feature flags)
+- **2026-02-25:** Flask-compatible response format for gradual migration
 
 ---
 
 ## Open Questions
 
-*(None yet)*
+1. **Wave 2 Auth Strategy:** Dual-auth bridge vs hard cut to JWT?
+   - Recommendation: Dual-auth bridge (lower risk)
+   - Decision pending user input
 
 ---
 
@@ -128,4 +135,5 @@ See: .planning/PROJECT.md (updated 2026-02-24)
 ```
 
 ---
-*Last updated: 2026-02-24 after project initialization*
+
+*Last updated: 2026-02-25 - Phase 2 Wave 1 complete*
