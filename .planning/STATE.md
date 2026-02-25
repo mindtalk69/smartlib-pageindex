@@ -3,7 +3,7 @@
 **Project:** SmartLib BASIC - FastAPI Migration
 **Current Phase:** Phase 1 (API Foundation)
 **Last Updated:** 2026-02-25
-**Progress:** Wave 3/5 complete
+**Progress:** Wave 4/5 complete
 
 ---
 
@@ -21,7 +21,7 @@ See: .planning/PROJECT.md (updated 2026-02-24)
 
 ### Phase 1: API Foundation
 
-**Status:** In Progress (Waves 1-3 complete)
+**Status:** In Progress (Waves 1-4 complete)
 
 **Goal:** Analyze Flask endpoints and create FastAPI equivalents with CRUD API, authentication, and admin API
 
@@ -43,14 +43,14 @@ See: .planning/PROJECT.md (updated 2026-02-24)
 - Wave 1: Authentication Layer (auth.py, schemas.py, JWT endpoints) ✓ COMPLETE
 - Wave 2: CRUDRouter Enhancement (auth integration, pagination) ✓ COMPLETE
 - Wave 3: Config & Branding Endpoints ✓ COMPLETE
-- Wave 4: Admin User Management API — NEXT
-- Wave 5: Integration Testing
+- Wave 4: Admin User Management API ✓ COMPLETE
+- Wave 5: Integration Testing — NEXT
 
-**Wave 3 Decisions:**
-- Config endpoint: Auth required (user-specific info)
-- Branding endpoint: Public (visible before login)
-- Config reads from environment variables
-- Branding returns defaults (can extend to AppSettings table)
+**Wave 4 Decisions:**
+- All /api/v1/admin/* endpoints require admin role
+- User updates limited to is_admin, is_disabled fields
+- Password reset: returns success, email sending TODO
+- Stats: aggregated counts from all major tables
 
 **Execution:** Run `/gsd:execute-phase 1` to start implementation
 
