@@ -72,6 +72,47 @@ function UsersPageContent({ page, perPage, search, onPageChange, onSearchChange 
     toast.error(message)
   }, [])
 
+  // Handle toggle admin status
+  const handleToggleAdmin = useCallback(async (userId: string) => {
+    const result = await actions.toggleAdmin(userId)
+    if (result.success) {
+      toast.success('Admin status updated')
+    } else {
+      toast.error(result.error || 'Failed to update admin status')
+    }
+  }, [actions])
+
+  // Handle toggle active status
+  const handleToggleActive = useCallback(async (userId: string) => {
+    const result = await actions.toggleActive(userId)
+    if (result.success) {
+      toast.success('User status updated')
+    } else {
+      toast.error(result.error || 'Failed to update user status')
+    }
+  }, [actions])
+
+  // Handle reset password
+  const handleResetPassword = useCallback(async (userId: string) => {
+    const result = await actions.resetPassword(userId)
+    if (result.success && result.tempPassword) {
+      navigator.clipboard.writeText(result.tempPassword)
+      toast.success(`Password reset. Temp: ${result.tempPassword} (copied)`)
+    } else {
+      toast.error(result.error || 'Failed to reset password')
+    }
+  }, [actions])
+
+  // Handle delete user
+  const handleDeleteUser = useCallback(async (userId: string) => {
+    const result = await actions.deleteUser(userId)
+    if (result.success) {
+      toast.success('User deleted')
+    } else {
+      toast.error(result.error || 'Failed to delete user')
+    }
+  }, [actions])
+
   return (
     <>
       <UserList
@@ -86,6 +127,12 @@ function UsersPageContent({ page, perPage, search, onPageChange, onSearchChange 
         onRefresh={refresh}
         onNextPage={nextPage}
         onPrevPage={prevPage}
+        onToggleAdmin={handleToggleAdmin}
+        onToggleActive={handleToggleActive}
+        onResetPassword={handleResetPassword}
+        onDeleteUser={handleDeleteUser}
+        onSuccess={handleSuccess}
+        onError={handleError}
       />
 
       <UserDialog
