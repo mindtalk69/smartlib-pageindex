@@ -1,10 +1,6 @@
 import { useEffect, ReactNode } from 'react'
 import { useAdminAuth } from '../../hooks/useAdminAuth'
 
-interface ProtectedRouteProps {
-    children: ReactNode
-}
-
 /**
  * ProtectedRoute - Route wrapper that checks admin access before rendering
  *
@@ -14,7 +10,7 @@ interface ProtectedRouteProps {
  * - Redirects non-admin users to /app with error message
  * - Renders children only for authenticated admin users
  */
-export function ProtectedRoute({ children }: ProtectedRouteProps) {
+export function ProtectedRoute({ children }: { children: ReactNode }): ReactNode {
     const { admin, isLoading, isAuthenticated, isAdmin } = useAdminAuth()
 
     useEffect(() => {

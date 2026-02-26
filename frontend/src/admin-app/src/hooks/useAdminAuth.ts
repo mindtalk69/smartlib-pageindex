@@ -6,5 +6,7 @@
  *   import { useAdminAuth } from '@/hooks/useAdminAuth'
  */
 
-export { useAdminAuth } from '../contexts/AdminAuthContext'
+import { useAdminAuth as useAdminAuthHook } from '../contexts/AdminAuthContext'
+
+export const useAdminAuth = useAdminAuthHook
 export default useAdminAuth

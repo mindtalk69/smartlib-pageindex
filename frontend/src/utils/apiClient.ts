@@ -28,20 +28,15 @@ function getToken(): string | null {
 }
 
 /**
- * Check if the current auth mode is JWT
- */
-function isJwtMode(): boolean {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem('auth_mode') === 'jwt'
-}
-
-/**
  * Build headers with authentication
  */
-function buildHeaders(customHeaders?: HeadersInit, requiresAuth: boolean = true): HeadersInit {
-    const headers: HeadersInit = {
+function buildHeaders(customHeaders?: HeadersInit, requiresAuth: boolean = true): Record<string, string> {
+    const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        ...customHeaders,
+    }
+
+    if (customHeaders) {
+        Object.assign(headers, customHeaders)
     }
 
     if (requiresAuth) {
