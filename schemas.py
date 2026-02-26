@@ -17,9 +17,22 @@ class TokenData(BaseModel):
     """Decoded JWT token data."""
     user_id: Optional[str] = None
 
+class LoginResponse(BaseModel):
+    """Flask-compatible login response."""
+    success: bool
+    user: Optional["UserResponse"] = None
+    error: Optional[str] = None
+    access_token: Optional[str] = None
+    token_type: Optional[str] = "bearer"
+
 class UserLogin(BaseModel):
     """Login request."""
     email: EmailStr
+    password: str
+
+class LoginRequest(BaseModel):
+    """Login request accepting username or email."""
+    username: str  # Can be username or email
     password: str
 
 class UserRegister(BaseModel):
@@ -27,6 +40,15 @@ class UserRegister(BaseModel):
     username: str
     email: EmailStr
     password: str
+
+class PasswordChange(BaseModel):
+    """Password change request."""
+    current_password: str
+    new_password: str
+
+class ForgotPasswordRequest(BaseModel):
+    """Forgot password request."""
+    email: EmailStr
 
 class UserResponse(BaseModel):
     """User data response (excludes sensitive fields)."""
@@ -140,6 +162,21 @@ class ModelConfigRead(ModelConfigBase):
 class Citations(SmartLibBase):
     citations: List[Dict[str, Any]] = []
 
+
+class Message(BaseModel):
+    """Chat message format."""
+    role: str  # "user" or "assistant"
+    content: str
+
+
+class ThreadInfo(BaseModel):
+    """Thread information for conversation list."""
+    id: str
+    preview: str
+    lastUpdated: str
+    messageCount: int
+
+
 class MessageHistoryRead(SmartLibBase):
     message_id: int
     user_id: str
@@ -149,3 +186,208 @@ class MessageHistoryRead(SmartLibBase):
     timestamp: datetime
     citations: Optional[str] = None
     suggested_questions: Optional[str] = None
+
+
+# Upload Schemas
+class FileUploadResponse(BaseModel):
+    """Response for file upload."""
+    filename: str
+    task_id: str
+
+
+class UploadResponse(BaseModel):
+    """Flask-compatible upload response."""
+    success: bool
+    message: str
+    files: Optional[List[FileUploadResponse]] = None
+
+
+class DuplicateCheckRequest(BaseModel):
+    """Request to check for duplicate files."""
+    filenames: List[str]
+    library_id: int
+    knowledge_id: Optional[int] = None
+
+
+class DuplicateInfo(BaseModel):
+    """Information about a duplicate file."""
+    filename: str
+    file_id: int
+    upload_time: Optional[str] = None
+
+
+class DuplicateCheckResponse(BaseModel):
+    """Response for duplicate check."""
+    duplicates: List[DuplicateInfo]
+    error: Optional[str] = None
+
+
+class UploadTaskInfo(BaseModel):
+    """Information about an upload task."""
+    task_id: str
+    status: str
+    filename: str
+    info: Optional[Dict[str, Any]] = None
+
+
+class UploadStatusResponse(BaseModel):
+    """Response for upload status."""
+    tasks: List[UploadTaskInfo]
+
+
+class UrlDownloadRequest(BaseModel):
+    """Request to process URL download."""
+    url: str
+    library_id: int
+    library_name: Optional[str] = None
+    knowledge_id: Optional[int] = None
+
+
+class UrlDownloadResponse(BaseModel):
+    """Response for URL download."""
+    success: bool
+    message: str
+    task_id: Optional[str] = None
+    download_id: Optional[int] = None
+
+
+class UrlValidateRequest(BaseModel):
+    """Request to validate URL."""
+    url: str
+
+
+class UrlValidateResponse(BaseModel):
+    """Response for URL validation."""
+    valid: bool
+    message: str
+
+
+# Library/Knowledge Schemas for Flask-compatible endpoints
+class CategoryInfo(BaseModel):
+    """Category information."""
+    id: int
+    name: str
+
+
+class CatalogInfo(BaseModel):
+    """Catalog information."""
+    id: int
+    name: str
+
+
+class GroupInfo(BaseModel):
+    """Group information."""
+    group_id: int
+    name: str
+
+
+class KnowledgeInfo(BaseModel):
+    """Knowledge information with relationships."""
+    id: int
+    name: str
+    categories: List[CategoryInfo] = []
+    catalogs: List[CatalogInfo] = []
+    groups: List[GroupInfo] = []
+
+
+class LibraryInfo(BaseModel):
+    """Library information with knowledges."""
+    library_id: int
+    name: str
+    description: str
+    knowledges: List[KnowledgeInfo] = []
+
+
+class LibrariesResponse(BaseModel):
+    """Response for libraries endpoint."""
+    libraries: List[LibraryInfo]
+
+
+class KnowledgeSimple(BaseModel):
+    """Simple knowledge information."""
+    id: int
+    name: str
+
+
+class LibrarySimple(BaseModel):
+    """Simple library information."""
+    id: int
+    name: str
+
+
+class KnowledgeWithLibraries(BaseModel):
+    """Knowledge with associated libraries."""
+    name: str
+    libraries: List[LibrarySimple]
+
+
+class KnowledgesResponse(BaseModel):
+    """Response for knowledges endpoint."""
+    knowledges: List[KnowledgeSimple]
+    knowledge_libraries_map: Dict[str, KnowledgeWithLibraries]
+    mode: str = "user"
+
+
+# User Profile & Stats Schemas
+class UserProfile(BaseModel):
+    """User profile information."""
+    user_id: str
+    username: str
+    email: Optional[str] = None
+    is_admin: bool = False
+    created_at: Optional[datetime] = None
+
+
+class UserProfileUpdate(BaseModel):
+    """User profile update request."""
+    username: Optional[str] = None
+    email: Optional[str] = None
+
+
+class UserStats(BaseModel):
+    """User statistics."""
+    file_count: int = 0
+    total_file_size_bytes: int = 0
+    message_count: int = 0
+    library_count: int = 0
+    knowledge_count: int = 0
+
+
+# Feedback Schemas
+class FeedbackRequest(BaseModel):
+    """Feedback request."""
+    message_id: int
+    feedback_type: str  # "like" or "dislike"
+
+
+class FeedbackResponse(BaseModel):
+    """Feedback response."""
+    success: bool
+    like_count: int
+    dislike_count: int
+
+
+# Query Schemas
+class QueryRequest(BaseModel):
+    """RAG query request."""
+    query: str
+    thread_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    library_id: Optional[int] = None
+    knowledge_id: Optional[int] = None
+    messages: List[Message] = []
+    user: Optional[Dict[str, Any]] = None
+    enable_visual_grounding: Optional[bool] = False
+    use_web_search: Optional[bool] = False
+
+
+class ConfirmWebSearchRequest(BaseModel):
+    """Confirm web search request."""
+    thread_id: str
+    confirm: bool
+
+
+class ResumeRagRequest(BaseModel):
+    """Resume RAG agent session request."""
+    thread_id: str
+    user_input: Optional[str] = None

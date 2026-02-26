@@ -4,12 +4,11 @@ Authentication utilities for FastAPI - JWT token handling and password hashing.
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlmodel import select
+from sqlmodel import select, Session
 from database_fastapi import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
 from modules.models import User
 
 # Configuration
@@ -17,21 +16,18 @@ SECRET_KEY = "smartlib-secret-key-change-in-production"  # TODO: Move to environ
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 # OAuth2 scheme for token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against a hashed password."""
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
 
 def get_password_hash(password: str) -> str:
     """Hash a password using bcrypt."""
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -56,9 +52,9 @@ def decode_access_token(token: str) -> Optional[dict]:
         return None
 
 
-async def get_current_user(
+def get_current_user(
     token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db)
+    db: Session = Depends(get_db)
 ) -> User:
     """
     Get the current user from the JWT token.
@@ -82,7 +78,7 @@ async def get_current_user(
 
     # Get user from database
     statement = select(User).where(User.user_id == user_id)
-    result = await db.exec(statement)
+    result = db.exec(statement)
     user = result.first()
 
     if user is None or user.is_disabled:
@@ -91,7 +87,7 @@ async def get_current_user(
     return user
 
 
-async def get_current_admin_user(
+def get_current_admin_user(
     current_user: User = Depends(get_current_user)
 ) -> User:
     """
@@ -108,31 +104,21 @@ async def get_current_admin_user(
     return current_user
 
 
-def authenticate_user(email: str, password: str, db: AsyncSession) -> Optional[User]:
+def get_user_by_email(email: str, db: Session) -> Optional[User]:
+    """Get a user by email address."""
+    statement = select(User).where(User.email == email)
+    result = db.exec(statement)
+    return result.first()
+
+
+def authenticate_user_async(email: str, password: str, db: Session) -> Optional[User]:
     """
     Authenticate a user by email and password.
 
     Returns the User object if authentication succeeds, None otherwise.
-    Note: This is sync, use get_user_by_email for async version.
+    Note: Function name kept for backwards compatibility, but now sync.
     """
-    # This is a helper - actual auth should use the async version below
-    pass
-
-
-async def get_user_by_email(email: str, db: AsyncSession) -> Optional[User]:
-    """Get a user by email address."""
-    statement = select(User).where(User.email == email)
-    result = await db.exec(statement)
-    return result.first()
-
-
-async def authenticate_user_async(email: str, password: str, db: AsyncSession) -> Optional[User]:
-    """
-    Authenticate a user by email and password asynchronously.
-
-    Returns the User object if authentication succeeds, None otherwise.
-    """
-    user = await get_user_by_email(email, db)
+    user = get_user_by_email(email, db)
     if not user:
         return None
     if not user.password_hash:

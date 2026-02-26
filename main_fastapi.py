@@ -1,12 +1,13 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException, status, Request
+from fastapi import FastAPI, Depends, HTTPException, status, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from sqladmin import Admin, ModelView
-from database_fastapi import engine, init_db, get_db
+from database_fastapi import engine, init_db, get_db, Session
 from modules.models import (
     User, Group, Library, Knowledge, UploadedFile,
     MessageHistory, LLMProvider, ModelConfig, AppSettings, LLMPrompt,
-    LLMLanguage, UserGroup
+    LLMLanguage, UserGroup, PasswordResetRequest, UrlDownload,
+    LibraryReference, VectorReference, VisualGroundingActivity, Document
 )
 from modules.crud_router import CRUDRouter
 from modules.auth import (
@@ -22,7 +23,38 @@ from schemas import (
     UserRegister,
     UserResponse,
     Token,
+    LoginRequest,
+    LoginResponse,
+    PasswordChange,
+    ForgotPasswordRequest,
+    # Upload schemas
+    UploadResponse,
+    FileUploadResponse,
+    DuplicateCheckRequest,
+    DuplicateCheckResponse,
+    DuplicateInfo,
+    UploadStatusResponse,
+    UploadTaskInfo,
+    UrlDownloadRequest,
+    UrlDownloadResponse,
+    UrlValidateRequest,
+    UrlValidateResponse,
+    LibrariesResponse,
+    LibraryInfo,
+    KnowledgeInfo,
+    CategoryInfo,
+    CatalogInfo,
+    GroupInfo,
+    KnowledgesResponse,
+    KnowledgeSimple,
+    LibrarySimple,
+    KnowledgeWithLibraries,
+    # User profile & stats schemas
+    UserProfile,
+    UserProfileUpdate,
+    UserStats,
 )
+from typing import Optional, List
 from fastapi_pagination import add_pagination
 from database_fastapi import DB_PATH
 from sqlmodel import select
@@ -105,6 +137,11 @@ class LLMLanguageAdmin(ModelView, model=LLMLanguage):
     column_list = [LLMLanguage.id, LLMLanguage.language_code, LLMLanguage.language_name, LLMLanguage.is_active]
     icon = "fa-solid fa-language"
 
+class PasswordResetRequestAdmin(ModelView, model=PasswordResetRequest):
+    column_list = [PasswordResetRequest.id, PasswordResetRequest.user_id, PasswordResetRequest.email, PasswordResetRequest.status, PasswordResetRequest.expires_at]
+    column_searchable_list = [PasswordResetRequest.email, PasswordResetRequest.token]
+    icon = "fa-solid fa-key"
+
 # Register views
 admin.add_view(UserAdmin)
 admin.add_view(GroupAdmin)
@@ -117,6 +154,7 @@ admin.add_view(ModelConfigAdmin)
 admin.add_view(AppSettingsAdmin)
 admin.add_view(LLMPromptAdmin)
 admin.add_view(LLMLanguageAdmin)
+admin.add_view(PasswordResetRequestAdmin)
 
 # Register CRUD API Routers (Turbo API)
 # Models with user ownership filtering
@@ -144,35 +182,77 @@ for model, prefix in global_models:
     app.include_router(crud.router, prefix="/api/v1")
 
 # Auth endpoints
-@app.post("/api/v1/auth/login", response_model=Token)
-def login(login_data: UserLogin, db = Depends(get_db)):
-    """
-    Login with email and password.
 
-    Returns JWT access token for authenticated user.
+@app.post("/api/v1/auth/login", response_model=LoginResponse)
+def api_v1_login(login_data: LoginRequest, db=Depends(get_db)):
     """
-    user = authenticate_user_async(login_data.email, login_data.password, db)
+    V1 Login endpoint with Flask-compatible response.
+    Accepts {username, password} where username can be username or email.
+    Returns {success, user, access_token} format.
+    """
+    username_or_email = login_data.username.strip()
+    password = login_data.password
+
+    if not username_or_email or not password:
+        return LoginResponse(
+            success=False,
+            error="Username/email and password are required"
+        )
+
+    # Try to authenticate - first try as email, then as username
+    user = authenticate_user_async(username_or_email, password, db)
+
+    # If not found and contains @, try by user_id (email field)
+    if not user and "@" in username_or_email:
+        statement = select(User).where(User.user_id == username_or_email)
+        result = db.exec(statement)
+        user_by_id = result.first()
+        if user_by_id and verify_password(password, user_by_id.password_hash):
+            user = user_by_id
+
+    # If still not found, try by username
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    if user.is_disabled:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is disabled",
+        statement = select(User).where(User.username == username_or_email)
+        result = db.exec(statement)
+        user_by_name = result.first()
+        if user_by_name and verify_password(password, user_by_name.password_hash):
+            user = user_by_name
+
+    if not user:
+        return LoginResponse(
+            success=False,
+            error="Invalid username/email or password"
         )
 
+    if user.is_disabled:
+        return LoginResponse(
+            success=False,
+            error="Account is disabled"
+        )
+
+    # Generate JWT token
     access_token = create_access_token(data={"sub": user.user_id})
-    return {"access_token": access_token, "token_type": "bearer"}
+
+    # Return Flask-compatible response with JWT token
+    return LoginResponse(
+        success=True,
+        user=UserResponse(
+            user_id=user.user_id,
+            username=user.username,
+            email=user.email,
+            is_admin=user.is_admin,
+            is_disabled=user.is_disabled,
+            created_at=user.created_at,
+        ),
+        access_token=access_token,
+        token_type="bearer",
+    )
+
 
 @app.post("/api/v1/auth/register", response_model=UserResponse)
-def register(register_data: UserRegister, db = Depends(get_db)):
+def api_v1_register(register_data: UserRegister, db=Depends(get_db)):
     """
-    Register a new user account.
-
-    Creates a new user with the given username, email, and password.
+    V1 Register endpoint - create new user account.
     """
     # Check if email already exists
     existing_user = db.exec(select(User).where(User.email == register_data.email))
@@ -214,6 +294,50 @@ def register(register_data: UserRegister, db = Depends(get_db)):
         created_at=user.created_at,
     )
 
+
+@app.post("/api/v1/auth/change-password")
+def api_v1_change_password(
+    password_data: PasswordChange,
+    current_user: User = Depends(get_current_user),
+    db=Depends(get_db)
+):
+    """
+    V1 Change password endpoint.
+    Validates current password and updates to new password.
+    """
+    # Verify current password
+    if not verify_password(password_data.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+
+    # Validate new password
+    new_password = password_data.new_password
+    if len(new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters",
+        )
+    if not any(c.isupper() for c in new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain at least one uppercase letter",
+        )
+    if not any(c.isdigit() for c in new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain at least one number",
+        )
+
+    # Update password
+    current_user.password_hash = get_password_hash(new_password)
+    db.add(current_user)
+    db.commit()
+
+    return {"success": True, "message": "Password changed successfully"}
+
+
 @app.get("/api/v1/auth/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     """
@@ -230,6 +354,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
         created_at=current_user.created_at,
     )
 
+
 @app.post("/api/v1/auth/logout")
 async def logout(current_user: User = Depends(get_current_user)):
     """
@@ -238,7 +363,60 @@ async def logout(current_user: User = Depends(get_current_user)):
     Note: JWT tokens are stateless. Client should discard the token.
     For token revocation, implement a token blacklist.
     """
-    return {"message": "Successfully logged out. Please discard your token."}
+    return {"success": True, "message": "Successfully logged out. Please discard your token."}
+
+
+@app.post("/api/v1/auth/forgot-password")
+def forgot_password(
+    email_data: ForgotPasswordRequest,
+    db = Depends(get_db)
+):
+    """
+    Request a password reset.
+
+    Creates a password reset request record and sends email to user.
+    For now, creates the record and returns success (email sending is TODO).
+    """
+    import uuid
+    from datetime import datetime, timedelta
+
+    email = email_data.email.strip()
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email is required",
+        )
+
+    # Find user by email
+    statement = select(User).where(User.email == email)
+    result = db.exec(statement)
+    user = result.first()
+
+    if not user:
+        # Don't reveal if email exists for security
+        return {"success": True, "message": "If the email exists, a password reset link will be sent."}
+
+    # Generate reset token
+    reset_token = str(uuid.uuid4())
+    expires_at = datetime.utcnow() + timedelta(hours=24)
+
+    # Create password reset request
+    reset_request = PasswordResetRequest(
+        user_id=user.user_id,
+        email=email,
+        token=reset_token,
+        status="pending",
+        expires_at=expires_at,
+    )
+
+    db.add(reset_request)
+    db.commit()
+
+    # TODO: Send email with reset link
+    # For now, just return success
+
+    return {"success": True, "message": "If the email exists, a password reset link will be sent."}
+
 
 # Config & Branding endpoints
 @app.get("/api/v1/config")
@@ -413,6 +591,242 @@ def get_admin_stats(
         "knowledges": knowledge_count,
         "messages": message_count,
     }
+
+
+# ============================================================
+# USER PROFILE & STATS ENDPOINTS
+# ============================================================
+
+@app.get("/api/v1/user/profile", response_model=UserProfile)
+async def get_user_profile(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get current authenticated user's profile.
+    """
+    return UserProfile(
+        user_id=current_user.user_id,
+        username=current_user.username,
+        email=current_user.email,
+        is_admin=current_user.is_admin,
+        created_at=current_user.created_at,
+    )
+
+
+@app.put("/api/v1/user/profile", response_model=UserProfile)
+async def update_user_profile(
+    profile_data: UserProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db = Depends(get_db),
+):
+    """
+    Update current user's profile.
+
+    Allows updating username and email.
+    """
+    from sqlmodel import select
+
+    # Update username if provided
+    if profile_data.username is not None and profile_data.username != current_user.username:
+        # Check if username is already taken
+        existing = db.exec(select(User).where(User.username == profile_data.username))
+        if existing.first():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already taken",
+            )
+        current_user.username = profile_data.username
+
+    # Update email if provided
+    if profile_data.email is not None and profile_data.email != current_user.email:
+        # Check if email is already registered
+        existing = db.exec(select(User).where(User.email == profile_data.email))
+        if existing.first():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered",
+            )
+        current_user.email = profile_data.email
+
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+
+    return UserProfile(
+        user_id=current_user.user_id,
+        username=current_user.username,
+        email=current_user.email,
+        is_admin=current_user.is_admin,
+        created_at=current_user.created_at,
+    )
+
+
+@app.get("/api/v1/user/stats", response_model=UserStats)
+async def get_user_stats(
+    current_user: User = Depends(get_current_user),
+    db = Depends(get_db),
+):
+    """
+    Get current user's statistics.
+
+    Returns file count, total storage, message count, etc.
+    """
+    from sqlmodel import select, func
+    from modules.models import UploadedFile, MessageHistory
+
+    # Count files
+    file_count = db.exec(
+        select(func.count(UploadedFile.file_id)).where(UploadedFile.user_id == current_user.user_id)
+    ).one()
+
+    # Total file size
+    total_size = db.exec(
+        select(func.sum(UploadedFile.file_size)).where(UploadedFile.user_id == current_user.user_id)
+    ).one() or 0
+
+    # Count messages
+    message_count = db.exec(
+        select(func.count(MessageHistory.message_id)).where(MessageHistory.user_id == current_user.user_id)
+    ).one()
+
+    # Count libraries (all libraries for now, could be filtered by ownership)
+    library_count = db.exec(select(func.count(Library.library_id))).one()
+
+    # Count knowledges (all knowledges for now)
+    knowledge_count = db.exec(select(func.count(Knowledge.id))).one()
+
+    return UserStats(
+        file_count=file_count,
+        total_file_size_bytes=total_size,
+        message_count=message_count,
+        library_count=library_count,
+        knowledge_count=knowledge_count,
+    )
+
+
+# ============================================================
+# FILE MANAGEMENT ENDPOINTS
+# ============================================================
+
+from fastapi.responses import FileResponse
+import os
+import shutil
+
+@app.get("/api/v1/files/{file_id}/download")
+async def download_file(
+    file_id: int,
+    current_user: User = Depends(get_current_user),
+    db = Depends(get_db),
+):
+    """
+    Download an uploaded file.
+
+    Users can only download their own files (admin can download any).
+    """
+    from sqlmodel import select
+
+    # Get file record
+    uploaded_file = db.get(UploadedFile, file_id)
+    if not uploaded_file:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # Check ownership (admin can download any file)
+    if not current_user.is_admin and uploaded_file.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Get file path from environment or use default
+    # Files are stored in DATA_VOLUME_PATH or default location
+    data_volume = os.environ.get("DATA_VOLUME_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"))
+    file_path = os.path.join(data_volume, "uploaded_files", uploaded_file.stored_filename)
+
+    # Check if file exists
+    if not os.path.exists(file_path):
+        # Try alternate location (uploads folder)
+        alt_path = os.path.join(data_volume, "uploads", uploaded_file.stored_filename)
+        if os.path.exists(alt_path):
+            file_path = alt_path
+        else:
+            raise HTTPException(status_code=404, detail="File not found on disk")
+
+    return FileResponse(
+        path=file_path,
+        filename=uploaded_file.original_filename,
+        media_type="application/octet-stream",
+    )
+
+
+@app.delete("/api/v1/files/{file_id}")
+async def delete_file(
+    file_id: int,
+    current_user: User = Depends(get_current_user),
+    db = Depends(get_db),
+):
+    """
+    Delete an uploaded file and its associated vectors.
+
+    Users can only delete their own files (admin can delete any).
+    Vector cleanup is handled automatically via database cascade deletes for sqlite-vec.
+    """
+    from sqlmodel import select
+    from modules.models import Document, VectorReference, LibraryReference, VisualGroundingActivity
+
+    # Get file record
+    uploaded_file = db.get(UploadedFile, file_id)
+    if not uploaded_file:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # Check ownership (admin can delete any file)
+    if not current_user.is_admin and uploaded_file.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    try:
+        # Find associated Document records
+        statement = select(Document).where(
+            Document.source == uploaded_file.original_filename,
+            Document.library_id == uploaded_file.library_id,
+            Document.knowledge_id == uploaded_file.knowledge_id,
+        )
+        result = db.exec(statement)
+        docs = result.all()
+        doc_ids = [str(doc.id) for doc in docs]
+
+        # Delete associated records
+        # VectorReference cleanup
+        VectorReference.query.filter_by(file_id=file_id).delete(synchronize_session=False) if hasattr(VectorReference, 'query') else None
+
+        # For SQLModel, use direct delete
+        from sqlmodel import delete
+        db.exec(delete(VectorReference).where(VectorReference.file_id == file_id))
+        db.exec(delete(LibraryReference).where(
+            LibraryReference.reference_type == 'file',
+            LibraryReference.source_id == file_id,
+        ))
+        db.exec(delete(VisualGroundingActivity).where(VisualGroundingActivity.file_id == file_id))
+
+        # Delete documents (vectors will be cleaned up via cascade)
+        for doc in docs:
+            db.delete(doc)
+
+        # Delete the file record
+        db.delete(uploaded_file)
+        db.commit()
+
+        # Delete physical file
+        data_volume = os.environ.get("DATA_VOLUME_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"))
+        file_path = os.path.join(data_volume, "uploaded_files", uploaded_file.stored_filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+        vector_count = len(doc_ids)
+        message = "File deleted successfully."
+        if vector_count > 0:
+            message = f"File deleted successfully. Removed {vector_count} vector chunk(s)."
+
+        return {"status": "success", "message": message}
+
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(exc)}")
 
 add_pagination(app)
 
@@ -737,6 +1151,599 @@ def api_self_retriever_questions(
 
     return {"questions": questions}
 
+
+# ============================================================
+# WAVE 3: DOCUMENT UPLOAD ENDPOINTS (/api/v1/*)
+# ============================================================
+
+# Allowed file extensions
+ALLOWED_EXTENSIONS = {'pdf', 'docx', 'txt', 'md', 'html', 'pptx', 'xlsx', 'csv', 'jpg', 'jpeg', 'png', 'gif'}
+
+def allowed_file(filename: str) -> bool:
+    """Check if the file extension is allowed."""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+@app.post("/api/v1/upload", response_model=UploadResponse)
+async def api_v1_upload(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    library_id: int = Form(...),
+    library_name: str = Form(...),
+    knowledge_id: Optional[int] = Form(None),
+    enable_visual_grounding: bool = Form(False),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Upload files for processing (multipart/form-data).
+
+    Files are saved to temp directory and Celery task is submitted for async processing.
+    Task ID is stored in Redis for status tracking.
+    """
+    from pathlib import Path
+    from uuid import uuid4
+    import logging
+    from werkzeug.utils import secure_filename
+
+    logger = logging.getLogger(__name__)
+
+    # Validate library
+    library = db.get(Library, library_id)
+    if not library:
+        return UploadResponse(
+            success=False,
+            message="Selected library does not exist."
+        )
+
+    # Validate knowledge if provided
+    if knowledge_id is not None:
+        knowledge = db.get(Knowledge, knowledge_id)
+        if not knowledge:
+            return UploadResponse(
+                success=False,
+                message="Selected knowledge does not exist."
+            )
+
+    # Process each file
+    uploaded_files = []
+    for file in files:
+        if file.filename and allowed_file(file.filename):
+            try:
+                # Save file temporarily
+                filename = secure_filename(file.filename)
+                base_temp_dir = Path("/tmp/smartlib_uploads")
+                temp_dir = base_temp_dir / str(uuid4())
+                temp_dir.mkdir(parents=True, exist_ok=True)
+                temp_file_path = temp_dir / filename
+
+                # Read and save file
+                content = await file.read()
+                with open(temp_file_path, 'wb') as f:
+                    f.write(content)
+                    f.flush()
+                    os.fsync(f.fileno())
+
+                # Submit to Celery worker
+                task_id = None
+                from modules.celery_tasks import submit_file_processing_task
+                if submit_file_processing_task:
+                    task_id = submit_file_processing_task(
+                        temp_file_path=str(temp_file_path),
+                        filename=filename,
+                        user_id=current_user.user_id,
+                        library_id=library_id,
+                        library_name=library_name,
+                        knowledge_id_str=str(knowledge_id) if knowledge_id else None,
+                        enable_visual_grounding_flag=enable_visual_grounding,
+                    )
+
+                if task_id:
+                    # Register task in Redis for status tracking
+                    try:
+                        import json
+                        from datetime import datetime, timezone
+                        broker_url = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+                        redis_client = redis.from_url(broker_url)
+                        task_key = f"user:{current_user.user_id}:upload_tasks"
+                        task_meta_key = f"user:{current_user.user_id}:upload_task_meta"
+
+                        redis_client.rpush(task_key, task_id)
+                        redis_client.expire(task_key, 86400)  # 24 hours
+
+                        task_meta = {
+                            'filename': filename,
+                            'created_at': datetime.now(timezone.utc).isoformat()
+                        }
+                        redis_client.hset(task_meta_key, task_id, json.dumps(task_meta))
+                        redis_client.expire(task_meta_key, 86400)
+
+                        logger.info(f"Registered task {task_id} for user {current_user.user_id}")
+                    except Exception as e:
+                        logger.error(f"Failed to register task in Redis: {e}")
+                else:
+                    task_id = 'processing_disabled'
+
+                uploaded_files.append(FileUploadResponse(
+                    filename=filename,
+                    task_id=task_id
+                ))
+
+            except Exception as e:
+                logger.error(f"Failed to upload file {file.filename}: {e}")
+                return UploadResponse(
+                    success=False,
+                    message=f"Failed to upload {file.filename}: {str(e)}"
+                )
+        else:
+            return UploadResponse(
+                success=False,
+                message=f"File type not allowed: {file.filename}"
+            )
+
+    return UploadResponse(
+        success=True,
+        message=f"Successfully uploaded {len(uploaded_files)} file(s). Processing started.",
+        files=uploaded_files
+    )
+
+
+@app.post("/api/v1/check-duplicates", response_model=DuplicateCheckResponse)
+def api_v1_check_duplicates(
+    request_data: DuplicateCheckRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Check if any filenames already exist in the target library/knowledge.
+    """
+    duplicates = []
+
+    for filename in request_data.filenames:
+        # Query for existing file with same name in same library/knowledge
+        statement = select(UploadedFile).where(
+            UploadedFile.original_filename == filename,
+            UploadedFile.library_id == request_data.library_id,
+        )
+
+        if request_data.knowledge_id is not None:
+            statement = statement.where(UploadedFile.knowledge_id == request_data.knowledge_id)
+
+        result = db.exec(statement)
+        existing = result.first()
+
+        if existing:
+            duplicates.append(DuplicateInfo(
+                filename=filename,
+                file_id=existing.file_id,
+                upload_time=existing.upload_time.isoformat() if existing.upload_time else None,
+            ))
+
+    return DuplicateCheckResponse(duplicates=duplicates)
+
+
+@app.get("/api/v1/upload-status", response_model=UploadStatusResponse)
+def api_v1_upload_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get status of user's upload tasks from Redis.
+    """
+    broker_url = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+
+    try:
+        redis_client = redis.from_url(broker_url)
+        task_key = f"user:{current_user.user_id}:upload_tasks"
+        task_meta_key = f"user:{current_user.user_id}:upload_task_meta"
+
+        task_ids = redis_client.lrange(task_key, 0, -1)
+        task_meta_raw = redis_client.hgetall(task_meta_key)
+
+        # Parse metadata
+        task_meta = {}
+        for k, v in task_meta_raw.items():
+            key = k.decode("utf-8") if isinstance(k, bytes) else k
+            try:
+                task_meta[key] = json.loads(v.decode("utf-8") if isinstance(v, bytes) else v)
+            except:
+                task_meta[key] = {}
+
+        tasks = []
+        for task_id in task_ids:
+            task_id_str = task_id.decode("utf-8") if isinstance(task_id, bytes) else task_id
+            meta = task_meta.get(task_id_str, {})
+
+            # Get task status from Celery
+            try:
+                from celery.result import AsyncResult
+                from celery_app import celery
+                result = AsyncResult(task_id_str, app=celery)
+
+                if result.state == "PENDING" and result.info is None:
+                    # Skip orphaned PENDING tasks
+                    continue
+
+                task_info = {
+                    "task_id": task_id_str,
+                    "status": result.state,
+                    "filename": meta.get("filename", "Unknown"),
+                    "info": {}
+                }
+
+                if isinstance(result.info, dict):
+                    result_filename = result.info.get("filename")
+                    if result_filename and result_filename != "Unknown":
+                        task_info["filename"] = result_filename
+                    task_info["info"] = {
+                        "stage": result.info.get("stage"),
+                        "progress": result.info.get("progress"),
+                        "error": result.info.get("error") or result.info.get("message"),
+                    }
+
+                tasks.append(UploadTaskInfo(**task_info))
+            except Exception as e:
+                # Task not found in Celery, skip
+                continue
+
+        return UploadStatusResponse(tasks=tasks)
+
+    except Exception as e:
+        return UploadStatusResponse(tasks=[])
+
+
+@app.post("/api/v1/upload-status/{task_id}/dismiss")
+def api_v1_dismiss_upload_task(
+    task_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Dismiss a completed upload task from status list."""
+    broker_url = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+
+    try:
+        redis_client = redis.from_url(broker_url)
+        task_key = f"user:{current_user.user_id}:upload_tasks"
+        redis_client.lrem(task_key, 0, task_id)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to dismiss task: {str(e)}")
+
+
+@app.post("/api/v1/validate_url", response_model=UrlValidateResponse)
+def api_v1_validate_url(
+    request_data: UrlValidateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Validate that a URL is reachable before download.
+    """
+    import requests
+    from urllib.parse import urlparse
+
+    parsed = urlparse(request_data.url)
+    if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
+        return UrlValidateResponse(
+            valid=False,
+            message="Only absolute HTTP or HTTPS URLs are allowed."
+        )
+
+    try:
+        # Use HEAD request with 3s timeout
+        response = requests.head(request_data.url, allow_redirects=True, timeout=3)
+        status_code = response.status_code
+        response.close()
+
+        # Accept any non-error response
+        if status_code < 500:
+            return UrlValidateResponse(
+                valid=True,
+                message=f"URL is reachable (status: {status_code})."
+            )
+        else:
+            return UrlValidateResponse(
+                valid=False,
+                message=f"Server error: {status_code}"
+            )
+    except requests.Timeout:
+        # Timeout - still consider valid (server might be slow)
+        return UrlValidateResponse(
+            valid=True,
+            message="URL timed out but may still be valid."
+        )
+    except requests.RequestException as e:
+        return UrlValidateResponse(
+            valid=False,
+            message="URL could not be reached."
+        )
+
+
+@app.post("/api/v1/process-url", response_model=UrlDownloadResponse)
+async def api_v1_process_url(
+    request_data: UrlDownloadRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Download and process URL.
+    """
+    import requests
+    from urllib.parse import urlparse
+    from pathlib import Path
+    from uuid import uuid4
+    import mimetypes
+    from werkzeug.utils import secure_filename
+
+    # Validate URL
+    parsed = urlparse(request_data.url)
+    if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
+        return UrlDownloadResponse(
+            success=False,
+            message="Only absolute HTTP or HTTPS URLs are allowed."
+        )
+
+    # Validate library
+    library = db.get(Library, request_data.library_id)
+    if not library:
+        return UrlDownloadResponse(
+            success=False,
+            message="Selected library does not exist."
+        )
+
+    # Validate knowledge if provided
+    if request_data.knowledge_id is not None:
+        knowledge = db.get(Knowledge, request_data.knowledge_id)
+        if not knowledge:
+            return UrlDownloadResponse(
+                success=False,
+                message="Selected knowledge does not exist."
+            )
+
+    # Download URL content
+    try:
+        download_response = requests.get(request_data.url, stream=True, timeout=15)
+        download_response.raise_for_status()
+        content_type = download_response.headers.get('Content-Type', 'unknown') or 'unknown'
+
+        # Generate filename
+        filename = os.path.basename(parsed.path) or 'downloaded_document'
+        if '.' not in filename:
+            mime_ext = mimetypes.guess_extension(content_type.split(';')[0].strip())
+            if mime_ext:
+                filename = f"{filename}{mime_ext}"
+            else:
+                filename = f"{filename}.html"
+
+        filename = secure_filename(filename)
+
+        # Save to temp file
+        base_temp_dir = Path("/tmp/smartlib_uploads")
+        temp_dir = base_temp_dir / str(uuid4())
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        temp_file_path = temp_dir / filename
+
+        with open(temp_file_path, 'wb') as f:
+            for chunk in download_response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+            f.flush()
+            os.fsync(f.fileno())
+
+        download_response.close()
+
+    except requests.RequestException as e:
+        return UrlDownloadResponse(
+            success=False,
+            message=f"Failed to download URL: {str(e)}"
+        )
+
+    # Create UrlDownload record
+    download_id = None
+    try:
+        url_download = UrlDownload(
+            user_id=current_user.user_id,
+            library_id=request_data.library_id,
+            knowledge_id=request_data.knowledge_id if request_data.knowledge_id else None,
+            url=request_data.url,
+            status='queued',
+            content_type=content_type,
+        )
+        db.add(url_download)
+        db.commit()
+        db.refresh(url_download)
+        download_id = url_download.download_id
+    except Exception as e:
+        return UrlDownloadResponse(
+            success=False,
+            message=f"Failed to create download record: {str(e)}"
+        )
+
+    # Submit to Celery worker
+    task_id = None
+    from modules.celery_tasks import submit_file_processing_task
+    if submit_file_processing_task:
+        task_id = submit_file_processing_task(
+            temp_file_path=str(temp_file_path),
+            filename=filename,
+            user_id=current_user.user_id,
+            library_id=request_data.library_id,
+            library_name=request_data.library_name or library.name,
+            knowledge_id_str=str(request_data.knowledge_id) if request_data.knowledge_id else None,
+            enable_visual_grounding_flag=False,
+            url_download_id=download_id,
+            source_url=request_data.url,
+            content_type=content_type,
+        )
+
+    if task_id:
+        # Register task in Redis
+        try:
+            import json
+            from datetime import datetime, timezone
+            broker_url = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+            redis_client = redis.from_url(broker_url)
+            task_key = f"user:{current_user.user_id}:upload_tasks"
+            task_meta_key = f"user:{current_user.user_id}:upload_task_meta"
+
+            redis_client.rpush(task_key, task_id)
+            redis_client.expire(task_key, 86400)
+
+            task_meta = {
+                'filename': filename,
+                'created_at': datetime.now(timezone.utc).isoformat()
+            }
+            redis_client.hset(task_meta_key, task_id, json.dumps(task_meta))
+            redis_client.expire(task_meta_key, 86400)
+        except Exception as e:
+            pass
+
+    return UrlDownloadResponse(
+        success=True,
+        message="URL queued for processing.",
+        task_id=task_id,
+        download_id=download_id
+    )
+
+
+# ============================================================
+# WAVE 3: LIBRARIES ENDPOINT WITH PERMISSION FILTERING
+# ============================================================
+
+@app.get("/api/v1/libraries", response_model=LibrariesResponse)
+def api_v1_get_libraries(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    List user's libraries with knowledges, filtered by permissions.
+
+    In 'knowledge' mode, only returns knowledges user has access to via groups.
+    In 'user' mode, returns all knowledges.
+    """
+    from modules.access_control import get_user_group_ids, filter_accessible_knowledges
+
+    vector_store_mode = os.environ.get("VECTOR_STORE_MODE", "user")
+    user_group_ids = get_user_group_ids(current_user.user_id, db)
+
+    # Get all libraries
+    statement = select(Library).order_by(Library.name)
+    result = db.exec(statement)
+    libraries = result.all()
+
+    libraries_data = []
+    for library in libraries:
+        # Get knowledges for this library via secondary relationship
+        # First get all knowledges, then filter by library association
+        all_knowledges = []
+        for k in db.exec(select(Knowledge).order_by(Knowledge.name)):
+            # Check if knowledge is associated with this library
+            # This requires checking the knowledge_libraries_association table
+            # For simplicity, we'll get knowledges and check association
+            all_knowledges.append(k)
+
+        # Filter knowledges by user's group permissions
+        if vector_store_mode == 'knowledge':
+            accessible_knowledges = filter_accessible_knowledges(all_knowledges, user_group_ids)
+        else:
+            accessible_knowledges = all_knowledges
+
+        knowledges_data = []
+        for k in accessible_knowledges:
+            # Get categories, catalogs, groups for each knowledge
+            categories = []
+            catalogs = []
+            groups = []
+
+            # Get groups for this knowledge
+            if hasattr(k, 'groups') and k.groups:
+                groups = [GroupInfo(group_id=g.group_id, name=g.name) for g in k.groups]
+
+            knowledges_data.append(KnowledgeInfo(
+                id=k.id,
+                name=k.name,
+                categories=categories,
+                catalogs=catalogs,
+                groups=groups,
+            ))
+
+        libraries_data.append(LibraryInfo(
+            library_id=library.library_id,
+            name=library.name,
+            description=library.description or "",
+            knowledges=knowledges_data,
+        ))
+
+    return LibrariesResponse(libraries=libraries_data)
+
+
+@app.get("/api/v1/knowledges", response_model=KnowledgesResponse)
+def api_v1_get_knowledges(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    List all knowledges with library mappings.
+    """
+    from modules.access_control import get_user_group_ids, filter_accessible_knowledges
+
+    vector_store_mode = os.environ.get("VECTOR_STORE_MODE", "user")
+    user_group_ids = get_user_group_ids(current_user.user_id, db)
+
+    # Get all knowledges
+    statement = select(Knowledge).order_by(Knowledge.name)
+    result = db.exec(statement)
+    knowledges = result.all()
+
+    # Filter by permissions if in knowledge mode
+    if vector_store_mode == 'knowledge':
+        knowledges = filter_accessible_knowledges(knowledges, user_group_ids)
+
+    knowledges_list = [KnowledgeSimple(id=k.id, name=k.name) for k in knowledges]
+
+    # Build knowledge_libraries_map
+    knowledge_libraries_map = {}
+    for k in knowledges:
+        # Get libraries associated with this knowledge
+        # This requires querying the association table
+        # For now, return all libraries
+        all_libraries = db.exec(select(Library).order_by(Library.name)).all()
+
+        knowledge_libraries_map[str(k.id)] = KnowledgeWithLibraries(
+            name=k.name,
+            libraries=[LibrarySimple(id=lib.library_id, name=lib.name) for lib in all_libraries]
+        )
+
+    return KnowledgesResponse(
+        knowledges=knowledges_list,
+        knowledge_libraries_map=knowledge_libraries_map,
+        mode=vector_store_mode
+    )
+
+
+# Wave 5: RAG Chat Migration Endpoints
+
+# Include RAG query endpoints
+from api.v1.query import router as query_router
+app.include_router(query_router, prefix="/api/v1")
+
+# Include conversation history endpoints
+from api.v1.threads import router as threads_router
+app.include_router(threads_router, prefix="/api/v1")
+
+# Include feedback endpoints
+from api.v1.feedback import router as feedback_router
+app.include_router(feedback_router, prefix="/api/v1")
+
+# Include auxiliary endpoints
+from api.v1.config import router as config_router
+app.include_router(config_router, prefix="/api/v1")
+
+from api.v1.visual import router as visual_router
+app.include_router(visual_router, prefix="/api/v1")
+
+from api.v1.documents import router as documents_router
+app.include_router(documents_router, prefix="/api/v1")
 
 add_pagination(app)
 

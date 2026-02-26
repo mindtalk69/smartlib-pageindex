@@ -4,20 +4,18 @@ from __future__ import annotations
 
 from typing import Iterable, List, Set
 
-from modules.database import Knowledge, UserGroup
+from sqlmodel import Session, select
+from modules.models import Knowledge, UserGroup
 
 
-def get_user_group_ids(user_id: str | None) -> Set[int]:
+def get_user_group_ids(user_id: str | None, db: Session) -> Set[int]:
     """Return the set of group IDs a user belongs to."""
     if not user_id:
         return set()
 
-    rows = (
-        UserGroup.query.with_entities(UserGroup.group_id)
-        .filter_by(user_id=user_id)
-        .all()
-    )
-    return {row.group_id for row in rows}
+    statement = select(UserGroup.group_id).where(UserGroup.user_id == user_id)
+    result = db.exec(statement)
+    return set(result.all())
 
 
 def knowledge_is_accessible(knowledge: Knowledge, user_group_ids: Set[int]) -> bool:

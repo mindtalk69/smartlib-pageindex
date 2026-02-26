@@ -4,10 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { User, Mail, Lock, UserPlus, Loader2, CheckCircle2 } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
 
 /**
  * RegisterPage Component
- * 
+ *
  * Registration form with username, email, password, and confirm password fields.
  * Uses shadcn/ui Card, Button, Input components to match LoginPage design.
  */
@@ -18,6 +19,7 @@ export function RegisterPage() {
     const [confirmPassword, setConfirmPassword] = useState('')
     const [error, setError] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(false)
+    const { register } = useAuth()
     const navigate = useNavigate()
 
     const handleSubmit = async (e: FormEvent) => {
@@ -68,38 +70,18 @@ export function RegisterPage() {
         setIsLoading(true)
 
         try {
-            console.log('[Register] Submitting to /api/register:', { username, email })
+            const result = await register(username, email, password)
 
-            const response = await fetch('/api/register', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    username,
-                    email,
-                    password,
-                    confirm_password: confirmPassword,
-                }),
-            })
-
-            const data = await response.json()
-            console.log('[Register] API response:', data)
-
-            if (data.success) {
+            if (result.success) {
                 // Success - navigate to login
-                console.log('[Register] Registration successful')
                 navigate('/login', {
-                    state: { message: data.message || 'Registration successful! Please login.' }
+                    state: { message: 'Registration successful! Please login.' }
                 })
             } else {
-                // Error - display message from API
-                console.log('[Register] Registration failed:', data.error)
-                setError(data.error || 'Registration failed. Please try again.')
+                setError(result.error || 'Registration failed. Please try again.')
             }
         } catch (err) {
-            console.error('[Register] Network error:', err)
-            setError('Network error. Please try again.')
+            console.error('[Register] Error:', err)
         } finally {
             setIsLoading(false)
         }

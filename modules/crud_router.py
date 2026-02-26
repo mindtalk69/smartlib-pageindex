@@ -1,7 +1,6 @@
 from typing import Any, List, Type, TypeVar, Generic, Optional
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import SQLModel, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import SQLModel, select, Session
 from fastapi_pagination import Page, Params
 from fastapi_pagination.ext.sqlmodel import paginate
 from database_fastapi import get_db
@@ -46,8 +45,8 @@ class CRUDRouter(Generic[ModelType]):
         """Setup CRUD routes with optional authentication."""
 
         @self.router.get("/", response_model=Page[self.model])
-        async def read_items(
-            db: AsyncSession = Depends(get_db),
+        def read_items(
+            db: Session = Depends(get_db),
             page: int = 1,
             size: int = 50,
             current_user: Optional[User] = Depends(self._get_auth_dependency()),
@@ -60,16 +59,16 @@ class CRUDRouter(Generic[ModelType]):
                 )
             else:
                 query = select(self.model)
-            return await paginate(db, query, Params(page=page, size=size))
+            return paginate(db, query, Params(page=page, size=size))
 
         @self.router.get("/{item_id}", response_model=self.model)
-        async def read_item(
+        def read_item(
             item_id: Any,
-            db: AsyncSession = Depends(get_db),
+            db: Session = Depends(get_db),
             current_user: Optional[User] = Depends(self._get_auth_dependency()),
         ):
             """Get a single item by ID."""
-            item = await db.get(self.model, item_id)
+            item = db.get(self.model, item_id)
             if not item:
                 raise HTTPException(status_code=404, detail=f"{self.model.__name__} not found")
 
@@ -81,9 +80,9 @@ class CRUDRouter(Generic[ModelType]):
             return item
 
         @self.router.post("/", response_model=self.model)
-        async def create_item(
+        def create_item(
             item: self.model,
-            db: AsyncSession = Depends(get_db),
+            db: Session = Depends(get_db),
             current_user: User = Depends(self._get_auth_dependency()),
         ):
             """Create a new item."""
@@ -92,19 +91,19 @@ class CRUDRouter(Generic[ModelType]):
                 setattr(item, self.user_field, current_user.user_id)
 
             db.add(item)
-            await db.commit()
-            await db.refresh(item)
+            db.commit()
+            db.refresh(item)
             return item
 
         @self.router.put("/{item_id}", response_model=self.model)
-        async def update_item(
+        def update_item(
             item_id: Any,
             item_data: self.model,
-            db: AsyncSession = Depends(get_db),
+            db: Session = Depends(get_db),
             current_user: User = Depends(self._get_auth_dependency()),
         ):
             """Update an existing item."""
-            db_item = await db.get(self.model, item_id)
+            db_item = db.get(self.model, item_id)
             if not db_item:
                 raise HTTPException(status_code=404, detail=f"{self.model.__name__} not found")
 
@@ -118,18 +117,18 @@ class CRUDRouter(Generic[ModelType]):
                 setattr(db_item, key, value)
 
             db.add(db_item)
-            await db.commit()
-            await db.refresh(db_item)
+            db.commit()
+            db.refresh(db_item)
             return db_item
 
         @self.router.delete("/{item_id}")
-        async def delete_item(
+        def delete_item(
             item_id: Any,
-            db: AsyncSession = Depends(get_db),
+            db: Session = Depends(get_db),
             current_user: User = Depends(self._get_auth_dependency()),
         ):
             """Delete an item."""
-            db_item = await db.get(self.model, item_id)
+            db_item = db.get(self.model, item_id)
             if not db_item:
                 raise HTTPException(status_code=404, detail=f"{self.model.__name__} not found")
 
@@ -138,6 +137,6 @@ class CRUDRouter(Generic[ModelType]):
                 if getattr(db_item, self.user_field) != current_user.user_id:
                     raise HTTPException(status_code=403, detail="Access denied")
 
-            await db.delete(db_item)
-            await db.commit()
+            db.delete(db_item)
+            db.commit()
             return {"ok": True}
