@@ -1,0 +1,155 @@
+/**
+ * useUsers Hook - User list management with pagination and search
+ *
+ * Features:
+ * - Fetch users from GET /api/v1/admin/users with pagination
+ * - Search by username or user_id
+ * - Loading and error states
+ * - Refresh capability
+ */
+
+import { useState, useEffect, useCallback } from 'react'
+import { api } from '@/lib/apiClient'
+
+/**
+ * User interface matching backend API response
+ */
+export interface User {
+  id: string
+  user_id: string
+  username: string
+  email: string
+  is_admin: boolean
+  is_disabled: boolean
+  created_at: string
+  updated_at?: string
+  last_login?: string
+}
+
+/**
+ * Pagination state interface
+ */
+export interface UserListResponse {
+  items: User[]
+  total: number
+  page: number
+  per_page: number
+  total_pages: number
+}
+
+/**
+ * Hook options for user list configuration
+ */
+export interface UseUsersOptions {
+  page?: number
+  perPage?: number
+  search?: string
+}
+
+/**
+ * Hook return type
+ */
+export interface UseUsersReturn {
+  users: User[]
+  pagination: {
+    page: number
+    perPage: number
+    total: number
+    totalPages: number
+  }
+  isLoading: boolean
+  error: string | null
+  refresh: () => Promise<void>
+  nextPage: () => Promise<void>
+  prevPage: () => Promise<void>
+  goToPage: (page: number) => Promise<void>
+}
+
+/**
+ * Custom hook for user list management
+ */
+export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
+  const [data, setData] = useState<UserListResponse | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchUsers = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const params = new URLSearchParams({
+        page: String(options.page || 1),
+        per_page: String(options.perPage || 10),
+        ...(options.search && { search: options.search }),
+      })
+      const response = await api.get<UserListResponse>(`/api/v1/admin/users?${params}`)
+      setData(response)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch users')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [options.page, options.perPage, options.search])
+
+  useEffect(() => {
+    fetchUsers()
+  }, [fetchUsers])
+
+  const nextPage = async () => {
+    const currentPage = data?.page || 1
+    const totalPages = data?.total_pages || 1
+    if (currentPage < totalPages) {
+      const newPage = currentPage + 1
+      const params = new URLSearchParams({
+        page: String(newPage),
+        per_page: String(options.perPage || 10),
+        ...(options.search && { search: options.search }),
+      })
+      const response = await api.get<UserListResponse>(`/api/v1/admin/users?${params}`)
+      setData(response)
+    }
+  }
+
+  const prevPage = async () => {
+    const currentPage = data?.page || 1
+    if (currentPage > 1) {
+      const newPage = currentPage - 1
+      const params = new URLSearchParams({
+        page: String(newPage),
+        per_page: String(options.perPage || 10),
+        ...(options.search && { search: options.search }),
+      })
+      const response = await api.get<UserListResponse>(`/api/v1/admin/users?${params}`)
+      setData(response)
+    }
+  }
+
+  const goToPage = async (page: number) => {
+    const totalPages = data?.total_pages || 1
+    if (page >= 1 && page <= totalPages) {
+      const params = new URLSearchParams({
+        page: String(page),
+        per_page: String(options.perPage || 10),
+        ...(options.search && { search: options.search }),
+      })
+      const response = await api.get<UserListResponse>(`/api/v1/admin/users?${params}`)
+      setData(response)
+    }
+  }
+
+  return {
+    users: data?.items || [],
+    pagination: {
+      page: data?.page || 1,
+      perPage: data?.per_page || 10,
+      total: data?.total || 0,
+      totalPages: data?.total_pages || 0,
+    },
+    isLoading,
+    error,
+    refresh: fetchUsers,
+    nextPage,
+    prevPage,
+    goToPage,
+  }
+}
