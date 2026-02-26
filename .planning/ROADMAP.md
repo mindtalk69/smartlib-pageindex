@@ -49,12 +49,12 @@
   2. Non-admin users are automatically redirected to /app with access denied message
   3. Admin can toggle between dark and light themes with preference persisted across sessions
   4. Admin can log out from any page and be redirected to login
-**Plans**: TBD
+**Plans**: 3
 
 Plans:
-- [ ] 03-01: React app setup with shadcn/ui components and TypeScript configuration
-- [ ] 03-02: Layout components (Sidebar, Header, ThemeToggle) with responsive design
-- [ ] 03-03: Authentication integration with JWT validation and admin-only access control
+- [ ] 03-01-PLAN.md — React app setup with shadcn/ui components and TypeScript configuration
+- [ ] 03-02-PLAN.md — Layout components (Sidebar, Header, ThemeToggle) with responsive design
+- [ ] 03-03-PLAN.md — Authentication integration with JWT validation and admin-only access control
 
 #### Phase 4: Dashboard & User Management
 **Goal**: System statistics dashboard and comprehensive user CRUD operations
