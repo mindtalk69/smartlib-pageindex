@@ -10,12 +10,18 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
 import { ThemeToggle } from "./ThemeToggle"
+import { useAdminAuth } from "../../hooks/useAdminAuth"
 
 export function Header() {
-  const handleLogout = () => {
-    console.log("Logout clicked")
-    // Will be connected to auth context in plan 03-03
+  const { logout, admin } = useAdminAuth()
+
+  const handleLogout = async () => {
+    await logout()
   }
+
+  const userInitials = admin?.username
+    ? admin.username.substring(0, 2).toUpperCase()
+    : "AD"
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6">
@@ -28,7 +34,7 @@ export function Header() {
             <Button variant="ghost" className="relative h-9 w-9 rounded-full">
               <Avatar className="h-9 w-9">
                 <AvatarFallback className="bg-primary text-primary-foreground">
-                  AD
+                  {userInitials}
                 </AvatarFallback>
               </Avatar>
             </Button>
@@ -36,9 +42,11 @@ export function Header() {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">Admin User</p>
+                <p className="text-sm font-medium leading-none">
+                  {admin?.username || "Admin User"}
+                </p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  admin@smartlib.local
+                  {admin?.email || "admin@smartlib.local"}
                 </p>
               </div>
             </DropdownMenuLabel>
