@@ -36,9 +36,9 @@ Requirements for Admin Dashboard (React frontend at /admin-app).
 
 ### User Management (USER)
 
-- [ ] **USER-01**: List all users with pagination (10 per page)
-- [ ] **USER-02**: Search users by username or user_id
-- [ ] **USER-03**: View user details (username, email, is_admin, is_disabled, created_at)
+- [x] **USER-01**: List all users with pagination (10 per page)
+- [x] **USER-02**: Search users by username or user_id
+- [x] **USER-03**: View user details (username, email, is_admin, is_disabled, created_at)
 - [ ] **USER-04**: Toggle user admin status (grant/revoke admin)
 - [ ] **USER-05**: Toggle user active status (enable/disable account)
 - [ ] **USER-06**: Reset user password (generate temporary password)
@@ -220,9 +220,9 @@ frontend/
 | DASH-03 | Phase 4 | Complete (04-02) |
 | DASH-04 | Phase 4 | Complete (04-01) |
 | DASH-05 | Phase 4 | Complete (04-01) |
-| USER-01 | Phase 4 | Pending |
-| USER-02 | Phase 4 | Pending |
-| USER-03 | Phase 4 | Pending |
+| USER-01 | Phase 4 | Complete (04-03) |
+| USER-02 | Phase 4 | Complete (04-03) |
+| USER-03 | Phase 4 | Complete (04-03) |
 | USER-04 | Phase 4 | Pending |
 | USER-05 | Phase 4 | Pending |
 | USER-06 | Phase 4 | Pending |
