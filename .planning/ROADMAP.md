@@ -68,7 +68,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 04-01: Dashboard page with stat cards and charts (Library Ref, Users per Library, File vs URL, Knowledge Stats)
+- [x] 04-01: Dashboard components (useDashboardData hook, StatCard, ChartSection) - completed 2026-02-27
 - [ ] 04-02: User management list with pagination, search, and user details view
 - [ ] 04-03: User actions (toggle admin/status, password reset, delete) with confirmations
 - [ ] 04-04: Password reset requests management (approve/deny with admin notes)
@@ -128,8 +128,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|-----------|----------------|--------|-----------|
 | 1. API Foundation | v1.0 | 5/5 | Complete | 2026-02-25 |
 | 2. Frontend User App | v1.0 | 6/6 | Complete | 2026-02-26 |
-| 3. Frontend Infrastructure & Auth | v1.1 | 0/3 | Not started | - |
-| 4. Dashboard & User Management | v1.1 | 0/4 | Not started | - |
+| 3. Frontend Infrastructure & Auth | v1.1 | 3/3 | Complete | 2026-02-26 |
+| 4. Dashboard & User Management | v1.1 | 1/4 | In progress | - |
 | 5. LLM/Model/Language Management | v1.1 | 0/4 | Not started | - |
 | 6. Content Management & Settings | v1.1 | 0/4 | Not started | - |
 
@@ -150,4 +150,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 ---
 
-*Last updated: 2026-02-26 after v1.1 roadmap creation*
+*Last updated: 2026-02-27 after 04-01 Dashboard Components completion*

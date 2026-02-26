@@ -28,11 +28,11 @@ Requirements for Admin Dashboard (React frontend at /admin-app).
 
 ### Dashboard (DASH)
 
-- [ ] **DASH-01**: Stats cards showing user count, file count, message count
+- [x] **DASH-01**: Stats cards showing user count, file count, message count
 - [ ] **DASH-02**: Statistics charts (Library Ref Distribution, Users per Library, File vs URL, Knowledge Stats)
 - [ ] **DASH-03**: User reference statistics table
-- [ ] **DASH-04**: Chart toggle buttons to switch between views
-- [ ] **DASH-05**: Real-time data refresh capability
+- [x] **DASH-04**: Chart toggle buttons to switch between views
+- [x] **DASH-05**: Real-time data refresh capability
 
 ### User Management (USER)
 
@@ -215,11 +215,11 @@ frontend/
 | AUTH-02 | Phase 3 | Pending |
 | AUTH-03 | Phase 3 | Pending |
 | AUTH-04 | Phase 3 | Pending |
-| DASH-01 | Phase 4 | Pending |
+| DASH-01 | Phase 4 | Complete (04-01) |
 | DASH-02 | Phase 4 | Pending |
 | DASH-03 | Phase 4 | Pending |
-| DASH-04 | Phase 4 | Pending |
-| DASH-05 | Phase 4 | Pending |
+| DASH-04 | Phase 4 | Complete (04-01) |
+| DASH-05 | Phase 4 | Complete (04-01) |
 | USER-01 | Phase 4 | Pending |
 | USER-02 | Phase 4 | Pending |
 | USER-03 | Phase 4 | Pending |
@@ -266,4 +266,4 @@ frontend/
 ---
 
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-26 after roadmap creation*
+*Last updated: 2026-02-27 after 04-01 Dashboard Components completion*
