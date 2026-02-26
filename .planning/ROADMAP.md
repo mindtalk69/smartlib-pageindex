@@ -72,6 +72,7 @@ Plans:
 - [x] 04-02: Dashboard integration (Dashboard page, UserStatsTable, UI components) - completed 2026-02-27
 - [x] 04-03: User management list (useUsers hook, UserList table, UserDialog) - completed 2026-02-27
 - [x] 04-04: User actions (toggle admin/status, password reset, delete) with confirmations - completed 2026-02-27
+- [x] 04-05: Password reset requests management (approve/deny with admin notes) - completed 2026-02-27
 
 #### Phase 5: LLM, Model & Language Management
 **Goal**: Complete AI configuration interface for providers, models, and languages
@@ -129,7 +130,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. API Foundation | v1.0 | 5/5 | Complete | 2026-02-25 |
 | 2. Frontend User App | v1.0 | 6/6 | Complete | 2026-02-26 |
 | 3. Frontend Infrastructure & Auth | v1.1 | 3/3 | Complete | 2026-02-26 |
-| 4. Dashboard & User Management | v1.1 | 4/4 | Complete | 2026-02-27 |
+| 4. Dashboard & User Management | v1.1 | 5/5 | Complete | 2026-02-27 |
 | 5. LLM/Model/Language Management | v1.1 | 0/4 | Not started | - |
 | 6. Content Management & Settings | v1.1 | 0/4 | Not started | - |
 
@@ -150,4 +151,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 ---
 
-*Last updated: 2026-02-27 after 04-04 User Action Operations completion*
+*Last updated: 2026-02-27 after 04-05 Password Reset Requests Management completion*

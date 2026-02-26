@@ -43,9 +43,9 @@ Requirements for Admin Dashboard (React frontend at /admin-app).
 - [x] **USER-05**: Toggle user active status (enable/disable account)
 - [x] **USER-06**: Reset user password (generate temporary password)
 - [x] **USER-07**: Delete user (with confirmation)
-- [ ] **USER-08**: View password reset requests (pending, completed, denied)
-- [ ] **USER-09**: Approve password reset request (generate temp password)
-- [ ] **USER-10**: Deny password reset request (with admin notes)
+- [x] **USER-08**: View password reset requests (pending, completed, denied)
+- [x] **USER-09**: Approve password reset request (generate temp password)
+- [x] **USER-10**: Deny password reset request (with admin notes)
 
 ### LLM Provider Management (PROV)
 
@@ -227,9 +227,9 @@ frontend/
 | USER-05 | Phase 4 | Complete (04-04) |
 | USER-06 | Phase 4 | Complete (04-04) |
 | USER-07 | Phase 4 | Complete (04-04) |
-| USER-08 | Phase 4 | Pending |
-| USER-09 | Phase 4 | Pending |
-| USER-10 | Phase 4 | Pending |
+| USER-08 | Phase 4 | Complete (04-05) |
+| USER-09 | Phase 4 | Complete (04-05) |
+| USER-10 | Phase 4 | Complete (04-05) |
 | PROV-01 | Phase 5 | Pending |
 | PROV-02 | Phase 5 | Pending |
 | PROV-03 | Phase 5 | Pending |
@@ -266,4 +266,4 @@ frontend/
 ---
 
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-27 after 04-01 Dashboard Components completion*
+*Last updated: 2026-02-27 after 04-05 Password Reset Requests Management completion*
