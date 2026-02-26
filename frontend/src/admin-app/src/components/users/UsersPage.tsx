@@ -74,42 +74,70 @@ function UsersPageContent({ page, perPage, search, onPageChange, onSearchChange 
 
   // Handle toggle admin status
   const handleToggleAdmin = useCallback(async (userId: string) => {
-    const result = await actions.toggleAdmin(userId)
-    if (result.success) {
-      toast.success('Admin status updated')
-    } else {
-      toast.error(result.error || 'Failed to update admin status')
+    try {
+      const result = await actions.toggleAdmin(userId)
+      if (result.success) {
+        toast.success('Admin status updated')
+      } else {
+        toast.error(result.error || 'Failed to update admin status')
+      }
+      return result
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to update admin status'
+      toast.error(errorMsg)
+      return { success: false, error: errorMsg }
     }
   }, [actions])
 
   // Handle toggle active status
   const handleToggleActive = useCallback(async (userId: string) => {
-    const result = await actions.toggleActive(userId)
-    if (result.success) {
-      toast.success('User status updated')
-    } else {
-      toast.error(result.error || 'Failed to update user status')
+    try {
+      const result = await actions.toggleActive(userId)
+      if (result.success) {
+        toast.success('User status updated')
+      } else {
+        toast.error(result.error || 'Failed to update user status')
+      }
+      return result
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to update user status'
+      toast.error(errorMsg)
+      return { success: false, error: errorMsg }
     }
   }, [actions])
 
   // Handle reset password
   const handleResetPassword = useCallback(async (userId: string) => {
-    const result = await actions.resetPassword(userId)
-    if (result.success && result.tempPassword) {
-      navigator.clipboard.writeText(result.tempPassword)
-      toast.success(`Password reset. Temp: ${result.tempPassword} (copied)`)
-    } else {
-      toast.error(result.error || 'Failed to reset password')
+    try {
+      const result = await actions.resetPassword(userId)
+      if (result.success && result.tempPassword) {
+        navigator.clipboard.writeText(result.tempPassword)
+        toast.success(`Password reset. Temp: ${result.tempPassword} (copied)`)
+      } else if (result.error) {
+        toast.error(result.error)
+      }
+      return result
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to reset password'
+      toast.error(errorMsg)
+      return { success: false, error: errorMsg }
     }
   }, [actions])
 
   // Handle delete user
   const handleDeleteUser = useCallback(async (userId: string) => {
-    const result = await actions.deleteUser(userId)
-    if (result.success) {
-      toast.success('User deleted')
-    } else {
-      toast.error(result.error || 'Failed to delete user')
+    try {
+      const result = await actions.deleteUser(userId)
+      if (result.success) {
+        toast.success('User deleted')
+      } else {
+        toast.error(result.error || 'Failed to delete user')
+      }
+      return result
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to delete user'
+      toast.error(errorMsg)
+      return { success: false, error: errorMsg }
     }
   }, [actions])
 

@@ -68,10 +68,10 @@ export interface UserListProps {
   onRefresh: () => void
   onNextPage: () => void
   onPrevPage: () => void
-  onToggleAdmin?: (userId: string) => Promise<void>
-  onToggleActive?: (userId: string) => Promise<void>
-  onResetPassword?: (userId: string) => Promise<{ tempPassword: string }>
-  onDeleteUser?: (userId: string) => Promise<void>
+  onToggleAdmin?: (userId: string) => Promise<{ success: boolean; error?: string }>
+  onToggleActive?: (userId: string) => Promise<{ success: boolean; error?: string }>
+  onResetPassword?: (userId: string) => Promise<{ success: boolean; tempPassword?: string; error?: string }>
+  onDeleteUser?: (userId: string) => Promise<{ success: boolean; error?: string }>
   onSuccess?: (message: string) => void
   onError?: (message: string) => void
 }
@@ -126,6 +126,12 @@ export function UserList({
   onRefresh,
   onNextPage,
   onPrevPage,
+  onToggleAdmin,
+  onToggleActive,
+  onResetPassword,
+  onDeleteUser,
+  onSuccess,
+  onError,
 }: UserListProps) {
   const [localSearch, setLocalSearch] = useState(search)
   const debouncedSearch = useDebounce(localSearch, 300)

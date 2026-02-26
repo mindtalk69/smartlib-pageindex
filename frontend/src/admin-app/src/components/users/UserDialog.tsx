@@ -29,10 +29,10 @@ export interface UserDialogProps {
   user: User | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  onToggleAdmin?: (userId: string) => Promise<void>
-  onToggleActive?: (userId: string) => Promise<void>
-  onResetPassword?: (userId: string) => Promise<{ tempPassword: string }>
-  onDeleteUser?: (userId: string) => Promise<void>
+  onToggleAdmin?: (userId: string) => Promise<{ success: boolean; error?: string }>
+  onToggleActive?: (userId: string) => Promise<{ success: boolean; error?: string }>
+  onResetPassword?: (userId: string) => Promise<{ success: boolean; tempPassword?: string; error?: string }>
+  onDeleteUser?: (userId: string) => Promise<{ success: boolean; error?: string }>
   onSuccess?: (message: string) => void
   onError?: (message: string) => void
   onRefresh?: () => void
@@ -95,14 +95,20 @@ export function UserDialog({
 
   const handleToggleAdmin = async (userId: string) => {
     if (onToggleAdmin) {
-      await onToggleAdmin(userId)
+      const result = await onToggleAdmin(userId)
+      if (!result.success) {
+        onError?.(result.error || 'Failed to update admin status')
+      }
       onRefresh?.()
     }
   }
 
   const handleToggleActive = async (userId: string) => {
     if (onToggleActive) {
-      await onToggleActive(userId)
+      const result = await onToggleActive(userId)
+      if (!result.success) {
+        onError?.(result.error || 'Failed to update user status')
+      }
       onRefresh?.()
     }
   }
@@ -110,19 +116,22 @@ export function UserDialog({
   const handleResetPassword = async (userId: string) => {
     if (onResetPassword) {
       const result = await onResetPassword(userId)
-      // Copy temp password to clipboard
-      if (result.tempPassword) {
+      if (result.success && result.tempPassword) {
+        // Copy temp password to clipboard
         handleCopyToClipboard(result.tempPassword)
       }
       onRefresh?.()
-      return result
+      return { tempPassword: result.tempPassword || '' }
     }
     return { tempPassword: '' }
   }
 
   const handleDeleteUser = async (userId: string) => {
     if (onDeleteUser) {
-      await onDeleteUser(userId)
+      const result = await onDeleteUser(userId)
+      if (!result.success) {
+        onError?.(result.error || 'Failed to delete user')
+      }
       onRefresh?.()
       onOpenChange(false) // Close dialog after deletion
     }

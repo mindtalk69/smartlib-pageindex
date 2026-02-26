@@ -40,8 +40,8 @@ export function PasswordResetRequests() {
     }
   }
 
-  const handleDeny = async (requestId: string, notes: string) => {
-    const result = await actions.deny(requestId, notes)
+  const handleDeny = async (requestId: string, notes?: string) => {
+    const result = await actions.deny(requestId, notes || '')
     if (result.success) {
       toast.success('Request denied')
       refresh()

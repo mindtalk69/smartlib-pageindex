@@ -22,8 +22,8 @@ interface PasswordResetRequestsListProps {
   statusFilter: 'pending' | 'approved' | 'denied' | 'all'
   onStatusChange: (status: 'pending' | 'approved' | 'denied' | 'all') => void
   onSelectRequest: (request: PasswordResetRequest) => void
-  onApprove: (requestId: string) => void
-  onDeny: (requestId: string) => void
+  onApprove: (requestId: string) => Promise<void>
+  onDeny: (requestId: string, notes?: string) => Promise<void>
   isLoading: boolean
   error: string | null
 }

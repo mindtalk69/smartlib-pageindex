@@ -31,8 +31,8 @@ interface PasswordResetRequestDialogProps {
   request: PasswordResetRequest | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  onApprove: (requestId: string) => Promise<{ tempPassword?: string }>
-  onDeny: (requestId: string, notes: string) => Promise<void>
+  onApprove: (requestId: string) => Promise<void>
+  onDeny: (requestId: string, notes?: string) => Promise<void>
 }
 
 export function PasswordResetRequestDialog({
@@ -52,14 +52,8 @@ export function PasswordResetRequestDialog({
     if (!request) return
     setIsApproving(true)
     try {
-      const result = await onApprove(request.id)
-      if (result.tempPassword) {
-        setTempPassword(result.tempPassword)
-        // Auto-copy to clipboard
-        await navigator.clipboard.writeText(result.tempPassword)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
-      }
+      await onApprove(request.id)
+      // Temp password handling is done by parent via toast notification
     } finally {
       setIsApproving(false)
     }
