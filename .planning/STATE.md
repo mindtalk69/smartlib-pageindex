@@ -1,13 +1,5 @@
 # STATE.md - SmartLib BASIC FastAPI Migration
 
-**Project:** SmartLib BASIC - FastAPI Migration
-**Current Milestone:** v1.1 Admin Dashboard
-**Current Phase:** Not started (defining requirements)
-**Last Updated:** 2026-02-26 - Milestone v1.1 started
-**Progress:** Requirements definition in progress
-
----
-
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-02-26)
@@ -16,278 +8,129 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Current focus:** Milestone v1.1 - Admin Dashboard (/admin-app) - Building custom React frontend to replace SQLAdmin
 
----
+## Current Position
 
-## Active Milestone: v1.1 Admin Dashboard
+Phase: 3 of 6 (Frontend Infrastructure & Authentication)
+Plan: 0 of 3 in current phase
+Status: Ready to plan
+Last activity: 2026-02-26 — v1.1 Admin Dashboard roadmap created
 
-**Goal:** Replace SQLAdmin with custom React frontend at /admin-app including system stats, LLM/model management, and user management.
+Progress: [████████░░░░░░░░░░] 33%
 
-**Target features:**
-- Custom React admin frontend (replace SQLAdmin)
-- System statistics dashboard (users, files, storage, messages, queries)
-- LLM provider management UI (configure OpenAI, Anthropic, local models)
-- Model configuration management UI (temperature, max_tokens, etc.)
-- User management UI (CRUD, roles, activity monitoring)
-- **Based on shadcn/ui with theming support**
+## Performance Metrics
 
----
+**Velocity:**
+- Total plans completed: 11 (Phase 1: 5, Phase 2: 6)
+- Average duration: ~45 min
+- Total execution time: ~8.25 hours
 
-## Completed Phases
+**By Phase:**
 
-**Status:** v1.0 milestone complete
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| 1. API Foundation | 5 | ~4h | ~48min |
+| 2. Frontend User App | 6 | ~4.25h | ~42min |
 
-**Goal:** Migrate existing React /app frontend from Flask session-based auth to FastAPI JWT with hard cut strategy
+**Recent Trend:**
+- Last 5 plans: Wave 2-6 (Phase 2)
+- Trend: Stable (velocity consistent)
 
-**Success Criteria:**
-1. React /app continues working during migration ✓ (Wave 1)
-2. FastAPI compatible endpoints at /api/* ✓ (Wave 1)
-3. Register/login via FastAPI with JWT ✓ (Wave 2)
-4. Upload with progress via FastAPI ✓ (Wave 3)
-5. Manage Libraries/Knowledges via FastAPI ✓ (Wave 3)
-6. Celery tasks triggered correctly ✓ (Wave 3)
-7. View files list via FastAPI ✓ (Wave 4)
-8. Delete files via FastAPI ✓ (Wave 4)
-9. RAG chat history via FastAPI ✓ (Wave 5)
-10. Password reset flow working ✓ (Wave 6 - verified)
-11. Nginx routing configured ✓ (Wave 1)
-
-**Plans:**
-- Wave 1: API Compatibility Analysis & Nginx Bridge ✓ COMPLETE
-- Wave 2: Authentication Migration ✓ COMPLETE (Option B - Hard Cut to JWT)
-- Wave 3: Document Upload Migration ✓ COMPLETE
-- Wave 4: File Management & User Data ✓ COMPLETE
-- Wave 5: RAG Chat Migration ✓ COMPLETE
-- Wave 6: Password Reset & Final Integration ✓ COMPLETE
-
-**Wave 5 Deliverables:**
-- `api/v1/query.py` - Streaming query endpoint with SSE:
-  - `/api/v1/query` - RAG query with real-time streaming
-  - `/api/v1/query/resume_rag` - Resume agent session
-  - `/api/v1/query/confirm_web_search` - Confirm web search
-- `api/v1/threads.py` - Conversation management:
-  - `GET /api/v1/threads` - List user conversations
-  - `GET /api/v1/threads/{thread_id}` - Get thread details
-  - `DELETE /api/v1/threads/{thread_id}` - Delete thread
-  - `GET /api/v1/threads/{thread_id}/messages` - List messages
-- `api/v1/feedback.py` - Message feedback:
-  - `POST /api/v1/message/feedback` - Thumbs up/down
-  - `GET /api/v1/message/metadata` - Message metadata
-- `api/v1/config.py` - App configuration:
-  - `GET /api/v1/config` - App configuration
-  - `GET /api/v1/branding` - Public branding
-- `api/v1/visual.py` - Visual evidence endpoint
-- `api/v1/documents.py` - Document metadata:
-  - `GET /api/v1/document-meta` - Document metadata
-  - `GET /api/v1/get-document-chunk` - Document chunk
-  - `GET /api/v1/self-retriever-questions` - Suggested questions
-- `schemas.py` - Added 4 new schemas:
-  - `ThreadInfo` - Conversation thread info
-  - `Message` - Chat message format
-  - `FeedbackRequest` - Feedback request
-  - `FeedbackResponse` - Feedback response
-- `main_fastapi.py` - Added 6 route imports
-- `wave-5-SUMMARY.md` - Wave 5 completion summary
-
-**Wave 5 Notes:**
-- Streaming SSE matches Flask format exactly for frontend compatibility
-- JWT authentication enforced with user ID verification
-- Message history tracked with `MessageHistory` model
-- Thread deletion removes all associated messages via cascade deletes
-- Visual evidence returns placeholder (actual implementation TODO)
-- Self-retriever returns static questions (LLM-based generation TODO)
-- Document chunk returns mock data (vector store integration TODO)
-- Wave 4: File CRUD already provided by `CRUDRouter` with ownership filtering
-- Custom delete handler removes vectors from sqlite-vec via cascade deletes
-- File download searches `DATA_VOLUME_PATH/uploaded_files/` and `uploads/` directories
-- User stats include file count, storage used, message count, library/knowledge counts
-- Known limitation: File path discovery assumes standard directory structure
-
-**Wave 6 Deliverables:**
-- Verification of password reset endpoint (`/api/v1/auth/forgot-password`)
-- Documentation of JWT frontend usage (AuthContext.tsx, apiClient.ts)
-- CSRF evaluation (not needed with JWT)
-- Nginx routing documentation for FastAPI switch
-- Integration testing checklist with all 11 criteria verified
-- `wave-6-SUMMARY.md` - Complete Phase 2 migration summary
-
-**Wave 6 Notes:**
-- Password reset endpoint implemented in Wave 2, verified working
-- Frontend already configured for JWT (no changes needed)
-- JWT Bearer tokens eliminate CSRF requirement
-- Nginx configured for dual-backend with manual switch option
-- All 11 success criteria verified and documented
-- Phase 2 migration complete, ready for production cutover
-
-**UAT Verification (2026-02-26):**
-- 30 tests executed, 18 passed, 12 skipped (infrastructure dependencies)
-- 0 test failures
-- All core authentication, user management, libraries/knowledges, file upload, and config endpoints verified
-- Router prefix issues fixed (double `/api/v1` paths)
-- Missing schemas added (QueryRequest, ResumeRequest, WebSearchConfirmRequest)
-- password_reset_requests table created in database
-- Authentication pattern fixed in threads/feedback endpoints (dependency injection)
-- **UAT Report:** `.planning/phases/02-frontend-user-app/02-frontend-user-app-UAT.md`
-
-**Bugs Fixed During UAT:**
-1. Missing `QueryRequest` schema in schemas.py
-2. Missing `ResumeRequest` and `WebSearchConfirmRequest` schemas
-3. `password_reset_requests` table missing from smartlib.db
-4. Router prefix double-path issue in 6 files:
-   - api/v1/threads.py
-   - api/v1/feedback.py
-   - api/v1/query.py
-   - api/v1/config.py
-   - api/v1/visual.py
-   - api/v1/documents.py
-5. Auth pattern in threads/feedback (changed from manual token passing to dependency injection)
-
-**Wave 3 Deliverables:**
-- `main_fastapi.py` - Added 8 upload/URL/libraries endpoints:
-  - POST `/api/v1/upload` - File upload with Celery task submission
-  - POST `/api/v1/check-duplicates` - Duplicate filename detection
-  - GET `/api/v1/upload-status` - Upload task status tracking
-  - POST `/api/v1/upload-status/{task_id}/dismiss` - Dismiss completed task
-  - POST `/api/v1/validate_url` - URL validation
-  - POST `/api/v1/process-url` - URL download and processing
-  - GET `/api/v1/libraries` - Libraries with permission-filtered knowledges
-  - GET `/api/v1/knowledges` - Knowledges with library mappings
-- `schemas.py` - Added 15+ upload/library schemas
-- `modules/models.py` - Added `UrlDownload` model, `knowledge_groups_association` table, Group-Knowledge relationships
-- `modules/access_control.py` - Updated for SQLModel/SQLAlchemy compatibility
-- `wave-3-SUMMARY.md` - Wave 3 completion summary
-
-**Wave 3 Notes:**
-- Celery task integration reuses existing `submit_file_processing_task()` wrapper
-- Redis task tracking uses same keys as Flask: `user:{user_id}:upload_tasks`
-- Permission filtering via `modules.access_control.get_user_group_ids()` and `filter_accessible_knowledges()`
-- Respects `VECTOR_STORE_MODE` environment variable
-- Known limitation: Library-knowledge association not fully implemented (returns all knowledges for each library)
-
-**Wave 2 Deliverables:**
-- `main_fastapi.py` - Fixed duplicate endpoints, added `/api/v1/auth/me`, `/api/v1/auth/logout`, `/api/v1/auth/forgot-password`
-- `modules/models.py` - Added `PasswordResetRequest` model
-- `schemas.py` - Added `ForgotPasswordRequest` schema
-- `WAVE-2-SUMMARY.md` - Wave 2 completion summary
-
-**Wave 2 Notes:**
-- User selected Option B (Hard Cut to JWT) - lower risk, allows gradual testing
-- Frontend already configured for JWT (`AuthContext.tsx`, `apiClient.ts`)
-- Password reset creates record but email sending is TODO
-
-**Wave 1 Deliverables:**
-- `API_CONTRACTS.md` - 34 Flask API endpoints documented
-- `main_fastapi.py` - 8 Flask-compatible endpoints added
-- `nginx.conf` - Dual-backend routing configured
-- `wave-1-SUMMARY.md` - Wave 1 completion summary
-
-**Wave 1 Notes:**
-- All auth endpoints documented with request/response schemas
-- FastAPI compatibility layer returns Flask-compatible format
-- Nginx configured for path-based routing
-- Known limitation: Libraries/knowledges simplified (no permission filtering yet)
-
----
-
-## Completed Phases
-
-### Phase 1: API Foundation (2026-02-25)
-
-**Waves:** 5/5 complete
-
-**Summary:** FastAPI migration with JWT authentication, CRUD endpoints for all 11 models, admin user management API, and OpenAPI documentation.
-
-**Key deliverables:**
-- `modules/auth.py` - JWT authentication utilities
-- `modules/schemas.py` - Pydantic schemas for auth
-- `main_fastapi.py` - FastAPI app with all endpoints
-- Admin endpoints at `/api/v1/admin/*`
-- OpenAPI docs at `/docs`
-
-**Issues fixed during Wave 5:**
-- Admin stats endpoint returning SQLModel objects instead of scalar counts
-
----
+*Updated after Phase 2 completion*
 
 ## Accumulated Context
 
-### Roadmap Evolution
+### Decisions
 
-- 2026-02-24: Initial roadmap created with 5 phases
-  - Phase 1: API Foundation (12 requirements)
-  - Phase 2: Frontend - User App (13 requirements)
-  - Phase 3: Admin Dashboard (3 requirements)
-  - Phase 4: RAG Integration (8 requirements)
-  - Phase 5: Coexistence & Migration (5 requirements)
+Decisions are logged in PROJECT.md Key Decisions table.
+Recent decisions affecting current work:
 
-### Key Decisions
+- **Phase 1 (v1.0):** FastAPI + Uvicorn selected for async performance and auto-generated OpenAPI docs
+- **Phase 2 (v1.0):** Path-based nginx routing for gradual migration (no feature flags)
+- **Phase 2 (v1.0):** JWT hard cut strategy (no dual-auth complexity)
+- **Phase 3 (v1.1):** Custom React admin frontend using shadcn/ui (not SQLAdmin)
 
-- YOLO mode for workflow (auto-approve phases)
-- Quick depth (5-8 phases, 3-5 plans each)
-- Parallel execution for independent plans
-- Research enabled before each phase
-- Plan checker and verifier enabled
-- **2026-02-25:** Phase 2 Wave 1 - Path-based nginx routing (no feature flags)
-- **2026-02-25:** Flask-compatible response format for gradual migration
+### Pending Todos
+
+[From .planning/todos/pending/ — ideas captured during sessions]
+
+None yet.
+
+### Blockers/Concerns
+
+[Issues that affect future work]
+
+None yet.
+
+## Session Continuity
+
+Last session: 2026-02-26
+Stopped at: v1.1 Admin Dashboard roadmap created with 4 phases (3-6), 55 requirements mapped
+Resume file: None
+
+## v1.0 Summary: Shipped 2026-02-26
+
+### Phase 1: API Foundation (5 waves)
+
+**Goal:** FastAPI server with JWT authentication and basic CRUD endpoints
+
+**Delivered:**
+- FastAPI + Uvicorn on port 8001
+- JWT authentication system with register/login/logout/password reset
+- CRUD endpoints for all 11 SQLModel models
+- Admin API endpoints at `/api/v1/admin/*`
+- OpenAPI documentation at `/docs`
+
+### Phase 2: Frontend User App Migration (6 waves + UAT)
+
+**Goal:** Migrate React /app from Flask sessions to FastAPI JWT
+
+**Delivered:**
+- Wave 1: API compatibility layer + nginx dual-backend routing
+- Wave 2: JWT authentication (hard cut strategy)
+- Wave 3: Document upload with Celery integration
+- Wave 4: File management and user data
+- Wave 5: RAG chat history with SSE streaming
+- Wave 6: Password reset flow and final integration
+
+**UAT Verification:**
+- 30 tests executed, 18 passed, 12 skipped (infrastructure dependencies)
+- 0 test failures
+- All core functionality verified
+
+**Bugs Fixed During UAT:**
+1. Missing schemas (QueryRequest, ResumeRequest, WebSearchConfirmRequest)
+2. Missing password_reset_requests table
+3. Router prefix double-path issue (6 files)
+4. Auth pattern in threads/feedback (dependency injection)
+
+## v1.1 Admin Dashboard: In Progress
+
+**Milestone Goal:** Custom React admin frontend at /admin-app with system stats, user management, LLM configuration, and content management capabilities.
+
+**Phase 3: Frontend Infrastructure & Authentication**
+- Requirements: 10 (FE-01 to FE-06, AUTH-01 to AUTH-04)
+- Goal: Admin app foundation with React setup, authentication flow, and UI framework
+- Success Criteria:
+  1. Admin can access /admin-app and see authenticated dashboard layout with sidebar navigation
+  2. Non-admin users are automatically redirected to /app with access denied message
+  3. Admin can toggle between dark and light themes with preference persisted across sessions
+  4. Admin can log out from any page and be redirected to login
+
+**Phase 4: Dashboard & User Management**
+- Requirements: 15 (DASH-01 to DASH-05, USER-01 to USER-10)
+- Goal: System statistics dashboard and comprehensive user CRUD operations
+
+**Phase 5: LLM, Model & Language Management**
+- Requirements: 20 (PROV-01 to PROV-08, MODEL-01 to MODEL-07, LANG-01 to LANG-05)
+- Goal: Complete AI configuration interface for providers, models, and languages
+
+**Phase 6: Content Management & Settings**
+- Requirements: 10 (CONTENT-01 to CONTENT-07, SET-01 to SET-03)
+- Goal: Activity logs, content oversight, and application settings
+
+**Total v1.1 Requirements:** 55
+**Total Phases:** 4 (3-6)
+**Estimated Plans:** 15 (3-4 per phase)
 
 ---
-
-## Open Questions
-
-Phase 2 complete. Ready for Phase 3 (Admin Dashboard) or production cutover.
-
----
-
-## Workflow State
-
-```json
-{
-  "mode": "yolo",
-  "depth": "quick",
-  "parallelization": true,
-  "commit_docs": true,
-  "model_profile": "balanced",
-  "workflow": {
-    "research": true,
-    "plan_check": true,
-    "verifier": true
-  }
-}
-```
-
----
-
-## Completed Phase 2: Frontend User App Migration
-
-**Status:** COMPLETE (UAT VERIFIED)
-**Duration:** Waves 1-6 + UAT (2026-02-25 to 2026-02-26)
-**Result:** React frontend successfully migrated from Flask sessions to FastAPI JWT authentication
-
-**Key Achievements:**
-- ✅ All 11 success criteria met
-- ✅ JWT authentication with token refresh
-- ✅ Complete feature parity maintained
-- ✅ Dual-backend nginx routing configured
-- ✅ UAT passed (18/30 tests, 0 failures, 12 skips for infra dependencies)
-
-**UAT Results:**
-- 30 tests executed across 6 waves
-- 18 tests passed (60%) - all core functionality verified
-- 12 tests skipped (40%) - require Redis/Celery or test data
-- 0 failures
-- 5 bugs fixed during testing
-
-**Production Readiness:**
-- ✅ FastAPI server running on port 8001
-- ✅ All core endpoints functional
-- ⚠️ Requires: Redis, Celery worker, and frontend FastAPI endpoint configuration
-
-**Next Steps:**
-- Phase 3: Admin Dashboard migration
-- Or production deployment with:
-  1. Redis configuration
-  2. Celery worker setup
-  3. Frontend updated to use FastAPI endpoints
-  4. Nginx routing switch to FastAPI
-
----
-*Last updated: 2026-02-26 - Phase 2 UAT Complete*
+*Last updated: 2026-02-26 - v1.1 Admin Dashboard roadmap created*

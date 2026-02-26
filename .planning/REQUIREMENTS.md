@@ -203,9 +203,67 @@ frontend/
 
 ## Traceability
 
-*To be populated during roadmap creation*
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| FE-01 | Phase 3 | Pending |
+| FE-02 | Phase 3 | Pending |
+| FE-03 | Phase 3 | Pending |
+| FE-04 | Phase 3 | Pending |
+| FE-05 | Phase 3 | Pending |
+| FE-06 | Phase 3 | Pending |
+| AUTH-01 | Phase 3 | Pending |
+| AUTH-02 | Phase 3 | Pending |
+| AUTH-03 | Phase 3 | Pending |
+| AUTH-04 | Phase 3 | Pending |
+| DASH-01 | Phase 4 | Pending |
+| DASH-02 | Phase 4 | Pending |
+| DASH-03 | Phase 4 | Pending |
+| DASH-04 | Phase 4 | Pending |
+| DASH-05 | Phase 4 | Pending |
+| USER-01 | Phase 4 | Pending |
+| USER-02 | Phase 4 | Pending |
+| USER-03 | Phase 4 | Pending |
+| USER-04 | Phase 4 | Pending |
+| USER-05 | Phase 4 | Pending |
+| USER-06 | Phase 4 | Pending |
+| USER-07 | Phase 4 | Pending |
+| USER-08 | Phase 4 | Pending |
+| USER-09 | Phase 4 | Pending |
+| USER-10 | Phase 4 | Pending |
+| PROV-01 | Phase 5 | Pending |
+| PROV-02 | Phase 5 | Pending |
+| PROV-03 | Phase 5 | Pending |
+| PROV-04 | Phase 5 | Pending |
+| PROV-05 | Phase 5 | Pending |
+| PROV-06 | Phase 5 | Pending |
+| PROV-07 | Phase 5 | Pending |
+| PROV-08 | Phase 5 | Pending |
+| MODEL-01 | Phase 5 | Pending |
+| MODEL-02 | Phase 5 | Pending |
+| MODEL-03 | Phase 5 | Pending |
+| MODEL-04 | Phase 5 | Pending |
+| MODEL-05 | Phase 5 | Pending |
+| MODEL-06 | Phase 5 | Pending |
+| MODEL-07 | Phase 5 | Pending |
+| LANG-01 | Phase 5 | Pending |
+| LANG-02 | Phase 5 | Pending |
+| LANG-03 | Phase 5 | Pending |
+| LANG-04 | Phase 5 | Pending |
+| LANG-05 | Phase 5 | Pending |
+| CONTENT-01 | Phase 6 | Pending |
+| CONTENT-02 | Phase 6 | Pending |
+| CONTENT-03 | Phase 6 | Pending |
+| CONTENT-04 | Phase 6 | Pending |
+| CONTENT-05 | Phase 6 | Pending |
+| CONTENT-06 | Phase 6 | Pending |
+| CONTENT-07 | Phase 6 | Pending |
+| SET-01 | Phase 6 | Pending |
+| SET-02 | Phase 6 | Pending |
+| SET-03 | Phase 6 | Pending |
+
+**Coverage:** 55/55 requirements mapped ✓
 
 ---
 
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-26 after initial definition*
+*Last updated: 2026-02-26 after roadmap creation*
