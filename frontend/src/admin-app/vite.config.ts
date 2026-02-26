@@ -1,9 +1,14 @@
 import path from "path"
+import { fileURLToPath } from "url"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
 export default defineConfig({
+  // Set root to current directory to prevent scanning parent
+  root: __dirname,
   // Base path: /admin-app/ for production build
   base: '/admin-app/',
   plugins: [react(), tailwindcss()],

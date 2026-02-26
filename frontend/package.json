@@ -4,8 +4,12 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "tsc && vite build",
+        "build": "npm run build:app && npm run build:admin",
+        "build:app": "tsc && vite build",
+        "build:admin": "tsc --project src/admin-app/tsconfig.json && vite build --config src/admin-app/vite.config.ts",
+        "dev:admin": "vite --config src/admin-app/vite.config.ts",
         "preview": "vite preview",
+        "preview:admin": "vite preview --config src/admin-app/vite.config.ts",
         "test": "vitest",
         "test:e2e": "playwright test"
     },
