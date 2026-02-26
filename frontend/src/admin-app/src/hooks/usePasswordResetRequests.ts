@@ -6,11 +6,15 @@
  * - Support status filter parameter (pending/approved/denied/all)
  * - Approve and deny action functions
  * - Loading and error states
- * - Refresh capability
  */
 
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/apiClient'
+
+/**
+ * RequestStatus type for status filtering across all components
+ */
+export type RequestStatus = 'pending' | 'approved' | 'denied' | 'all'
 
 /**
  * PasswordResetRequest interface matching backend API response
@@ -33,7 +37,7 @@ export interface PasswordResetRequest {
  * Hook options for status filtering
  */
 export interface UsePasswordResetRequestsOptions {
-  status?: 'pending' | 'approved' | 'denied' | 'all'
+  status?: RequestStatus
 }
 
 /**

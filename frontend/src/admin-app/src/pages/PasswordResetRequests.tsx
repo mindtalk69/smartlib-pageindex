@@ -14,16 +14,15 @@ import {
   type PasswordResetRequest,
   type ApproveResult,
   type DenyResult,
+  type RequestStatus,
 } from '@/hooks/usePasswordResetRequests'
 import { PasswordResetRequestsList } from '@/components/users/PasswordResetRequests'
 import { PasswordResetRequestDialog } from '@/components/users/PasswordResetRequestDialog'
 import { toast } from 'sonner'
 
-type StatusFilter = 'pending' | 'approved' | 'denied' | 'all'
-
 export function PasswordResetRequests() {
   const [selectedRequest, setSelectedRequest] = useState<PasswordResetRequest | null>(null)
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending')
+  const [statusFilter, setStatusFilter] = useState<RequestStatus>('pending')
 
   const { requests, isLoading, error, refresh, actions } = usePasswordResetRequests({
     status: statusFilter,

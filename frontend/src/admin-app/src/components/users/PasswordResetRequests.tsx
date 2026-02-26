@@ -15,12 +15,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { PasswordResetRequest } from '@/hooks/usePasswordResetRequests'
+import type { PasswordResetRequest, RequestStatus } from '@/hooks/usePasswordResetRequests'
 
 interface PasswordResetRequestsListProps {
   requests: PasswordResetRequest[]
-  statusFilter: 'pending' | 'approved' | 'denied' | 'all'
-  onStatusChange: (status: 'pending' | 'approved' | 'denied' | 'all') => void
+  statusFilter: RequestStatus
+  onStatusChange: (status: RequestStatus) => void
   onSelectRequest: (request: PasswordResetRequest) => void
   onApprove: (requestId: string) => Promise<void>
   onDeny: (requestId: string, notes?: string) => Promise<void>
@@ -44,7 +44,7 @@ export function PasswordResetRequestsList({
   const [sortField, setSortField] = useState<SortField>('requested_at')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
-  const statusTabs: { value: 'pending' | 'approved' | 'denied' | 'all'; label: string }[] = [
+  const statusTabs: { value: RequestStatus; label: string }[] = [
     { value: 'pending', label: 'Pending' },
     { value: 'approved', label: 'Approved' },
     { value: 'denied', label: 'Denied' },
