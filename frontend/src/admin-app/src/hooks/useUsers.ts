@@ -47,6 +47,30 @@ export interface UseUsersOptions {
 }
 
 /**
+ * Action function return types
+ */
+export interface ToggleAdminResult {
+  success: boolean
+  error?: string
+}
+
+export interface ToggleActiveResult {
+  success: boolean
+  error?: string
+}
+
+export interface ResetPasswordResult {
+  success: boolean
+  tempPassword?: string
+  error?: string
+}
+
+export interface DeleteUserResult {
+  success: boolean
+  error?: string
+}
+
+/**
  * Hook return type
  */
 export interface UseUsersReturn {
@@ -63,6 +87,12 @@ export interface UseUsersReturn {
   nextPage: () => Promise<void>
   prevPage: () => Promise<void>
   goToPage: (page: number) => Promise<void>
+  actions: {
+    toggleAdmin: (userId: string) => Promise<ToggleAdminResult>
+    toggleActive: (userId: string) => Promise<ToggleActiveResult>
+    resetPassword: (userId: string) => Promise<ResetPasswordResult>
+    deleteUser: (userId: string) => Promise<DeleteUserResult>
+  }
 }
 
 /**
@@ -137,6 +167,60 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
     }
   }
 
+  // Action functions for user management operations
+  const toggleAdmin = async (userId: string): Promise<ToggleAdminResult> => {
+    try {
+      await api.post(`/api/v1/admin/users/${userId}/toggle-admin`)
+      await fetchUsers() // Refresh list
+      return { success: true }
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to toggle admin status',
+      }
+    }
+  }
+
+  const toggleActive = async (userId: string): Promise<ToggleActiveResult> => {
+    try {
+      await api.post(`/api/v1/admin/users/${userId}/toggle-active`)
+      await fetchUsers() // Refresh list
+      return { success: true }
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to toggle user status',
+      }
+    }
+  }
+
+  const resetPassword = async (userId: string): Promise<ResetPasswordResult> => {
+    try {
+      const result = await api.post<{ temp_password: string }>(
+        `/api/v1/admin/users/${userId}/reset-password`
+      )
+      return { success: true, tempPassword: result.temp_password }
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to reset password',
+      }
+    }
+  }
+
+  const deleteUser = async (userId: string): Promise<DeleteUserResult> => {
+    try {
+      await api.delete(`/api/v1/admin/users/${userId}`)
+      await fetchUsers() // Refresh list
+      return { success: true }
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to delete user',
+      }
+    }
+  }
+
   return {
     users: data?.items || [],
     pagination: {
@@ -151,5 +235,11 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
     nextPage,
     prevPage,
     goToPage,
+    actions: {
+      toggleAdmin,
+      toggleActive,
+      resetPassword,
+      deleteUser,
+    },
   }
 }
