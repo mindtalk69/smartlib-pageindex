@@ -27,21 +27,28 @@ SmartLib BASIC is a RAG (Retrieval-Augmented Generation) application for documen
 - Redis + Celery for async tasks
 - React frontends (/app, /admin-app)
 
-## Next Milestone Goals (v1.1)
+## Current Milestone: v1.1 Admin Dashboard
 
-**Admin Dashboard:**
-- Custom React admin frontend to replace SQLAdmin
-- System statistics dashboard
-- LLM provider management UI
-- Model configuration management UI
-- User management UI
+**Goal:** Replace SQLAdmin with custom React frontend at /admin-app including system stats, LLM/model management, and user management.
+
+**Target features:**
+- Custom React admin frontend (replace SQLAdmin)
+- System statistics dashboard (users, files, storage, messages, queries)
+- LLM provider management UI (configure OpenAI, Anthropic, local models)
+- Model configuration management UI (temperature, max_tokens, etc.)
+- User management UI (CRUD, roles, activity monitoring)
+
+## Future Milestones (v1.2+)
 
 **RAG Integration:**
 - FastAPI endpoints for RAG queries
 - Vector similarity search via sqlite-vec
 - Citation generation from source documents
-- Conversation thread management
 - Suggested follow-up questions
+
+**Production Migration:**
+- Complete Flask cutover
+- Performance optimization
 
 ## Core Value
 
@@ -61,17 +68,20 @@ Users can upload documents (including OCR processing), organize them into librar
 - ✓ Configuration & branding endpoints
 - ✓ Nginx dual-backend routing
 
-### Active
+### Active (v1.1 - Admin Dashboard)
 
 - [ ] Custom React admin frontend (/admin-app)
-- [ ] RAG query endpoint with streaming SSE
-- [ ] Vector similarity search via FastAPI
-- [ ] Citation generation in RAG responses
-- [ ] Suggested follow-up questions
 - [ ] Admin dashboard with system statistics
 - [ ] LLM provider management UI
 - [ ] Model configuration management UI
 - [ ] User management UI
+
+### Deferred (v1.2+ - RAG Integration)
+
+- [ ] RAG query endpoint with streaming SSE (FastAPI side complete)
+- [ ] Vector similarity search via sqlite-vec
+- [ ] Citation generation in RAG responses
+- [ ] Suggested follow-up questions
 
 ### Out of Scope
 
@@ -100,4 +110,4 @@ Users can upload documents (including OCR processing), organize them into librar
 | CRUDRouter Pattern | Standardized API endpoints for all models | ✓ Implemented |
 
 ---
-*Last updated: 2026-02-26 after v1.0 milestone completion*
+*Last updated: 2026-02-26 after v1.1 milestone start*

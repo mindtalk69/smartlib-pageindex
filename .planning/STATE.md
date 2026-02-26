@@ -1,25 +1,38 @@
 # STATE.md - SmartLib BASIC FastAPI Migration
 
 **Project:** SmartLib BASIC - FastAPI Migration
-**Current Phase:** Phase 2 (Frontend User App) - COMPLETE (UAT VERIFIED)
-**Last Updated:** 2026-02-26 - Phase 2 UAT Complete
-**Progress:** Phase 2 COMPLETE - Ready for production deployment
+**Current Milestone:** v1.1 Admin Dashboard
+**Current Phase:** Not started (defining requirements)
+**Last Updated:** 2026-02-26 - Milestone v1.1 started
+**Progress:** Requirements definition in progress
 
 ---
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-24)
+See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Users can upload documents, organize them into libraries/knowledges, and get intelligent answers to questions by querying document vectors via embedding-based retrieval.
 
-**Current focus:** Phase 2 - Frontend User App (/app) - Migrating React frontend from Flask to FastAPI
+**Current focus:** Milestone v1.1 - Admin Dashboard (/admin-app) - Building custom React frontend to replace SQLAdmin
 
 ---
 
-## Active Phase
+## Active Milestone: v1.1 Admin Dashboard
 
-### Phase 2: Frontend User App (/app)
+**Goal:** Replace SQLAdmin with custom React frontend at /admin-app including system stats, LLM/model management, and user management.
+
+**Target features:**
+- Custom React admin frontend (replace SQLAdmin)
+- System statistics dashboard (users, files, storage, messages, queries)
+- LLM provider management UI (configure OpenAI, Anthropic, local models)
+- Model configuration management UI (temperature, max_tokens, etc.)
+- User management UI (CRUD, roles, activity monitoring)
+- **Based on shadcn/ui with theming support**
+
+---
+
+## Completed Phases
 
 **Status:** v1.0 milestone complete
 
