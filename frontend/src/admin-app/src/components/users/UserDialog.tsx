@@ -8,6 +8,7 @@
  * - Badges for role and status
  * - Email as mailto link
  * - Copy button for User ID
+ * - User action buttons (toggle admin, toggle status, reset password, delete)
  * - Loading and error states
  */
 
@@ -22,11 +23,19 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Copy, Mail, User as UserIcon, Shield, AlertCircle, Calendar, Clock } from 'lucide-react'
 import { useState } from 'react'
+import { UserActions } from './UserActions'
 
 export interface UserDialogProps {
   user: User | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onToggleAdmin?: (userId: string) => Promise<void>
+  onToggleActive?: (userId: string) => Promise<void>
+  onResetPassword?: (userId: string) => Promise<{ tempPassword: string }>
+  onDeleteUser?: (userId: string) => Promise<void>
+  onSuccess?: (message: string) => void
+  onError?: (message: string) => void
+  onRefresh?: () => void
 }
 
 /**
@@ -58,7 +67,18 @@ function copyToClipboard(text: string): void {
 /**
  * UserDialog component for displaying user details
  */
-export function UserDialog({ user, open, onOpenChange }: UserDialogProps) {
+export function UserDialog({
+  user,
+  open,
+  onOpenChange,
+  onToggleAdmin,
+  onToggleActive,
+  onResetPassword,
+  onDeleteUser,
+  onSuccess,
+  onError,
+  onRefresh,
+}: UserDialogProps) {
   const [copied, setCopied] = useState(false)
 
   const handleCopyUserId = () => {
@@ -66,6 +86,45 @@ export function UserDialog({ user, open, onOpenChange }: UserDialogProps) {
       copyToClipboard(user.user_id)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  const handleCopyToClipboard = (text: string) => {
+    copyToClipboard(text)
+  }
+
+  const handleToggleAdmin = async (userId: string) => {
+    if (onToggleAdmin) {
+      await onToggleAdmin(userId)
+      onRefresh?.()
+    }
+  }
+
+  const handleToggleActive = async (userId: string) => {
+    if (onToggleActive) {
+      await onToggleActive(userId)
+      onRefresh?.()
+    }
+  }
+
+  const handleResetPassword = async (userId: string) => {
+    if (onResetPassword) {
+      const result = await onResetPassword(userId)
+      // Copy temp password to clipboard
+      if (result.tempPassword) {
+        handleCopyToClipboard(result.tempPassword)
+      }
+      onRefresh?.()
+      return result
+    }
+    return { tempPassword: '' }
+  }
+
+  const handleDeleteUser = async (userId: string) => {
+    if (onDeleteUser) {
+      await onDeleteUser(userId)
+      onRefresh?.()
+      onOpenChange(false) // Close dialog after deletion
     }
   }
 
@@ -203,15 +262,22 @@ export function UserDialog({ user, open, onOpenChange }: UserDialogProps) {
           </div>
         </div>
 
-        {/* Actions - placeholders for future functionality */}
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button
-            variant="outline"
-            disabled
-            title="Coming soon"
-          >
-            Edit User
-          </Button>
+        {/* Action buttons */}
+        <div className="border-t pt-4">
+          <h3 className="text-sm font-medium mb-3">User Actions</h3>
+          <UserActions
+            user={user}
+            onToggleAdmin={handleToggleAdmin}
+            onToggleActive={handleToggleActive}
+            onResetPassword={handleResetPassword}
+            onDeleteUser={handleDeleteUser}
+            onSuccess={onSuccess}
+            onError={onError}
+          />
+        </div>
+
+        {/* Close button */}
+        <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
