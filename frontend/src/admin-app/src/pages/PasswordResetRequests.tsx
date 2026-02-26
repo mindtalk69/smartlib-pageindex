@@ -9,7 +9,12 @@
  */
 
 import { useState } from 'react'
-import { usePasswordResetRequests, type PasswordResetRequest } from '@/hooks/usePasswordResetRequests'
+import {
+  usePasswordResetRequests,
+  type PasswordResetRequest,
+  type ApproveResult,
+  type DenyResult,
+} from '@/hooks/usePasswordResetRequests'
 import { PasswordResetRequestsList } from '@/components/users/PasswordResetRequests'
 import { PasswordResetRequestDialog } from '@/components/users/PasswordResetRequestDialog'
 import { toast } from 'sonner'
@@ -24,8 +29,8 @@ export function PasswordResetRequests() {
     status: statusFilter,
   })
 
-  const handleApprove = async (requestId: string) => {
-    const result = await actions.approve(requestId)
+  const handleApprove = async (requestId: string): Promise<void> => {
+    const result: ApproveResult = await actions.approve(requestId)
     if (result.success) {
       toast.success('Password reset approved', {
         description: result.tempPassword
@@ -40,8 +45,8 @@ export function PasswordResetRequests() {
     }
   }
 
-  const handleDeny = async (requestId: string, notes?: string) => {
-    const result = await actions.deny(requestId, notes || '')
+  const handleDeny = async (requestId: string, notes?: string): Promise<void> => {
+    const result: DenyResult = await actions.deny(requestId, notes || '')
     if (result.success) {
       toast.success('Request denied')
       refresh()
