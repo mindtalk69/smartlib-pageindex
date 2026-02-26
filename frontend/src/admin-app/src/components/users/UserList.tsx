@@ -7,6 +7,7 @@
  * - Search input with debounced filtering
  * - Row click to view user details
  * - Status badges for role and active/disabled
+ * - Actions dropdown menu with quick operations
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -29,7 +30,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Search, X, ChevronLeft, ChevronRight, Eye } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Search,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  MoreHorizontal,
+  Shield,
+  UserCheck,
+  Key,
+  Trash2,
+} from 'lucide-react'
 
 export interface UserListProps {
   users: User[]
@@ -48,6 +68,12 @@ export interface UserListProps {
   onRefresh: () => void
   onNextPage: () => void
   onPrevPage: () => void
+  onToggleAdmin?: (userId: string) => Promise<void>
+  onToggleActive?: (userId: string) => Promise<void>
+  onResetPassword?: (userId: string) => Promise<{ tempPassword: string }>
+  onDeleteUser?: (userId: string) => Promise<void>
+  onSuccess?: (message: string) => void
+  onError?: (message: string) => void
 }
 
 /**
@@ -240,17 +266,83 @@ export function UserList({
                     {formatDate(user.created_at)}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onUserSelect(user)
-                      }}
-                    >
-                      <Eye className="h-4 w-4" />
-                      <span className="sr-only">View details</span>
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                          }}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="sr-only">Open menu</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-[180px]">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onUserSelect(user)
+                          }}
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          View details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onToggleAdmin?.(user.id)
+                              .then(() => onSuccess?.(user.is_admin ? 'Admin rights revoked' : 'Admin rights granted'))
+                              .catch(() => onError?.('Failed to update admin status'))
+                          }}
+                        >
+                          <Shield className="mr-2 h-4 w-4" />
+                          {user.is_admin ? 'Revoke admin' : 'Make admin'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onToggleActive?.(user.id)
+                              .then(() => onSuccess?.(user.is_disabled ? 'User enabled' : 'User disabled'))
+                              .catch(() => onError?.('Failed to update user status'))
+                          }}
+                        >
+                          <UserCheck className="mr-2 h-4 w-4" />
+                          {user.is_disabled ? 'Enable user' : 'Disable user'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onResetPassword?.(user.id)
+                              .then((result) => {
+                                if (result?.tempPassword) {
+                                  navigator.clipboard.writeText(result.tempPassword)
+                                  onSuccess?.(`Password reset. Temp: ${result.tempPassword}`)
+                                }
+                              })
+                              .catch(() => onError?.('Failed to reset password'))
+                          }}
+                        >
+                          <Key className="mr-2 h-4 w-4" />
+                          Reset password
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            // For delete, we still open the dialog for safety
+                            onUserSelect(user)
+                          }}
+                          className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))

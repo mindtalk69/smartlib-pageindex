@@ -9,6 +9,7 @@ import { useState, useCallback } from 'react'
 import { useUsers, User } from '@/hooks/useUsers'
 import { UserList } from '@/components/users/UserList'
 import { UserDialog } from '@/components/users/UserDialog'
+import { toast } from 'sonner'
 
 export interface UsersPageProps {
   page: number
@@ -33,6 +34,7 @@ function UsersPageContent({ page, perPage, search, onPageChange, onSearchChange 
     refresh,
     nextPage,
     prevPage,
+    actions,
   } = useUsers({
     page,
     perPage,
@@ -60,6 +62,16 @@ function UsersPageContent({ page, perPage, search, onPageChange, onSearchChange 
     }
   }, [pagination.page, onPageChange])
 
+  // Handle success messages
+  const handleSuccess = useCallback((message: string) => {
+    toast.success(message)
+  }, [])
+
+  // Handle error messages
+  const handleError = useCallback((message: string) => {
+    toast.error(message)
+  }, [])
+
   return (
     <>
       <UserList
@@ -80,6 +92,13 @@ function UsersPageContent({ page, perPage, search, onPageChange, onSearchChange 
         user={selectedUser}
         open={dialogOpen}
         onOpenChange={handleDialogOpenChange}
+        onToggleAdmin={actions.toggleAdmin}
+        onToggleActive={actions.toggleActive}
+        onResetPassword={actions.resetPassword}
+        onDeleteUser={actions.deleteUser}
+        onSuccess={handleSuccess}
+        onError={handleError}
+        onRefresh={refresh}
       />
     </>
   )
