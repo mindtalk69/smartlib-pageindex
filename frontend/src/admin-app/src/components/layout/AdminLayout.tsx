@@ -1,15 +1,19 @@
-import { Outlet } from "react-router-dom"
+import { ReactNode } from "react"
 import { Header } from "./Header"
 import { Sidebar } from "./Sidebar"
 
-export function AdminLayout() {
+interface AdminLayoutProps {
+  children: ReactNode
+}
+
+export function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <div className="flex">
         <Sidebar />
         <main className="flex-1 p-6">
-          <Outlet />
+          {children}
         </main>
       </div>
     </div>
