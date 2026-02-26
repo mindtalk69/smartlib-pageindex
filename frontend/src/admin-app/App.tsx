@@ -3,12 +3,9 @@ import { AdminAuthProvider } from "./src/contexts/AdminAuthContext"
 import { ProtectedRoute } from "./src/components/auth/ProtectedRoute"
 import { AdminLayout } from "./src/components/layout/AdminLayout"
 import { Dashboard } from "./src/pages/Dashboard"
+import { Users } from "./src/pages/Users"
 
 // Placeholder components - detailed implementations in future phases
-function UsersPage() {
-  return <h1 className="text-2xl font-bold">Users</h1>
-}
-
 function LLMProvidersPage() {
   return <h1 className="text-2xl font-bold">LLM Providers</h1>
 }
@@ -52,7 +49,7 @@ export function App() {
           <Route path="users" element={
             <ProtectedRoute>
               <AdminLayout>
-                <UsersPage />
+                <Users />
               </AdminLayout>
             </ProtectedRoute>
           } />
