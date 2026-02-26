@@ -6,6 +6,7 @@ import {
   MessageSquare,
   Database,
   FileText,
+  Key,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -13,6 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 const menuItems = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/users", icon: Users, label: "Users" },
+  { path: "/password-reset-requests", icon: Key, label: "Password Resets" },
   { path: "/llm-providers", icon: MessageSquare, label: "LLM Providers" },
   { path: "/models", icon: Database, label: "Models" },
   { path: "/languages", icon: FileText, label: "Languages" },

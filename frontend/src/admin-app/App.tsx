@@ -4,6 +4,7 @@ import { ProtectedRoute } from "./src/components/auth/ProtectedRoute"
 import { AdminLayout } from "./src/components/layout/AdminLayout"
 import { Dashboard } from "./src/pages/Dashboard"
 import { Users } from "./src/pages/Users"
+import { PasswordResetRequests } from "./src/pages/PasswordResetRequests"
 
 // Placeholder components - detailed implementations in future phases
 function LLMProvidersPage() {
@@ -50,6 +51,13 @@ export function App() {
             <ProtectedRoute>
               <AdminLayout>
                 <Users />
+              </AdminLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="password-reset-requests" element={
+            <ProtectedRoute>
+              <AdminLayout>
+                <PasswordResetRequests />
               </AdminLayout>
             </ProtectedRoute>
           } />
