@@ -266,4 +266,4 @@ frontend/
 ---
 
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-27 after 04-05 Password Reset Requests Management completion*
+*Last updated: 2026-02-27 after 04-GAP-02 AdminLayout Children Prop Fix completion (LAYOUT-01 gap closed)*
