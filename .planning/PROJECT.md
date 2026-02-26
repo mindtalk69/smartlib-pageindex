@@ -4,61 +4,80 @@
 
 SmartLib BASIC is a RAG (Retrieval-Augmented Generation) application for document management and intelligent Q&A. It allows users to upload documents, extract knowledge via OCR, store vectors in SQLite using sqlite-vec, and chat with documents using LLMs. The project is migrating from Flask to FastAPI for better production performance while keeping the existing Flask app running during transition.
 
+## Current State
+
+**Shipped v1.0 (2026-02-26): FastAPI Foundation**
+- ✅ JWT authentication system with FastAPI
+- ✅ FastAPI server running on port 8001
+- ✅ CRUD endpoints for all 11 SQLModel models
+- ✅ Admin API endpoints at `/api/v1/admin/*`
+- ✅ User registration, login, logout, password reset endpoints
+- ✅ File upload endpoint with progress tracking
+- ✅ Libraries & Knowledges management endpoints
+- ✅ Conversation threads and message history endpoints
+- ✅ Configuration and branding endpoints
+- ✅ Nginx dual-backend routing configured
+- ✅ UAT verified: 18/30 tests passed, 0 failures
+
+**Technical Stack:**
+- FastAPI + Uvicorn (port 8001)
+- Flask (port 8000) - legacy backend
+- SQLModel for database models
+- SQLite with sqlite-vec extension
+- Redis + Celery for async tasks
+- React frontends (/app, /admin-app)
+
+## Next Milestone Goals (v1.1)
+
+**Admin Dashboard:**
+- Custom React admin frontend to replace SQLAdmin
+- System statistics dashboard
+- LLM provider management UI
+- Model configuration management UI
+- User management UI
+
+**RAG Integration:**
+- FastAPI endpoints for RAG queries
+- Vector similarity search via sqlite-vec
+- Citation generation from source documents
+- Conversation thread management
+- Suggested follow-up questions
+
 ## Core Value
 
 Users can upload documents (including OCR processing), organize them into libraries/knowledges, and get intelligent answers to questions by querying document vectors via embedding-based retrieval.
 
 ## Requirements
 
-### Validated
+### Validated (v1.0)
 
-- ✓ Flask backend with SQLAlchemy models - existing production code
-- ✓ sqlite-vec vector storage in SQLite - existing
-- ✓ Document upload with OCR support (Docling + RapidOCR) - existing
-- ✓ LangChain/LangGraph agent for RAG queries - existing
-- ✓ Celery + Redis task queue for background processing - existing
-- ✓ SQLModel models for FastAPI - partial migration complete
-- ✓ SQLAdmin dashboard at /admin - partial migration complete
-- ✓ FastAPI CRUD API endpoints - partial migration complete
+- ✓ JWT authentication system with register/login/logout/password reset
+- ✓ FastAPI CRUD endpoints for all models
+- ✓ OpenAPI documentation at `/docs`
+- ✓ Admin API endpoints for user management
+- ✓ File upload endpoint with Celery integration
+- ✓ Libraries & Knowledges management API
+- ✓ Conversation history API (threads, messages)
+- ✓ Configuration & branding endpoints
+- ✓ Nginx dual-backend routing
 
 ### Active
 
-- [ ] Complete FastAPI API layer to serve frontend (/app and /admin-app)
-- [ ] Migrate all Flask routes to FastAPI endpoints
-- [ ] Ensure both Flask and FastAPI can coexist during migration
-- [ ] Frontend React app (/app) - user-facing interface
-- [ ] Frontend React admin-app (/admin-app) - admin interface
-- [ ] Maintain sqlite-vec vector storage compatibility
-- [ ] Preserve Celery worker integration for document processing
-- [ ] Migrate authentication/authorization from Flask to FastAPI
+- [ ] Custom React admin frontend (/admin-app)
+- [ ] RAG query endpoint with streaming SSE
+- [ ] Vector similarity search via FastAPI
+- [ ] Citation generation in RAG responses
+- [ ] Suggested follow-up questions
+- [ ] Admin dashboard with system statistics
+- [ ] LLM provider management UI
+- [ ] Model configuration management UI
+- [ ] User management UI
 
 ### Out of Scope
 
 - ~~Switching to PostgreSQL/PGVector~~ — sqlite-vec in SQLite is the chosen architecture
 - ~~Replacing Celery with other task queues~~ — Existing Celery + Redis works well
 - ~~Rewriting document processing pipeline~~ — Docling + RapidOCR pipeline stays
-
-## Context
-
-**Current State:**
-- Brownfield project with production Flask app (app.py, main.py)
-- Partial FastAPI migration exists (main_fastapi.py, database_fastapi.py, modules/models.py with SQLModel)
-- SQLAdmin dashboard partially configured for all models
-- CRUD router exists for API endpoints
-- Existing documentation from prior Gemini sessions describes "Turbo" migration approach
-
-**Technical Environment:**
-- Docker Compose deployment (multiple configurations: GPU, CPU, single, prod)
-- Python 3.x with SQLAlchemy, SQLModel, FastAPI, Flask
-- React frontends (frontend/ for /app, admin-frontend/ for /admin-app)
-- SQLite with sqlite-vec extension for vector storage
-- Redis broker for Celery workers
-
-**Prior Work:**
-- Implementation plan from Gemini session: FastAPI + SQLModel + SQLAdmin "Turbo" approach
-- SQLModel models created for: User, Group, Library, Knowledge, UploadedFile, MessageHistory, LLMProvider, ModelConfig, AppSettings, LLMPrompt, LLMLanguage
-- Admin views configured for all models
-- CRUD API router module created
 
 ## Constraints
 
@@ -73,10 +92,12 @@ Users can upload documents (including OCR processing), organize them into librar
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | SQLModel for models | Unify SQLAlchemy models with Pydantic schemas, eliminate code duplication | ✓ Good — already implemented |
-| Custom React Admin Frontend | Replace SQLAdmin with polished custom UI at /admin-app for better UX and branding | ⚠️ Revisit — more work but better user experience |
-| FastAPI + Uvicorn | Async support, auto-generated OpenAPI docs, better production performance | ✓ Good — driver for migration |
-| Keep Flask during migration | Production cannot go down, gradual migration safer | — Pending |
-| CRUDRouter pattern | Standardized API endpoints for all models | — Pending completion |
+| JWT Authentication | Stateless tokens, easier scaling, no CSRF complexity | ✓ Good — v1.0 delivered |
+| Nginx Dual-Backend Routing | Path-based routing allows gradual transition, zero downtime | ✓ Good — v1.0 delivered |
+| Hard Cut to JWT | Faster migration, cleaner codebase vs dual-auth complexity | ✓ Good — v1.0 delivered |
+| Custom React Admin Frontend | Replace SQLAdmin with polished custom UI for better UX | Planned for v1.1 |
+| FastAPI + Uvicorn | Async support, auto-generated OpenAPI docs, better production performance | ✓ Driver for migration |
+| CRUDRouter Pattern | Standardized API endpoints for all models | ✓ Implemented |
 
 ---
-*Last updated: 2026-02-24 after GSD project initialization*
+*Last updated: 2026-02-26 after v1.0 milestone completion*
