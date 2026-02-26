@@ -2,17 +2,9 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { AdminAuthProvider } from "./src/contexts/AdminAuthContext"
 import { ProtectedRoute } from "./src/components/auth/ProtectedRoute"
 import { AdminLayout } from "./src/components/layout/AdminLayout"
+import { Dashboard } from "./src/pages/Dashboard"
 
 // Placeholder components - detailed implementations in future phases
-function AdminDashboard() {
-  return (
-    <div>
-      <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-      <p className="text-muted-foreground mt-2">Welcome to the SmartLib Admin Dashboard</p>
-    </div>
-  )
-}
-
 function UsersPage() {
   return <h1 className="text-2xl font-bold">Users</h1>
 }
@@ -46,7 +38,14 @@ export function App() {
           <Route path="/" element={
             <ProtectedRoute>
               <AdminLayout>
-                <AdminDashboard />
+                <Dashboard />
+              </AdminLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="dashboard" element={
+            <ProtectedRoute>
+              <AdminLayout>
+                <Dashboard />
               </AdminLayout>
             </ProtectedRoute>
           } />
