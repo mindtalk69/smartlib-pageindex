@@ -12,12 +12,12 @@ Requirements for Admin Dashboard (React frontend at /admin-app).
 
 ### Frontend Infrastructure (FE)
 
-- [ ] **FE-01**: Admin app built with React + TypeScript
+- [x] **FE-01**: Admin app built with React + TypeScript
 - [ ] **FE-02**: UI components using shadcn/ui library
 - [ ] **FE-03**: Client-side routing with React Router
 - [ ] **FE-04**: Dark/light theme toggle with persistence
 - [ ] **FE-05**: Responsive admin layout with sidebar navigation
-- [ ] **FE-06**: JWT authentication integration (reuse from /app)
+- [x] **FE-06**: JWT authentication integration (reuse from /app)
 
 ### Authentication (AUTH)
 
@@ -205,12 +205,12 @@ frontend/
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FE-01 | Phase 3 | Pending |
+| FE-01 | Phase 3 | Complete |
 | FE-02 | Phase 3 | Pending |
 | FE-03 | Phase 3 | Pending |
 | FE-04 | Phase 3 | Pending |
 | FE-05 | Phase 3 | Pending |
-| FE-06 | Phase 3 | Pending |
+| FE-06 | Phase 3 | Complete |
 | AUTH-01 | Phase 3 | Pending |
 | AUTH-02 | Phase 3 | Pending |
 | AUTH-03 | Phase 3 | Pending |
