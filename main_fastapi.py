@@ -1445,6 +1445,116 @@ def create_admin_language(
     }
 
 
+@app.post("/api/v1/admin/languages/edit/{language_id}", response_model=LLMLanguageUpdateResponse)
+def update_admin_language(
+    language_id: int,
+    language_data: LLMLanguageUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Update an existing LLM language (admin only).
+
+    Validates:
+    - language_id must exist (404 if not found)
+    - language_code and language_name are required (non-empty, stripped)
+    - language_code must be unique (returns 409 if duplicate)
+    - language_name must be unique (returns 409 if duplicate)
+    - is_active toggle supported (LANG-04)
+    """
+    # Validate required fields
+    if language_data.language_code is None or language_data.language_name is None or language_data.is_active is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="language_code, language_name, and is_active are required"
+        )
+
+    language_code = language_data.language_code.strip()
+    language_name = language_data.language_name.strip()
+    is_active = bool(language_data.is_active)
+
+    if not language_code or not language_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="language_code and language_name must not be empty"
+        )
+
+    # Check if language exists
+    existing_language = db.get(LLMLanguage, language_id)
+    if not existing_language:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Language not found"
+        )
+
+    # Update fields
+    existing_language.language_code = language_code
+    existing_language.language_name = language_name
+    existing_language.is_active = is_active
+
+    try:
+        db.add(existing_language)
+        db.commit()
+        db.refresh(existing_language)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Language code '{language_code}' or name '{language_name}' already exists"
+        )
+
+    language_dict = {
+        "id": existing_language.id,
+        "language_code": existing_language.language_code,
+        "language_name": existing_language.language_name,
+        "is_active": existing_language.is_active,
+        "created_by": existing_language.created_by,
+        "created_at": existing_language.created_at.isoformat() if existing_language.created_at else None,
+    }
+
+    return {
+        "success": True,
+        "message": "Language updated successfully",
+        "language": language_dict,
+    }
+
+
+@app.post("/api/v1/admin/languages/delete/{language_id}", response_model=LLMLanguageDeleteResponse)
+def delete_admin_language(
+    language_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Delete an existing LLM language (admin only).
+
+    Validates:
+    - language_id must exist (404 if not found)
+    """
+    # Check if language exists
+    existing_language = db.get(LLMLanguage, language_id)
+    if not existing_language:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Language not found"
+        )
+
+    try:
+        db.delete(existing_language)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error deleting language: {str(e)}"
+        )
+
+    return {
+        "success": True,
+        "message": "Language deleted successfully",
+    }
+
+
 # Config & Branding endpoints
 @app.get("/api/v1/config")
 async def get_config(current_user: User = Depends(get_current_user)):
