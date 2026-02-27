@@ -5,12 +5,9 @@ import { AdminLayout } from "./src/components/layout/AdminLayout"
 import { Dashboard } from "./src/pages/Dashboard"
 import { Users } from "./src/pages/Users"
 import { PasswordResetRequests } from "./src/pages/PasswordResetRequests"
+import { Providers } from "./src/pages/Providers"
 
 // Placeholder components - detailed implementations in future phases
-function LLMProvidersPage() {
-  return <h1 className="text-2xl font-bold">LLM Providers</h1>
-}
-
 function ModelsPage() {
   return <h1 className="text-2xl font-bold">Models</h1>
 }
@@ -64,7 +61,7 @@ export function App() {
           <Route path="llm-providers" element={
             <ProtectedRoute>
               <AdminLayout>
-                <LLMProvidersPage />
+                <Providers />
               </AdminLayout>
             </ProtectedRoute>
           } />
