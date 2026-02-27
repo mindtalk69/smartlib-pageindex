@@ -99,6 +99,20 @@ metrics:
 
 ---
 
+## Self-Check: PASSED
+
+- [x] All 4 tasks completed
+- [x] Code committed with hash a7bee67
+- [x] Helper functions integrated from modules/llm_provider_utils.py
+- [x] Health status fields present on provider objects
+- [x] Endpoints follow existing FastAPI patterns
+- [x] Admin authentication required on all endpoints
+- [x] SUMMARY.md created with substantive content
+- [x] STATE.md updated with position and decisions
+- [x] ROADMAP.md updated with plan progress
+
+---
+
 ## Verification
 
 All four action endpoints implemented with:
