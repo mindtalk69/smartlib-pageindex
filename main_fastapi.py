@@ -109,11 +109,12 @@ from schemas import (
 from typing import Optional, List
 from fastapi_pagination import add_pagination
 from database_fastapi import DB_PATH
-from sqlmodel import select, update
+from sqlmodel import select, update, func
 from datetime import datetime
 import uuid
 import os
 import json
+import logging
 import redis
 
 
@@ -1525,6 +1526,60 @@ def update_admin_model(
     return {
         "success": True,
         "model": model_dict,
+    }
+
+
+# ============================================================================
+# Model Config Admin CRUD Endpoints (Phase 08 - MODEL-04)
+# ============================================================================
+
+
+@app.post("/api/v1/admin/models/delete/{model_id}", response_model=ModelConfigDeleteResponse)
+def delete_admin_model(
+    model_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Delete a model configuration (admin only).
+
+    Validates model_id exists (404 if not found).
+    Checks AppSettings for multimodal_model_id reference (warn but allow deletion).
+    Deletes ModelConfig from database.
+    Returns success confirmation.
+
+    Note: Unlike providers, models can be deleted even if referenced in app settings.
+    """
+    # Validate model exists
+    model = db.exec(select(ModelConfig).where(ModelConfig.id == model_id)).first()
+    if not model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model with id {model_id} not found"
+        )
+
+    # Check AppSettings for multimodal_model_id reference
+    try:
+        multimodal_setting = db.exec(
+            select(AppSettings).where(AppSettings.key == 'multimodal_model_id')
+        ).first()
+        if multimodal_setting and multimodal_setting.value == str(model_id):
+            logging.warning(
+                f"Deleting model {model_id} ({model.name}) which is currently set as multimodal model. "
+                f"AppSettings multimodal_model_id will reference non-existent model."
+            )
+    except Exception as exc:
+        logging.warning(f"Could not check AppSettings for multimodal_model_id reference: {exc}")
+
+    # Delete the model
+    db.delete(model)
+    db.commit()
+
+    logging.info(f"ModelConfig ID {model_id} ({model.name}) deleted by user {current_user.user_id}")
+
+    return {
+        "success": True,
+        "message": "Model deleted successfully"
     }
 
 
