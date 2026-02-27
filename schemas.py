@@ -223,7 +223,83 @@ class LLMProviderPriorityUpdateResponse(SmartLibBase):
     success: bool = True
     message: str
 
-# Model Config Schemas
+# Model Config Admin CRUD Schemas
+class ModelConfigListResponse(SmartLibBase):
+    """Response for list models endpoint."""
+    success: bool = True
+    data: Dict[str, Any] = {}  # Contains items list and total
+
+
+class ModelConfigCreateRequest(SmartLibBase):
+    """Request to create a model."""
+    name: str
+    deployment_name: str
+    provider_id: int
+    temperature: Optional[float] = None
+    streaming: bool = True
+    description: Optional[str] = None
+    is_default: bool = False
+
+
+class ModelConfigCreateResponse(SmartLibBase):
+    """Response for create model endpoint."""
+    success: bool = True
+    model: Dict[str, Any]
+
+
+class ModelConfigUpdateRequest(SmartLibBase):
+    """Request to update a model (all fields optional)."""
+    name: Optional[str] = None
+    deployment_name: Optional[str] = None
+    provider_id: Optional[int] = None
+    temperature: Optional[float] = None
+    streaming: Optional[bool] = None
+    description: Optional[str] = None
+    is_default: Optional[bool] = False
+
+
+class ModelConfigUpdateResponse(SmartLibBase):
+    """Response for update model endpoint."""
+    success: bool = True
+    model: Dict[str, Any]
+
+
+class ModelConfigDeleteResponse(SmartLibBase):
+    """Response for delete model endpoint."""
+    success: bool = True
+    message: str
+
+
+class ModelConfigDefaultResponse(SmartLibBase):
+    """Response for set default model endpoint."""
+    success: bool = True
+    message: str
+
+
+class ModelConfigMultimodalResponse(SmartLibBase):
+    """Response for set multimodal model endpoint."""
+    success: bool = True
+    message: str
+
+
+class ModelValidationRequest(SmartLibBase):
+    """Request for model validation."""
+    deployment_name: str
+    temperature: Optional[float] = None
+    streaming: bool = True
+    provider_id: int
+
+
+class ModelValidationResponse(SmartLibBase):
+    """Response for model validation endpoint."""
+    valid: bool
+    streaming_supported: bool
+    temperature_valid: bool
+    connectivity_ok: bool
+    message: str
+
+
+# Model Config Base Schemas (for reference)
 class ModelConfigBase(SmartLibBase):
     name: str
     deployment_name: str
@@ -233,9 +309,11 @@ class ModelConfigBase(SmartLibBase):
     description: Optional[str] = None
     is_default: bool = False
 
+
 class ModelConfigCreate(ModelConfigBase):
     provider_id: Optional[int] = None
     created_by: Optional[str] = None
+
 
 class ModelConfigRead(ModelConfigBase):
     id: int
