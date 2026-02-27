@@ -70,11 +70,11 @@ Requirements for Admin Dashboard (React frontend at /admin-app).
 
 ### Language Management (LANG)
 
-- [ ] **LANG-01**: List all LLM languages (language_code, language_name, is_active)
-- [ ] **LANG-02**: Add new language
-- [ ] **LANG-03**: Edit language details
-- [ ] **LANG-04**: Toggle language active status
-- [ ] **LANG-05**: Delete language
+- [x] **LANG-01**: List all LLM languages (language_code, language_name, is_active)
+- [x] **LANG-02**: Add new language
+- [x] **LANG-03**: Edit language details
+- [x] **LANG-04**: Toggle language active status
+- [x] **LANG-05**: Delete language
 
 ### Content Management (CONTENT)
 
@@ -245,11 +245,11 @@ frontend/
 | MODEL-05 | Phase 5 | Pending |
 | MODEL-06 | Phase 5 | Pending |
 | MODEL-07 | Phase 5 | Pending |
-| LANG-01 | Phase 5 | Pending |
-| LANG-02 | Phase 5 | Pending |
-| LANG-03 | Phase 5 | Pending |
-| LANG-04 | Phase 5 | Pending |
-| LANG-05 | Phase 5 | Pending |
+| LANG-01 | Phase 5 | Complete (05-04) |
+| LANG-02 | Phase 5 | Complete (05-04) |
+| LANG-03 | Phase 5 | Complete (05-04) |
+| LANG-04 | Phase 5 | Complete (05-04) |
+| LANG-05 | Phase 5 | Complete (05-04) |
 | CONTENT-01 | Phase 6 | Pending |
 | CONTENT-02 | Phase 6 | Pending |
 | CONTENT-03 | Phase 6 | Pending |
@@ -266,4 +266,4 @@ frontend/
 ---
 
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-27 after 05-01 LLM Provider Management completion (PROV-01 to PROV-08 complete)*
+*Last updated: 2026-02-27 after 05-04 Language Management completion (LANG-01 to LANG-05 complete)*
