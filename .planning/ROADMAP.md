@@ -118,11 +118,14 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Admin can manage AI models and languages (CRUD) via FastAPI endpoints
   2. Model deployment validation and default/multimodal flags are functional
-**Plans**: 2
+**Plans**: 5
 
 Plans:
 - [ ] 08-01: Model Config CRUD endpoints (MODEL-01 through MODEL-07) - planned 2026-02-27
-- [ ] 08-02: Language CRUD endpoints (LANG-01 through LANG-05) - planned 2026-02-27
+- [ ] 08-02: Model Config action endpoints (MODEL-05, MODEL-06, MODEL-07) - planned 2026-02-27
+- [x] 08-03: Language list/create endpoints (LANG-01, LANG-02) - completed 2026-02-27
+- [ ] 08-04: Language edit/delete endpoints (LANG-03, LANG-04, LANG-05) - planned 2026-02-27
+- [ ] 08-05: [TBD] - planned 2026-02-27
 
 #### Phase 9: Content Management & Settings
 **Goal**: Activity logs, content oversight, and application settings
@@ -167,7 +170,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 5. LLM/Model/Language (FE) | v1.1 | 4/4 | Complete | 2026-02-27 |
 | 6. Backend User Actions (GAP) | v1.1 | 0/2 | Not started | - |
 | 7. Backend LLM Providers (GAP) | v1.1 | 2/2 | Complete | 2026-02-27 |
-| 8. Backend Models & Languages (GAP) | v1.1 | 0/2 | Planned | 2026-02-27 |
+| 8. Backend Models & Languages (GAP) | v1.1 | 1/5 | In progress | 2026-02-27 |
 | 9. Content Management & Settings | v1.1 | 0/4 | Not started | - |
 
 ---
@@ -190,5 +193,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 
 ---
 
-*Last updated: 2026-02-27 after Phase 07 LLM Provider Endpoints completion (PROV-01 through PROV-08)*
+*Last updated: 2026-02-27 after 08-03 LLM Language Schemas and Base CRUD Endpoints completion (LANG-01, LANG-02)*
 
