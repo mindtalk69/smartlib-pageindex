@@ -363,6 +363,19 @@ class LLMLanguageDeleteResponse(SmartLibBase):
     message: str
 
 
+# Activity Log Admin Schemas
+class UploadActivityListResponse(SmartLibBase):
+    """Response for upload activity list endpoint."""
+    success: bool = True
+    data: Dict[str, Any] = {}  # Contains items list and total
+
+
+class DownloadActivityListResponse(SmartLibBase):
+    """Response for download activity list endpoint."""
+    success: bool = True
+    data: Dict[str, Any] = {}  # Contains items list and total
+
+
 # Search Results / General
 class Citations(SmartLibBase):
     citations: List[Dict[str, Any]] = []
@@ -609,3 +622,23 @@ class FileDeleteResponse(SmartLibBase):
     """Response for file deletion endpoint."""
     success: bool = True
     message: str
+
+
+# Application Settings Schemas (Phase 09 - SET-01, SET-02, SET-03)
+class AppSettingsResponse(SmartLibBase):
+    """Response for get settings endpoint."""
+    success: bool = True
+    settings: Dict[str, Any] = {}
+    active_user_count: Optional[int] = None
+
+
+class SettingsUpdateRequest(SmartLibBase):
+    """Request to update settings."""
+    settings: Dict[str, Any]
+
+
+class SettingsUpdateResponse(SmartLibBase):
+    """Response for settings update endpoint."""
+    success: bool = True
+    message: str
+    updated_keys: List[str] = []
