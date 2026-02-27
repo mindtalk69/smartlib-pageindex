@@ -1,6 +1,6 @@
 ---
 phase: 08-backend-llm-model-language
-summary_version: 1.0
+summary_version: 2.0
 generated: 2026-02-27
 status: ready_for_execution
 ---
@@ -19,62 +19,69 @@ Port Flask model configuration and language management endpoints to FastAPI.
 
 | Plan | Wave | Requirements | Tasks | Files |
 |------|------|--------------|-------|-------|
-| 08-01 | 1 | MODEL-01 to MODEL-07 | 8 tasks | main_fastapi.py, schemas.py |
-| 08-02 | 1 | LANG-01 to LANG-05 | 5 tasks | main_fastapi.py, schemas.py |
+| 08-01 | 1 | MODEL-01, MODEL-02 | 3 | main_fastapi.py, schemas.py |
+| 08-02 | 2 | MODEL-03, MODEL-04 | 2 | main_fastapi.py |
+| 08-03 | 1 | LANG-01, LANG-02 | 3 | main_fastapi.py, schemas.py |
+| 08-04 | 2 | LANG-03, LANG-04, LANG-05 | 2 | main_fastapi.py |
+| 08-05 | 2 | MODEL-05, MODEL-06, MODEL-07 | 3 | main_fastapi.py |
 
-**Total:** 2 plans, 13 tasks, 2 files modified
+**Total:** 5 plans, 13 tasks, 2 files modified
 
 ## Execution Order
 
-Both plans are Wave 1 (no inter-dependencies) and can execute in parallel:
-
 ```
 Wave 1 (Parallel):
-├── 08-01: Model Config Endpoints (8 tasks)
-│   ├── Task 1: Add Model Config schemas
-│   ├── Task 2: List models endpoint (MODEL-01)
-│   ├── Task 3: Create model endpoint (MODEL-02)
-│   ├── Task 4: Update model endpoint (MODEL-03)
-│   ├── Task 5: Delete model endpoint (MODEL-04)
-│   ├── Task 6: Set default endpoint (MODEL-05)
-│   ├── Task 7: Set multimodal endpoint (MODEL-06)
-│   └── Task 8: Validate deployment endpoint (MODEL-07)
+├── 08-01: Model Schemas + List/Create (MODEL-01, MODEL-02)
+│   ├── Task 1: Add ModelConfig schemas (10 classes)
+│   ├── Task 2: GET /api/v1/admin/models - List models
+│   └── Task 3: POST /api/v1/admin/models/add - Create model
 │
-└── 08-02: Language Endpoints (5 tasks)
-    ├── Task 1: Add Language schemas
-    ├── Task 2: List languages endpoint (LANG-01)
-    ├── Task 3: Create language endpoint (LANG-02)
-    ├── Task 4: Update language endpoint (LANG-03, LANG-04)
-    └── Task 5: Delete language endpoint (LANG-05)
+└── 08-03: Language Schemas + List/Create (LANG-01, LANG-02)
+    ├── Task 1: Add LLMLanguage schemas (6 classes)
+    ├── Task 2: GET /api/v1/admin/languages - List languages
+    └── Task 3: POST /api/v1/admin/languages/add - Create language
+
+Wave 2 (Parallel, after Wave 1):
+├── 08-02: Model Update/Delete (MODEL-03, MODEL-04)
+│   ├── Task 1: POST /api/v1/admin/models/edit/{id}
+│   └── Task 2: POST /api/v1/admin/models/delete/{id}
+│
+├── 08-04: Language Update/Delete (LANG-03, LANG-04, LANG-05)
+│   ├── Task 1: POST /api/v1/admin/languages/edit/{id}
+│   └── Task 2: POST /api/v1/admin/languages/delete/{id}
+│
+└── 08-05: Model Actions (MODEL-05, MODEL-06, MODEL-07)
+    ├── Task 1: POST /api/v1/admin/models/set-default/{id}
+    ├── Task 2: POST /api/v1/admin/models/set-multimodal/{id}
+    └── Task 3: POST /api/v1/admin/models/validate
 ```
 
 ## Endpoints to Implement
 
-### Model Config (08-01)
+### Model Config (08-01, 08-02, 08-05)
 
-| Method | Path | Requirement | Description |
-|--------|------|-------------|-------------|
-| GET | /api/v1/admin/models | MODEL-01 | List all models with provider_obj |
-| POST | /api/v1/admin/models/add | MODEL-02 | Create new model with validation |
-| POST | /api/v1/admin/models/edit/{id} | MODEL-03 | Update model configuration |
-| POST | /api/v1/admin/models/delete/{id} | MODEL-04 | Delete model |
-| POST | /api/v1/admin/models/set-default/{id} | MODEL-05 | Set model as default |
-| POST | /api/v1/admin/models/set-multimodal/{id} | MODEL-06 | Set model as multimodal |
-| POST | /api/v1/admin/models/validate | MODEL-07 | Validate deployment configuration |
+| Plan | Method | Path | Requirement | Description |
+|------|--------|------|-------------|-------------|
+| 08-01 | GET | /api/v1/admin/models | MODEL-01 | List all models with provider_obj |
+| 08-01 | POST | /api/v1/admin/models/add | MODEL-02 | Create new model with validation |
+| 08-02 | POST | /api/v1/admin/models/edit/{id} | MODEL-03 | Update model configuration |
+| 08-02 | POST | /api/v1/admin/models/delete/{id} | MODEL-04 | Delete model |
+| 08-05 | POST | /api/v1/admin/models/set-default/{id} | MODEL-05 | Set model as default |
+| 08-05 | POST | /api/v1/admin/models/set-multimodal/{id} | MODEL-06 | Set model as multimodal |
+| 08-05 | POST | /api/v1/admin/models/validate | MODEL-07 | Validate deployment configuration |
 
-### Language (08-02)
+### Language (08-03, 08-04)
 
-| Method | Path | Requirement | Description |
-|--------|------|-------------|-------------|
-| GET | /api/v1/admin/languages | LANG-01 | List all languages |
-| POST | /api/v1/admin/languages/add | LANG-02 | Create new language |
-| POST | /api/v1/admin/languages/edit/{id} | LANG-03 | Update language details |
-| POST | /api/v1/admin/languages/edit/{id} | LANG-04 | Toggle active status (via edit) |
-| POST | /api/v1/admin/languages/delete/{id} | LANG-05 | Delete language |
+| Plan | Method | Path | Requirement | Description |
+|------|--------|------|-------------|-------------|
+| 08-03 | GET | /api/v1/admin/languages | LANG-01 | List all languages |
+| 08-03 | POST | /api/v1/admin/languages/add | LANG-02 | Create new language |
+| 08-04 | POST | /api/v1/admin/languages/edit/{id} | LANG-03, LANG-04 | Update language / toggle active |
+| 08-04 | POST | /api/v1/admin/languages/delete/{id} | LANG-05 | Delete language |
 
 ## Schemas to Add (schemas.py)
 
-### Model Config Schemas
+### Model Config Schemas (08-01)
 ```python
 ModelConfigListResponse      # List response wrapper
 ModelConfigCreateRequest     # Create request body
@@ -88,12 +95,12 @@ ModelValidationRequest       # Validation request body
 ModelValidationResponse      # Validation response with flags
 ```
 
-### Language Schemas
+### Language Schemas (08-03)
 ```python
 LLMLanguageListResponse      # List response wrapper
 LLMLanguageCreateRequest     # Create request body
 LLMLanguageCreateResponse    # Create response wrapper
-LLMLanguageUpdateRequest     # Update request body
+LLMLanguageUpdateRequest     # Update request body (all optional)
 LLMLanguageUpdateResponse    # Update response wrapper
 LLMLanguageDeleteResponse    # Delete response wrapper
 ```
@@ -181,14 +188,6 @@ Already expects these endpoints. No frontend changes needed.
 | AppSettings multimodal reference | Check existing pattern in codebase |
 | IntegrityError handling for languages | Catch and return 409 Conflict |
 | Temperature edge cases | Use _coerce_temperature helper pattern |
-
-## Next Steps
-
-After execution:
-1. Run verification tests for all endpoints
-2. Test frontend integration (useModels, useLanguages hooks)
-3. Update .planning/STATE.md with phase completion
-4. Update .planning/ROADMAP.md phase status
 
 ---
 
