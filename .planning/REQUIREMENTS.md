@@ -78,9 +78,9 @@ Requirements for Admin Dashboard (React frontend at /admin-app).
 
 ### Content Management (CONTENT)
 
-- [ ] **CONTENT-01**: Activity log showing upload activities
-- [ ] **CONTENT-02**: Activity log showing download activities
-- [ ] **CONTENT-03**: Filter activities by type (upload/download) and status
+- [x] **CONTENT-01**: Activity log showing upload activities
+- [x] **CONTENT-02**: Activity log showing download activities
+- [x] **CONTENT-03**: Filter activities by type (upload/download) and status
 - [x] **CONTENT-04**: View file details with metadata summary
 - [x] **CONTENT-05**: Delete file records (with vector cleanup confirmation)
 - [x] **CONTENT-06**: Catalog CRUD operations (name, description, created_by)
@@ -250,9 +250,9 @@ frontend/
 | LANG-03 | Phase 8 | Complete |
 | LANG-04 | Phase 8 | Complete |
 | LANG-05 | Phase 8 | Complete |
-| CONTENT-01 | Phase 9 | Pending |
-| CONTENT-02 | Phase 9 | Pending |
-| CONTENT-03 | Phase 9 | Pending |
+| CONTENT-01 | Phase 9 | Complete |
+| CONTENT-02 | Phase 9 | Complete |
+| CONTENT-03 | Phase 9 | Complete |
 | CONTENT-04 | Phase 9 | Complete |
 | CONTENT-05 | Phase 9 | Complete |
 | CONTENT-06 | Phase 9 | Complete |
