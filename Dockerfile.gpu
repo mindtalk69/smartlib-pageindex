@@ -22,12 +22,12 @@ RUN npm install --silent
 COPY frontend/ ./
 RUN npm run build
 
-# ─── Stage 1c: Build admin-frontend/ React app (served at /app-admin/) ───────
+# ─── Stage 1c: Build admin-app React app (served at /admin-app/) ─────────────
 FROM node:20-alpine AS admin_frontend
 WORKDIR /app
-COPY admin-frontend/package.json admin-frontend/package-lock.json* ./
+COPY frontend/src/admin-app/package.json frontend/src/admin-app/package-lock.json* ./
 RUN npm install --silent
-COPY admin-frontend/ ./
+COPY frontend/src/admin-app/ ./
 RUN npm run build
 
 # ─── Stage 2: Optimized GPU Python base ─────────────────────────────────────
@@ -99,8 +99,8 @@ COPY --from=assets /app/static/dist /app/static/dist
 # Copy built frontend/ React app (served at /app/)
 COPY --from=frontend /app/dist /app/frontend/dist
 
-# Copy built admin-frontend/ React app (served at /app-admin/)
-COPY --from=admin_frontend /app/dist /app/admin-frontend/dist
+# Copy built admin-app React app (served at /admin-app/)
+COPY --from=admin_frontend /app/dist /app/admin-app/dist
 
 # Copy supervisord configuration
 COPY supervisord.conf /etc/supervisor/conf.d/smartlib.conf
@@ -127,7 +127,7 @@ ENV PORT=8000 \
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-EXPOSE 8000
+EXPOSE 8000 8001
 
 # supervisord manages Redis + Celery + Gunicorn + Init scripts
 CMD ["supervisord", "-c", "/etc/supervisor/conf.d/smartlib.conf"]
