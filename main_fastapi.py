@@ -94,11 +94,22 @@ from schemas import (
     LLMLanguageUpdateRequest,
     LLMLanguageUpdateResponse,
     LLMLanguageDeleteResponse,
+    # Model Config admin schemas
+    ModelConfigListResponse,
+    ModelConfigCreateRequest,
+    ModelConfigCreateResponse,
+    ModelConfigUpdateRequest,
+    ModelConfigUpdateResponse,
+    ModelConfigDeleteResponse,
+    ModelConfigDefaultResponse,
+    ModelConfigMultimodalResponse,
+    ModelValidationRequest,
+    ModelValidationResponse,
 )
 from typing import Optional, List
 from fastapi_pagination import add_pagination
 from database_fastapi import DB_PATH
-from sqlmodel import select
+from sqlmodel import select, update
 from datetime import datetime
 import uuid
 import os
@@ -1120,6 +1131,211 @@ def update_admin_provider_priorities(
     return {
         "success": True,
         "message": f"Priorities updated for {len(priority_data.priorities)} provider(s)",
+    }
+
+
+# ============================================================================
+# Model Config Admin CRUD Endpoints (Phase 08 - MODEL-01 through MODEL-02)
+# ============================================================================
+
+
+@app.get("/api/v1/admin/models", response_model=ModelConfigListResponse)
+def list_admin_models(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    skip: int = 0,
+    limit: int = 100,
+):
+    """
+    List all model configurations (admin only).
+
+    Returns models with associated provider information (provider_obj field).
+    Models are ordered by name for consistent display.
+    """
+    statement = select(ModelConfig).order_by(
+        ModelConfig.name
+    ).offset(skip).limit(limit)
+    result = db.exec(statement)
+    models = result.all()
+
+    # Get total count
+    count_statement = select(func.count(ModelConfig.id))
+    total = db.exec(count_statement).one()
+
+    items = []
+    for model in models:
+        # Get associated provider
+        provider_obj = None
+        if model.provider_id:
+            provider_stmt = select(LLMProvider).where(LLMProvider.id == model.provider_id)
+            provider_result = db.exec(provider_stmt).first()
+            if provider_result:
+                provider_obj = {
+                    "id": provider_result.id,
+                    "name": provider_result.name,
+                    "provider_type": provider_result.provider_type,
+                    "is_active": provider_result.is_active,
+                }
+
+        items.append({
+            "id": model.id,
+            "provider_id": model.provider_id,
+            "name": model.name,
+            "deployment_name": model.deployment_name,
+            "provider": model.provider,
+            "temperature": model.temperature,
+            "streaming": model.streaming,
+            "description": model.description,
+            "is_default": model.is_default,
+            "is_multimodal": getattr(model, 'is_multimodal', False),
+            "created_by": model.created_by,
+            "created_at": model.created_at.isoformat() if model.created_at else None,
+            "provider_obj": provider_obj,
+        })
+
+    return {
+        "success": True,
+        "data": {
+            "items": items,
+            "total": total,
+        },
+    }
+
+
+@app.post("/api/v1/admin/models/add", response_model=ModelConfigCreateResponse, status_code=status.HTTP_201_CREATED)
+def create_admin_model(
+    model_data: ModelConfigCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Create a new model configuration (admin only).
+
+    Validates:
+    - Required fields: name, deployment_name, provider_id
+    - Provider must exist
+    - Streaming supported for deployment
+    - Temperature in valid range for deployment
+    - Connectivity test passes
+    - Name uniqueness (returns 400 if duplicate)
+    - Clears other defaults if is_default=true
+    """
+    from modules.llm_utils import (
+        is_streaming_supported_for_deployment,
+        validate_temperature_for_deployment,
+        get_llm,
+    )
+
+    # Validate required fields
+    name = model_data.name.strip() if model_data.name else ""
+    deployment_name = model_data.deployment_name.strip() if model_data.deployment_name else ""
+    provider_id = model_data.provider_id
+
+    if not name or not deployment_name or provider_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Name, deployment_name, and provider_id are required"
+        )
+
+    # Get provider to validate it exists and get config
+    provider_stmt = select(LLMProvider).where(LLMProvider.id == provider_id)
+    provider_result = db.exec(provider_stmt).first()
+
+    if not provider_result:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Provider with id {provider_id} not found"
+        )
+
+    # Validate streaming support
+    if model_data.streaming and not is_streaming_supported_for_deployment(deployment_name):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Deployment '{deployment_name}' does not support streaming. Disable streaming or choose a compatible deployment."
+        )
+
+    # Validate temperature
+    temp_ok, _, temp_error = validate_temperature_for_deployment(deployment_name, model_data.temperature)
+    if not temp_ok:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=temp_error
+        )
+
+    # Test connectivity
+    try:
+        get_llm(
+            model_name=deployment_name,
+            streaming=model_data.streaming,
+            temperature=model_data.temperature,
+            api_key=provider_result.api_key,
+            endpoint=provider_result.base_url,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Could not initialize deployment '{deployment_name}': {exc}"
+        )
+
+    # Check for duplicate name
+    existing = db.exec(select(ModelConfig).where(ModelConfig.name == name)).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'Model with name "{name}" already exists'
+        )
+
+    # Clear other defaults if is_default=true
+    if model_data.is_default:
+        db.exec(
+            update(ModelConfig).where(ModelConfig.is_default == True).values(is_default=False)
+        )
+        db.commit()
+
+    # Create model config
+    model_config = ModelConfig(
+        provider_id=provider_id,
+        name=name,
+        deployment_name=deployment_name,
+        provider=provider_result.provider_type,
+        temperature=model_data.temperature,
+        streaming=model_data.streaming,
+        description=model_data.description.strip() if model_data.description else None,
+        is_default=model_data.is_default if model_data.is_default is not None else False,
+        created_by=current_user.user_id,
+    )
+
+    db.add(model_config)
+    db.commit()
+    db.refresh(model_config)
+
+    # Get associated provider for response
+    provider_obj = {
+        "id": provider_result.id,
+        "name": provider_result.name,
+        "provider_type": provider_result.provider_type,
+        "is_active": provider_result.is_active,
+    }
+
+    model_dict = {
+        "id": model_config.id,
+        "provider_id": model_config.provider_id,
+        "name": model_config.name,
+        "deployment_name": model_config.deployment_name,
+        "provider": model_config.provider,
+        "temperature": model_config.temperature,
+        "streaming": model_config.streaming,
+        "description": model_config.description,
+        "is_default": model_config.is_default,
+        "is_multimodal": getattr(model_config, 'is_multimodal', False),
+        "created_by": model_config.created_by,
+        "created_at": model_config.created_at.isoformat() if model_config.created_at else None,
+        "provider_obj": provider_obj,
+    }
+
+    return {
+        "success": True,
+        "model": model_dict,
     }
 
 
