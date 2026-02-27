@@ -60,13 +60,13 @@ Requirements for Admin Dashboard (React frontend at /admin-app).
 
 ### Model Configuration (MODEL)
 
-- [ ] **MODEL-01**: List all models with provider association
-- [ ] **MODEL-02**: Add new model (name, deployment_name, provider_id, temperature, streaming, description)
-- [ ] **MODEL-03**: Edit model configuration
-- [ ] **MODEL-04**: Delete model
-- [ ] **MODEL-05**: Set model as default
-- [ ] **MODEL-06**: Set model as multimodal
-- [ ] **MODEL-07**: Validate deployment configuration (streaming support, temperature range, connectivity)
+- [x] **MODEL-01**: List all models with provider association
+- [x] **MODEL-02**: Add new model (name, deployment_name, provider_id, temperature, streaming, description)
+- [x] **MODEL-03**: Edit model configuration
+- [x] **MODEL-04**: Delete model
+- [x] **MODEL-05**: Set model as default
+- [x] **MODEL-06**: Set model as multimodal
+- [x] **MODEL-07**: Validate deployment configuration (streaming support, temperature range, connectivity)
 
 ### Language Management (LANG)
 
@@ -238,13 +238,13 @@ frontend/
 | PROV-06 | Phase 5 | Complete (05-01) |
 | PROV-07 | Phase 5 | Complete (05-01) |
 | PROV-08 | Phase 5 | Complete (05-01) |
-| MODEL-01 | Phase 5 | Pending |
-| MODEL-02 | Phase 5 | Pending |
-| MODEL-03 | Phase 5 | Pending |
-| MODEL-04 | Phase 5 | Pending |
-| MODEL-05 | Phase 5 | Pending |
-| MODEL-06 | Phase 5 | Pending |
-| MODEL-07 | Phase 5 | Pending |
+| MODEL-01 | Phase 5 | Complete |
+| MODEL-02 | Phase 5 | Complete |
+| MODEL-03 | Phase 5 | Complete |
+| MODEL-04 | Phase 5 | Complete |
+| MODEL-05 | Phase 5 | Complete |
+| MODEL-06 | Phase 5 | Complete |
+| MODEL-07 | Phase 5 | Complete |
 | LANG-01 | Phase 5 | Complete (05-04) |
 | LANG-02 | Phase 5 | Complete (05-04) |
 | LANG-03 | Phase 5 | Complete (05-04) |
