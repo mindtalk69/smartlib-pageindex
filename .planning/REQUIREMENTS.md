@@ -83,8 +83,8 @@ Requirements for Admin Dashboard (React frontend at /admin-app).
 - [ ] **CONTENT-03**: Filter activities by type (upload/download) and status
 - [x] **CONTENT-04**: View file details with metadata summary
 - [x] **CONTENT-05**: Delete file records (with vector cleanup confirmation)
-- [ ] **CONTENT-06**: Catalog CRUD operations (name, description, created_by)
-- [ ] **CONTENT-07**: Category CRUD operations (name, description, created_by_user_id)
+- [x] **CONTENT-06**: Catalog CRUD operations (name, description, created_by)
+- [x] **CONTENT-07**: Category CRUD operations (name, description, created_by_user_id)
 
 ### Settings (SET)
 
@@ -255,8 +255,8 @@ frontend/
 | CONTENT-03 | Phase 9 | Pending |
 | CONTENT-04 | Phase 9 | Complete |
 | CONTENT-05 | Phase 9 | Complete |
-| CONTENT-06 | Phase 9 | Pending |
-| CONTENT-07 | Phase 9 | Pending |
+| CONTENT-06 | Phase 9 | Complete |
+| CONTENT-07 | Phase 9 | Complete |
 | SET-01 | Phase 9 | Complete |
 | SET-02 | Phase 9 | Complete |
 | SET-03 | Phase 9 | Complete |
