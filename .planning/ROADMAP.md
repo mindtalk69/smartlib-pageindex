@@ -90,7 +90,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 05-01: LLM Provider management (list, add, edit, delete, test, discover models, prioritize)
+- [x] 05-01: LLM Provider management (list, add, edit, delete, test, discover models, prioritize) - completed 2026-02-27
 - [ ] 05-02: Provider health monitoring and connectivity testing
 - [ ] 05-03: Model configuration (list, add, edit, delete, set default/multimodal, validate deployment)
 - [ ] 05-04: Language management (list, add, edit, delete, toggle active)

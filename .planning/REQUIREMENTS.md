@@ -49,14 +49,14 @@ Requirements for Admin Dashboard (React frontend at /admin-app).
 
 ### LLM Provider Management (PROV)
 
-- [ ] **PROV-01**: List all LLM providers with priority ordering
-- [ ] **PROV-02**: Add new provider (name, provider_type, base_url, api_key, is_active, priority, config)
-- [ ] **PROV-03**: Edit existing provider details
-- [ ] **PROV-04**: Delete provider (if no associated models)
-- [ ] **PROV-05**: Test provider connectivity (health check)
-- [ ] **PROV-06**: Discover available models from provider
-- [ ] **PROV-07**: Update provider priorities (drag-and-drop reordering)
-- [ ] **PROV-08**: View provider health status (last_health_check, health_status, error_message)
+- [x] **PROV-01**: List all LLM providers with priority ordering
+- [x] **PROV-02**: Add new provider (name, provider_type, base_url, api_key, is_active, priority, config)
+- [x] **PROV-03**: Edit existing provider details
+- [x] **PROV-04**: Delete provider (if no associated models)
+- [x] **PROV-05**: Test provider connectivity (health check)
+- [x] **PROV-06**: Discover available models from provider
+- [x] **PROV-07**: Update provider priorities (drag-and-drop reordering)
+- [x] **PROV-08**: View provider health status (last_health_check, health_status, error_message)
 
 ### Model Configuration (MODEL)
 
@@ -230,14 +230,14 @@ frontend/
 | USER-08 | Phase 4 | Complete (04-05) |
 | USER-09 | Phase 4 | Complete (04-05) |
 | USER-10 | Phase 4 | Complete (04-05) |
-| PROV-01 | Phase 5 | Pending |
-| PROV-02 | Phase 5 | Pending |
-| PROV-03 | Phase 5 | Pending |
-| PROV-04 | Phase 5 | Pending |
-| PROV-05 | Phase 5 | Pending |
-| PROV-06 | Phase 5 | Pending |
-| PROV-07 | Phase 5 | Pending |
-| PROV-08 | Phase 5 | Pending |
+| PROV-01 | Phase 5 | Complete (05-01) |
+| PROV-02 | Phase 5 | Complete (05-01) |
+| PROV-03 | Phase 5 | Complete (05-01) |
+| PROV-04 | Phase 5 | Complete (05-01) |
+| PROV-05 | Phase 5 | Complete (05-01) |
+| PROV-06 | Phase 5 | Complete (05-01) |
+| PROV-07 | Phase 5 | Complete (05-01) |
+| PROV-08 | Phase 5 | Complete (05-01) |
 | MODEL-01 | Phase 5 | Pending |
 | MODEL-02 | Phase 5 | Pending |
 | MODEL-03 | Phase 5 | Pending |
@@ -266,4 +266,4 @@ frontend/
 ---
 
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-27 after 04-GAP-02 AdminLayout Children Prop Fix completion (LAYOUT-01 gap closed)*
+*Last updated: 2026-02-27 after 05-01 LLM Provider Management completion (PROV-01 to PROV-08 complete)*
