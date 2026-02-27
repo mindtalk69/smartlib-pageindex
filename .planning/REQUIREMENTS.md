@@ -72,9 +72,9 @@ Requirements for Admin Dashboard (React frontend at /admin-app).
 
 - [x] **LANG-01**: List all LLM languages (language_code, language_name, is_active)
 - [x] **LANG-02**: Add new language
-- [ ] **LANG-03**: Edit language details
-- [ ] **LANG-04**: Toggle language active status
-- [ ] **LANG-05**: Delete language
+- [x] **LANG-03**: Edit language details
+- [x] **LANG-04**: Toggle language active status
+- [x] **LANG-05**: Delete language
 
 ### Content Management (CONTENT)
 
@@ -247,9 +247,9 @@ frontend/
 | MODEL-07 | Phase 8 | Pending |
 | LANG-01 | Phase 8 | Complete |
 | LANG-02 | Phase 8 | Complete |
-| LANG-03 | Phase 8 | Pending |
-| LANG-04 | Phase 8 | Pending |
-| LANG-05 | Phase 8 | Pending |
+| LANG-03 | Phase 8 | Complete |
+| LANG-04 | Phase 8 | Complete |
+| LANG-05 | Phase 8 | Complete |
 | CONTENT-01 | Phase 9 | Pending |
 | CONTENT-02 | Phase 9 | Pending |
 | CONTENT-03 | Phase 9 | Pending |
