@@ -6,6 +6,20 @@ SmartLib BASIC is a RAG (Retrieval-Augmented Generation) application for documen
 
 ## Current State
 
+**Shipped v1.1 (2026-02-27): Admin Dashboard**
+- ✅ Custom React admin frontend at /admin-app
+- ✅ Admin dashboard with statistics charts (user/file/message counts, distribution charts)
+- ✅ LLM provider management UI (CRUD, health check, model discovery, priority ordering)
+- ✅ Model configuration management UI (list/add/edit/delete, set default/multimodal, validate deployment)
+- ✅ Language management UI (list/add/edit/delete, toggle active)
+- ✅ User management UI (list, search, toggle admin/active, delete)
+- ✅ Password reset request management (approve/deny with temp password generation)
+- ✅ Activity log endpoints (upload/download with filtering)
+- ✅ File management endpoints (details, deletion with vector cleanup)
+- ✅ Catalog & Category CRUD operations
+- ✅ Application settings (view/edit with persistence)
+- ✅ 33 FastAPI admin endpoints for all management operations
+
 **Shipped v1.0 (2026-02-26): FastAPI Foundation**
 - ✅ JWT authentication system with FastAPI
 - ✅ FastAPI server running on port 8001
@@ -26,17 +40,13 @@ SmartLib BASIC is a RAG (Retrieval-Augmented Generation) application for documen
 - SQLite with sqlite-vec extension
 - Redis + Celery for async tasks
 - React frontends (/app, /admin-app)
+- shadcn/ui component library
 
-## Current Milestone: v1.1 Admin Dashboard
-
-**Goal:** Replace SQLAdmin with custom React frontend at /admin-app including system stats, LLM/model management, and user management.
-
-**Target features:**
-- Custom React admin frontend (replace SQLAdmin)
-- System statistics dashboard (users, files, storage, messages, queries)
-- LLM provider management UI (configure OpenAI, Anthropic, local models)
-- Model configuration management UI (temperature, max_tokens, etc.)
-- User management UI (CRUD, roles, activity monitoring)
+**Milestone Stats (v1.1):**
+- Phases: 7 (3-9)
+- Plans: 30
+- Feature commits: 70
+- Timeline: 1 day (Feb 26-27, 2026)
 
 ## Future Milestones (v1.2+)
 
@@ -56,8 +66,20 @@ Users can upload documents (including OCR processing), organize them into librar
 
 ## Requirements
 
-### Validated (v1.0)
+### Validated
 
+**v1.1 (Admin Dashboard):**
+- ✓ Custom React admin frontend at /admin-app with shadcn/ui
+- ✓ Admin dashboard with statistics charts (Recharts)
+- ✓ LLM provider management UI (full CRUD + health monitoring)
+- ✓ Model configuration management UI (full CRUD + validation)
+- ✓ Language management UI (full CRUD)
+- ✓ User management UI (list, search, toggle admin/active, delete)
+- ✓ Password reset request management (approve/deny)
+- ✓ Dark/light theme toggle with persistence
+- ✓ 33 FastAPI admin endpoints for all management operations
+
+**v1.0 (FastAPI Foundation):**
 - ✓ JWT authentication system with register/login/logout/password reset
 - ✓ FastAPI CRUD endpoints for all models
 - ✓ OpenAPI documentation at `/docs`
@@ -68,20 +90,18 @@ Users can upload documents (including OCR processing), organize them into librar
 - ✓ Configuration & branding endpoints
 - ✓ Nginx dual-backend routing
 
-### Active (v1.1 - Admin Dashboard)
+### Active (v1.2 - RAG Integration)
 
-- [ ] Custom React admin frontend (/admin-app)
-- [ ] Admin dashboard with system statistics
-- [ ] LLM provider management UI
-- [ ] Model configuration management UI
-- [ ] User management UI
-
-### Deferred (v1.2+ - RAG Integration)
-
-- [ ] RAG query endpoint with streaming SSE (FastAPI side complete)
+- [ ] RAG query endpoint with streaming SSE
 - [ ] Vector similarity search via sqlite-vec
 - [ ] Citation generation in RAG responses
 - [ ] Suggested follow-up questions
+
+### Deferred (v1.3+ - Production Migration)
+
+- [ ] Complete Flask cutover
+- [ ] Performance optimization
+- [ ] Production hardening
 
 ### Out of Scope
 
@@ -105,9 +125,9 @@ Users can upload documents (including OCR processing), organize them into librar
 | JWT Authentication | Stateless tokens, easier scaling, no CSRF complexity | ✓ Good — v1.0 delivered |
 | Nginx Dual-Backend Routing | Path-based routing allows gradual transition, zero downtime | ✓ Good — v1.0 delivered |
 | Hard Cut to JWT | Faster migration, cleaner codebase vs dual-auth complexity | ✓ Good — v1.0 delivered |
-| Custom React Admin Frontend | Replace SQLAdmin with polished custom UI for better UX | Planned for v1.1 |
+| Custom React Admin Frontend | Replace SQLAdmin with polished custom UI for better UX | ✓ Good — v1.1 delivered, shadcn/ui excellent |
 | FastAPI + Uvicorn | Async support, auto-generated OpenAPI docs, better production performance | ✓ Driver for migration |
 | CRUDRouter Pattern | Standardized API endpoints for all models | ✓ Implemented |
 
 ---
-*Last updated: 2026-02-26 after v1.1 milestone start*
+*Last updated: 2026-02-27 after v1.1 Admin Dashboard milestone*

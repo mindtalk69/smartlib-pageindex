@@ -59,3 +59,13 @@
 
 ---
 *Last updated: 2026-02-26*
+
+## v1.1 Admin Dashboard (Shipped: 2026-02-27)
+
+**Phases completed:** 9 phases, 32 plans, 14 tasks
+
+**Key accomplishments:**
+- (none recorded)
+
+---
+
