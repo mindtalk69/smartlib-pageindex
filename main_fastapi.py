@@ -2375,6 +2375,211 @@ def delete_admin_catalog(
 
 
 # ============================================================================
+# Category CRUD Endpoints (Phase 09 - CONTENT-07)
+# ============================================================================
+
+
+@app.get("/api/v1/admin/categories", response_model=CategoryListResponse)
+def list_admin_categories(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    skip: int = 0,
+    limit: int = 100,
+):
+    """
+    List all categories (admin only).
+
+    Returns categories ordered by name.
+    """
+    statement = select(Category).order_by(Category.name).offset(skip).limit(limit)
+    result = db.exec(statement)
+    categories = result.all()
+
+    # Get total count
+    count_statement = select(func.count(Category.id))
+    total = db.exec(count_statement).one()
+
+    items = []
+    for category in categories:
+        items.append({
+            "id": category.id,
+            "name": category.name,
+            "description": category.description,
+            "created_by_user_id": category.created_by_user_id,
+            "created_at": category.created_at.isoformat() if category.created_at else None,
+        })
+
+    return {
+        "success": True,
+        "data": {
+            "items": items,
+            "total": total,
+        },
+    }
+
+
+@app.post("/api/v1/admin/categories/add", response_model=CategoryCreateResponse, status_code=status.HTTP_201_CREATED)
+def create_admin_category(
+    category_data: CategoryCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Create a new category (admin only).
+
+    Validates:
+    - name is required (non-empty, stripped)
+    - name must be unique (returns 400 if duplicate)
+    """
+    # Validate required fields
+    name = category_data.name.strip() if category_data.name else ""
+
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="name is required"
+        )
+
+    # Check for duplicate name
+    existing = db.exec(select(Category).where(Category.name == name)).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Category with name '{name}' already exists."
+        )
+
+    # Create category
+    category = Category(
+        name=name,
+        description=category_data.description,
+        created_by_user_id=current_user.user_id,
+    )
+
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+
+    category_dict = {
+        "id": category.id,
+        "name": category.name,
+        "description": category.description,
+        "created_by_user_id": category.created_by_user_id,
+        "created_at": category.created_at.isoformat() if category.created_at else None,
+    }
+
+    return {
+        "success": True,
+        "message": "Category added successfully",
+        "category": category_dict,
+    }
+
+
+@app.post("/api/v1/admin/categories/edit/{category_id}", response_model=CategoryUpdateResponse)
+def update_admin_category(
+    category_id: int,
+    category_data: CategoryUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Update an existing category (admin only).
+
+    Validates:
+    - category_id must exist (404 if not found)
+    - name is required (non-empty, stripped)
+    - name must be unique excluding current id (returns 409 if duplicate)
+    """
+    # Check if category exists
+    category = db.get(Category, category_id)
+    if not category:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Category not found"
+        )
+
+    # Validate name if provided
+    if category_data.name is not None:
+        name = category_data.name.strip()
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="name must not be empty"
+            )
+
+        # Check for duplicate name (excluding current id)
+        existing = db.exec(
+            select(Category).where(
+                Category.name == name,
+                Category.id != category_id
+            )
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Category with name '{name}' already exists."
+            )
+        category.name = name
+
+    # Update description if provided
+    if category_data.description is not None:
+        category.description = category_data.description
+
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+
+    category_dict = {
+        "id": category.id,
+        "name": category.name,
+        "description": category.description,
+        "created_by_user_id": category.created_by_user_id,
+        "created_at": category.created_at.isoformat() if category.created_at else None,
+    }
+
+    return {
+        "success": True,
+        "message": "Category updated successfully",
+        "category": category_dict,
+    }
+
+
+@app.delete("/api/v1/admin/categories/delete/{category_id}", response_model=CategoryDeleteResponse)
+def delete_admin_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Delete an existing category (admin only).
+
+    Validates:
+    - category_id must exist (404 if not found)
+    """
+    # Check if category exists
+    category = db.get(Category, category_id)
+    if not category:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Category not found"
+        )
+
+    try:
+        db.delete(category)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error deleting category: {str(e)}"
+        )
+
+    return {
+        "success": True,
+        "message": "Category deleted successfully",
+    }
+
+
+# ============================================================================
 # Application Settings Endpoints (Phase 09 - SET-01, SET-02, SET-03)
 # ============================================================================
 
