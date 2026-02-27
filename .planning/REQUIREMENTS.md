@@ -39,13 +39,13 @@ Requirements for Admin Dashboard (React frontend at /admin-app).
 - [x] **USER-01**: List all users with pagination (10 per page)
 - [x] **USER-02**: Search users by username or user_id
 - [x] **USER-03**: View user details (username, email, is_admin, is_disabled, created_at)
-- [ ] **USER-04**: Toggle user admin status (grant/revoke admin)
-- [ ] **USER-05**: Toggle user active status (enable/disable account)
+- [x] **USER-04**: Toggle user admin status (grant/revoke admin)
+- [x] **USER-05**: Toggle user active status (enable/disable account)
 - [x] **USER-06**: Reset user password (generate temporary password)
-- [ ] **USER-07**: Delete user (with confirmation)
-- [ ] **USER-08**: View password reset requests (pending, completed, denied)
-- [ ] **USER-09**: Approve password reset request (generate temp password)
-- [ ] **USER-10**: Deny password reset request (with admin notes)
+- [x] **USER-07**: Delete user (with confirmation)
+- [x] **USER-08**: View password reset requests (pending, completed, denied)
+- [x] **USER-09**: Approve password reset request (generate temp password)
+- [x] **USER-10**: Deny password reset request (with admin notes)
 
 ### LLM Provider Management (PROV)
 
@@ -223,13 +223,13 @@ frontend/
 | USER-01 | Phase 4 | Complete |
 | USER-02 | Phase 4 | Complete |
 | USER-03 | Phase 4 | Complete |
-| USER-04 | Phase 6 | Pending |
-| USER-05 | Phase 6 | Pending |
+| USER-04 | Phase 6 | Complete |
+| USER-05 | Phase 6 | Complete |
 | USER-06 | Phase 4 | Complete |
-| USER-07 | Phase 6 | Pending |
-| USER-08 | Phase 6 | Pending |
-| USER-09 | Phase 6 | Pending |
-| USER-10 | Phase 6 | Pending |
+| USER-07 | Phase 6 | Complete |
+| USER-08 | Phase 6 | Complete |
+| USER-09 | Phase 6 | Complete |
+| USER-10 | Phase 6 | Complete |
 | PROV-01 | Phase 7 | Pending |
 | PROV-02 | Phase 7 | Pending |
 | PROV-03 | Phase 7 | Pending |

@@ -74,42 +74,39 @@ export function useModels() {
   /**
    * Add a new model
    */
-  const addModel = async (model: Omit<ModelConfig, 'id' | 'created_at' | 'provider_obj'>) => {
-    const result = await api.post('/api/v1/admin/models/add', model)
+  const addModel = async (model: Omit<ModelConfig, 'id' | 'created_at' | 'provider_obj'>): Promise<void> => {
+    await api.post('/api/v1/admin/models/add', model)
     await fetchModels()
-    return result
   }
 
   /**
    * Update an existing model
    */
-  const updateModel = async (id: number, updates: Partial<ModelConfig>) => {
-    const result = await api.post(`/api/v1/admin/models/edit/${id}`, updates)
+  const updateModel = async (id: number, updates: Partial<ModelConfig>): Promise<void> => {
+    await api.post(`/api/v1/admin/models/edit/${id}`, updates)
     await fetchModels()
-    return result
   }
 
   /**
    * Delete a model
    */
-  const deleteModel = async (id: number) => {
-    const result = await api.post(`/api/v1/admin/models/delete/${id}`)
+  const deleteModel = async (id: number): Promise<void> => {
+    await api.post(`/api/v1/admin/models/delete/${id}`)
     await fetchModels()
-    return result
   }
 
   /**
    * Set a model as the default
    */
-  const setDefault = async (id: number) => {
-    return await api.post(`/api/v1/admin/models/set-default/${id}`)
+  const setDefault = async (id: number): Promise<void> => {
+    await api.post(`/api/v1/admin/models/set-default/${id}`)
   }
 
   /**
    * Set a model as multimodal
    */
-  const setMultimodal = async (id: number) => {
-    return await api.post(`/api/v1/admin/models/set-multimodal/${id}`)
+  const setMultimodal = async (id: number): Promise<void> => {
+    await api.post(`/api/v1/admin/models/set-multimodal/${id}`)
   }
 
   /**
