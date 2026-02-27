@@ -376,6 +376,84 @@ class DownloadActivityListResponse(SmartLibBase):
     data: Dict[str, Any] = {}  # Contains items list and total
 
 
+# Catalog Admin CRUD Schemas
+class CatalogListResponse(SmartLibBase):
+    """Response for list catalogs endpoint."""
+    success: bool = True
+    data: Dict[str, Any] = {}  # Contains items list and total
+
+
+class CatalogCreateRequest(SmartLibBase):
+    """Request to create a catalog."""
+    name: str
+    description: Optional[str] = None
+
+
+class CatalogCreateResponse(SmartLibBase):
+    """Response for create catalog endpoint."""
+    success: bool = True
+    message: str
+    catalog: Dict[str, Any]
+
+
+class CatalogUpdateRequest(SmartLibBase):
+    """Request to update a catalog (all fields optional)."""
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
+class CatalogUpdateResponse(SmartLibBase):
+    """Response for update catalog endpoint."""
+    success: bool = True
+    message: str
+    catalog: Dict[str, Any]
+
+
+class CatalogDeleteResponse(SmartLibBase):
+    """Response for delete catalog endpoint."""
+    success: bool = True
+    message: str
+
+
+# Category Admin CRUD Schemas
+class CategoryListResponse(SmartLibBase):
+    """Response for list categories endpoint."""
+    success: bool = True
+    data: Dict[str, Any] = {}  # Contains items list and total
+
+
+class CategoryCreateRequest(SmartLibBase):
+    """Request to create a category."""
+    name: str
+    description: Optional[str] = None
+
+
+class CategoryCreateResponse(SmartLibBase):
+    """Response for create category endpoint."""
+    success: bool = True
+    message: str
+    category: Dict[str, Any]
+
+
+class CategoryUpdateRequest(SmartLibBase):
+    """Request to update a category (all fields optional)."""
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
+class CategoryUpdateResponse(SmartLibBase):
+    """Response for update category endpoint."""
+    success: bool = True
+    message: str
+    category: Dict[str, Any]
+
+
+class CategoryDeleteResponse(SmartLibBase):
+    """Response for delete category endpoint."""
+    success: bool = True
+    message: str
+
+
 # Search Results / General
 class Citations(SmartLibBase):
     citations: List[Dict[str, Any]] = []
