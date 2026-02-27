@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: Admin Dashboard
 current_plan: Not started
 status: planning
-stopped_at: "Completed 07-01 and 07-02: LLM Provider Admin Endpoints - PROV-01 through PROV-08 complete"
-last_updated: "2026-02-27T03:10:15.296Z"
+stopped_at: "Phase 08 planning complete - 2 plans created for Model Config and Language CRUD endpoints"
+last_updated: "2026-02-27T15:36:00.000Z"
 last_activity: 2026-02-27
 progress:
   total_phases: 4
   completed_phases: 7
-  total_plans: 23
+  total_plans: 25
   completed_plans: 33
   percent: 100
 ---
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Current Plan:** Not started
 **Total Plans in Phase:** 2
-**Phase:** 7 of 7 (Backend LLM Providers)
-**Status:** Ready to plan
+**Phase:** 8 of 9 (Backend LLM Model & Language Endpoints)
+**Status:** Ready to execute
 **Last activity:** 2026-02-27
 
 **Progress:** [██████████] 100%
@@ -64,6 +64,8 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
+| Phase 08 P02 | planned | 5 tasks | 2 files |
+| Phase 08 P01 | planned | 8 tasks | 2 files |
 | Phase 07 P02 | ~15 min | 4 tasks | 2 files |
 | Phase 07 P01 | ~15 min | 4 tasks | 2 files |
 | Phase 06 P02 | 1 min | 3 tasks | 2 files |
@@ -100,6 +102,8 @@ Recent decisions affecting current work:
 - **Phase 6 Plan 02:** Password reset request admin endpoints implemented with secure temp password generation; PasswordResetRequest model extended with processed_at, processed_by, admin_notes fields; status filtering for list endpoint
 - **Phase 7 Plan 01:** LLM Provider CRUD endpoints implemented with admin authentication, name uniqueness validation, model-count checks before deletion; PROV-01 through PROV-04 closed
 - **Phase 7 Plan 02:** LLM Provider action endpoints implemented (test connectivity, discover models, update priorities, health status tracking); PROV-05 through PROV-08 closed; modules/llm_provider_utils.py integrated
+- **Phase 8 Plan 01:** Model Config CRUD endpoints planned (MODEL-01 through MODEL-07) - 8 tasks for list, add, edit, delete, set-default, set-multimodal, validate deployment
+- **Phase 8 Plan 02:** Language CRUD endpoints planned (LANG-01 through LANG-05) - 5 tasks for list, add, edit, delete with uniqueness validation
 
 ### Pending Todos
 
@@ -116,8 +120,8 @@ None yet.
 ## Session Continuity
 
 **Last session:** 2026-02-27
-**Stopped at:** Completed 07-01 and 07-02: LLM Provider Admin Endpoints - PROV-01 through PROV-08 complete
-**Resume file:** .planning/phases/07-backend-llm-providers/07-02-SUMMARY.md
+**Stopped at:** Phase 08 planning complete - 2 plans created for Model Config and Language CRUD endpoints
+**Resume file:** .planning/phases/08-backend-llm-model-language/08-PLAN-SUMMARY.md
 
 ## v1.0 Summary: Shipped 2026-02-26
 
