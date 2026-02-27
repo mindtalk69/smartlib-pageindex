@@ -258,6 +258,30 @@ class PasswordResetRequest(SQLModel, table=True):
     admin_notes: Optional[str] = Field(default=None)
 
 
+class Catalog(SQLModel, table=True):
+    __tablename__ = "catalogs"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(unique=True)
+    description: Optional[str] = Field(default=None)
+    created_by_user_id: str = Field(foreign_key="users.user_id")
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(DateTime, server_default=func.now()),
+    )
+
+
+class Category(SQLModel, table=True):
+    __tablename__ = "categories"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(unique=True)
+    description: Optional[str] = Field(default=None)
+    created_by_user_id: str = Field(foreign_key="users.user_id")
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(DateTime, server_default=func.now()),
+    )
+
+
 class UrlDownload(SQLModel, table=True):
     __tablename__ = "url_downloads"
     download_id: Optional[int] = Field(default=None, primary_key=True)
