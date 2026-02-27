@@ -1996,6 +1996,180 @@ def delete_admin_language(
 
 
 # ============================================================================
+# Activity Log Endpoints (Phase 09 - CONTENT-01, CONTENT-02, CONTENT-03)
+# ============================================================================
+
+def build_knowledge_metadata_summary_fastapi(knowledge_ids, db):
+    """
+    Return a mapping of knowledge_id to a formatted metadata summary string.
+    FastAPI/SQLModel-compatible version.
+    """
+    if not knowledge_ids:
+        return {}
+
+    from sqlmodel import select
+
+    normalized_ids = {int(k) for k in knowledge_ids if k is not None}
+    if not normalized_ids:
+        return {}
+
+    # Query knowledge records with their relationships
+    knowledge_map = {}
+    for kid in normalized_ids:
+        knowledge = db.get(Knowledge, kid)
+        if knowledge:
+            knowledge_map[kid] = knowledge
+
+    summary_map = {}
+    for kid, knowledge in knowledge_map.items():
+        parts = []
+
+        # Get catalogs for this knowledge
+        catalog_statement = select(Catalog).join(Knowledge, Catalog.knowledges).where(Knowledge.id == kid)
+        catalogs = db.exec(catalog_statement).all()
+        if catalogs:
+            parts.append(f"Catalogs: {', '.join([c.name for c in catalogs])}")
+
+        # Get categories for this knowledge
+        category_statement = select(Category).join(Knowledge, Category.knowledges).where(Knowledge.id == kid)
+        categories = db.exec(category_statement).all()
+        if categories:
+            parts.append(f"Categories: {', '.join([c.name for c in categories])}")
+
+        summary_map[kid] = '; '.join(parts) if parts else 'None'
+
+    return summary_map
+
+
+@app.get("/api/v1/admin/activity/uploads", response_model=UploadActivityListResponse)
+def list_upload_activities(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    skip: int = 0,
+    limit: int = 10,
+):
+    """
+    List upload activities (admin only).
+
+    Returns uploaded files with user, library, and knowledge info.
+    Ordered by upload_time desc (newest first).
+    """
+    from sqlmodel import select
+
+    # Query uploaded files with joins to user, library, knowledge
+    statement = (
+        select(UploadedFile, User, Library, Knowledge)
+        .join(User, UploadedFile.user_id == User.user_id)
+        .outerjoin(Library, UploadedFile.library_id == Library.library_id)
+        .outerjoin(Knowledge, UploadedFile.knowledge_id == Knowledge.id)
+    )
+    statement = statement.order_by(UploadedFile.upload_time.desc()).offset(skip).limit(limit)
+
+    results = db.exec(statement).all()
+
+    # Get total count
+    count_statement = select(func.count(UploadedFile.file_id))
+    total = db.exec(count_statement).one()
+
+    # Build metadata summary for all knowledge_ids
+    knowledge_ids = {row[3].id for row in results if row[3] is not None}
+    metadata_map = build_knowledge_metadata_summary_fastapi(knowledge_ids, db)
+
+    items = []
+    for uploaded_file, user, library, knowledge in results:
+        items.append({
+            "id": uploaded_file.file_id,
+            "type": "upload",
+            "filename": uploaded_file.original_filename,
+            "file_size": uploaded_file.file_size,
+            "upload_time": uploaded_file.upload_time.isoformat() if uploaded_file.upload_time else None,
+            "username": user.username if user else None,
+            "library_name": library.name if library else None,
+            "knowledge_name": knowledge.name if knowledge else None,
+            "metadata_summary": metadata_map.get(knowledge.id, 'None') if knowledge else 'N/A',
+            "is_ocr": uploaded_file.is_ocr,
+            "status": "success",
+        })
+
+    return {
+        "success": True,
+        "data": {
+            "items": items,
+            "total": total,
+        },
+    }
+
+
+@app.get("/api/v1/admin/activity/downloads", response_model=DownloadActivityListResponse)
+def list_download_activities(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    skip: int = 0,
+    limit: int = 10,
+    status: Optional[str] = None,
+):
+    """
+    List download activities (admin only).
+
+    Returns URL downloads with user, library, and knowledge info.
+    Supports status filtering: queued, processing, success, failed.
+    Ordered by processed_at desc (newest first).
+    """
+    from sqlmodel import select
+
+    # Query URL downloads with joins to user, library, knowledge
+    statement = (
+        select(UrlDownload, User, Library, Knowledge)
+        .join(User, UrlDownload.user_id == User.user_id)
+        .outerjoin(Library, UrlDownload.library_id == Library.library_id)
+        .outerjoin(Knowledge, UrlDownload.knowledge_id == Knowledge.id)
+    )
+
+    # Apply status filter if provided
+    if status:
+        statement = statement.where(UrlDownload.status == status)
+
+    statement = statement.order_by(UrlDownload.processed_at.desc()).offset(skip).limit(limit)
+
+    results = db.exec(statement).all()
+
+    # Get total count (respecting status filter)
+    count_statement = select(func.count(UrlDownload.download_id))
+    if status:
+        count_statement = count_statement.where(UrlDownload.status == status)
+    total = db.exec(count_statement).one()
+
+    # Build metadata summary for all knowledge_ids
+    knowledge_ids = {row[3].id for row in results if row[3] is not None}
+    metadata_map = build_knowledge_metadata_summary_fastapi(knowledge_ids, db)
+
+    items = []
+    for url_download, user, library, knowledge in results:
+        items.append({
+            "id": url_download.download_id,
+            "type": "download",
+            "url": url_download.url,
+            "status": url_download.status,
+            "content_type": url_download.content_type,
+            "error_message": url_download.error_message,
+            "processed_at": url_download.processed_at.isoformat() if url_download.processed_at else None,
+            "username": user.username if user else None,
+            "library_name": library.name if library else None,
+            "knowledge_name": knowledge.name if knowledge else None,
+            "metadata_summary": metadata_map.get(knowledge.id, 'None') if knowledge else 'N/A',
+            "is_ocr": url_download.is_ocr,
+        })
+
+    return {
+        "success": True,
+        "data": {
+            "items": items,
+            "total": total,
+        },
+    }
+
+
+# ============================================================================
 # Application Settings Endpoints (Phase 09 - SET-01, SET-02, SET-03)
 # ============================================================================
 
@@ -2033,6 +2207,80 @@ def get_app_settings(
         "success": True,
         "settings": settings_dict,
         "active_user_count": active_user_count,
+    }
+
+
+@app.post("/api/v1/admin/settings/update", response_model=SettingsUpdateResponse)
+def update_app_settings(
+    settings_data: SettingsUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Update application settings (admin only).
+
+    Validates:
+    - max_active_users must be a valid integer >= 1
+    - max_active_users must be >= current active user count
+
+    Creates new settings if they don't exist, updates existing ones.
+    Returns list of updated keys.
+    """
+    updated_keys = []
+
+    # Get current active user count for validation
+    count_statement = select(func.count(User.id)).where(User.is_disabled == False)
+    current_active = db.exec(count_statement).one()
+
+    for key, value in settings_data.settings.items():
+        # Special validation for max_active_users
+        if key == 'max_active_users':
+            try:
+                max_users = int(value)
+            except (ValueError, TypeError):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="max_active_users must be a valid integer."
+                )
+
+            if max_users < 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="max_active_users must be at least 1."
+                )
+
+            if max_users < current_active:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Cannot set limit to {max_users} - currently have {current_active} active users."
+                )
+
+            # Store as integer for proper type handling
+            value = max_users
+
+        # Update or insert setting
+        existing = db.get(AppSettings, key)
+        if existing:
+            existing.value = str(value)
+        else:
+            new_setting = AppSettings(key=key, value=str(value))
+            db.add(new_setting)
+
+        updated_keys.append(key)
+
+    try:
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update settings: {str(exc)}"
+        )
+
+    return {
+        "success": True,
+        "message": f"Updated {len(updated_keys)} setting(s).",
+        "updated_keys": updated_keys,
     }
 
 
