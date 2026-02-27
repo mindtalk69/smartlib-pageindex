@@ -105,6 +105,9 @@ from schemas import (
     ModelConfigMultimodalResponse,
     ModelValidationRequest,
     ModelValidationResponse,
+    # File Management admin schemas (Phase 09)
+    FileDetailsResponse,
+    FileDeleteResponse,
 )
 from typing import Optional, List
 from fastapi_pagination import add_pagination
@@ -1967,6 +1970,172 @@ def delete_admin_language(
         "success": True,
         "message": "Language deleted successfully",
     }
+
+
+# ============================================================================
+# File Management Endpoints (Phase 09 - CONTENT-04, CONTENT-05)
+# ============================================================================
+
+@app.get("/api/v1/admin/files/{file_id}", response_model=FileDetailsResponse)
+def get_file_details(
+    file_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Get file details by file_id (admin only).
+
+    Validates:
+    - file_id must exist (404 if not found)
+    - Returns file metadata with document count and metadata summary
+
+    Response includes:
+    - file_id, filename, file_size, upload_time
+    - username of uploader
+    - library_name, knowledge_name
+    - metadata_summary (catalogs/categories from knowledge)
+    - is_ocr, is_az_doci flags
+    - document_count (number of document chunks)
+    - vector_count (0 for sqlite-vec - cascade handled)
+    - brand_manufacturer_organization, product_model_name_service
+    """
+    # Get uploaded file
+    uploaded_file = db.get(UploadedFile, file_id)
+    if not uploaded_file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File record not found."
+        )
+
+    # Get user
+    user = db.get(User, uploaded_file.user_id)
+
+    # Get library and knowledge (optional)
+    library = db.get(Library, uploaded_file.library_id) if uploaded_file.library_id else None
+    knowledge = db.get(Knowledge, uploaded_file.knowledge_id) if uploaded_file.knowledge_id else None
+
+    # Count documents associated with this file
+    doc_count_statement = select(func.count(Document.id)).where(
+        Document.source == uploaded_file.original_filename,
+        Document.library_id == uploaded_file.library_id,
+        Document.knowledge_id == uploaded_file.knowledge_id,
+    )
+    document_count = db.exec(doc_count_statement).one()
+
+    # Build metadata summary using database function
+    metadata_summary = "N/A"
+    if knowledge:
+        from modules.database import build_knowledge_metadata_summary
+        metadata_map = build_knowledge_metadata_summary([knowledge.id])
+        metadata_summary = metadata_map.get(knowledge.id, 'N/A')
+
+    # Build response dict
+    file_dict = {
+        "file_id": uploaded_file.file_id,
+        "filename": uploaded_file.original_filename,
+        "file_size": uploaded_file.file_size,
+        "upload_time": uploaded_file.upload_time.isoformat() if uploaded_file.upload_time else None,
+        "username": user.username if user else "Unknown",
+        "library_name": library.name if library else None,
+        "knowledge_name": knowledge.name if knowledge else None,
+        "metadata_summary": metadata_summary,
+        "is_ocr": uploaded_file.is_ocr if hasattr(uploaded_file, 'is_ocr') else False,
+        "is_az_doci": uploaded_file.is_az_doci if hasattr(uploaded_file, 'is_az_doci') else False,
+        "document_count": document_count,
+        "vector_count": 0,  # sqlite-vec handles vectors via cascade
+        "brand_manufacturer_organization": knowledge.brand_manufacturer_organization if knowledge else None,
+        "product_model_name_service": knowledge.product_model_name_service if knowledge else None,
+    }
+
+    return {
+        "success": True,
+        "file": file_dict,
+    }
+
+
+@app.delete("/api/v1/admin/files/{file_id}", response_model=FileDeleteResponse)
+def delete_file(
+    file_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Delete a file and its associated data (admin only).
+
+    Validates:
+    - file_id must exist (404 if not found)
+
+    Deletes:
+    - Associated Document records (chunks)
+    - VectorReference records
+    - LibraryReference records
+    - VisualGroundingActivity records
+    - UploadedFile record
+
+    For sqlite-vec: Vectors are deleted automatically via database cascade deletes.
+    No manual vector deletion is performed.
+
+    Returns success message with document count if any documents were removed.
+    """
+    # Get uploaded file
+    uploaded_file = db.get(UploadedFile, file_id)
+    if not uploaded_file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File record not found."
+        )
+
+    try:
+        # Find associated documents
+        doc_statement = select(Document).where(
+            Document.source == uploaded_file.original_filename,
+            Document.library_id == uploaded_file.library_id,
+            Document.knowledge_id == uploaded_file.knowledge_id,
+        )
+        docs = db.exec(doc_statement).all()
+        doc_count = len(docs)
+
+        # Delete document records (vectors cascade for sqlite-vec)
+        for doc in docs:
+            db.delete(doc)
+
+        # Delete vector references
+        vr_statement = select(VectorReference).where(VectorReference.file_id == file_id)
+        for vr in db.exec(vr_statement):
+            db.delete(vr)
+
+        # Delete library references
+        lr_statement = select(LibraryReference).where(
+            LibraryReference.reference_type == 'file',
+            LibraryReference.source_id == file_id
+        )
+        for lr in db.exec(lr_statement):
+            db.delete(lr)
+
+        # Delete visual grounding activities
+        vg_statement = select(VisualGroundingActivity).where(
+            VisualGroundingActivity.file_id == file_id
+        )
+        for vg in db.exec(vg_statement):
+            db.delete(vg)
+
+        # Delete the uploaded file
+        db.delete(uploaded_file)
+        db.commit()
+
+        message = "File deleted successfully."
+        if doc_count > 0:
+            message = f"File deleted successfully. Removed {doc_count} document(s)."
+
+        return {"success": True, "message": message}
+
+    except Exception as exc:
+        db.rollback()
+        logging.error(f"Failed to delete file_id {file_id}: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete file."
+        )
 
 
 # Config & Branding endpoints
