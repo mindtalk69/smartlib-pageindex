@@ -39,47 +39,47 @@ Requirements for Admin Dashboard (React frontend at /admin-app).
 - [x] **USER-01**: List all users with pagination (10 per page)
 - [x] **USER-02**: Search users by username or user_id
 - [x] **USER-03**: View user details (username, email, is_admin, is_disabled, created_at)
-- [x] **USER-04**: Toggle user admin status (grant/revoke admin)
-- [x] **USER-05**: Toggle user active status (enable/disable account)
+- [ ] **USER-04**: Toggle user admin status (grant/revoke admin)
+- [ ] **USER-05**: Toggle user active status (enable/disable account)
 - [x] **USER-06**: Reset user password (generate temporary password)
-- [x] **USER-07**: Delete user (with confirmation)
-- [x] **USER-08**: View password reset requests (pending, completed, denied)
-- [x] **USER-09**: Approve password reset request (generate temp password)
-- [x] **USER-10**: Deny password reset request (with admin notes)
+- [ ] **USER-07**: Delete user (with confirmation)
+- [ ] **USER-08**: View password reset requests (pending, completed, denied)
+- [ ] **USER-09**: Approve password reset request (generate temp password)
+- [ ] **USER-10**: Deny password reset request (with admin notes)
 
 ### LLM Provider Management (PROV)
 
-- [x] **PROV-01**: List all LLM providers with priority ordering
-- [x] **PROV-02**: Add new provider (name, provider_type, base_url, api_key, is_active, priority, config)
-- [x] **PROV-03**: Edit existing provider details
-- [x] **PROV-04**: Delete provider (if no associated models)
-- [x] **PROV-05**: Test provider connectivity (health check)
-- [x] **PROV-06**: Discover available models from provider
-- [x] **PROV-07**: Update provider priorities (drag-and-drop reordering)
-- [x] **PROV-08**: View provider health status (last_health_check, health_status, error_message)
+- [ ] **PROV-01**: List all LLM providers with priority ordering
+- [ ] **PROV-02**: Add new provider (name, provider_type, base_url, api_key, is_active, priority, config)
+- [ ] **PROV-03**: Edit existing provider details
+- [ ] **PROV-04**: Delete provider (if no associated models)
+- [ ] **PROV-05**: Test provider connectivity (health check)
+- [ ] **PROV-06**: Discover available models from provider
+- [ ] **PROV-07**: Update provider priorities (drag-and-drop reordering)
+- [ ] **PROV-08**: View provider health status (last_health_check, health_status, error_message)
 
 ### Model Configuration (MODEL)
 
-- [x] **MODEL-01**: List all models with provider association
-- [x] **MODEL-02**: Add new model (name, deployment_name, provider_id, temperature, streaming, description)
-- [x] **MODEL-03**: Edit model configuration
-- [x] **MODEL-04**: Delete model
-- [x] **MODEL-05**: Set model as default
-- [x] **MODEL-06**: Set model as multimodal
-- [x] **MODEL-07**: Validate deployment configuration (streaming support, temperature range, connectivity)
+- [ ] **MODEL-01**: List all models with provider association
+- [ ] **MODEL-02**: Add new model (name, deployment_name, provider_id, temperature, streaming, description)
+- [ ] **MODEL-03**: Edit model configuration
+- [ ] **MODEL-04**: Delete model
+- [ ] **MODEL-05**: Set model as default
+- [ ] **MODEL-06**: Set model as multimodal
+- [ ] **MODEL-07**: Validate deployment configuration (streaming support, temperature range, connectivity)
 
 ### Language Management (LANG)
 
-- [x] **LANG-01**: List all LLM languages (language_code, language_name, is_active)
-- [x] **LANG-02**: Add new language
-- [x] **LANG-03**: Edit language details
-- [x] **LANG-04**: Toggle language active status
-- [x] **LANG-05**: Delete language
+- [ ] **LANG-01**: List all LLM languages (language_code, language_name, is_active)
+- [ ] **LANG-02**: Add new language
+- [ ] **LANG-03**: Edit language details
+- [ ] **LANG-04**: Toggle language active status
+- [ ] **LANG-05**: Delete language
 
 ### Content Management (CONTENT)
 
-- [ ] **CONTENT-01**: Activity log showing upload activities (filename, file_size, upload_time, username, library, knowledge, is_ocr, metadata_summary)
-- [ ] **CONTENT-02**: Activity log showing download activities (url, library, knowledge, status, error_message, processed_at)
+- [ ] **CONTENT-01**: Activity log showing upload activities
+- [ ] **CONTENT-02**: Activity log showing download activities
 - [ ] **CONTENT-03**: Filter activities by type (upload/download) and status
 - [ ] **CONTENT-04**: View file details with metadata summary
 - [ ] **CONTENT-05**: Delete file records (with vector cleanup confirmation)
@@ -95,7 +95,7 @@ Requirements for Admin Dashboard (React frontend at /admin-app).
 ### API Integration (API)
 
 All features must use existing FastAPI admin endpoints:
-- `/api/v1/admin/*` — Admin API endpoints (already implemented)
+- `/api/v1/admin/*` — Admin API endpoints
 - JWT Bearer token authentication
 - Error handling with user-friendly messages
 
@@ -142,7 +142,7 @@ All features must use existing FastAPI admin endpoints:
 - **State Management**: React Context + hooks
 - **Forms**: React Hook Form + Zod validation
 - **Data Fetching**: fetch API with JWT tokens
-- **Charts**: Chart.js (reuse from Flask admin)
+- **Charts**: Recharts (Phase 4 integration)
 
 ### Folder Structure
 ```
@@ -215,55 +215,55 @@ frontend/
 | AUTH-02 | Phase 3 | Pending |
 | AUTH-03 | Phase 3 | Pending |
 | AUTH-04 | Phase 3 | Pending |
-| DASH-01 | Phase 4 | Complete (04-01) |
-| DASH-02 | Phase 4 | Complete (04-GAP-01) |
-| DASH-03 | Phase 4 | Complete (04-02) |
-| DASH-04 | Phase 4 | Complete (04-01) |
-| DASH-05 | Phase 4 | Complete (04-01) |
-| USER-01 | Phase 4 | Complete (04-03) |
-| USER-02 | Phase 4 | Complete (04-03) |
-| USER-03 | Phase 4 | Complete (04-03) |
-| USER-04 | Phase 4 | Complete (04-04) |
-| USER-05 | Phase 4 | Complete (04-04) |
-| USER-06 | Phase 4 | Complete (04-04) |
-| USER-07 | Phase 4 | Complete (04-04) |
-| USER-08 | Phase 4 | Complete (04-05) |
-| USER-09 | Phase 4 | Complete (04-05) |
-| USER-10 | Phase 4 | Complete (04-05) |
-| PROV-01 | Phase 5 | Complete (05-01) |
-| PROV-02 | Phase 5 | Complete (05-01) |
-| PROV-03 | Phase 5 | Complete (05-01) |
-| PROV-04 | Phase 5 | Complete (05-01) |
-| PROV-05 | Phase 5 | Complete (05-01) |
-| PROV-06 | Phase 5 | Complete (05-01) |
-| PROV-07 | Phase 5 | Complete (05-01) |
-| PROV-08 | Phase 5 | Complete (05-01) |
-| MODEL-01 | Phase 5 | Complete |
-| MODEL-02 | Phase 5 | Complete |
-| MODEL-03 | Phase 5 | Complete |
-| MODEL-04 | Phase 5 | Complete |
-| MODEL-05 | Phase 5 | Complete |
-| MODEL-06 | Phase 5 | Complete |
-| MODEL-07 | Phase 5 | Complete |
-| LANG-01 | Phase 5 | Complete (05-04) |
-| LANG-02 | Phase 5 | Complete (05-04) |
-| LANG-03 | Phase 5 | Complete (05-04) |
-| LANG-04 | Phase 5 | Complete (05-04) |
-| LANG-05 | Phase 5 | Complete (05-04) |
-| CONTENT-01 | Phase 6 | Pending |
-| CONTENT-02 | Phase 6 | Pending |
-| CONTENT-03 | Phase 6 | Pending |
-| CONTENT-04 | Phase 6 | Pending |
-| CONTENT-05 | Phase 6 | Pending |
-| CONTENT-06 | Phase 6 | Pending |
-| CONTENT-07 | Phase 6 | Pending |
-| SET-01 | Phase 6 | Pending |
-| SET-02 | Phase 6 | Pending |
-| SET-03 | Phase 6 | Pending |
+| DASH-01 | Phase 4 | Complete |
+| DASH-02 | Phase 4 | Complete |
+| DASH-03 | Phase 4 | Complete |
+| DASH-04 | Phase 4 | Complete |
+| DASH-05 | Phase 4 | Complete |
+| USER-01 | Phase 4 | Complete |
+| USER-02 | Phase 4 | Complete |
+| USER-03 | Phase 4 | Complete |
+| USER-04 | Phase 6 | Pending |
+| USER-05 | Phase 6 | Pending |
+| USER-06 | Phase 4 | Complete |
+| USER-07 | Phase 6 | Pending |
+| USER-08 | Phase 6 | Pending |
+| USER-09 | Phase 6 | Pending |
+| USER-10 | Phase 6 | Pending |
+| PROV-01 | Phase 7 | Pending |
+| PROV-02 | Phase 7 | Pending |
+| PROV-03 | Phase 7 | Pending |
+| PROV-04 | Phase 7 | Pending |
+| PROV-05 | Phase 7 | Pending |
+| PROV-06 | Phase 7 | Pending |
+| PROV-07 | Phase 7 | Pending |
+| PROV-08 | Phase 7 | Pending |
+| MODEL-01 | Phase 8 | Pending |
+| MODEL-02 | Phase 8 | Pending |
+| MODEL-03 | Phase 8 | Pending |
+| MODEL-04 | Phase 8 | Pending |
+| MODEL-05 | Phase 8 | Pending |
+| MODEL-06 | Phase 8 | Pending |
+| MODEL-07 | Phase 8 | Pending |
+| LANG-01 | Phase 8 | Pending |
+| LANG-02 | Phase 8 | Pending |
+| LANG-03 | Phase 8 | Pending |
+| LANG-04 | Phase 8 | Pending |
+| LANG-05 | Phase 8 | Pending |
+| CONTENT-01 | Phase 9 | Pending |
+| CONTENT-02 | Phase 9 | Pending |
+| CONTENT-03 | Phase 9 | Pending |
+| CONTENT-04 | Phase 9 | Pending |
+| CONTENT-05 | Phase 9 | Pending |
+| CONTENT-06 | Phase 9 | Pending |
+| CONTENT-07 | Phase 9 | Pending |
+| SET-01 | Phase 9 | Pending |
+| SET-02 | Phase 9 | Pending |
+| SET-03 | Phase 9 | Pending |
 
 **Coverage:** 55/55 requirements mapped ✓
 
 ---
 
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-27 after 05-04 Language Management completion (LANG-01 to LANG-05 complete)*
+*Last updated: 2026-02-27 after Milestone Audit (Gaps identified in backend integration)*

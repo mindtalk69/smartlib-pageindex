@@ -8,9 +8,7 @@
 ## Milestones
 
 - ✅ **v1.0 FastAPI Foundation** — Phases 1-2 (shipped 2026-02-26)
-- 🚧 **v1.1 Admin Dashboard** — Phases 3-6 (in progress)
-- 📋 **v1.2 RAG Integration** — Future (planned)
-- 📋 **v1.3 Production Migration** — Future (planned)
+- ✅ **v1.1 Admin Dashboard** — Phases 3-8 (in progress)
 
 ---
 
@@ -52,52 +50,75 @@
 **Plans**: 3
 
 Plans:
-- [ ] 03-01-PLAN.md — React app setup with shadcn/ui components and TypeScript configuration
-- [ ] 03-02-PLAN.md — Layout components (Sidebar, Header, ThemeToggle) with responsive design
-- [ ] 03-03-PLAN.md — Authentication integration with JWT validation and admin-only access control
+- [x] 03-01: React app setup with shadcn/ui components - completed 2026-02-26
+- [x] 03-02: Layout components (Sidebar, Header, ThemeToggle) - completed 2026-02-26
+- [x] 03-03: Authentication integration with JWT validation - completed 2026-02-26
 
-#### Phase 4: Dashboard & User Management
-**Goal**: System statistics dashboard and comprehensive user CRUD operations
+#### Phase 4: Dashboard & User Management (Frontend)
+**Goal**: System statistics dashboard and user management frontend
 **Depends on**: Phase 3
-**Requirements**: DASH-01, DASH-02, DASH-03, DASH-04, DASH-05, USER-01, USER-02, USER-03, USER-04, USER-05, USER-06, USER-07, USER-08, USER-09, USER-10
+**Requirements**: DASH-01, DASH-02, DASH-03, DASH-04, DASH-05, USER-01, USER-02, USER-03
 **Success Criteria** (what must be TRUE):
   1. Admin sees dashboard with stats cards (user/file/message counts) and interactive charts
-  2. Admin can search, view, enable/disable, grant/revoke admin, and delete users
-  3. Admin can view and manage password reset requests (approve/deny with notes)
-  4. Admin can switch between different chart views and refresh data in real-time
-**Plans**: TBD
+  2. Admin can search and view users in a paginated list
+  3. Dashboard charts display data from /api/v1/admin/stats
+**Plans**: 8
 
 Plans:
 - [x] 04-01: Dashboard components (useDashboardData hook, StatCard, ChartSection) - completed 2026-02-27
 - [x] 04-02: Dashboard integration (Dashboard page, UserStatsTable, UI components) - completed 2026-02-27
 - [x] 04-03: User management list (useUsers hook, UserList table, UserDialog) - completed 2026-02-27
-- [x] 04-04: User actions (toggle admin/status, password reset, delete) with confirmations - completed 2026-02-27
-- [x] 04-05: Password reset requests management (approve/deny with admin notes) - completed 2026-02-27
 - [x] 04-GAP-01: Dashboard chart implementation (Recharts integration, 4 chart types) - completed 2026-02-27
-- [x] 04-GAP-02: AdminLayout children prop fix (LAYOUT-01 gap closed) - completed 2026-02-27
-- [x] 04-GAP-03: UserList undefined props fix (action callbacks wired, USER-01 gap closed) - completed 2026-02-27
-- [x] 04-GAP-05: TypeScript type annotations for PasswordResetRequests (TS-TYPE-01 gap closed) - completed 2026-02-26
+- [x] 04-GAP-02: AdminLayout children prop fix - completed 2026-02-27
+- [x] 04-GAP-03: UserList undefined props fix - completed 2026-02-27
+- [x] 04-GAP-05: TypeScript type annotations for PasswordResetRequests - completed 2026-02-26
 
-#### Phase 5: LLM, Model & Language Management
-**Goal**: Complete AI configuration interface for providers, models, and languages
+#### Phase 5: LLM, Model & Language Management (Frontend)
+**Goal**: AI configuration interface for providers, models, and languages
 **Depends on**: Phase 4
 **Requirements**: PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06, PROV-07, PROV-08, MODEL-01, MODEL-02, MODEL-03, MODEL-04, MODEL-05, MODEL-06, MODEL-07, LANG-01, LANG-02, LANG-03, LANG-04, LANG-05
 **Success Criteria** (what must be TRUE):
-  1. Admin can add, edit, delete, and prioritize LLM providers with health status visibility
-  2. Admin can test provider connectivity and discover available models
-  3. Admin can configure models (temperature, streaming, default/multimodal flags) and validate deployment
-  4. Admin can manage languages (CRUD, toggle active status)
-**Plans**: TBD
+  1. Admin can interact with LLM provider, model, and language management UI
+  2. Frontend components are ready for backend integration
+**Plans**: 4
 
 Plans:
-- [x] 05-01: LLM Provider management (list, add, edit, delete, test, discover models, prioritize) - completed 2026-02-27
-- [ ] 05-02: Provider health monitoring and connectivity testing
-- [ ] 05-03: Model configuration (list, add, edit, delete, set default/multimodal, validate deployment)
-- [ ] 05-04: Language management (list, add, edit, delete, toggle active)
+- [x] 05-01: LLM Provider management frontend - completed 2026-02-27
+- [x] 05-02: Provider health monitoring UI - completed 2026-02-27
+- [x] 05-03: Model configuration UI - completed 2026-02-27
+- [x] 05-04: Language management UI - completed 2026-02-27
 
-#### Phase 6: Content Management & Settings
+#### Phase 6: Backend User Action Endpoints (GAP CLOSURE)
+**Goal**: Port Flask user management actions to FastAPI
+**Depends on**: Phase 4, Phase 1
+**Requirements**: USER-04, USER-05, USER-07, USER-08, USER-09, USER-10
+**Success Criteria** (what must be TRUE):
+  1. Admin can toggle admin status, active status, and delete users via custom React UI
+  2. Admin can manage password reset requests (approve/deny) via FastAPI endpoints
+  3. Pagination response format matches frontend expectations
+**Plans**: TBD
+
+#### Phase 7: Backend LLM Provider Endpoints (GAP CLOSURE)
+**Goal**: Port Flask LLM provider endpoints to FastAPI
+**Depends on**: Phase 5, Phase 1
+**Requirements**: PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06, PROV-07, PROV-08
+**Success Criteria** (what must be TRUE):
+  1. Admin can manage LLM providers (CRUD) with functional test connection and model discovery
+  2. Provider health status is correctly tracked and updated in the backend
+**Plans**: TBD
+
+#### Phase 8: Backend LLM Model & Language Endpoints (GAP CLOSURE)
+**Goal**: Port Flask model and language endpoints to FastAPI
+**Depends on**: Phase 7, Phase 1
+**Requirements**: MODEL-01, MODEL-02, MODEL-03, MODEL-04, MODEL-05, MODEL-06, MODEL-07, LANG-01, LANG-02, LANG-03, LANG-04, LANG-05
+**Success Criteria** (what must be TRUE):
+  1. Admin can manage AI models and languages (CRUD) via FastAPI endpoints
+  2. Model deployment validation and default/multimodal flags are functional
+**Plans**: TBD
+
+#### Phase 9: Content Management & Settings
 **Goal**: Activity logs, content oversight, and application settings
-**Depends on**: Phase 5
+**Depends on**: Phase 8
 **Requirements**: CONTENT-01, CONTENT-02, CONTENT-03, CONTENT-04, CONTENT-05, CONTENT-06, CONTENT-07, SET-01, SET-02, SET-03
 **Success Criteria** (what must be TRUE):
   1. Admin can view upload/download activity logs with filtering by type and status
@@ -107,10 +128,10 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 06-01: Activity log with upload/download filtering and file details
-- [ ] 06-02: File deletion with vector cleanup confirmation
-- [ ] 06-03: Catalog and Category CRUD operations
-- [ ] 06-04: App settings with edit/save functionality
+- [ ] 09-01: Activity log with upload/download filtering and file details
+- [ ] 09-02: File deletion with vector cleanup confirmation
+- [ ] 09-03: Catalog and Category CRUD operations
+- [ ] 09-04: App settings with edit/save functionality
 
 ### 📋 v1.2 RAG Integration (Planned)
 
@@ -127,16 +148,19 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1. API Foundation | v1.0 | 5/5 | Complete | 2026-02-25 |
 | 2. Frontend User App | v1.0 | 6/6 | Complete | 2026-02-26 |
 | 3. Frontend Infrastructure & Auth | v1.1 | 3/3 | Complete | 2026-02-26 |
-| 4. Dashboard & User Management | v1.1 | 8/8 | Complete | 2026-02-26 |
-| 5. LLM/Model/Language Management | v1.1 | 2/4 | In Progress | - |
-| 6. Content Management & Settings | v1.1 | 0/4 | Not started | - |
+| 4. Dashboard & User Management (FE) | v1.1 | 8/8 | Complete | 2026-02-26 |
+| 5. LLM/Model/Language (FE) | v1.1 | 4/4 | Complete | 2026-02-27 |
+| 6. Backend User Actions (GAP) | v1.1 | 0/2 | Not started | - |
+| 7. Backend LLM Providers (GAP) | v1.1 | 0/2 | Not started | - |
+| 8. Backend Models & Languages (GAP) | v1.1 | 0/2 | Not started | - |
+| 9. Content Management & Settings | v1.1 | 0/4 | Not started | - |
 
 ---
 
@@ -147,12 +171,16 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1 | API-01-05, AUTH-01-05, ADM-01-02 | 12 |
 | 2 | AUTH-06, DOC-01-07, FEA-01-05 | 13 |
 | 3 | FE-01-06, AUTH-01-04 | 10 |
-| 4 | DASH-01-05, USER-01-10 | 15 |
-| 5 | PROV-01-08, MODEL-01-07, LANG-01-05 | 20 |
-| 6 | CONTENT-01-07, SET-01-03 | 10 |
+| 4 | DASH-01-05, USER-01-03 | 8 |
+| 5 | (Frontend only - PROV, MODEL, LANG) | 0 |
+| 6 | USER-04-10 | 7 |
+| 7 | PROV-01-08 | 8 |
+| 8 | MODEL-01-07, LANG-01-05 | 12 |
+| 9 | CONTENT-01-07, SET-01-03 | 10 |
 | **v1.1 Total** | | **55** |
 | **Grand Total** | | **110** |
 
 ---
 
-*Last updated: 2026-02-27 after 05-04 Language Management completion (LANG-01 to LANG-05 complete)*
+*Last updated: 2026-02-27 after Milestone Audit (Gaps identified in backend integration)*
+
