@@ -243,6 +243,48 @@ class ModelConfigRead(ModelConfigBase):
     created_by: Optional[str] = None
     created_at: Optional[datetime] = None
 
+
+# LLM Language Admin CRUD Schemas
+class LLMLanguageListResponse(SmartLibBase):
+    """Response for list languages endpoint."""
+    success: bool = True
+    data: Dict[str, Any] = {}  # Contains items list and total
+
+
+class LLMLanguageCreateRequest(SmartLibBase):
+    """Request to create a language."""
+    language_code: str
+    language_name: str
+    is_active: bool = True
+
+
+class LLMLanguageCreateResponse(SmartLibBase):
+    """Response for create language endpoint."""
+    success: bool = True
+    message: str
+    language: Dict[str, Any]
+
+
+class LLMLanguageUpdateRequest(SmartLibBase):
+    """Request to update a language (all fields optional)."""
+    language_code: Optional[str] = None
+    language_name: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class LLMLanguageUpdateResponse(SmartLibBase):
+    """Response for update language endpoint."""
+    success: bool = True
+    message: str
+    language: Dict[str, Any]
+
+
+class LLMLanguageDeleteResponse(SmartLibBase):
+    """Response for delete language endpoint."""
+    success: bool = True
+    message: str
+
+
 # Search Results / General
 class Citations(SmartLibBase):
     citations: List[Dict[str, Any]] = []
