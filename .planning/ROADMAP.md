@@ -105,7 +105,11 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Admin can manage LLM providers (CRUD) with functional test connection and model discovery
   2. Provider health status is correctly tracked and updated in the backend
-**Plans**: TBD
+**Plans**: 2
+
+Plans:
+- [x] 07-01: Provider CRUD endpoints (PROV-01 through PROV-04) - completed 2026-02-27
+- [x] 07-02: Provider action endpoints (PROV-05 through PROV-08) - completed 2026-02-27
 
 #### Phase 8: Backend LLM Model & Language Endpoints (GAP CLOSURE)
 **Goal**: Port Flask model and language endpoints to FastAPI
@@ -158,7 +162,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 4. Dashboard & User Management (FE) | v1.1 | 8/8 | Complete | 2026-02-26 |
 | 5. LLM/Model/Language (FE) | v1.1 | 4/4 | Complete | 2026-02-27 |
 | 6. Backend User Actions (GAP) | v1.1 | 0/2 | Not started | - |
-| 7. Backend LLM Providers (GAP) | v1.1 | 0/2 | Not started | - |
+| 7. Backend LLM Providers (GAP) | v1.1 | 2/2 | Complete | 2026-02-27 |
 | 8. Backend Models & Languages (GAP) | v1.1 | 0/2 | Not started | - |
 | 9. Content Management & Settings | v1.1 | 0/4 | Not started | - |
 
@@ -182,5 +186,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 
 ---
 
-*Last updated: 2026-02-27 after Milestone Audit (Gaps identified in backend integration)*
+*Last updated: 2026-02-27 after Phase 07 LLM Provider Endpoints completion (PROV-01 through PROV-08)*
 
