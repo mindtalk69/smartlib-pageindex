@@ -122,10 +122,10 @@ Plans:
 
 Plans:
 - [x] 08-01: Model Config CRUD endpoints (MODEL-01, MODEL-02) - completed 2026-02-27
-- [ ] 08-02: Model Config action endpoints (MODEL-03, MODEL-04, MODEL-05, MODEL-06, MODEL-07) - planned 2026-02-27
+- [x] 08-02: Model Config update/delete endpoints (MODEL-03, MODEL-04) - completed 2026-02-27
 - [x] 08-03: Language list/create endpoints (LANG-01, LANG-02) - completed 2026-02-27
-- [ ] 08-04: Language edit/delete endpoints (LANG-03, LANG-04, LANG-05) - planned 2026-02-27
-- [ ] 08-05: [TBD] - planned 2026-02-27
+- [x] 08-04: Language edit/delete endpoints (LANG-03, LANG-04, LANG-05) - completed 2026-02-27
+- [x] 08-05: Model Config action endpoints (MODEL-05, MODEL-06, MODEL-07) - completed 2026-02-27
 
 #### Phase 9: Content Management & Settings
 **Goal**: Activity logs, content oversight, and application settings

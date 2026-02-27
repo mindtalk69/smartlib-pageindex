@@ -64,9 +64,9 @@ Requirements for Admin Dashboard (React frontend at /admin-app).
 - [x] **MODEL-02**: Add new model (name, deployment_name, provider_id, temperature, streaming, description)
 - [x] **MODEL-03**: Edit model configuration
 - [x] **MODEL-04**: Delete model
-- [ ] **MODEL-05**: Set model as default
-- [ ] **MODEL-06**: Set model as multimodal
-- [ ] **MODEL-07**: Validate deployment configuration (streaming support, temperature range, connectivity)
+- [x] **MODEL-05**: Set model as default
+- [x] **MODEL-06**: Set model as multimodal
+- [x] **MODEL-07**: Validate deployment configuration (streaming support, temperature range, connectivity)
 
 ### Language Management (LANG)
 
@@ -242,9 +242,9 @@ frontend/
 | MODEL-02 | Phase 8 | Complete |
 | MODEL-03 | Phase 8 | Complete |
 | MODEL-04 | Phase 8 | Complete |
-| MODEL-05 | Phase 8 | Pending |
-| MODEL-06 | Phase 8 | Pending |
-| MODEL-07 | Phase 8 | Pending |
+| MODEL-05 | Phase 8 | Complete |
+| MODEL-06 | Phase 8 | Complete |
+| MODEL-07 | Phase 8 | Complete |
 | LANG-01 | Phase 8 | Complete |
 | LANG-02 | Phase 8 | Complete |
 | LANG-03 | Phase 8 | Complete |
