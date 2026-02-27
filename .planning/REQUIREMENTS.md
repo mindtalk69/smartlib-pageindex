@@ -60,8 +60,8 @@ Requirements for Admin Dashboard (React frontend at /admin-app).
 
 ### Model Configuration (MODEL)
 
-- [ ] **MODEL-01**: List all models with provider association
-- [ ] **MODEL-02**: Add new model (name, deployment_name, provider_id, temperature, streaming, description)
+- [x] **MODEL-01**: List all models with provider association
+- [x] **MODEL-02**: Add new model (name, deployment_name, provider_id, temperature, streaming, description)
 - [ ] **MODEL-03**: Edit model configuration
 - [ ] **MODEL-04**: Delete model
 - [ ] **MODEL-05**: Set model as default
@@ -238,8 +238,8 @@ frontend/
 | PROV-06 | Phase 7 | Pending |
 | PROV-07 | Phase 7 | Pending |
 | PROV-08 | Phase 7 | Pending |
-| MODEL-01 | Phase 8 | Pending |
-| MODEL-02 | Phase 8 | Pending |
+| MODEL-01 | Phase 8 | Complete |
+| MODEL-02 | Phase 8 | Complete |
 | MODEL-03 | Phase 8 | Pending |
 | MODEL-04 | Phase 8 | Pending |
 | MODEL-05 | Phase 8 | Pending |

@@ -122,8 +122,8 @@ None yet.
 ## Session Continuity
 
 **Last session:** 2026-02-27
-**Stopped at:** Completed 08-03 LLM Language Schemas and Base CRUD Endpoints (LANG-01, LANG-02)
-**Resume file:** .planning/phases/08-backend-llm-model-language/08-03-SUMMARY.md
+**Stopped at:** Completed 08-01 Model Config Schemas and Base CRUD Endpoints (MODEL-01, MODEL-02)
+**Resume file:** .planning/phases/08-backend-llm-model-language/08-01-SUMMARY.md
 
 ## v1.0 Summary: Shipped 2026-02-26
 
