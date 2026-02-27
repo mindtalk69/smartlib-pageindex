@@ -2002,39 +2002,44 @@ def delete_admin_language(
 def build_knowledge_metadata_summary_fastapi(knowledge_ids, db):
     """
     Return a mapping of knowledge_id to a formatted metadata summary string.
-    FastAPI/SQLModel-compatible version.
+    FastAPI/SQLModel-compatible version using raw SQL for catalog/category joins.
     """
     if not knowledge_ids:
         return {}
-
-    from sqlmodel import select
 
     normalized_ids = {int(k) for k in knowledge_ids if k is not None}
     if not normalized_ids:
         return {}
 
-    # Query knowledge records with their relationships
-    knowledge_map = {}
-    for kid in normalized_ids:
-        knowledge = db.get(Knowledge, kid)
-        if knowledge:
-            knowledge_map[kid] = knowledge
-
     summary_map = {}
-    for kid, knowledge in knowledge_map.items():
+    for kid in normalized_ids:
         parts = []
 
-        # Get catalogs for this knowledge
-        catalog_statement = select(Catalog).join(Knowledge, Catalog.knowledges).where(Knowledge.id == kid)
-        catalogs = db.exec(catalog_statement).all()
-        if catalogs:
-            parts.append(f"Catalogs: {', '.join([c.name for c in catalogs])}")
+        # Use raw SQL to get catalogs for this knowledge
+        catalog_query = """
+            SELECT c.name FROM catalogs c
+            JOIN knowledge_catalogs kc ON c.id = kc.catalog_id
+            WHERE kc.knowledge_id = ?
+        """
+        try:
+            catalogs = db.exec(catalog_query, kid).all()
+            if catalogs:
+                parts.append(f"Catalogs: {', '.join([c[0] for c in catalogs])}")
+        except Exception:
+            pass
 
-        # Get categories for this knowledge
-        category_statement = select(Category).join(Knowledge, Category.knowledges).where(Knowledge.id == kid)
-        categories = db.exec(category_statement).all()
-        if categories:
-            parts.append(f"Categories: {', '.join([c.name for c in categories])}")
+        # Use raw SQL to get categories for this knowledge
+        category_query = """
+            SELECT cat.name FROM categories cat
+            JOIN knowledge_category_association kca ON cat.id = kca.category_id
+            WHERE kca.knowledge_id = ?
+        """
+        try:
+            categories = db.exec(category_query, kid).all()
+            if categories:
+                parts.append(f"Categories: {', '.join([c[0] for c in categories])}")
+        except Exception:
+            pass
 
         summary_map[kid] = '; '.join(parts) if parts else 'None'
 
