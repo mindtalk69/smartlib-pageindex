@@ -88,9 +88,9 @@ Requirements for Admin Dashboard (React frontend at /admin-app).
 
 ### Settings (SET)
 
-- [ ] **SET-01**: View and edit app settings (app_name, logo_url, primary_color)
-- [ ] **SET-02**: Save settings with confirmation
-- [ ] **SET-03**: Settings persistence to database
+- [x] **SET-01**: View and edit app settings (app_name, logo_url, primary_color)
+- [x] **SET-02**: Save settings with confirmation
+- [x] **SET-03**: Settings persistence to database
 
 ### API Integration (API)
 
@@ -257,9 +257,9 @@ frontend/
 | CONTENT-05 | Phase 9 | Complete |
 | CONTENT-06 | Phase 9 | Pending |
 | CONTENT-07 | Phase 9 | Pending |
-| SET-01 | Phase 9 | Pending |
-| SET-02 | Phase 9 | Pending |
-| SET-03 | Phase 9 | Pending |
+| SET-01 | Phase 9 | Complete |
+| SET-02 | Phase 9 | Complete |
+| SET-03 | Phase 9 | Complete |
 
 **Coverage:** 55/55 requirements mapped ✓
 
