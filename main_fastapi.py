@@ -1,13 +1,36 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException, status, Request, UploadFile, File, Form
+from fastapi import (
+    FastAPI,
+    Depends,
+    HTTPException,
+    status,
+    Request,
+    UploadFile,
+    File,
+    Form,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from sqladmin import Admin, ModelView
 from database_fastapi import engine, init_db, get_db, Session
 from modules.models import (
-    User, Group, Library, Knowledge, UploadedFile,
-    MessageHistory, LLMProvider, ModelConfig, AppSettings, LLMPrompt,
-    LLMLanguage, UserGroup, PasswordResetRequest, UrlDownload,
-    LibraryReference, VectorReference, VisualGroundingActivity, Document
+    User,
+    Group,
+    Library,
+    Knowledge,
+    UploadedFile,
+    MessageHistory,
+    LLMProvider,
+    ModelConfig,
+    AppSettings,
+    LLMPrompt,
+    LLMLanguage,
+    UserGroup,
+    PasswordResetRequest,
+    UrlDownload,
+    LibraryReference,
+    VectorReference,
+    VisualGroundingActivity,
+    Document,
 )
 from modules.crud_router import CRUDRouter
 from modules.auth import (
@@ -64,11 +87,13 @@ import os
 import json
 import redis
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize database tables on startup
     init_db()
     yield
+
 
 app = FastAPI(title="SmartLib Turbo API (SQLAdmin)", lifespan=lifespan)
 
@@ -91,56 +116,102 @@ app.add_middleware(
 # Setup SQLAdmin
 admin = Admin(app, engine)
 
+
 class UserAdmin(ModelView, model=User):
     column_list = [User.user_id, User.username, User.email, User.is_admin]
     column_searchable_list = [User.username, User.email]
     icon = "fa-solid fa-user"
 
+
 class GroupAdmin(ModelView, model=Group):
     column_list = [Group.group_id, Group.name, Group.created_by_user_id]
     icon = "fa-solid fa-users"
+
 
 class LibraryAdmin(ModelView, model=Library):
     column_list = [Library.library_id, Library.name, Library.created_by_user_id]
     icon = "fa-solid fa-book"
 
+
 class KnowledgeAdmin(ModelView, model=Knowledge):
-    column_list = [Knowledge.id, Knowledge.name, Knowledge.brand_manufacturer_organization]
+    column_list = [
+        Knowledge.id,
+        Knowledge.name,
+        Knowledge.brand_manufacturer_organization,
+    ]
     column_searchable_list = [Knowledge.name, Knowledge.brand_manufacturer_organization]
     icon = "fa-solid fa-brain"
 
+
 class UploadedFileAdmin(ModelView, model=UploadedFile):
-    column_list = [UploadedFile.file_id, UploadedFile.original_filename, UploadedFile.user_id]
+    column_list = [
+        UploadedFile.file_id,
+        UploadedFile.original_filename,
+        UploadedFile.user_id,
+    ]
     icon = "fa-solid fa-file-arrow-up"
 
+
 class MessageHistoryAdmin(ModelView, model=MessageHistory):
-    column_list = [MessageHistory.message_id, MessageHistory.user_id, MessageHistory.timestamp]
+    column_list = [
+        MessageHistory.message_id,
+        MessageHistory.user_id,
+        MessageHistory.timestamp,
+    ]
     icon = "fa-solid fa-message"
 
+
 class LLMProviderAdmin(ModelView, model=LLMProvider):
-    column_list = [LLMProvider.id, LLMProvider.name, LLMProvider.provider_type, LLMProvider.is_active]
+    column_list = [
+        LLMProvider.id,
+        LLMProvider.name,
+        LLMProvider.provider_type,
+        LLMProvider.is_active,
+    ]
     icon = "fa-solid fa-server"
 
+
 class ModelConfigAdmin(ModelView, model=ModelConfig):
-    column_list = [ModelConfig.id, ModelConfig.name, ModelConfig.deployment_name, ModelConfig.is_default]
+    column_list = [
+        ModelConfig.id,
+        ModelConfig.name,
+        ModelConfig.deployment_name,
+        ModelConfig.is_default,
+    ]
     icon = "fa-solid fa-microchip"
+
 
 class AppSettingsAdmin(ModelView, model=AppSettings):
     column_list = [AppSettings.key, AppSettings.value]
     icon = "fa-solid fa-gear"
 
+
 class LLMPromptAdmin(ModelView, model=LLMPrompt):
     column_list = [LLMPrompt.id, LLMPrompt.name, LLMPrompt.is_active]
     icon = "fa-solid fa-terminal"
 
+
 class LLMLanguageAdmin(ModelView, model=LLMLanguage):
-    column_list = [LLMLanguage.id, LLMLanguage.language_code, LLMLanguage.language_name, LLMLanguage.is_active]
+    column_list = [
+        LLMLanguage.id,
+        LLMLanguage.language_code,
+        LLMLanguage.language_name,
+        LLMLanguage.is_active,
+    ]
     icon = "fa-solid fa-language"
 
+
 class PasswordResetRequestAdmin(ModelView, model=PasswordResetRequest):
-    column_list = [PasswordResetRequest.id, PasswordResetRequest.user_id, PasswordResetRequest.email, PasswordResetRequest.status, PasswordResetRequest.expires_at]
+    column_list = [
+        PasswordResetRequest.id,
+        PasswordResetRequest.user_id,
+        PasswordResetRequest.email,
+        PasswordResetRequest.status,
+        PasswordResetRequest.expires_at,
+    ]
     column_searchable_list = [PasswordResetRequest.email, PasswordResetRequest.token]
     icon = "fa-solid fa-key"
+
 
 # Register views
 admin.add_view(UserAdmin)
@@ -165,10 +236,15 @@ user_owned_models = [
 
 # Models without user ownership (global or admin-managed)
 global_models = [
-    (User, "/users"), (Group, "/groups"), (Library, "/libraries"),
-    (Knowledge, "/knowledges"), (LLMProvider, "/providers"),
-    (ModelConfig, "/models"), (AppSettings, "/settings"),
-    (LLMPrompt, "/prompts"), (LLMLanguage, "/languages")
+    (User, "/users"),
+    (Group, "/groups"),
+    (Library, "/libraries"),
+    (Knowledge, "/knowledges"),
+    (LLMProvider, "/providers"),
+    (ModelConfig, "/models"),
+    (AppSettings, "/settings"),
+    (LLMPrompt, "/prompts"),
+    (LLMLanguage, "/languages"),
 ]
 
 # Register user-owned models with filtering
@@ -183,6 +259,7 @@ for model, prefix in global_models:
 
 # Auth endpoints
 
+
 @app.post("/api/v1/auth/login", response_model=LoginResponse)
 def api_v1_login(login_data: LoginRequest, db=Depends(get_db)):
     """
@@ -195,8 +272,7 @@ def api_v1_login(login_data: LoginRequest, db=Depends(get_db)):
 
     if not username_or_email or not password:
         return LoginResponse(
-            success=False,
-            error="Username/email and password are required"
+            success=False, error="Username/email and password are required"
         )
 
     # Try to authenticate - first try as email, then as username
@@ -219,16 +295,10 @@ def api_v1_login(login_data: LoginRequest, db=Depends(get_db)):
             user = user_by_name
 
     if not user:
-        return LoginResponse(
-            success=False,
-            error="Invalid username/email or password"
-        )
+        return LoginResponse(success=False, error="Invalid username/email or password")
 
     if user.is_disabled:
-        return LoginResponse(
-            success=False,
-            error="Account is disabled"
-        )
+        return LoginResponse(success=False, error="Account is disabled")
 
     # Generate JWT token
     access_token = create_access_token(data={"sub": user.user_id})
@@ -263,7 +333,9 @@ def api_v1_register(register_data: UserRegister, db=Depends(get_db)):
         )
 
     # Check if username already exists
-    existing_username = db.exec(select(User).where(User.username == register_data.username))
+    existing_username = db.exec(
+        select(User).where(User.username == register_data.username)
+    )
     if existing_username.first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -299,7 +371,7 @@ def api_v1_register(register_data: UserRegister, db=Depends(get_db)):
 def api_v1_change_password(
     password_data: PasswordChange,
     current_user: User = Depends(get_current_user),
-    db=Depends(get_db)
+    db=Depends(get_db),
 ):
     """
     V1 Change password endpoint.
@@ -363,14 +435,14 @@ async def logout(current_user: User = Depends(get_current_user)):
     Note: JWT tokens are stateless. Client should discard the token.
     For token revocation, implement a token blacklist.
     """
-    return {"success": True, "message": "Successfully logged out. Please discard your token."}
+    return {
+        "success": True,
+        "message": "Successfully logged out. Please discard your token.",
+    }
 
 
 @app.post("/api/v1/auth/forgot-password")
-def forgot_password(
-    email_data: ForgotPasswordRequest,
-    db = Depends(get_db)
-):
+def forgot_password(email_data: ForgotPasswordRequest, db=Depends(get_db)):
     """
     Request a password reset.
 
@@ -394,7 +466,10 @@ def forgot_password(
 
     if not user:
         # Don't reveal if email exists for security
-        return {"success": True, "message": "If the email exists, a password reset link will be sent."}
+        return {
+            "success": True,
+            "message": "If the email exists, a password reset link will be sent.",
+        }
 
     # Generate reset token
     reset_token = str(uuid.uuid4())
@@ -415,7 +490,10 @@ def forgot_password(
     # TODO: Send email with reset link
     # For now, just return success
 
-    return {"success": True, "message": "If the email exists, a password reset link will be sent."}
+    return {
+        "success": True,
+        "message": "If the email exists, a password reset link will be sent.",
+    }
 
 
 # Config & Branding endpoints
@@ -427,12 +505,17 @@ async def get_config(current_user: User = Depends(get_current_user)):
     Returns: {vector_store_mode, visual_grounding_enabled, is_admin, username}
     """
     import os
+
     return {
         "vector_store_mode": os.environ.get("VECTOR_STORE_MODE", "user"),
-        "visual_grounding_enabled": os.environ.get("VISUAL_GROUNDING_ENABLED", "false").lower() == "true",
+        "visual_grounding_enabled": os.environ.get(
+            "VISUAL_GROUNDING_ENABLED", "false"
+        ).lower()
+        == "true",
         "is_admin": current_user.is_admin,
         "username": current_user.username or "",
     }
+
 
 @app.get("/api/v1/branding")
 async def get_branding():
@@ -449,10 +532,11 @@ async def get_branding():
         "logo_url": None,
     }
 
+
 # Admin User Management endpoints
 @app.get("/api/v1/admin/users")
 def list_admin_users(
-    db = Depends(get_db),
+    db=Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
     skip: int = 0,
     limit: int = 100,
@@ -463,6 +547,7 @@ def list_admin_users(
     Returns paginated list of all users in the system.
     """
     from sqlmodel import select
+
     statement = select(User).offset(skip).limit(limit)
     result = db.exec(statement)
     users = result.all()
@@ -481,16 +566,18 @@ def list_admin_users(
         "total": len(users),
     }
 
+
 @app.get("/api/v1/admin/users/{user_id}")
 def get_admin_user(
     user_id: str,
-    db = Depends(get_db),
+    db=Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
     """
     Get a specific user by ID (admin only).
     """
     from sqlmodel import select
+
     statement = select(User).where(User.user_id == user_id)
     result = db.exec(statement)
     user = result.first()
@@ -505,11 +592,12 @@ def get_admin_user(
         "created_at": user.created_at,
     }
 
+
 @app.put("/api/v1/admin/users/{user_id}")
 def update_admin_user(
     user_id: str,
     update_data: dict,
-    db = Depends(get_db),
+    db=Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
     """
@@ -518,6 +606,7 @@ def update_admin_user(
     Allowed updates: is_admin, is_disabled
     """
     from sqlmodel import select
+
     statement = select(User).where(User.user_id == user_id)
     result = db.exec(statement)
     user = result.first()
@@ -543,10 +632,11 @@ def update_admin_user(
         "created_at": user.created_at,
     }
 
+
 @app.post("/api/v1/admin/users/{user_id}/reset-password")
 def admin_reset_password(
     user_id: str,
-    db = Depends(get_db),
+    db=Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
     """
@@ -556,6 +646,7 @@ def admin_reset_password(
     For now, just returns success.
     """
     from sqlmodel import select
+
     statement = select(User).where(User.user_id == user_id)
     result = db.exec(statement)
     user = result.first()
@@ -565,9 +656,124 @@ def admin_reset_password(
     # TODO: Implement password reset email
     return {"message": "Password reset initiated. Email will be sent to user."}
 
+
+@app.post("/api/v1/admin/users/{user_id}/toggle-admin")
+def toggle_admin_status(
+    user_id: str,
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Toggle user's admin status (admin only).
+
+    Prevents self-modification (user cannot toggle their own admin status).
+    """
+    from sqlmodel import select
+
+    # Get target user
+    statement = select(User).where(User.user_id == user_id)
+    result = db.exec(statement)
+    target_user = result.first()
+
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Prevent self-modification
+    if target_user.user_id == current_user.user_id:
+        raise HTTPException(
+            status_code=400, detail="You cannot toggle your own admin status"
+        )
+
+    # Toggle admin status
+    target_user.is_admin = not target_user.is_admin
+    db.add(target_user)
+    db.commit()
+    db.refresh(target_user)
+
+    return {
+        "success": True,
+        "data": {"user_id": target_user.user_id, "is_admin": target_user.is_admin},
+    }
+
+
+@app.post("/api/v1/admin/users/{user_id}/toggle-active")
+def toggle_active_status(
+    user_id: str,
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Toggle user's active/disabled status (admin only).
+
+    Prevents self-modification (user cannot disable their own account).
+    """
+    from sqlmodel import select
+
+    # Get target user
+    statement = select(User).where(User.user_id == user_id)
+    result = db.exec(statement)
+    target_user = result.first()
+
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Prevent self-modification
+    if target_user.user_id == current_user.user_id:
+        raise HTTPException(
+            status_code=400, detail="You cannot disable your own account"
+        )
+
+    # Toggle disabled status
+    target_user.is_disabled = not target_user.is_disabled
+    db.add(target_user)
+    db.commit()
+    db.refresh(target_user)
+
+    return {
+        "success": True,
+        "data": {
+            "user_id": target_user.user_id,
+            "is_disabled": target_user.is_disabled,
+        },
+    }
+
+
+@app.delete("/api/v1/admin/users/{user_id}")
+def delete_user(
+    user_id: str,
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Delete a user account (admin only).
+
+    Prevents self-deletion.
+    """
+    from sqlmodel import select
+    from sqlmodel import delete
+
+    # Get target user
+    statement = select(User).where(User.user_id == user_id)
+    result = db.exec(statement)
+    target_user = result.first()
+
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Prevent self-deletion
+    if target_user.user_id == current_user.user_id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+
+    # Delete user
+    db.delete(target_user)
+    db.commit()
+
+    return {"success": True}
+
+
 @app.get("/api/v1/admin/stats")
 def get_admin_stats(
-    db = Depends(get_db),
+    db=Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
     """
@@ -597,6 +803,7 @@ def get_admin_stats(
 # USER PROFILE & STATS ENDPOINTS
 # ============================================================
 
+
 @app.get("/api/v1/user/profile", response_model=UserProfile)
 async def get_user_profile(
     current_user: User = Depends(get_current_user),
@@ -617,7 +824,7 @@ async def get_user_profile(
 async def update_user_profile(
     profile_data: UserProfileUpdate,
     current_user: User = Depends(get_current_user),
-    db = Depends(get_db),
+    db=Depends(get_db),
 ):
     """
     Update current user's profile.
@@ -627,7 +834,10 @@ async def update_user_profile(
     from sqlmodel import select
 
     # Update username if provided
-    if profile_data.username is not None and profile_data.username != current_user.username:
+    if (
+        profile_data.username is not None
+        and profile_data.username != current_user.username
+    ):
         # Check if username is already taken
         existing = db.exec(select(User).where(User.username == profile_data.username))
         if existing.first():
@@ -664,7 +874,7 @@ async def update_user_profile(
 @app.get("/api/v1/user/stats", response_model=UserStats)
 async def get_user_stats(
     current_user: User = Depends(get_current_user),
-    db = Depends(get_db),
+    db=Depends(get_db),
 ):
     """
     Get current user's statistics.
@@ -676,17 +886,26 @@ async def get_user_stats(
 
     # Count files
     file_count = db.exec(
-        select(func.count(UploadedFile.file_id)).where(UploadedFile.user_id == current_user.user_id)
+        select(func.count(UploadedFile.file_id)).where(
+            UploadedFile.user_id == current_user.user_id
+        )
     ).one()
 
     # Total file size
-    total_size = db.exec(
-        select(func.sum(UploadedFile.file_size)).where(UploadedFile.user_id == current_user.user_id)
-    ).one() or 0
+    total_size = (
+        db.exec(
+            select(func.sum(UploadedFile.file_size)).where(
+                UploadedFile.user_id == current_user.user_id
+            )
+        ).one()
+        or 0
+    )
 
     # Count messages
     message_count = db.exec(
-        select(func.count(MessageHistory.message_id)).where(MessageHistory.user_id == current_user.user_id)
+        select(func.count(MessageHistory.message_id)).where(
+            MessageHistory.user_id == current_user.user_id
+        )
     ).one()
 
     # Count libraries (all libraries for now, could be filtered by ownership)
@@ -712,11 +931,12 @@ from fastapi.responses import FileResponse
 import os
 import shutil
 
+
 @app.get("/api/v1/files/{file_id}/download")
 async def download_file(
     file_id: int,
     current_user: User = Depends(get_current_user),
-    db = Depends(get_db),
+    db=Depends(get_db),
 ):
     """
     Download an uploaded file.
@@ -736,8 +956,13 @@ async def download_file(
 
     # Get file path from environment or use default
     # Files are stored in DATA_VOLUME_PATH or default location
-    data_volume = os.environ.get("DATA_VOLUME_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"))
-    file_path = os.path.join(data_volume, "uploaded_files", uploaded_file.stored_filename)
+    data_volume = os.environ.get(
+        "DATA_VOLUME_PATH",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"),
+    )
+    file_path = os.path.join(
+        data_volume, "uploaded_files", uploaded_file.stored_filename
+    )
 
     # Check if file exists
     if not os.path.exists(file_path):
@@ -759,7 +984,7 @@ async def download_file(
 async def delete_file(
     file_id: int,
     current_user: User = Depends(get_current_user),
-    db = Depends(get_db),
+    db=Depends(get_db),
 ):
     """
     Delete an uploaded file and its associated vectors.
@@ -768,7 +993,12 @@ async def delete_file(
     Vector cleanup is handled automatically via database cascade deletes for sqlite-vec.
     """
     from sqlmodel import select
-    from modules.models import Document, VectorReference, LibraryReference, VisualGroundingActivity
+    from modules.models import (
+        Document,
+        VectorReference,
+        LibraryReference,
+        VisualGroundingActivity,
+    )
 
     # Get file record
     uploaded_file = db.get(UploadedFile, file_id)
@@ -792,16 +1022,25 @@ async def delete_file(
 
         # Delete associated records
         # VectorReference cleanup
-        VectorReference.query.filter_by(file_id=file_id).delete(synchronize_session=False) if hasattr(VectorReference, 'query') else None
+        VectorReference.query.filter_by(file_id=file_id).delete(
+            synchronize_session=False
+        ) if hasattr(VectorReference, "query") else None
 
         # For SQLModel, use direct delete
         from sqlmodel import delete
+
         db.exec(delete(VectorReference).where(VectorReference.file_id == file_id))
-        db.exec(delete(LibraryReference).where(
-            LibraryReference.reference_type == 'file',
-            LibraryReference.source_id == file_id,
-        ))
-        db.exec(delete(VisualGroundingActivity).where(VisualGroundingActivity.file_id == file_id))
+        db.exec(
+            delete(LibraryReference).where(
+                LibraryReference.reference_type == "file",
+                LibraryReference.source_id == file_id,
+            )
+        )
+        db.exec(
+            delete(VisualGroundingActivity).where(
+                VisualGroundingActivity.file_id == file_id
+            )
+        )
 
         # Delete documents (vectors will be cleaned up via cascade)
         for doc in docs:
@@ -812,21 +1051,31 @@ async def delete_file(
         db.commit()
 
         # Delete physical file
-        data_volume = os.environ.get("DATA_VOLUME_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"))
-        file_path = os.path.join(data_volume, "uploaded_files", uploaded_file.stored_filename)
+        data_volume = os.environ.get(
+            "DATA_VOLUME_PATH",
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"),
+        )
+        file_path = os.path.join(
+            data_volume, "uploaded_files", uploaded_file.stored_filename
+        )
         if os.path.exists(file_path):
             os.remove(file_path)
 
         vector_count = len(doc_ids)
         message = "File deleted successfully."
         if vector_count > 0:
-            message = f"File deleted successfully. Removed {vector_count} vector chunk(s)."
+            message = (
+                f"File deleted successfully. Removed {vector_count} vector chunk(s)."
+            )
 
         return {"status": "success", "message": message}
 
     except Exception as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(exc)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete file: {str(exc)}"
+        )
+
 
 add_pagination(app)
 
@@ -835,6 +1084,7 @@ add_pagination(app)
 # ============================================================
 # These endpoints mirror Flask API response formats exactly
 # for gradual frontend migration.
+
 
 def get_user_group_ids(user_id: str, db) -> list:
     """Get list of group IDs for a user."""
@@ -845,12 +1095,9 @@ def get_user_group_ids(user_id: str, db) -> list:
 
 # --- Authentication Compatibility Endpoints ---
 
+
 @app.post("/api/login")
-def api_login_flask_compat(
-    request: Request,
-    login_data: dict,
-    db=Depends(get_db)
-):
+def api_login_flask_compat(request: Request, login_data: dict, db=Depends(get_db)):
     """
     Flask-compatible login endpoint.
     Accepts {username, password} and returns {success, user}.
@@ -860,10 +1107,7 @@ def api_login_flask_compat(
     password = login_data.get("password", "")
 
     if not username or not password:
-        return {
-            "success": False,
-            "error": "Username and password are required"
-        }
+        return {"success": False, "error": "Username and password are required"}
 
     # Try email lookup first (FastAPI style), then username
     user = authenticate_user_async(username, password, db)
@@ -906,8 +1150,7 @@ def api_login_flask_compat(
 
 @app.get("/api/me")
 async def api_me_flask_compat(
-    request: Request,
-    current_user: User = Depends(get_current_user)
+    request: Request, current_user: User = Depends(get_current_user)
 ):
     """Flask-compatible /api/me endpoint."""
     return {
@@ -917,25 +1160,22 @@ async def api_me_flask_compat(
             "username": current_user.username,
             "is_admin": current_user.is_admin,
             "profile_picture_url": None,
-        }
+        },
     }
 
 
 @app.post("/api/logout")
-async def api_logout_flask_compat(
-    current_user: User = Depends(get_current_user)
-):
+async def api_logout_flask_compat(current_user: User = Depends(get_current_user)):
     """Flask-compatible logout endpoint."""
     return {"success": True}
 
 
 # --- Library & Knowledge Endpoints ---
 
+
 @app.get("/api/libraries")
 def api_libraries_flask_compat(
-    request: Request,
-    db=Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    request: Request, db=Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     Flask-compatible libraries endpoint.
@@ -961,29 +1201,31 @@ def api_libraries_flask_compat(
         knowledges = knowledge_result.all()
 
         for k in knowledges:
-            knowledges_data.append({
-                "id": k.id,
-                "name": k.name,
-                "categories": [],
-                "catalogs": [],
-                "groups": [],
-            })
+            knowledges_data.append(
+                {
+                    "id": k.id,
+                    "name": k.name,
+                    "categories": [],
+                    "catalogs": [],
+                    "groups": [],
+                }
+            )
 
-        libraries_data.append({
-            "library_id": library.library_id,
-            "name": library.name,
-            "description": library.description or "",
-            "knowledges": knowledges_data,
-        })
+        libraries_data.append(
+            {
+                "library_id": library.library_id,
+                "name": library.name,
+                "description": library.description or "",
+                "knowledges": knowledges_data,
+            }
+        )
 
     return {"libraries": libraries_data}
 
 
 @app.get("/api/knowledges")
 def api_knowledges_flask_compat(
-    request: Request,
-    db=Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    request: Request, db=Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     Flask-compatible knowledges endpoint.
@@ -1011,9 +1253,8 @@ def api_knowledges_flask_compat(
         knowledge_libraries_map[str(k.id)] = {
             "name": k.name,
             "libraries": [
-                {"id": lib.library_id, "name": lib.name}
-                for lib in all_libraries
-            ]
+                {"id": lib.library_id, "name": lib.name} for lib in all_libraries
+            ],
         }
 
     return {
@@ -1025,11 +1266,10 @@ def api_knowledges_flask_compat(
 
 # --- Upload Status Endpoints ---
 
+
 @app.get("/api/upload-status")
 def api_upload_status_flask_compat(
-    request: Request,
-    db=Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    request: Request, db=Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     Flask-compatible upload status endpoint.
@@ -1049,19 +1289,24 @@ def api_upload_status_flask_compat(
         for k, v in task_meta_raw.items():
             key = k.decode("utf-8") if isinstance(k, bytes) else k
             try:
-                task_meta[key] = json.loads(v.decode("utf-8") if isinstance(v, bytes) else v)
+                task_meta[key] = json.loads(
+                    v.decode("utf-8") if isinstance(v, bytes) else v
+                )
             except:
                 task_meta[key] = {}
 
         tasks = []
         for task_id in task_ids:
-            task_id_str = task_id.decode("utf-8") if isinstance(task_id, bytes) else task_id
+            task_id_str = (
+                task_id.decode("utf-8") if isinstance(task_id, bytes) else task_id
+            )
             meta = task_meta.get(task_id_str, {})
 
             # Get task status from Celery
             try:
                 from celery.result import AsyncResult
                 from celery_app import celery
+
                 result = AsyncResult(task_id_str, app=celery)
 
                 if result.state == "PENDING" and result.info is None:
@@ -1072,7 +1317,7 @@ def api_upload_status_flask_compat(
                     "task_id": task_id_str,
                     "status": result.state,
                     "filename": meta.get("filename", "Unknown"),
-                    "info": {}
+                    "info": {},
                 }
 
                 if isinstance(result.info, dict):
@@ -1098,9 +1343,7 @@ def api_upload_status_flask_compat(
 
 @app.post("/api/upload-status/{task_id}/dismiss")
 def api_dismiss_upload_task(
-    task_id: str,
-    db=Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    task_id: str, db=Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """Dismiss a completed upload task."""
     broker_url = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
@@ -1116,12 +1359,13 @@ def api_dismiss_upload_task(
 
 # --- Self-Retriever Questions Endpoint ---
 
+
 @app.post("/api/self-retriever-questions")
 def api_self_retriever_questions(
     request: Request,
     data: dict,
     db=Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Generate suggested questions for the given knowledge/library context.
@@ -1157,11 +1401,25 @@ def api_self_retriever_questions(
 # ============================================================
 
 # Allowed file extensions
-ALLOWED_EXTENSIONS = {'pdf', 'docx', 'txt', 'md', 'html', 'pptx', 'xlsx', 'csv', 'jpg', 'jpeg', 'png', 'gif'}
+ALLOWED_EXTENSIONS = {
+    "pdf",
+    "docx",
+    "txt",
+    "md",
+    "html",
+    "pptx",
+    "xlsx",
+    "csv",
+    "jpg",
+    "jpeg",
+    "png",
+    "gif",
+}
+
 
 def allowed_file(filename: str) -> bool:
     """Check if the file extension is allowed."""
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 @app.post("/api/v1/upload", response_model=UploadResponse)
@@ -1191,18 +1449,14 @@ async def api_v1_upload(
     # Validate library
     library = db.get(Library, library_id)
     if not library:
-        return UploadResponse(
-            success=False,
-            message="Selected library does not exist."
-        )
+        return UploadResponse(success=False, message="Selected library does not exist.")
 
     # Validate knowledge if provided
     if knowledge_id is not None:
         knowledge = db.get(Knowledge, knowledge_id)
         if not knowledge:
             return UploadResponse(
-                success=False,
-                message="Selected knowledge does not exist."
+                success=False, message="Selected knowledge does not exist."
             )
 
     # Process each file
@@ -1219,7 +1473,7 @@ async def api_v1_upload(
 
                 # Read and save file
                 content = await file.read()
-                with open(temp_file_path, 'wb') as f:
+                with open(temp_file_path, "wb") as f:
                     f.write(content)
                     f.flush()
                     os.fsync(f.fileno())
@@ -1227,6 +1481,7 @@ async def api_v1_upload(
                 # Submit to Celery worker
                 task_id = None
                 from modules.celery_tasks import submit_file_processing_task
+
                 if submit_file_processing_task:
                     task_id = submit_file_processing_task(
                         temp_file_path=str(temp_file_path),
@@ -1243,7 +1498,10 @@ async def api_v1_upload(
                     try:
                         import json
                         from datetime import datetime, timezone
-                        broker_url = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+
+                        broker_url = os.environ.get(
+                            "CELERY_BROKER_URL", "redis://localhost:6379/0"
+                        )
                         redis_client = redis.from_url(broker_url)
                         task_key = f"user:{current_user.user_id}:upload_tasks"
                         task_meta_key = f"user:{current_user.user_id}:upload_task_meta"
@@ -1252,39 +1510,38 @@ async def api_v1_upload(
                         redis_client.expire(task_key, 86400)  # 24 hours
 
                         task_meta = {
-                            'filename': filename,
-                            'created_at': datetime.now(timezone.utc).isoformat()
+                            "filename": filename,
+                            "created_at": datetime.now(timezone.utc).isoformat(),
                         }
                         redis_client.hset(task_meta_key, task_id, json.dumps(task_meta))
                         redis_client.expire(task_meta_key, 86400)
 
-                        logger.info(f"Registered task {task_id} for user {current_user.user_id}")
+                        logger.info(
+                            f"Registered task {task_id} for user {current_user.user_id}"
+                        )
                     except Exception as e:
                         logger.error(f"Failed to register task in Redis: {e}")
                 else:
-                    task_id = 'processing_disabled'
+                    task_id = "processing_disabled"
 
-                uploaded_files.append(FileUploadResponse(
-                    filename=filename,
-                    task_id=task_id
-                ))
+                uploaded_files.append(
+                    FileUploadResponse(filename=filename, task_id=task_id)
+                )
 
             except Exception as e:
                 logger.error(f"Failed to upload file {file.filename}: {e}")
                 return UploadResponse(
-                    success=False,
-                    message=f"Failed to upload {file.filename}: {str(e)}"
+                    success=False, message=f"Failed to upload {file.filename}: {str(e)}"
                 )
         else:
             return UploadResponse(
-                success=False,
-                message=f"File type not allowed: {file.filename}"
+                success=False, message=f"File type not allowed: {file.filename}"
             )
 
     return UploadResponse(
         success=True,
         message=f"Successfully uploaded {len(uploaded_files)} file(s). Processing started.",
-        files=uploaded_files
+        files=uploaded_files,
     )
 
 
@@ -1307,17 +1564,23 @@ def api_v1_check_duplicates(
         )
 
         if request_data.knowledge_id is not None:
-            statement = statement.where(UploadedFile.knowledge_id == request_data.knowledge_id)
+            statement = statement.where(
+                UploadedFile.knowledge_id == request_data.knowledge_id
+            )
 
         result = db.exec(statement)
         existing = result.first()
 
         if existing:
-            duplicates.append(DuplicateInfo(
-                filename=filename,
-                file_id=existing.file_id,
-                upload_time=existing.upload_time.isoformat() if existing.upload_time else None,
-            ))
+            duplicates.append(
+                DuplicateInfo(
+                    filename=filename,
+                    file_id=existing.file_id,
+                    upload_time=existing.upload_time.isoformat()
+                    if existing.upload_time
+                    else None,
+                )
+            )
 
     return DuplicateCheckResponse(duplicates=duplicates)
 
@@ -1345,19 +1608,24 @@ def api_v1_upload_status(
         for k, v in task_meta_raw.items():
             key = k.decode("utf-8") if isinstance(k, bytes) else k
             try:
-                task_meta[key] = json.loads(v.decode("utf-8") if isinstance(v, bytes) else v)
+                task_meta[key] = json.loads(
+                    v.decode("utf-8") if isinstance(v, bytes) else v
+                )
             except:
                 task_meta[key] = {}
 
         tasks = []
         for task_id in task_ids:
-            task_id_str = task_id.decode("utf-8") if isinstance(task_id, bytes) else task_id
+            task_id_str = (
+                task_id.decode("utf-8") if isinstance(task_id, bytes) else task_id
+            )
             meta = task_meta.get(task_id_str, {})
 
             # Get task status from Celery
             try:
                 from celery.result import AsyncResult
                 from celery_app import celery
+
                 result = AsyncResult(task_id_str, app=celery)
 
                 if result.state == "PENDING" and result.info is None:
@@ -1368,7 +1636,7 @@ def api_v1_upload_status(
                     "task_id": task_id_str,
                     "status": result.state,
                     "filename": meta.get("filename", "Unknown"),
-                    "info": {}
+                    "info": {},
                 }
 
                 if isinstance(result.info, dict):
@@ -1423,10 +1691,9 @@ def api_v1_validate_url(
     from urllib.parse import urlparse
 
     parsed = urlparse(request_data.url)
-    if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return UrlValidateResponse(
-            valid=False,
-            message="Only absolute HTTP or HTTPS URLs are allowed."
+            valid=False, message="Only absolute HTTP or HTTPS URLs are allowed."
         )
 
     try:
@@ -1438,25 +1705,19 @@ def api_v1_validate_url(
         # Accept any non-error response
         if status_code < 500:
             return UrlValidateResponse(
-                valid=True,
-                message=f"URL is reachable (status: {status_code})."
+                valid=True, message=f"URL is reachable (status: {status_code})."
             )
         else:
             return UrlValidateResponse(
-                valid=False,
-                message=f"Server error: {status_code}"
+                valid=False, message=f"Server error: {status_code}"
             )
     except requests.Timeout:
         # Timeout - still consider valid (server might be slow)
         return UrlValidateResponse(
-            valid=True,
-            message="URL timed out but may still be valid."
+            valid=True, message="URL timed out but may still be valid."
         )
     except requests.RequestException as e:
-        return UrlValidateResponse(
-            valid=False,
-            message="URL could not be reached."
-        )
+        return UrlValidateResponse(valid=False, message="URL could not be reached.")
 
 
 @app.post("/api/v1/process-url", response_model=UrlDownloadResponse)
@@ -1477,18 +1738,16 @@ async def api_v1_process_url(
 
     # Validate URL
     parsed = urlparse(request_data.url)
-    if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return UrlDownloadResponse(
-            success=False,
-            message="Only absolute HTTP or HTTPS URLs are allowed."
+            success=False, message="Only absolute HTTP or HTTPS URLs are allowed."
         )
 
     # Validate library
     library = db.get(Library, request_data.library_id)
     if not library:
         return UrlDownloadResponse(
-            success=False,
-            message="Selected library does not exist."
+            success=False, message="Selected library does not exist."
         )
 
     # Validate knowledge if provided
@@ -1496,20 +1755,21 @@ async def api_v1_process_url(
         knowledge = db.get(Knowledge, request_data.knowledge_id)
         if not knowledge:
             return UrlDownloadResponse(
-                success=False,
-                message="Selected knowledge does not exist."
+                success=False, message="Selected knowledge does not exist."
             )
 
     # Download URL content
     try:
         download_response = requests.get(request_data.url, stream=True, timeout=15)
         download_response.raise_for_status()
-        content_type = download_response.headers.get('Content-Type', 'unknown') or 'unknown'
+        content_type = (
+            download_response.headers.get("Content-Type", "unknown") or "unknown"
+        )
 
         # Generate filename
-        filename = os.path.basename(parsed.path) or 'downloaded_document'
-        if '.' not in filename:
-            mime_ext = mimetypes.guess_extension(content_type.split(';')[0].strip())
+        filename = os.path.basename(parsed.path) or "downloaded_document"
+        if "." not in filename:
+            mime_ext = mimetypes.guess_extension(content_type.split(";")[0].strip())
             if mime_ext:
                 filename = f"{filename}{mime_ext}"
             else:
@@ -1523,7 +1783,7 @@ async def api_v1_process_url(
         temp_dir.mkdir(parents=True, exist_ok=True)
         temp_file_path = temp_dir / filename
 
-        with open(temp_file_path, 'wb') as f:
+        with open(temp_file_path, "wb") as f:
             for chunk in download_response.iter_content(chunk_size=8192):
                 if chunk:
                     f.write(chunk)
@@ -1534,8 +1794,7 @@ async def api_v1_process_url(
 
     except requests.RequestException as e:
         return UrlDownloadResponse(
-            success=False,
-            message=f"Failed to download URL: {str(e)}"
+            success=False, message=f"Failed to download URL: {str(e)}"
         )
 
     # Create UrlDownload record
@@ -1544,9 +1803,11 @@ async def api_v1_process_url(
         url_download = UrlDownload(
             user_id=current_user.user_id,
             library_id=request_data.library_id,
-            knowledge_id=request_data.knowledge_id if request_data.knowledge_id else None,
+            knowledge_id=request_data.knowledge_id
+            if request_data.knowledge_id
+            else None,
             url=request_data.url,
-            status='queued',
+            status="queued",
             content_type=content_type,
         )
         db.add(url_download)
@@ -1555,13 +1816,13 @@ async def api_v1_process_url(
         download_id = url_download.download_id
     except Exception as e:
         return UrlDownloadResponse(
-            success=False,
-            message=f"Failed to create download record: {str(e)}"
+            success=False, message=f"Failed to create download record: {str(e)}"
         )
 
     # Submit to Celery worker
     task_id = None
     from modules.celery_tasks import submit_file_processing_task
+
     if submit_file_processing_task:
         task_id = submit_file_processing_task(
             temp_file_path=str(temp_file_path),
@@ -1569,7 +1830,9 @@ async def api_v1_process_url(
             user_id=current_user.user_id,
             library_id=request_data.library_id,
             library_name=request_data.library_name or library.name,
-            knowledge_id_str=str(request_data.knowledge_id) if request_data.knowledge_id else None,
+            knowledge_id_str=str(request_data.knowledge_id)
+            if request_data.knowledge_id
+            else None,
             enable_visual_grounding_flag=False,
             url_download_id=download_id,
             source_url=request_data.url,
@@ -1581,6 +1844,7 @@ async def api_v1_process_url(
         try:
             import json
             from datetime import datetime, timezone
+
             broker_url = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
             redis_client = redis.from_url(broker_url)
             task_key = f"user:{current_user.user_id}:upload_tasks"
@@ -1590,8 +1854,8 @@ async def api_v1_process_url(
             redis_client.expire(task_key, 86400)
 
             task_meta = {
-                'filename': filename,
-                'created_at': datetime.now(timezone.utc).isoformat()
+                "filename": filename,
+                "created_at": datetime.now(timezone.utc).isoformat(),
             }
             redis_client.hset(task_meta_key, task_id, json.dumps(task_meta))
             redis_client.expire(task_meta_key, 86400)
@@ -1602,13 +1866,14 @@ async def api_v1_process_url(
         success=True,
         message="URL queued for processing.",
         task_id=task_id,
-        download_id=download_id
+        download_id=download_id,
     )
 
 
 # ============================================================
 # WAVE 3: LIBRARIES ENDPOINT WITH PERMISSION FILTERING
 # ============================================================
+
 
 @app.get("/api/v1/libraries", response_model=LibrariesResponse)
 def api_v1_get_libraries(
@@ -1643,8 +1908,10 @@ def api_v1_get_libraries(
             all_knowledges.append(k)
 
         # Filter knowledges by user's group permissions
-        if vector_store_mode == 'knowledge':
-            accessible_knowledges = filter_accessible_knowledges(all_knowledges, user_group_ids)
+        if vector_store_mode == "knowledge":
+            accessible_knowledges = filter_accessible_knowledges(
+                all_knowledges, user_group_ids
+            )
         else:
             accessible_knowledges = all_knowledges
 
@@ -1656,23 +1923,27 @@ def api_v1_get_libraries(
             groups = []
 
             # Get groups for this knowledge
-            if hasattr(k, 'groups') and k.groups:
+            if hasattr(k, "groups") and k.groups:
                 groups = [GroupInfo(group_id=g.group_id, name=g.name) for g in k.groups]
 
-            knowledges_data.append(KnowledgeInfo(
-                id=k.id,
-                name=k.name,
-                categories=categories,
-                catalogs=catalogs,
-                groups=groups,
-            ))
+            knowledges_data.append(
+                KnowledgeInfo(
+                    id=k.id,
+                    name=k.name,
+                    categories=categories,
+                    catalogs=catalogs,
+                    groups=groups,
+                )
+            )
 
-        libraries_data.append(LibraryInfo(
-            library_id=library.library_id,
-            name=library.name,
-            description=library.description or "",
-            knowledges=knowledges_data,
-        ))
+        libraries_data.append(
+            LibraryInfo(
+                library_id=library.library_id,
+                name=library.name,
+                description=library.description or "",
+                knowledges=knowledges_data,
+            )
+        )
 
     return LibrariesResponse(libraries=libraries_data)
 
@@ -1696,7 +1967,7 @@ def api_v1_get_knowledges(
     knowledges = result.all()
 
     # Filter by permissions if in knowledge mode
-    if vector_store_mode == 'knowledge':
+    if vector_store_mode == "knowledge":
         knowledges = filter_accessible_knowledges(knowledges, user_group_ids)
 
     knowledges_list = [KnowledgeSimple(id=k.id, name=k.name) for k in knowledges]
@@ -1711,13 +1982,15 @@ def api_v1_get_knowledges(
 
         knowledge_libraries_map[str(k.id)] = KnowledgeWithLibraries(
             name=k.name,
-            libraries=[LibrarySimple(id=lib.library_id, name=lib.name) for lib in all_libraries]
+            libraries=[
+                LibrarySimple(id=lib.library_id, name=lib.name) for lib in all_libraries
+            ],
         )
 
     return KnowledgesResponse(
         knowledges=knowledges_list,
         knowledge_libraries_map=knowledge_libraries_map,
-        mode=vector_store_mode
+        mode=vector_store_mode,
     )
 
 
@@ -1725,27 +1998,34 @@ def api_v1_get_knowledges(
 
 # Include RAG query endpoints
 from api.v1.query import router as query_router
+
 app.include_router(query_router, prefix="/api/v1")
 
 # Include conversation history endpoints
 from api.v1.threads import router as threads_router
+
 app.include_router(threads_router, prefix="/api/v1")
 
 # Include feedback endpoints
 from api.v1.feedback import router as feedback_router
+
 app.include_router(feedback_router, prefix="/api/v1")
 
 # Include auxiliary endpoints
 from api.v1.config import router as config_router
+
 app.include_router(config_router, prefix="/api/v1")
 
 from api.v1.visual import router as visual_router
+
 app.include_router(visual_router, prefix="/api/v1")
 
 from api.v1.documents import router as documents_router
+
 app.include_router(documents_router, prefix="/api/v1")
 
 add_pagination(app)
+
 
 @app.get("/")
 async def root():
@@ -1753,9 +2033,11 @@ async def root():
         "message": "SmartLib Turbo API is running!",
         "admin_ui": "/admin",
         "docs": "/docs",
-        "db_path": DB_PATH
+        "db_path": DB_PATH,
     }
+
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8001)
