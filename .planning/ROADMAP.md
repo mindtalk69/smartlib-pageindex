@@ -136,13 +136,13 @@ Plans:
   2. Admin can view file details, delete files with vector cleanup confirmation
   3. Admin can manage catalogs and categories (CRUD operations)
   4. Admin can view and edit app settings (name, logo, color) with persistence
-**Plans**: TBD
+**Plans**: 4
 
 Plans:
-- [ ] 09-01: Activity log with upload/download filtering and file details
-- [ ] 09-02: File deletion with vector cleanup confirmation
-- [ ] 09-03: Catalog and Category CRUD operations
-- [ ] 09-04: App settings with edit/save functionality
+- [ ] 09-01: Activity log endpoints (CONTENT-01, CONTENT-02, CONTENT-03) - Planned 2026-02-27
+- [ ] 09-02: File management endpoints (CONTENT-04, CONTENT-05) - Planned 2026-02-27
+- [ ] 09-03: Catalog and Category CRUD (CONTENT-06, CONTENT-07) - Planned 2026-02-27
+- [ ] 09-04: Application settings (SET-01, SET-02, SET-03) - Planned 2026-02-27
 
 ### 📋 v1.2 RAG Integration (Planned)
 
