@@ -62,8 +62,8 @@ Requirements for Admin Dashboard (React frontend at /admin-app).
 
 - [x] **MODEL-01**: List all models with provider association
 - [x] **MODEL-02**: Add new model (name, deployment_name, provider_id, temperature, streaming, description)
-- [ ] **MODEL-03**: Edit model configuration
-- [ ] **MODEL-04**: Delete model
+- [x] **MODEL-03**: Edit model configuration
+- [x] **MODEL-04**: Delete model
 - [ ] **MODEL-05**: Set model as default
 - [ ] **MODEL-06**: Set model as multimodal
 - [ ] **MODEL-07**: Validate deployment configuration (streaming support, temperature range, connectivity)
@@ -240,8 +240,8 @@ frontend/
 | PROV-08 | Phase 7 | Pending |
 | MODEL-01 | Phase 8 | Complete |
 | MODEL-02 | Phase 8 | Complete |
-| MODEL-03 | Phase 8 | Pending |
-| MODEL-04 | Phase 8 | Pending |
+| MODEL-03 | Phase 8 | Complete |
+| MODEL-04 | Phase 8 | Complete |
 | MODEL-05 | Phase 8 | Pending |
 | MODEL-06 | Phase 8 | Pending |
 | MODEL-07 | Phase 8 | Pending |
