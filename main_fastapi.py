@@ -496,6 +496,216 @@ def forgot_password(email_data: ForgotPasswordRequest, db=Depends(get_db)):
     }
 
 
+def _generate_temp_password(length: int = 12) -> str:
+    """Generate a secure temporary password for admin-initiated resets."""
+    import secrets
+    import string
+
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    length = max(8, length or 12)
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+# Password Reset Request Admin Endpoints
+@app.get("/api/v1/admin/password-reset-requests")
+def list_password_reset_requests(
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    status: str = "pending",
+):
+    """
+    List password reset requests (admin only).
+
+    Filter by status: pending, completed, denied, all.
+    Returns paginated list with request details and user info.
+    """
+    from sqlmodel import select
+    from datetime import datetime
+
+    # Map status filter to database values
+    if status == "all":
+        statuses = None
+    elif status == "active":
+        statuses = ["pending"]
+    elif status == "processed":
+        statuses = ["completed", "denied"]
+    else:
+        statuses = [status]
+
+    # Query password reset requests with user info
+    statement = select(PasswordResetRequest).order_by(
+        PasswordResetRequest.created_at.desc()
+    )
+    if statuses:
+        statement = statement.where(PasswordResetRequest.status.in_(statuses))
+
+    result = db.exec(statement)
+    requests = result.all()
+
+    items = []
+    for req in requests:
+        items.append(
+            {
+                "id": req.id,
+                "user_id": req.user_id,
+                "email": req.email,
+                "status": req.status,
+                "created_at": req.created_at.isoformat() if req.created_at else None,
+                "expires_at": req.expires_at.isoformat() if req.expires_at else None,
+            }
+        )
+
+    return {
+        "success": True,
+        "data": {
+            "items": items,
+            "total": len(items),
+        },
+    }
+
+
+@app.post("/api/v1/admin/password-reset-requests/{request_id}/approve")
+def approve_password_reset_request(
+    request_id: int,
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    admin_notes: Optional[str] = None,
+):
+    """
+    Approve a password reset request and generate temporary password (admin only).
+
+    Updates the user's password with a temporary one and marks request completed.
+    """
+    from sqlmodel import select
+    from datetime import datetime
+
+    # Find the request
+    statement = select(PasswordResetRequest).where(
+        PasswordResetRequest.id == request_id
+    )
+    result = db.exec(statement)
+    reset_request = result.first()
+
+    if not reset_request:
+        raise HTTPException(status_code=404, detail="Password reset request not found")
+
+    if reset_request.status != "pending":
+        raise HTTPException(
+            status_code=400, detail="That request has already been processed"
+        )
+
+    # Find the user
+    statement = select(User).where(User.user_id == reset_request.user_id)
+    result = db.exec(statement)
+    user = result.first()
+
+    if not user:
+        # Update request status to denied since user doesn't exist
+        reset_request.status = "denied"
+        reset_request.processed_at = datetime.utcnow()
+        reset_request.processed_by = current_user.user_id
+        reset_request.admin_notes = "User account missing during approval."
+        db.add(reset_request)
+        db.commit()
+        raise HTTPException(status_code=400, detail="User account does not exist")
+
+    if user.auth_provider and user.auth_provider.lower() != "local":
+        # Update request status to denied since it's not a local account
+        reset_request.status = "denied"
+        reset_request.processed_at = datetime.utcnow()
+        reset_request.processed_by = current_user.user_id
+        reset_request.admin_notes = "Account is not eligible for local password resets."
+        db.add(reset_request)
+        db.commit()
+        raise HTTPException(
+            status_code=400,
+            detail="Password resets are only available for local accounts",
+        )
+
+    # Generate temporary password and update user
+    temp_password = _generate_temp_password()
+    from modules.auth import get_password_hash
+
+    user.password_hash = get_password_hash(temp_password)
+
+    # Update request status
+    reset_request.status = "completed"
+    reset_request.processed_at = datetime.utcnow()
+    reset_request.processed_by = current_user.user_id
+    reset_request.completed_at = datetime.utcnow()
+    if admin_notes:
+        reset_request.admin_notes = admin_notes
+
+    try:
+        db.add(user)
+        db.add(reset_request)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update password: {str(exc)}"
+        )
+
+    return {
+        "success": True,
+        "message": "Password updated successfully",
+        "temp_password": temp_password,
+    }
+
+
+@app.post("/api/v1/admin/password-reset-requests/{request_id}/deny")
+def deny_password_reset_request(
+    request_id: int,
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    admin_notes: Optional[str] = None,
+):
+    """
+    Deny a password reset request (admin only).
+
+    Marks request as denied without changing user password.
+    """
+    from sqlmodel import select
+    from datetime import datetime
+
+    # Find the request
+    statement = select(PasswordResetRequest).where(
+        PasswordResetRequest.id == request_id
+    )
+    result = db.exec(statement)
+    reset_request = result.first()
+
+    if not reset_request:
+        raise HTTPException(status_code=404, detail="Password reset request not found")
+
+    if reset_request.status != "pending":
+        raise HTTPException(
+            status_code=400, detail="That request has already been processed"
+        )
+
+    # Update request status
+    reset_request.status = "denied"
+    reset_request.processed_at = datetime.utcnow()
+    reset_request.processed_by = current_user.user_id
+    reset_request.completed_at = datetime.utcnow()
+    if admin_notes:
+        reset_request.admin_notes = admin_notes
+
+    try:
+        db.add(reset_request)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500, detail=f"Failed to deny request: {str(exc)}"
+        )
+
+    return {
+        "success": True,
+        "message": "Password reset request denied",
+    }
+
+
 # Config & Branding endpoints
 @app.get("/api/v1/config")
 async def get_config(current_user: User = Depends(get_current_user)):
