@@ -133,10 +133,95 @@ class LLMProviderCreate(LLMProviderBase):
 
 class LLMProviderRead(LLMProviderBase):
     id: int
+    api_key: Optional[str] = None
     health_status: Optional[str] = None
     last_health_check: Optional[datetime] = None
+    error_message: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+
+# LLM Provider Admin CRUD Schemas
+class LLMProviderListResponse(SmartLibBase):
+    """Response for list providers endpoint."""
+    success: bool = True
+    data: Dict[str, Any] = {}  # Contains items list and total
+
+
+class LLMProviderCreateRequest(SmartLibBase):
+    """Request to create a provider."""
+    name: str
+    provider_type: str
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    is_active: bool = True
+    is_default: bool = False
+    priority: int = 0
+    config: Dict[str, Any] = {}
+
+
+class LLMProviderCreateResponse(SmartLibBase):
+    """Response for create provider endpoint."""
+    success: bool = True
+    provider: LLMProviderRead
+
+
+class LLMProviderUpdateRequest(SmartLibBase):
+    """Request to update a provider (all fields optional)."""
+    name: Optional[str] = None
+    provider_type: Optional[str] = None
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    is_active: Optional[bool] = None
+    is_default: Optional[bool] = None
+    priority: Optional[int] = None
+    config: Optional[Dict[str, Any]] = None
+
+
+class LLMProviderUpdateResponse(SmartLibBase):
+    """Response for update provider endpoint."""
+    success: bool = True
+    provider: LLMProviderRead
+
+
+class LLMProviderDeleteResponse(SmartLibBase):
+    """Response for delete provider endpoint."""
+    success: bool = True
+    message: str
+
+
+class LLMProviderTestResponse(SmartLibBase):
+    """Response for test provider connectivity."""
+    success: bool = True
+    status: str  # 'healthy', 'degraded', 'offline', 'error'
+    message: Optional[str] = None
+    error: Optional[str] = None
+    provider_id: int
+    last_health_check: Optional[datetime] = None
+
+
+class LLMProviderDiscoverModelsResponse(SmartLibBase):
+    """Response for discover models endpoint."""
+    success: bool = True
+    provider: LLMProviderRead
+    models: List[Dict[str, Any]] = []
+
+
+class LLMProviderPriorityItem(SmartLibBase):
+    """Single priority update item."""
+    id: int
+    priority: int
+
+
+class LLMProviderPriorityUpdateRequest(SmartLibBase):
+    """Request to update provider priorities."""
+    priorities: List[LLMProviderPriorityItem] = []
+
+
+class LLMProviderPriorityUpdateResponse(SmartLibBase):
+    """Response for priority update endpoint."""
+    success: bool = True
+    message: str
 
 # Model Config Schemas
 class ModelConfigBase(SmartLibBase):

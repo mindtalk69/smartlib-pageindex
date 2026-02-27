@@ -76,6 +76,17 @@ from schemas import (
     UserProfile,
     UserProfileUpdate,
     UserStats,
+    # LLM Provider admin schemas
+    LLMProviderListResponse,
+    LLMProviderCreateRequest,
+    LLMProviderCreateResponse,
+    LLMProviderUpdateRequest,
+    LLMProviderUpdateResponse,
+    LLMProviderDeleteResponse,
+    LLMProviderTestResponse,
+    LLMProviderDiscoverModelsResponse,
+    LLMProviderPriorityUpdateRequest,
+    LLMProviderPriorityUpdateResponse,
 )
 from typing import Optional, List
 from fastapi_pagination import add_pagination
@@ -703,6 +714,404 @@ def deny_password_reset_request(
     return {
         "success": True,
         "message": "Password reset request denied",
+    }
+
+
+# ============================================================================
+# LLM Provider Admin CRUD Endpoints (Phase 07 - PROV-01 through PROV-08)
+# ============================================================================
+
+from sqlalchemy import func
+
+
+@app.get("/api/v1/admin/providers", response_model=LLMProviderListResponse)
+def list_admin_providers(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    skip: int = 0,
+    limit: int = 100,
+):
+    """
+    List all LLM providers (admin only).
+
+    Returns providers ordered by priority then name.
+    Includes health status fields (last_health_check, health_status, error_message).
+    """
+    statement = select(LLMProvider).order_by(
+        LLMProvider.priority,
+        LLMProvider.name
+    ).offset(skip).limit(limit)
+    result = db.exec(statement)
+    providers = result.all()
+
+    # Get total count
+    count_statement = select(func.count(LLMProvider.id))
+    total = db.exec(count_statement).one()
+
+    items = []
+    for p in providers:
+        items.append({
+            "id": p.id,
+            "name": p.name,
+            "provider_type": p.provider_type,
+            "base_url": p.base_url,
+            "api_key": p.api_key,
+            "is_active": p.is_active,
+            "is_default": p.is_default,
+            "priority": p.priority,
+            "config": p.config or {},
+            "last_health_check": p.last_health_check.isoformat() if p.last_health_check else None,
+            "health_status": p.health_status,
+            "error_message": p.error_message,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+        })
+
+    return {
+        "success": True,
+        "data": {
+            "items": items,
+            "total": total,
+        },
+    }
+
+
+@app.post("/api/v1/admin/providers", response_model=LLMProviderCreateResponse, status_code=status.HTTP_201_CREATED)
+def create_admin_provider(
+    provider_data: LLMProviderCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Create a new LLM provider (admin only).
+
+    Validates:
+    - Name and provider_type are required
+    - Name must be unique (returns 400 if duplicate)
+    """
+    # Validate required fields
+    name = provider_data.name.strip() if provider_data.name else ""
+    provider_type = provider_data.provider_type.strip() if provider_data.provider_type else ""
+
+    if not name or not provider_type:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Name and provider_type are required"
+        )
+
+    # Check for duplicate name
+    existing = db.exec(select(LLMProvider).where(LLMProvider.name == name)).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'Provider with name "{name}" already exists'
+        )
+
+    # Create provider
+    provider = LLMProvider(
+        name=name,
+        provider_type=provider_type,
+        base_url=provider_data.base_url.strip() if provider_data.base_url else None,
+        api_key=provider_data.api_key.strip() if provider_data.api_key else None,
+        is_active=provider_data.is_active if provider_data.is_active is not None else True,
+        is_default=provider_data.is_default if provider_data.is_default is not None else False,
+        priority=provider_data.priority if provider_data.priority is not None else 0,
+        config=provider_data.config if provider_data.config else {},
+    )
+
+    db.add(provider)
+    db.commit()
+    db.refresh(provider)
+
+    provider_dict = {
+        "id": provider.id,
+        "name": provider.name,
+        "provider_type": provider.provider_type,
+        "base_url": provider.base_url,
+        "api_key": provider.api_key,
+        "is_active": provider.is_active,
+        "is_default": provider.is_default,
+        "priority": provider.priority,
+        "config": provider.config or {},
+        "last_health_check": provider.last_health_check.isoformat() if provider.last_health_check else None,
+        "health_status": provider.health_status,
+        "error_message": provider.error_message,
+        "created_at": provider.created_at.isoformat() if provider.created_at else None,
+        "updated_at": provider.updated_at.isoformat() if provider.updated_at else None,
+    }
+
+    return {
+        "success": True,
+        "provider": provider_dict,
+    }
+
+
+@app.put("/api/v1/admin/providers/{provider_id}", response_model=LLMProviderUpdateResponse)
+def update_admin_provider(
+    provider_id: int,
+    provider_data: LLMProviderUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Update an LLM provider (admin only).
+
+    Validates:
+    - Provider must exist (404 if not found)
+    - Name must be unique when changed (400 if duplicate)
+    """
+    # Find provider
+    statement = select(LLMProvider).where(LLMProvider.id == provider_id)
+    result = db.exec(statement)
+    provider = result.first()
+
+    if not provider:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Provider with id {provider_id} not found"
+        )
+
+    # Update fields (only if provided)
+    if provider_data.name is not None:
+        new_name = provider_data.name.strip()
+        if new_name != provider.name:
+            # Check for duplicate
+            existing = db.exec(select(LLMProvider).where(LLMProvider.name == new_name)).first()
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f'Provider with name "{new_name}" already exists'
+                )
+            provider.name = new_name
+
+    if provider_data.provider_type is not None:
+        provider.provider_type = provider_data.provider_type.strip()
+
+    if provider_data.base_url is not None:
+        provider.base_url = provider_data.base_url.strip() or None
+
+    if provider_data.api_key is not None:
+        provider.api_key = provider_data.api_key.strip() or None
+
+    if provider_data.is_active is not None:
+        provider.is_active = provider_data.is_active
+
+    if provider_data.is_default is not None:
+        provider.is_default = provider_data.is_default
+
+    if provider_data.priority is not None:
+        provider.priority = provider_data.priority
+
+    if provider_data.config is not None:
+        provider.config = provider_data.config
+
+    provider.updated_at = datetime.utcnow()
+    db.add(provider)
+    db.commit()
+    db.refresh(provider)
+
+    provider_dict = {
+        "id": provider.id,
+        "name": provider.name,
+        "provider_type": provider.provider_type,
+        "base_url": provider.base_url,
+        "api_key": provider.api_key,
+        "is_active": provider.is_active,
+        "is_default": provider.is_default,
+        "priority": provider.priority,
+        "config": provider.config or {},
+        "last_health_check": provider.last_health_check.isoformat() if provider.last_health_check else None,
+        "health_status": provider.health_status,
+        "error_message": provider.error_message,
+        "created_at": provider.created_at.isoformat() if provider.created_at else None,
+        "updated_at": provider.updated_at.isoformat() if provider.updated_at else None,
+    }
+
+    return {
+        "success": True,
+        "provider": provider_dict,
+    }
+
+
+@app.delete("/api/v1/admin/providers/{provider_id}", response_model=LLMProviderDeleteResponse)
+def delete_admin_provider(
+    provider_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Delete an LLM provider (admin only).
+
+    Validates:
+    - Provider must exist (404 if not found)
+    - Cannot delete if associated models exist (400 with model count)
+    """
+    # Find provider
+    statement = select(LLMProvider).where(LLMProvider.id == provider_id)
+    result = db.exec(statement)
+    provider = result.first()
+
+    if not provider:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Provider with id {provider_id} not found"
+        )
+
+    # Check for associated models
+    model_count = db.exec(
+        select(func.count(ModelConfig.id)).where(ModelConfig.provider_id == provider_id)
+    ).one()
+
+    if model_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete provider: {model_count} associated model(s) exist. Delete associated models first."
+        )
+
+    name = provider.name
+    db.delete(provider)
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f'Provider "{name}" deleted successfully',
+    }
+
+
+@app.post("/api/v1/admin/providers/{provider_id}/test", response_model=LLMProviderTestResponse)
+def test_admin_provider(
+    provider_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Test LLM provider connectivity (admin only).
+
+    Updates provider health status fields:
+    - last_health_check: current UTC datetime
+    - health_status: test result status
+    - error_message: any error from test
+    """
+    from modules.llm_provider_utils import test_provider_connection
+
+    # Find provider
+    statement = select(LLMProvider).where(LLMProvider.id == provider_id)
+    result = db.exec(statement)
+    provider = result.first()
+
+    if not provider:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Provider with id {provider_id} not found"
+        )
+
+    # Test connection
+    result = test_provider_connection(provider)
+
+    # Update health status
+    provider.last_health_check = datetime.utcnow()
+    provider.health_status = result.get('status', 'unknown')
+    provider.error_message = result.get('error') or result.get('message')
+
+    db.add(provider)
+    db.commit()
+
+    return {
+        "success": True,
+        "status": result.get('status', 'unknown'),
+        "message": result.get('message'),
+        "error": result.get('error'),
+        "provider_id": provider_id,
+        "last_health_check": provider.last_health_check.isoformat() if provider.last_health_check else None,
+    }
+
+
+@app.post("/api/v1/admin/providers/{provider_id}/discover-models", response_model=LLMProviderDiscoverModelsResponse)
+def discover_admin_provider_models(
+    provider_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Discover available models from LLM provider (admin only).
+
+    Returns list of available models without creating database records.
+    """
+    from modules.llm_provider_utils import discover_provider_models
+
+    # Find provider
+    statement = select(LLMProvider).where(LLMProvider.id == provider_id)
+    result = db.exec(statement)
+    provider = result.first()
+
+    if not provider:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Provider with id {provider_id} not found"
+        )
+
+    # Discover models
+    models = discover_provider_models(provider)
+
+    provider_dict = {
+        "id": provider.id,
+        "name": provider.name,
+        "provider_type": provider.provider_type,
+        "base_url": provider.base_url,
+        "is_active": provider.is_active,
+        "is_default": provider.is_default,
+        "priority": provider.priority,
+        "config": provider.config or {},
+        "last_health_check": provider.last_health_check.isoformat() if provider.last_health_check else None,
+        "health_status": provider.health_status,
+        "error_message": provider.error_message,
+        "created_at": provider.created_at.isoformat() if provider.created_at else None,
+        "updated_at": provider.updated_at.isoformat() if provider.updated_at else None,
+    }
+
+    return {
+        "success": True,
+        "provider": provider_dict,
+        "models": models,
+    }
+
+
+@app.post("/api/v1/admin/providers/priority", response_model=LLMProviderPriorityUpdateResponse)
+def update_admin_provider_priorities(
+    priority_data: LLMProviderPriorityUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Update LLM provider priorities (admin only).
+
+    Accepts array of {id, priority} objects and updates all in single transaction.
+    """
+    if not priority_data.priorities:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Priorities array is required and cannot be empty"
+        )
+
+    for item in priority_data.priorities:
+        if not hasattr(item, 'id') or not hasattr(item, 'priority'):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each priority item must have 'id' and 'priority' fields"
+            )
+
+        statement = select(LLMProvider).where(LLMProvider.id == item.id)
+        result = db.exec(statement)
+        provider = result.first()
+
+        if provider:
+            provider.priority = item.priority
+
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"Priorities updated for {len(priority_data.priorities)} provider(s)",
     }
 
 
