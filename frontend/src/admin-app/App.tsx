@@ -7,12 +7,9 @@ import { Users } from "./src/pages/Users"
 import { PasswordResetRequests } from "./src/pages/PasswordResetRequests"
 import { Providers } from "./src/pages/Providers"
 import { Languages } from "./src/pages/Languages"
+import Models from "./src/pages/Models"
 
 // Placeholder components - detailed implementations in future phases
-function ModelsPage() {
-  return <h1 className="text-2xl font-bold">Models</h1>
-}
-
 function ContentPage() {
   return <h1 className="text-2xl font-bold">Content</h1>
 }
@@ -65,7 +62,7 @@ export function App() {
           <Route path="models" element={
             <ProtectedRoute>
               <AdminLayout>
-                <ModelsPage />
+                <Models />
               </AdminLayout>
             </ProtectedRoute>
           } />
