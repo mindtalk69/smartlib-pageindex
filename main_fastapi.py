@@ -31,6 +31,8 @@ from modules.models import (
     VectorReference,
     VisualGroundingActivity,
     Document,
+    Catalog,
+    Category,
 )
 from modules.crud_router import CRUDRouter
 from modules.auth import (
@@ -105,9 +107,30 @@ from schemas import (
     ModelConfigMultimodalResponse,
     ModelValidationRequest,
     ModelValidationResponse,
+    # Activity Log admin schemas (Phase 09)
+    UploadActivityListResponse,
+    DownloadActivityListResponse,
     # File Management admin schemas (Phase 09)
     FileDetailsResponse,
     FileDeleteResponse,
+    # Settings schemas (Phase 09)
+    AppSettingsResponse,
+    SettingsUpdateRequest,
+    SettingsUpdateResponse,
+    # Catalog admin schemas (Phase 09)
+    CatalogListResponse,
+    CatalogCreateRequest,
+    CatalogCreateResponse,
+    CatalogUpdateRequest,
+    CatalogUpdateResponse,
+    CatalogDeleteResponse,
+    # Category admin schemas (Phase 09)
+    CategoryListResponse,
+    CategoryCreateRequest,
+    CategoryCreateResponse,
+    CategoryUpdateRequest,
+    CategoryUpdateResponse,
+    CategoryDeleteResponse,
 )
 from typing import Optional, List
 from fastapi_pagination import add_pagination
@@ -1969,6 +1992,47 @@ def delete_admin_language(
     return {
         "success": True,
         "message": "Language deleted successfully",
+    }
+
+
+# ============================================================================
+# Application Settings Endpoints (Phase 09 - SET-01, SET-02, SET-03)
+# ============================================================================
+
+
+@app.get("/api/v1/admin/settings", response_model=AppSettingsResponse)
+def get_app_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Get application settings (admin only).
+
+    Returns all settings from AppSettings table as key-value pairs.
+    Includes active_user_count for validation context.
+    """
+    # Query all settings ordered by key
+    settings = db.exec(select(AppSettings).order_by(AppSettings.key)).all()
+
+    settings_dict = {}
+    for setting in settings:
+        value = setting.value
+        # Parse known numeric settings
+        if setting.key == 'max_active_users':
+            try:
+                value = int(value)
+            except (ValueError, TypeError):
+                pass
+        settings_dict[setting.key] = value
+
+    # Get active user count (count non-disabled users)
+    count_statement = select(func.count(User.id)).where(User.is_disabled == False)
+    active_user_count = db.exec(count_statement).one()
+
+    return {
+        "success": True,
+        "settings": settings_dict,
+        "active_user_count": active_user_count,
     }
 
 
