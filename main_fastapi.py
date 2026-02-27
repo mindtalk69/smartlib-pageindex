@@ -87,6 +87,13 @@ from schemas import (
     LLMProviderDiscoverModelsResponse,
     LLMProviderPriorityUpdateRequest,
     LLMProviderPriorityUpdateResponse,
+    # LLM Language admin schemas
+    LLMLanguageListResponse,
+    LLMLanguageCreateRequest,
+    LLMLanguageCreateResponse,
+    LLMLanguageUpdateRequest,
+    LLMLanguageUpdateResponse,
+    LLMLanguageDeleteResponse,
 )
 from typing import Optional, List
 from fastapi_pagination import add_pagination
@@ -722,6 +729,7 @@ def deny_password_reset_request(
 # ============================================================================
 
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 
 @app.get("/api/v1/admin/providers", response_model=LLMProviderListResponse)
@@ -1112,6 +1120,112 @@ def update_admin_provider_priorities(
     return {
         "success": True,
         "message": f"Priorities updated for {len(priority_data.priorities)} provider(s)",
+    }
+
+
+# ============================================================================
+# LLM Language Admin CRUD Endpoints (Phase 08 - LANG-01 through LANG-02)
+# ============================================================================
+
+
+@app.get("/api/v1/admin/languages", response_model=LLMLanguageListResponse)
+def list_admin_languages(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    skip: int = 0,
+    limit: int = 100,
+):
+    """
+    List all LLM languages (admin only).
+
+    Returns languages ordered by language_name.
+    """
+    statement = select(LLMLanguage).order_by(
+        LLMLanguage.language_name
+    ).offset(skip).limit(limit)
+    result = db.exec(statement)
+    languages = result.all()
+
+    # Get total count
+    count_statement = select(func.count(LLMLanguage.id))
+    total = db.exec(count_statement).one()
+
+    items = []
+    for lang in languages:
+        items.append({
+            "id": lang.id,
+            "language_code": lang.language_code,
+            "language_name": lang.language_name,
+            "is_active": lang.is_active,
+            "created_by": lang.created_by,
+            "created_at": lang.created_at.isoformat() if lang.created_at else None,
+        })
+
+    return {
+        "success": True,
+        "data": {
+            "items": items,
+            "total": total,
+        },
+    }
+
+
+@app.post("/api/v1/admin/languages/add", response_model=LLMLanguageCreateResponse, status_code=status.HTTP_201_CREATED)
+def create_admin_language(
+    language_data: LLMLanguageCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Create a new LLM language (admin only).
+
+    Validates:
+    - language_code and language_name are required (non-empty, stripped)
+    - language_code must be unique (returns 409 if duplicate)
+    - language_name must be unique (returns 409 if duplicate)
+    """
+    # Validate required fields
+    language_code = language_data.language_code.strip() if language_data.language_code else ""
+    language_name = language_data.language_name.strip() if language_data.language_name else ""
+
+    if not language_code or not language_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="language_code and language_name are required"
+        )
+
+    # Create language
+    language = LLMLanguage(
+        language_code=language_code,
+        language_name=language_name,
+        is_active=language_data.is_active if language_data.is_active is not None else True,
+        created_by=current_user.username,
+    )
+
+    try:
+        db.add(language)
+        db.commit()
+        db.refresh(language)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Language code '{language_code}' or name '{language_name}' already exists"
+        )
+
+    language_dict = {
+        "id": language.id,
+        "language_code": language.language_code,
+        "language_name": language.language_name,
+        "is_active": language.is_active,
+        "created_by": language.created_by,
+        "created_at": language.created_at.isoformat() if language.created_at else None,
+    }
+
+    return {
+        "success": True,
+        "message": "Language added successfully",
+        "language": language_dict,
     }
 
 
