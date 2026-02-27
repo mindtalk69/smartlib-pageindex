@@ -1340,6 +1340,365 @@ def create_admin_model(
 
 
 # ============================================================================
+# Model Config Admin CRUD Endpoints (Phase 08 - MODEL-03)
+# ============================================================================
+
+
+@app.post("/api/v1/admin/models/edit/{model_id}", response_model=ModelConfigUpdateResponse)
+def update_admin_model(
+    model_id: int,
+    model_data: ModelConfigUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Update an existing model configuration (admin only).
+
+    Performs partial update using model_update with exclude_unset=True.
+    Validates deployment configuration if deployment_name, temperature, or streaming changes.
+    Validates name uniqueness when name changes (400 if duplicate).
+    Clears other defaults if is_default=true.
+    Returns updated model object.
+    """
+    from modules.llm_utils import (
+        is_streaming_supported_for_deployment,
+        validate_temperature_for_deployment,
+        get_llm,
+    )
+
+    # Validate model exists
+    existing_model = db.exec(select(ModelConfig).where(ModelConfig.id == model_id)).first()
+    if not existing_model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model with id {model_id} not found"
+        )
+
+    # Track which fields are being updated
+    update_values = {}
+    deployment_changed = False
+    deployment_name = existing_model.deployment_name
+    streaming = existing_model.streaming
+    temperature = existing_model.temperature
+    provider_obj = None
+
+    # Process name update
+    if model_data.name is not None:
+        new_name = model_data.name.strip()
+        if new_name != existing_model.name:
+            # Check for duplicate name (different model)
+            duplicate = db.exec(select(ModelConfig).where(
+                ModelConfig.name == new_name,
+                ModelConfig.id != model_id
+            )).first()
+            if duplicate:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f'Model with name "{new_name}" already exists'
+                )
+        update_values['name'] = new_name
+
+    # Process deployment_name update
+    if model_data.deployment_name is not None:
+        deployment_name = model_data.deployment_name.strip()
+        if deployment_name != existing_model.deployment_name:
+            deployment_changed = True
+        update_values['deployment_name'] = deployment_name
+
+    # Process provider_id update
+    if model_data.provider_id is not None and model_data.provider_id != existing_model.provider_id:
+        provider_stmt = select(LLMProvider).where(LLMProvider.id == model_data.provider_id)
+        provider_result = db.exec(provider_stmt).first()
+        if not provider_result:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Provider with id {model_data.provider_id} not found"
+            )
+        update_values['provider_id'] = model_data.provider_id
+        update_values['provider'] = provider_result.provider_type
+        provider_obj = provider_result
+        deployment_changed = True  # Provider change requires re-validation
+    else:
+        # Get existing provider for validation
+        if existing_model.provider_id:
+            provider_stmt = select(LLMProvider).where(LLMProvider.id == existing_model.provider_id)
+            provider_obj = db.exec(provider_stmt).first()
+
+    # Process description update
+    if model_data.description is not None:
+        update_values['description'] = model_data.description.strip() if model_data.description else None
+
+    # Process is_default update
+    if model_data.is_default is not None and model_data.is_default != existing_model.is_default:
+        update_values['is_default'] = model_data.is_default
+
+    # Process streaming update
+    if model_data.streaming is not None:
+        streaming = model_data.streaming
+        update_values['streaming'] = streaming
+        deployment_changed = True  # Streaming change requires re-validation
+
+    # Process temperature update
+    if model_data.temperature is not None:
+        temperature = model_data.temperature
+        update_values['temperature'] = temperature
+        deployment_changed = True  # Temperature change requires re-validation
+
+    # Validate deployment configuration if anything changed
+    if deployment_changed and provider_obj:
+        # Validate streaming support
+        if streaming and not is_streaming_supported_for_deployment(deployment_name):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Deployment '{deployment_name}' does not support streaming. Disable streaming or choose a compatible deployment."
+            )
+
+        # Validate temperature
+        temp_ok, _, temp_error = validate_temperature_for_deployment(deployment_name, temperature)
+        if not temp_ok:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=temp_error
+            )
+
+        # Test connectivity
+        try:
+            get_llm(
+                model_name=deployment_name,
+                streaming=streaming,
+                temperature=temperature,
+                api_key=provider_obj.api_key,
+                endpoint=provider_obj.base_url,
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Could not initialize deployment '{deployment_name}': {exc}"
+            )
+
+    # Clear other defaults if is_default=true
+    if update_values.get('is_default'):
+        db.exec(
+            update(ModelConfig).where(
+                ModelConfig.is_default == True,
+                ModelConfig.id != model_id
+            ).values(is_default=False)
+        )
+        db.commit()
+
+    # Apply updates
+    for key, value in update_values.items():
+        setattr(existing_model, key, value)
+
+    db.commit()
+    db.refresh(existing_model)
+
+    # Get associated provider for response
+    if existing_model.provider_id:
+        provider_stmt = select(LLMProvider).where(LLMProvider.id == existing_model.provider_id)
+        provider_result = db.exec(provider_stmt).first()
+        provider_obj = {
+            "id": provider_result.id,
+            "name": provider_result.name,
+            "provider_type": provider_result.provider_type,
+            "is_active": provider_result.is_active,
+        } if provider_result else None
+    else:
+        provider_obj = None
+
+    model_dict = {
+        "id": existing_model.id,
+        "provider_id": existing_model.provider_id,
+        "name": existing_model.name,
+        "deployment_name": existing_model.deployment_name,
+        "provider": existing_model.provider,
+        "temperature": existing_model.temperature,
+        "streaming": existing_model.streaming,
+        "description": existing_model.description,
+        "is_default": existing_model.is_default,
+        "is_multimodal": getattr(existing_model, 'is_multimodal', False),
+        "created_by": existing_model.created_by,
+        "created_at": existing_model.created_at.isoformat() if existing_model.created_at else None,
+        "provider_obj": provider_obj,
+    }
+
+    return {
+        "success": True,
+        "model": model_dict,
+    }
+
+
+# ============================================================================
+# Model Config Action Endpoints (Phase 08 - MODEL-05, MODEL-06, MODEL-07)
+# ============================================================================
+
+
+@app.post("/api/v1/admin/models/set-default/{model_id}", response_model=ModelConfigDefaultResponse)
+def set_default_model_endpoint(
+    model_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Set a specific model as the global default (admin only).
+
+    Clears is_default on all other models and sets is_default=True on target model.
+    Follows Flask pattern from modules/admin_models.py lines 289-302.
+    """
+    # Validate model exists
+    model = db.get(ModelConfig, model_id)
+    if not model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model with id {model_id} not found"
+        )
+
+    # Clear existing defaults in one statement
+    db.exec(
+        update(ModelConfig).where(ModelConfig.is_default == True).values(is_default=False)
+    )
+
+    # Set new default
+    model.is_default = True
+    db.commit()
+
+    logging.info(f"ModelConfig ID {model_id} set as default by user {current_user.user_id}")
+
+    return {
+        "success": True,
+        "message": "Default model updated"
+    }
+
+
+@app.post("/api/v1/admin/models/set-multimodal/{model_id}", response_model=ModelConfigMultimodalResponse)
+def set_multimodal_model_endpoint(
+    model_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Set a specific model as the multimodal model (admin only).
+
+    Updates AppSettings table with multimodal_model_id and multimodal_deployment_name.
+    Follows Flask pattern from modules/admin_models.py (set_multimodal functionality).
+    """
+    # Validate model exists
+    model = db.get(ModelConfig, model_id)
+    if not model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model with id {model_id} not found"
+        )
+
+    # Get deployment_name for reference
+    deployment_name = model.deployment_name
+
+    # Update AppSettings with multimodal_model_id
+    setting = db.get(AppSettings, 'multimodal_model_id')
+    if not setting:
+        setting = AppSettings(key='multimodal_model_id', value=str(model_id))
+        db.add(setting)
+    else:
+        setting.value = str(model_id)
+
+    # Also update multimodal_deployment_name for reference
+    deployment_setting = db.get(AppSettings, 'multimodal_deployment_name')
+    if not deployment_setting:
+        deployment_setting = AppSettings(key='multimodal_deployment_name', value=deployment_name)
+        db.add(deployment_setting)
+    else:
+        deployment_setting.value = deployment_name
+
+    db.commit()
+
+    logging.info(f"ModelConfig ID {model_id} set as multimodal model by user {current_user.user_id}")
+
+    return {
+        "success": True,
+        "message": "Multimodal model updated"
+    }
+
+
+@app.post("/api/v1/admin/models/validate", response_model=ModelValidationResponse)
+def validate_deployment_endpoint(
+    validation_data: ModelValidationRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Validate deployment configuration (admin only).
+
+    Validates streaming support, temperature range, and connectivity using modules/llm_utils functions.
+    Follows Flask pattern from modules/admin_models.py lines 43-80 (_validate_deployment_configuration).
+    """
+    from modules.llm_utils import (
+        is_streaming_supported_for_deployment,
+        validate_temperature_for_deployment,
+        get_llm,
+    )
+
+    deployment_name = validation_data.deployment_name
+    temperature = validation_data.temperature
+    streaming = validation_data.streaming
+    provider_id = validation_data.provider_id
+
+    # Validate streaming support
+    streaming_supported = is_streaming_supported_for_deployment(deployment_name)
+
+    # Validate temperature
+    temp_ok, _, temp_error = validate_temperature_for_deployment(deployment_name, temperature)
+    temperature_valid = temp_ok
+
+    # Test connectivity
+    connectivity_ok = False
+    connectivity_error = None
+
+    if streaming_supported and temperature_valid:
+        # Get provider if provider_id is provided
+        provider_result = None
+        if provider_id:
+            provider_stmt = select(LLMProvider).where(LLMProvider.id == provider_id)
+            provider_result = db.exec(provider_stmt).first()
+
+        try:
+            get_llm(
+                model_name=deployment_name,
+                streaming=streaming,
+                temperature=temperature if temperature is not None else 0.0,
+                api_key=provider_result.api_key if provider_result else None,
+                endpoint=provider_result.base_url if provider_result else None,
+            )
+            connectivity_ok = True
+        except Exception as exc:
+            connectivity_ok = False
+            connectivity_error = str(exc)
+
+    # Build response
+    valid = streaming_supported and temperature_valid and connectivity_ok
+
+    if not valid:
+        if not streaming_supported:
+            message = f"Deployment '{deployment_name}' does not support streaming"
+        elif not temperature_valid:
+            message = temp_error or f"Invalid temperature for deployment '{deployment_name}'"
+        elif not connectivity_ok:
+            message = f"Connectivity test failed: {connectivity_error}"
+        else:
+            message = "Deployment configuration is invalid"
+    else:
+        message = "Deployment configuration is valid"
+
+    return {
+        "success": True,
+        "valid": valid,
+        "streaming_supported": streaming_supported,
+        "temperature_valid": temperature_valid,
+        "connectivity_ok": connectivity_ok,
+        "message": message
+    }
+
+
+# ============================================================================
 # LLM Language Admin CRUD Endpoints (Phase 08 - LANG-01 through LANG-02)
 # ============================================================================
 
