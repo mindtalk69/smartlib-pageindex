@@ -1,0 +1,139 @@
+# ============================================================================
+# SmartLib BASIC - GPU Enabled Single Container (SLIM)
+# Runs: Redis + Celery Worker + Gunicorn (web) via supervisord
+# Hardware Acceleration: NVIDIA CUDA 12.1
+# Image Size Optimization: Uses CUDA runtime base instead of full PyTorch env
+# ============================================================================
+
+# ─── Stage 1a: Build root static assets (chat/admin embeds) ─────────────────
+FROM node:20-alpine AS assets
+WORKDIR /app
+COPY package.json ./
+RUN npm install --silent
+COPY vite.config.js ./
+COPY static ./static
+RUN npm run build
+
+# ─── Stage 1b: Build frontend/ React app (served at /app/) ───────────────────
+FROM node:20-alpine AS frontend
+WORKDIR /app
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install --silent
+COPY frontend/ ./
+RUN npm run build
+
+# ─── Stage 1c: Build admin-frontend/ React app (served at /app-admin/) ───────
+FROM node:20-alpine AS admin_frontend
+WORKDIR /app
+COPY admin-frontend/package.json admin-frontend/package-lock.json* ./
+RUN npm install --silent
+COPY admin-frontend/ ./
+RUN npm run build
+
+# ─── Stage 2: Optimized GPU Python base ─────────────────────────────────────
+# nvidia/cuda:12.1.1-runtime-ubuntu22.04 is ~200MB vs pytorch/pytorch which is ~3.5GB
+FROM nvidia/cuda:12.1.1-runtime-ubuntu22.04 AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PYTHONPATH=/app \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# Install Python 3.11 and system dependencies.
+# Ubuntu 22.04 ships python3.11 in its repos but python3-pip is linked to python3.10.
+# We bootstrap pip explicitly for 3.11 using get-pip.py to avoid version mismatch.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-dev \
+    python3.11-distutils \
+    build-essential \
+    curl \
+    git \
+    libffi-dev \
+    libjpeg-dev \
+    zlib1g-dev \
+    libpng-dev \
+    libxml2-dev \
+    libxslt1-dev \
+    libssl-dev \
+    libgl1 \
+    libglib2.0-0 \
+    redis-server \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    # Bootstrap pip for python3.11 specifically
+    && curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11 \
+    # Make python3.11 the default python/pip
+    && ln -sf /usr/bin/python3.11 /usr/bin/python3 \
+    && ln -sf /usr/bin/python3.11 /usr/bin/python \
+    && ln -sf /usr/local/bin/pip3 /usr/local/bin/pip
+
+# ─── Stage 3: Install Python dependencies ──────────────────────────────────
+FROM base AS python
+
+# Worker requirements include langchain-huggingface + docling
+COPY requirements-worker.txt /tmp/requirements-worker.txt
+COPY requirements-web.txt /tmp/requirements-web.txt
+
+# Install GPU-enabled torch FIRST using the cu121 wheel index.
+# This ensures we get the CUDA-accelerated version (~2.8GB) but only
+# for the specific CUDA 12.1 version we need.
+RUN pip install --no-cache-dir \
+    --extra-index-url https://download.pytorch.org/whl/cu121 \
+    -r /tmp/requirements-worker.txt \
+    -r /tmp/requirements-web.txt
+
+# ─── Stage 4: Final image ───────────────────────────────────────────────────
+FROM python AS final
+
+# Copy application code
+COPY . /app
+
+# Copy built root static assets
+COPY --from=assets /app/static/dist /app/static/dist
+
+# Copy built frontend/ React app (served at /app/)
+COPY --from=frontend /app/dist /app/frontend/dist
+
+# Copy built admin-frontend/ React app (served at /app-admin/)
+COPY --from=admin_frontend /app/dist /app/admin-frontend/dist
+
+# Copy supervisord configuration
+COPY supervisord.conf /etc/supervisor/conf.d/smartlib.conf
+
+# Create data and Redis persistence directories
+RUN mkdir -p /home/data/redis /home/data/hf_cache \
+    && chmod -R 777 /home/data \
+    && chmod +x /app/docker-entrypoint.sh
+
+# Default environment for single-container mode
+ENV PORT=8000 \
+    WORKERS=1 \
+    GUNICORN_TIMEOUT=300 \
+    APP_EDITION=BASIC \
+    LOCAL_MODE=true \
+    # Redis runs inside the container on localhost
+    CELERY_BROKER_URL=redis://localhost:6379/0 \
+    CELERY_RESULT_BACKEND=redis://localhost:6379/0 \
+    STREAM_BUS_URL=redis://localhost:6379/0 \
+    VECTOR_STORE_PROVIDER=sqlite-vec \
+    SKIP_DATA_MOUNT_CHECK=true \
+    EMBEDDING_CACHE_DIR=/home/data/hf_cache
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+EXPOSE 8000
+
+# supervisord manages Redis + Celery + Gunicorn + Init scripts
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/smartlib.conf"]
+
+# ============================================================================
+# Build:  docker build -f Dockerfile.gpu -t smartlib-gpu:latest .
+# Run:    docker run --gpus all -p 8000:8000 -v ./data:/home/data \
+#           --env-file .env.dev smartlib-gpu:latest
+# ============================================================================
