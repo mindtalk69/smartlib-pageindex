@@ -2170,6 +2170,211 @@ def list_download_activities(
 
 
 # ============================================================================
+# Catalog CRUD Endpoints (Phase 09 - CONTENT-06)
+# ============================================================================
+
+
+@app.get("/api/v1/admin/catalogs", response_model=CatalogListResponse)
+def list_admin_catalogs(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    skip: int = 0,
+    limit: int = 100,
+):
+    """
+    List all catalogs (admin only).
+
+    Returns catalogs ordered by name.
+    """
+    statement = select(Catalog).order_by(Catalog.name).offset(skip).limit(limit)
+    result = db.exec(statement)
+    catalogs = result.all()
+
+    # Get total count
+    count_statement = select(func.count(Catalog.id))
+    total = db.exec(count_statement).one()
+
+    items = []
+    for catalog in catalogs:
+        items.append({
+            "id": catalog.id,
+            "name": catalog.name,
+            "description": catalog.description,
+            "created_by": catalog.created_by_user_id,
+            "created_at": catalog.created_at.isoformat() if catalog.created_at else None,
+        })
+
+    return {
+        "success": True,
+        "data": {
+            "items": items,
+            "total": total,
+        },
+    }
+
+
+@app.post("/api/v1/admin/catalogs/add", response_model=CatalogCreateResponse, status_code=status.HTTP_201_CREATED)
+def create_admin_catalog(
+    catalog_data: CatalogCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Create a new catalog (admin only).
+
+    Validates:
+    - name is required (non-empty, stripped)
+    - name must be unique (returns 400 if duplicate)
+    """
+    # Validate required fields
+    name = catalog_data.name.strip() if catalog_data.name else ""
+
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="name is required"
+        )
+
+    # Check for duplicate name
+    existing = db.exec(select(Catalog).where(Catalog.name == name)).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Catalog with name '{name}' already exists."
+        )
+
+    # Create catalog
+    catalog = Catalog(
+        name=name,
+        description=catalog_data.description,
+        created_by_user_id=current_user.user_id,
+    )
+
+    db.add(catalog)
+    db.commit()
+    db.refresh(catalog)
+
+    catalog_dict = {
+        "id": catalog.id,
+        "name": catalog.name,
+        "description": catalog.description,
+        "created_by": catalog.created_by_user_id,
+        "created_at": catalog.created_at.isoformat() if catalog.created_at else None,
+    }
+
+    return {
+        "success": True,
+        "message": "Catalog added successfully",
+        "catalog": catalog_dict,
+    }
+
+
+@app.post("/api/v1/admin/catalogs/edit/{catalog_id}", response_model=CatalogUpdateResponse)
+def update_admin_catalog(
+    catalog_id: int,
+    catalog_data: CatalogUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Update an existing catalog (admin only).
+
+    Validates:
+    - catalog_id must exist (404 if not found)
+    - name is required (non-empty, stripped)
+    - name must be unique excluding current id (returns 409 if duplicate)
+    """
+    # Check if catalog exists
+    catalog = db.get(Catalog, catalog_id)
+    if not catalog:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Catalog not found"
+        )
+
+    # Validate name if provided
+    if catalog_data.name is not None:
+        name = catalog_data.name.strip()
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="name must not be empty"
+            )
+
+        # Check for duplicate name (excluding current id)
+        existing = db.exec(
+            select(Catalog).where(
+                Catalog.name == name,
+                Catalog.id != catalog_id
+            )
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Catalog with name '{name}' already exists."
+            )
+        catalog.name = name
+
+    # Update description if provided
+    if catalog_data.description is not None:
+        catalog.description = catalog_data.description
+
+    db.add(catalog)
+    db.commit()
+    db.refresh(catalog)
+
+    catalog_dict = {
+        "id": catalog.id,
+        "name": catalog.name,
+        "description": catalog.description,
+        "created_by": catalog.created_by_user_id,
+        "created_at": catalog.created_at.isoformat() if catalog.created_at else None,
+    }
+
+    return {
+        "success": True,
+        "message": "Catalog updated successfully",
+        "catalog": catalog_dict,
+    }
+
+
+@app.delete("/api/v1/admin/catalogs/delete/{catalog_id}", response_model=CatalogDeleteResponse)
+def delete_admin_catalog(
+    catalog_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Delete an existing catalog (admin only).
+
+    Validates:
+    - catalog_id must exist (404 if not found)
+    """
+    # Check if catalog exists
+    catalog = db.get(Catalog, catalog_id)
+    if not catalog:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Catalog not found"
+        )
+
+    try:
+        db.delete(catalog)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error deleting catalog: {str(e)}"
+        )
+
+    return {
+        "success": True,
+        "message": "Catalog deleted successfully",
+    }
+
+
+# ============================================================================
 # Application Settings Endpoints (Phase 09 - SET-01, SET-02, SET-03)
 # ============================================================================
 
