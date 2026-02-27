@@ -25,6 +25,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { ThemeToggle } from "./SettingsPanel";
 import { NavigationMenu } from "./NavigationMenu";
 import { useNavigate } from "react-router-dom";
+import api from "@/utils/apiClient";
 
 interface Library {
     library_id: number;
@@ -74,10 +75,7 @@ export function UploadPage() {
                 autoDismissedRef.current.add(task.task_id);
                 setTimeout(() => {
                     handleTaskComplete(task.task_id);
-                    fetch(`/api/upload-status/${task.task_id}/dismiss`, {
-                        method: "POST",
-                        credentials: "include",
-                    }).catch(console.error);
+                    api.post(`/api/upload-status/${task.task_id}/dismiss`).catch(console.error);
                 }, 5000);
             }
         });
@@ -93,13 +91,8 @@ export function UploadPage() {
 
     const fetchBranding = async () => {
         try {
-            const response = await fetch("/api/branding", {
-                credentials: "include",
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setBranding(data);
-            }
+            const data = await api.get<{ logo_url?: string; app_name?: string }>("/branding");
+            setBranding(data);
         } catch (error) {
             console.error("Failed to fetch branding:", error);
         }
@@ -108,13 +101,8 @@ export function UploadPage() {
     const fetchLibraries = async () => {
         try {
             setLoading(true);
-            const response = await fetch("/api/libraries", {
-                credentials: "include",
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setLibraries(data.libraries || []);
-            }
+            const data = await api.get<{ libraries: Library[] }>("/libraries");
+            setLibraries(data.libraries || []);
         } catch (error) {
             console.error("Failed to fetch libraries:", error);
         } finally {
@@ -124,18 +112,16 @@ export function UploadPage() {
 
     const fetchConfig = async () => {
         try {
-            const response = await fetch("/api/config", {
-                credentials: "include",
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setVectorStoreMode(data.vector_store_mode || "user");
-                setVisualGroundingEnabled(
-                    data.visual_grounding_enabled || false,
-                );
-                setIsAdmin(data.is_admin || false);
-                setUsername(data.username || "User");
-            }
+            const data = await api.get<{
+                vector_store_mode?: string;
+                visual_grounding_enabled?: boolean;
+                is_admin?: boolean;
+                username?: string;
+            }>("/api/config");
+            setVectorStoreMode(data.vector_store_mode || "user");
+            setVisualGroundingEnabled(data.visual_grounding_enabled || false);
+            setIsAdmin(data.is_admin || false);
+            setUsername(data.username || "User");
         } catch (error) {
             console.error("Failed to fetch config:", error);
         }
@@ -143,14 +129,8 @@ export function UploadPage() {
 
     const fetchUploadStatus = async () => {
         try {
-            const response = await fetch("/api/upload-status", {
-                credentials: "include",
-            });
-            if (response.ok) {
-                const data = await response.json();
-                const tasks = data.tasks || [];
-                setActiveTasks(tasks);
-            }
+            const data = await api.get<{ tasks: UploadTask[] }>("/upload-status");
+            setActiveTasks(data.tasks || []);
         } catch (error) {
             console.error("Failed to fetch upload status:", error);
         }

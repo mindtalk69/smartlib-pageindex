@@ -1,4 +1,5 @@
 import { useState, FormEvent } from 'react'
+import { api } from '@/utils/apiClient'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -45,22 +46,13 @@ export function ChangePasswordPage() {
         setSuccess(null)
 
         try {
-            const response = await fetch('/api/change-password', {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    current_password: currentPassword,
-                    new_password: newPassword,
-                    confirm_new_password: confirmPassword,
-                }),
+            const data = await api.post<any>('/auth/change-password', {
+                current_password: currentPassword,
+                new_password: newPassword,
+                confirm_new_password: confirmPassword,
             })
 
-            const data = await response.json()
-
-            if (response.ok && data.success) {
+            if (data.success) {
                 setSuccess(data.message || 'Password changed successfully!')
                 // Clear form
                 setCurrentPassword('')

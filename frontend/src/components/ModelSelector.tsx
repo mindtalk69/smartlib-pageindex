@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { api } from '@/utils/apiClient';
 import {
   Select,
   SelectContent,
@@ -36,10 +37,7 @@ export function ModelSelector({ onModelChange, className }: ModelSelectorProps) 
 
   const fetchModels = async () => {
     try {
-      const response = await fetch('/admin/models/api/available', {
-        credentials: 'include',
-      });
-      const data = await response.json();
+      const data = await api.get<any>('/admin/models/api/available');
 
       if (data.status === 'success' && data.models) {
         setModels(data.models);

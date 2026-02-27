@@ -39,7 +39,7 @@ export function useLanguages() {
         setIsLoading(true)
         setError(null)
         try {
-            const data = await api.get<LanguagesResponse>('/api/v1/admin/languages')
+            const data = await api.get<LanguagesResponse>('/admin/languages')
             // Sort by language_name for consistent display
             const sortedLanguages = (data.languages || []).sort((a, b) =>
                 a.language_name.localeCompare(b.language_name)

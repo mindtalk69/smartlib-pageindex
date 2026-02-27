@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { api } from '@/utils/apiClient'
 import {
     Dialog,
     DialogContent,
@@ -73,22 +74,11 @@ export function DocumentViewer({
 
         console.log('[DocumentViewer] Fetching:', url, { libraryId, documentId, page })
 
-        fetch(url, { credentials: 'include' })
-            .then(response => {
-                console.log('[DocumentViewer] Response status:', response.status)
-                if (!response.ok) {
-                    return response.json().then(data => {
-                        throw new Error(data.error || `HTTP ${response.status}`)
-                    }).catch(() => {
-                        throw new Error(`HTTP ${response.status}: Failed to load document content`)
-                    })
-                }
-                return response.json()
-            })
+        api.get<DocumentData>(url)
             .then(result => {
                 console.log('[DocumentViewer] Result:', result)
-                if (result.error) {
-                    throw new Error(result.error)
+                if ((result as any).error) {
+                    throw new Error((result as any).error)
                 }
                 setData(result)
                 setLoading(false)

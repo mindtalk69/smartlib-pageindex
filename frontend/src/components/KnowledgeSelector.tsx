@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { api } from '../utils/apiClient'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -63,24 +64,14 @@ export function KnowledgeSelector({
             setLoading(true)
 
             // Fetch knowledges with their libraries mapping
-            const knowledgesRes = await fetch('/api/knowledges', {
-                credentials: 'include',
-            })
-            if (knowledgesRes.ok) {
-                const data = await knowledgesRes.json()
-                setKnowledges(data.knowledges || [])
-                setKnowledgeLibrariesMap(data.knowledge_libraries_map || {})
-                setVectorStoreMode(data.mode || 'user')
-            }
+            const knowledgesData = await api.get<any>('/knowledges')
+            setKnowledges(knowledgesData.knowledges || [])
+            setKnowledgeLibrariesMap(knowledgesData.knowledge_libraries_map || {})
+            setVectorStoreMode(knowledgesData.mode || 'user')
 
             // Fetch all libraries (fallback when no knowledge selected)
-            const librariesRes = await fetch('/api/libraries', {
-                credentials: 'include',
-            })
-            if (librariesRes.ok) {
-                const data = await librariesRes.json()
-                setAllLibraries(data.libraries || [])
-            }
+            const librariesData = await api.get<any>('/libraries')
+            setAllLibraries(librariesData.libraries || [])
 
             setError(null)
         } catch (err) {

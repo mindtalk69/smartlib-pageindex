@@ -1,0 +1,21 @@
+# Docker Compose for Single Container (CPU Only)
+# Usage:
+#   docker compose -f docker-compose.single-cpu.yaml up --build
+
+services:
+  app:
+    image: smartlib-basic-single-cpu:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.single.cpu
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/home/data
+      - ./.env.dev:/app/.env.dev:ro # Mount for local testing
+    env_file:
+      - .env.dev
+    environment:
+      # Optional overrides from env_file
+      - LOCAL_MODE=true
+    restart: unless-stopped

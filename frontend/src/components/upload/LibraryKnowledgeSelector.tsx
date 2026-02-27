@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { getCsrfTokenSync } from "@/utils/csrf";
+import { api } from "@/utils/apiClient";
 
 import { Info, AlertTriangle } from "lucide-react";
 import {
@@ -69,20 +69,10 @@ export function LibraryKnowledgeSelector({
 
     setCheckingEmbedding(true);
     try {
-      const response = await fetch("/api/embedding-compatibility", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": getCsrfTokenSync(),
-        },
-        credentials: "include",
-        body: JSON.stringify({ knowledge_id: selectedKnowledgeId }),
+      const data = await api.post<EmbeddingCompatibility>("/embedding-compatibility", {
+        knowledge_id: selectedKnowledgeId
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        setEmbeddingInfo(data);
-      }
+      setEmbeddingInfo(data);
     } catch (error) {
       console.error("Failed to check embedding compatibility:", error);
     } finally {

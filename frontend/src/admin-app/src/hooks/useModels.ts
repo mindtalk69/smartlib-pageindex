@@ -62,7 +62,7 @@ export function useModels() {
     setIsLoading(true)
     setError(null)
     try {
-      const response = await api.get<{ models?: ModelConfig[] }>('/api/v1/admin/models')
+      const response = await api.get<{ models?: ModelConfig[] }>('/admin/models')
       setModels(response.models || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch models')
@@ -75,7 +75,7 @@ export function useModels() {
    * Add a new model
    */
   const addModel = async (model: Omit<ModelConfig, 'id' | 'created_at' | 'provider_obj'>): Promise<void> => {
-    await api.post('/api/v1/admin/models/add', model)
+    await api.post('/admin/models/add', model)
     await fetchModels()
   }
 
@@ -118,7 +118,7 @@ export function useModels() {
     streaming: boolean
     provider_id?: number
   }): Promise<ValidationResult> => {
-    return await api.post('/api/v1/admin/models/validate', config)
+    return await api.post('/admin/models/validate', config)
   }
 
   /**

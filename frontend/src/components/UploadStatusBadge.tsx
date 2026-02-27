@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { Link } from "react-router-dom";
+import api from "@/utils/apiClient";
 
 interface UploadTask {
   task_id: string;
@@ -47,14 +48,9 @@ export function UploadStatusBadge({ className }: UploadStatusBadgeProps) {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const response = await fetch("/api/upload-status", {
-        credentials: "include",
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setTasks(data.tasks || []);
-        setLastRefresh(new Date());
-      }
+      const data = await api.get<{ tasks: UploadTask[] }>("/upload-status");
+      setTasks(data.tasks || []);
+      setLastRefresh(new Date());
     } catch (err) {
       console.error("Failed to fetch upload status:", err);
     }
@@ -85,10 +81,7 @@ export function UploadStatusBadge({ className }: UploadStatusBadgeProps) {
 
   const dismissTask = async (taskId: string) => {
     try {
-      await fetch(`/api/upload-status/${taskId}/dismiss`, {
-        method: "POST",
-        credentials: "include",
-      });
+      await api.post(`/api/upload-status/${taskId}/dismiss`);
       setTasks((prev) => prev.filter((t) => t.task_id !== taskId));
     } catch (err) {
       console.error("Failed to dismiss task:", err);

@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
+import { fetchApi } from '@/lib/api-client'
 import { Lock, Loader2 } from 'lucide-react'
 
 export function ChangePassword() {
@@ -52,43 +53,21 @@ export function ChangePassword() {
     setIsLoading(true)
 
     try {
-      const formData = new URLSearchParams()
-      formData.append('current_password', currentPassword)
-      formData.append('new_password', newPassword)
-      formData.append('confirm_new_password', confirmPassword)
-
-      const response = await fetch('/change_password', {
+      const response = await fetchApi<any>('/v1/auth/change-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData.toString(),
-        credentials: 'include',
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
       })
 
-      // Check if response is HTML (error page) or JSON
-      const contentType = response.headers.get('content-type')
-
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json()
-        if (data.success) {
-          toast.success('Password updated successfully')
-          setCurrentPassword('')
-          setNewPassword('')
-          setConfirmPassword('')
-        } else {
-          toast.error(data.message || 'Failed to change password')
-        }
+      if (response.success) {
+        toast.success('Password updated successfully')
+        setCurrentPassword('')
+        setNewPassword('')
+        setConfirmPassword('')
       } else {
-        // For Flask redirects/success, check status
-        if (response.ok || response.redirected) {
-          toast.success('Password updated successfully')
-          setCurrentPassword('')
-          setNewPassword('')
-          setConfirmPassword('')
-        } else {
-          toast.error('Failed to change password')
-        }
+        toast.error(response.error || 'Failed to change password')
       }
     } catch (error: any) {
       console.error('Password change error:', error)

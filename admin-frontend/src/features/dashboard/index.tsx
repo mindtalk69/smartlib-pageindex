@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { FileText, MessageSquare, Users, FolderOpen, Library } from 'lucide-react'
+import { fetchApi } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -45,15 +46,14 @@ export function Dashboard() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const response = await fetch('/admin/api/dashboard/stats')
-        const data = await response.json()
-        if (data.success) {
-          setStats(data.data)
+        const response = await fetchApi<DashboardStats>('/v1/admin/stats')
+        if (response.success && response.data) {
+          setStats(response.data)
         } else {
-          setError(data.error || 'Failed to fetch stats')
+          setError(response.error || 'Failed to fetch stats')
         }
-      } catch (err) {
-        setError('Failed to connect to server')
+      } catch (err: any) {
+        setError(err.message || 'Failed to connect to server')
       } finally {
         setIsLoading(false)
       }

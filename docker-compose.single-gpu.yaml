@@ -1,0 +1,31 @@
+# Docker Compose for Single Container (GPU Enabled)
+# Usage:
+#   docker compose -f docker-compose.single-gpu.yaml up --build
+
+services:
+  app:
+    image: smartlib-basic-single-gpu:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.single.gpu
+    # Enable NVIDIA GPU access
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/home/data
+      - ./.env.dev:/app/.env.dev:ro # Mount for local testing
+    env_file:
+      - .env.dev
+    environment:
+      # Optional overrides from env_file
+      - LOCAL_MODE=true
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    restart: unless-stopped

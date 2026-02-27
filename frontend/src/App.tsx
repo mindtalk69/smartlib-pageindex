@@ -20,6 +20,7 @@ import { ThinkingAnimation } from "./components/ThinkingAnimation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import api from "@/utils/apiClient";
 
 import {
   Tooltip,
@@ -183,8 +184,7 @@ export function App() {
       setSelectedModelId(parseInt(savedModelId));
     } else {
       // First-time user: fetch system default from backend
-      fetch('/admin/models/api/default', { credentials: 'include' })
-        .then(res => res.json())
+      api.get<any>('/admin/models/api/default')
         .then(data => {
           if (data.model_id) {
             setSelectedModelId(data.model_id);
@@ -304,11 +304,8 @@ export function App() {
   useEffect(() => {
     const fetchBranding = async () => {
       try {
-        const response = await fetch("/api/branding");
-        if (response.ok) {
-          const data = await response.json();
-          setBranding(data);
-        }
+        const data = await api.get<any>("/branding", { requiresAuth: false });
+        setBranding(data);
       } catch (err) {
         console.error("Failed to fetch branding:", err);
       }
@@ -316,16 +313,11 @@ export function App() {
 
     const fetchConfig = async () => {
       try {
-        const response = await fetch("/api/me", {
-          credentials: "include",
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.authenticated && data.user) {
-            setUsername(data.user.username || "User");
-            setIsAdmin(data.user.is_admin || false);
-            setProfilePictureUrl(data.user.profile_picture_url || null);
-          }
+        const data = await api.get<any>("/me");
+        if (data.authenticated && data.user) {
+          setUsername(data.user.username || "User");
+          setIsAdmin(data.user.is_admin || false);
+          setProfilePictureUrl(data.user.profile_picture_url || null);
         }
       } catch (err) {
         console.error("Failed to fetch user info:", err);
@@ -334,13 +326,8 @@ export function App() {
 
     const fetchKnowledgeLibrariesMap = async () => {
       try {
-        const response = await fetch("/api/knowledges", {
-          credentials: "include",
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setKnowledgeLibrariesMap(data.knowledge_libraries_map || {});
-        }
+        const data = await api.get<any>("/knowledges");
+        setKnowledgeLibrariesMap(data.knowledge_libraries_map || {});
       } catch (err) {
         console.error("Failed to fetch knowledge-library mapping:", err);
       }
@@ -367,16 +354,11 @@ export function App() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch("/api/counters", {
-          credentials: "include",
+        const data = await api.get<any>("/counters");
+        setUserStats({
+          messageCount: data.message_count || 0,
+          docsCount: data.uploaded_docs_count || 0,
         });
-        if (response.ok) {
-          const data = await response.json();
-          setUserStats({
-            messageCount: data.message_count || 0,
-            docsCount: data.uploaded_docs_count || 0,
-          });
-        }
       } catch (err) {
         console.error("Failed to fetch user stats:", err);
       }
@@ -396,58 +378,49 @@ export function App() {
     const fetchHistory = async () => {
       try {
         console.log('[App] Fetching chat history from /api/history');
-        const response = await fetch(`/api/history`, {
-          credentials: "include",
-        });
-        console.log('[App] History response status:', response.status);
+        const data = await api.get<any>("/history");
+        console.log('[App] History data received:', data);
 
-        if (response.ok) {
-          const data = await response.json();
-          console.log('[App] History data received:', data);
+        if (data.success && data.history) {
+          // Flatten date-grouped history into messages array
+          const restoredMessages: Message[] = [];
 
-          if (data.success && data.history) {
-            // Flatten date-grouped history into messages array
-            const restoredMessages: Message[] = [];
+          // Sort dates chronologically
+          const sortedDates = Object.keys(data.history).sort();
+          console.log('[App] Processing dates:', sortedDates);
 
-            // Sort dates chronologically
-            const sortedDates = Object.keys(data.history).sort();
-            console.log('[App] Processing dates:', sortedDates);
+          for (const date of sortedDates) {
+            const dayMessages = data.history[date];
+            console.log(`[App] Date ${date} has ${dayMessages.length} messages`);
 
-            for (const date of sortedDates) {
-              const dayMessages = data.history[date];
-              console.log(`[App] Date ${date} has ${dayMessages.length} messages`);
-
-              for (const msg of dayMessages) {
-                // Skip messages with no content or invalid role
-                if (!msg.message_text || !msg.message_text.trim()) {
-                  console.log('[App] Skipping message with empty content:', msg.message_id);
-                  continue;
-                }
-                if (!msg.role || (msg.role !== 'user' && msg.role !== 'assistant')) {
-                  console.log('[App] Skipping message with invalid role:', msg.message_id, msg.role);
-                  continue;
-                }
-
-                restoredMessages.push({
-                  id: msg.message_id?.toString() || `${Date.now()}-${Math.random()}`,
-                  role: msg.role as "user" | "assistant",
-                  content: msg.message_text.trim(),
-                  citations: Array.isArray(msg.citations) ? msg.citations : [],
-                  suggestedQuestions: Array.isArray(msg.suggested_questions) ? msg.suggested_questions : [],
-                  usageMetadata: msg.usage_metadata,
-                  timestamp: msg.timestamp ? new Date(`${date} ${msg.timestamp}`) : undefined,
-                });
+            for (const msg of dayMessages) {
+              // Skip messages with no content or invalid role
+              if (!msg.message_text || !msg.message_text.trim()) {
+                console.log('[App] Skipping message with empty content:', msg.message_id);
+                continue;
               }
-            }
+              if (!msg.role || (msg.role !== 'user' && msg.role !== 'assistant')) {
+                console.log('[App] Skipping message with invalid role:', msg.message_id, msg.role);
+                continue;
+              }
 
-            console.log(`[App] Restored ${restoredMessages.length} valid messages from history`);
-            console.log('[App] First few messages:', restoredMessages.slice(0, 3));
-            setMessages(restoredMessages);
-          } else {
-            console.log('[App] No history data or unsuccessful response:', data);
+              restoredMessages.push({
+                id: msg.message_id?.toString() || `${Date.now()}-${Math.random()}`,
+                role: msg.role as "user" | "assistant",
+                content: msg.message_text.trim(),
+                citations: Array.isArray(msg.citations) ? msg.citations : [],
+                suggestedQuestions: Array.isArray(msg.suggested_questions) ? msg.suggested_questions : [],
+                usageMetadata: msg.usage_metadata,
+                timestamp: msg.timestamp ? new Date(`${date} ${msg.timestamp}`) : undefined,
+              });
+            }
           }
+
+          console.log(`[App] Restored ${restoredMessages.length} valid messages from history`);
+          console.log('[App] First few messages:', restoredMessages.slice(0, 3));
+          setMessages(restoredMessages);
         } else {
-          console.error('[App] History fetch failed with status:', response.status);
+          console.log('[App] No history data or unsuccessful response:', data);
         }
       } catch (err) {
         console.error("[App] Failed to restore chat history:", err);
@@ -515,9 +488,12 @@ export function App() {
 
     try {
       // Send the confirmation to backend
-      const response = await fetch("/api/query", {
+      const response = await fetch("/api/v1/query", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${api.getToken()}`
+        },
         credentials: "include",
         body: JSON.stringify({
           query: payload, // "yes" or "no"
@@ -693,9 +669,12 @@ export function App() {
         console.log(`[App] Knowledge ${selectedKnowledgeId} selected with "All Libraries". Sending library_ids:`, library_ids);
       }
 
-      const response = await fetch("/api/query", {
+      const response = await fetch("/api/v1/query", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${api.getToken()}`
+        },
         credentials: "include",
         body: JSON.stringify({
           query: userMessage.content,
@@ -781,7 +760,7 @@ export function App() {
                   console.log('[SSE] agent_progress:', data.status);
                   setAgentStatus(data.status);
                 }
-                // Handle metadata_update from /api/query (contains answer, citations, etc)
+                // Handle metadata_update from /api/v1/query (contains answer, citations, etc)
                 else if (data.type === "metadata_update" && data.metadata) {
                   const meta = data.metadata;
                   if (meta.answer) {
@@ -875,7 +854,7 @@ export function App() {
                     );
                   }
                 }
-                // Handle end_of_stream from /api/query
+                // Handle end_of_stream from /api/v1/query
                 else if (data.type === "end_of_stream" && data.data) {
                   const endData = data.data;
                   setMessages((prev) =>
@@ -959,9 +938,12 @@ export function App() {
         console.log(`[Sidebar] Knowledge ${selectedKnowledgeId} selected with "All Libraries". Sending library_ids:`, library_ids);
       }
 
-      const response = await fetch("/api/query", {
+      const response = await fetch("/api/v1/query", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${api.getToken()}`
+        },
         credentials: "include",
         body: JSON.stringify({
           query: userMessage.content,
@@ -1327,26 +1309,18 @@ export function App() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`/api/threads/${id}`, {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.messages) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const loadedMessages: Message[] = data.messages.map((msg: any) => ({
-            id: msg.id,
-            role: msg.role as 'user' | 'assistant',
-            content: msg.content,
-            citations: msg.citations || [],
-            usageMetadata: msg.usageMetadata,
-            suggestedQuestions: msg.suggestedQuestions || [],
-          }));
-          setMessages(loadedMessages);
-        }
-      } else {
-        console.error('Failed to fetch thread messages:', response.status);
+      const data = await api.get<any>(`/threads/${id}`);
+      if (data.success && data.messages) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const loadedMessages: Message[] = data.messages.map((msg: any) => ({
+          id: msg.id,
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+          citations: msg.citations || [],
+          usageMetadata: msg.usageMetadata,
+          suggestedQuestions: msg.suggestedQuestions || [],
+        }));
+        setMessages(loadedMessages);
       }
     } catch (err) {
       console.error('Error fetching thread:', err);
@@ -1375,28 +1349,11 @@ export function App() {
     if (selfRetrieverEnabled) {
       setLoadingSuggestions(true);
       try {
-        // Get CSRF token first
-        const csrfRes = await fetch("/api/csrf-token", {
-          credentials: "include",
+        const data = await api.post<{ questions?: string[] }>("/api/self-retriever-questions", {
+          library_id: selectedLibraryId,
+          knowledge_id: selectedKnowledgeId,
         });
-        const csrfData = csrfRes.ok ? await csrfRes.json() : { csrf_token: "" };
-
-        const res = await fetch("/api/self-retriever-questions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": csrfData.csrf_token,
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            library_id: selectedLibraryId,
-            knowledge_id: selectedKnowledgeId,
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setSuggestedQuestions(data.questions || []);
-        }
+        setSuggestedQuestions(data.questions || []);
       } catch (err) {
         console.error("Failed to fetch suggestions:", err);
       } finally {
@@ -1528,6 +1485,9 @@ export function App() {
 
       const response = await fetch("/api/upload", {
         method: "POST",
+        headers: {
+          "Authorization": `Bearer ${api.getToken()}`
+        },
         credentials: "include",
         body: formData,
       });
@@ -1669,9 +1629,12 @@ export function App() {
               setIsLoading(true);
 
               try {
-                const response = await fetch("/api/query", {
+                const response = await fetch("/api/v1/query", {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${api.getToken()}`
+                  },
                   credentials: "include",
                   body: JSON.stringify({
                     query: defaultMessage,
@@ -2496,13 +2459,11 @@ export function App() {
                                       className="h-8 w-8 text-muted-foreground hover:text-green-500 hover:bg-green-500/10 transition-colors"
                                       onClick={async () => {
                                         try {
-                                          const res = await fetch('/api/message_feedback', {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ message_id: message.id, feedback_type: 'like' }),
-                                            credentials: 'include',
+                                          const data = await api.post<any>('/api/message_feedback', {
+                                            message_id: message.id,
+                                            feedback_type: 'like'
                                           });
-                                          if (res.ok) {
+                                          if (data.success || !data.error) {
                                             (event?.target as HTMLElement)?.classList.add('text-green-500');
                                           }
                                         } catch (e) { console.error('Feedback error:', e); }
@@ -2525,13 +2486,11 @@ export function App() {
                                       className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
                                       onClick={async () => {
                                         try {
-                                          const res = await fetch('/api/message_feedback', {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ message_id: message.id, feedback_type: 'dislike' }),
-                                            credentials: 'include',
+                                          const data = await api.post<any>('/api/message_feedback', {
+                                            message_id: message.id,
+                                            feedback_type: 'dislike'
                                           });
-                                          if (res.ok) {
+                                          if (data.success || !data.error) {
                                             (event?.target as HTMLElement)?.classList.add('text-red-500');
                                           }
                                         } catch (e) { console.error('Feedback error:', e); }

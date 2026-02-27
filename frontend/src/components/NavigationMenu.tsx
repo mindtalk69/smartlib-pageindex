@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { User, Settings, Upload, Info, LogOut, Lock, Plus, UserCircle } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface NavigationMenuProps {
   isAdmin?: boolean;
@@ -29,12 +30,10 @@ export function NavigationMenu({
   profilePictureUrl = null,
   onNewConversation,
 }: NavigationMenuProps) {
+  const { logout } = useAuth();
   const handleLogout = async () => {
     try {
-      await fetch("/logout", {
-        method: "GET",
-        credentials: "include",
-      });
+      await logout();
       window.location.href = "/app/login";
     } catch (err) {
       console.error("Logout error:", err);

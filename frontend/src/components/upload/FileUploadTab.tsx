@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { api } from "@/utils/apiClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,10 @@ import {
 import { LibraryKnowledgeSelector } from "./LibraryKnowledgeSelector";
 import { DuplicateConfirmDialog } from "./DuplicateConfirmDialog";
 import { toast } from "sonner";
+
+interface DuplicateCheckResponse {
+  duplicates: { filename: string; upload_time: string }[];
+}
 
 interface Library {
   library_id: number;
@@ -161,32 +166,23 @@ export function FileUploadTab({
     }
 
     try {
-      const response = await fetch("/api/check-duplicates", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          filenames: files.map((f) => f.file.name),
-          library_id: selectedLibraryId,
-          knowledge_id: selectedKnowledgeId,
-        }),
+      const data = await api.post<DuplicateCheckResponse>("/check-duplicates", {
+        filenames: files.map((f) => f.file.name),
+        library_id: selectedLibraryId,
+        knowledge_id: selectedKnowledgeId,
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.duplicates && data.duplicates.length > 0) {
-          setDuplicates(data.duplicates);
-          setShowDuplicateDialog(true);
-          return false;
-        }
+      if (data.duplicates && data.duplicates.length > 0) {
+        setDuplicates(data.duplicates);
+        setShowDuplicateDialog(true);
+        return false;
       }
+      return true;
     } catch (error) {
       console.error("Failed to check duplicates:", error);
+      // Proceed anyway on error
+      return true;
     }
-
-    return true;
   };
 
   const handleUpload = async () => {
@@ -230,10 +226,13 @@ export function FileUploadTab({
         }
 
         try {
-          const response = await fetch("/upload", {
+          // Manual fetch for multipart/form-data to include JWT but avoid automated content-type header
+          const response = await fetch("/api/v1/upload", {
             method: "POST",
             body: formData,
-            credentials: "include",
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`,
+            }
           });
 
           if (response.ok) {

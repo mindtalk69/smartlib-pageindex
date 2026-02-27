@@ -10,6 +10,7 @@ import {
     X,
     FileText,
 } from 'lucide-react'
+import api from '@/utils/apiClient'
 
 interface UploadTask {
     task_id: string
@@ -86,10 +87,7 @@ export function UploadProgress({ tasks, onTaskComplete }: UploadProgressProps) {
 
     const handleDismiss = async (taskId: string) => {
         try {
-            await fetch(`/api/upload-status/${taskId}/dismiss`, {
-                method: 'POST',
-                credentials: 'include',
-            })
+            await api.post(`/api/upload-status/${taskId}/dismiss`);
             onTaskComplete(taskId)
         } catch (error) {
             console.error('Failed to dismiss task:', error)

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { api } from "@/utils/apiClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -163,51 +164,31 @@ export function UrlDownloadTab({
       );
 
       try {
-        const response = await fetch("/api/process-url", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            url: urlItem.url,
-            library_id: selectedLibraryId,
-            library_name: libraryName,
-            knowledge_id: selectedKnowledgeId,
-          }),
+        const data = await api.post<any>('/process-url', {
+          url: urlItem.url,
+          library_id: selectedLibraryId,
+          library_name: libraryName,
+          knowledge_id: selectedKnowledgeId,
         });
 
-        const data = await response.json();
-
-        if (response.ok) {
-          successCount++;
-          setUrls((prev) =>
-            prev.map((u) =>
-              u.id === urlItem.id
-                ? { ...u, status: "success" as const, message: data.message }
-                : u,
-            ),
-          );
-        } else {
-          errorCount++;
-          setUrls((prev) =>
-            prev.map((u) =>
-              u.id === urlItem.id
-                ? {
-                    ...u,
-                    status: "error" as const,
-                    message: data.message || "Download failed",
-                  }
-                : u,
-            ),
-          );
-        }
-      } catch (error) {
+        successCount++;
+        setUrls((prev) =>
+          prev.map((u) =>
+            u.id === urlItem.id
+              ? { ...u, status: "success" as const, message: data.message || "Queued" }
+              : u,
+          ),
+        );
+      } catch (err: any) {
         errorCount++;
         setUrls((prev) =>
           prev.map((u) =>
             u.id === urlItem.id
-              ? { ...u, status: "error" as const, message: "Network error" }
+              ? {
+                ...u,
+                status: "error" as const,
+                message: err.message || "Download failed",
+              }
               : u,
           ),
         );
@@ -363,11 +344,10 @@ export function UrlDownloadTab({
                       </p>
                       {urlItem.message && (
                         <p
-                          className={`text-xs mt-1 ${
-                            urlItem.status === "error"
-                              ? "text-red-500"
-                              : "text-green-600"
-                          }`}
+                          className={`text-xs mt-1 ${urlItem.status === "error"
+                            ? "text-red-500"
+                            : "text-green-600"
+                            }`}
                         >
                           {urlItem.message}
                         </p>

@@ -26,33 +26,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     const checkAuth = async () => {
         setIsLoading(true)
         try {
-            const token = localStorage.getItem('auth_token')
-            if (!token) {
-                // No token - redirect to main app login
-                console.log('No auth token found, redirecting to login')
-                window.location.href = '/app/login'
-                return
-            }
-
-            const response = await fetch('/api/me', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-            })
-
-            if (!response.ok) {
-                if (response.status === 401) {
-                    // Token invalid - redirect to login
-                    console.error('Token expired or invalid, redirecting to login')
-                    localStorage.removeItem('auth_token')
-                    window.location.href = '/app/login'
-                    return
-                }
-                throw new Error('Auth check failed')
-            }
-
-            const data = await response.json()
+            const data = await api.get<any>('/me')
 
             if (!data.user) {
                 // No user data - redirect to login
@@ -86,7 +60,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     const logout = async () => {
         try {
             // Call logout endpoint to invalidate session
-            await api.post('/api/v1/auth/logout', null)
+            await api.post('/auth/logout', null)
         } catch (err) {
             console.error('Logout error:', err)
         } finally {

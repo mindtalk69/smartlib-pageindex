@@ -110,7 +110,7 @@ export function useProviders(): UseProvidersReturn {
     setIsLoading(true)
     setError(null)
     try {
-      const data = await api.get<ProviderListResponse>('/api/v1/admin/providers')
+      const data = await api.get<ProviderListResponse>('/admin/providers')
       // Sort by priority (ascending - lower number = higher priority)
       const sorted = (data.providers || []).sort((a, b) => a.priority - b.priority)
       setProviders(sorted)

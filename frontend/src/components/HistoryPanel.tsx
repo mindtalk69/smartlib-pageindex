@@ -24,7 +24,8 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { cn } from '@/utils/cn'
-import { History, Plus, MessageSquare, MoreVertical, Trash2 } from 'lucide-react'
+import { Trash2, MessageSquare, Plus, History, MoreVertical } from 'lucide-react'
+import { api } from '@/utils/apiClient'
 
 interface Thread {
     id: string
@@ -69,18 +70,7 @@ export function HistoryPanel({
     const fetchThreads = async () => {
         try {
             setLoading(true)
-            const response = await fetch('/api/threads', {
-                credentials: 'include',
-            })
-
-            if (!response.ok) {
-                if (response.status === 403) {
-                    throw new Error('Please login to view history')
-                }
-                throw new Error('Failed to fetch threads')
-            }
-
-            const data = await response.json()
+            const data = await api.get<any>('/threads')
             setThreads(data.threads || [])
             setError(null)
         } catch (err) {
@@ -96,12 +86,8 @@ export function HistoryPanel({
 
         try {
             setIsDeleting(true)
-            const response = await fetch(`/api/threads/${threadToDelete}`, {
-                method: 'DELETE',
-                credentials: 'include',
-            })
-
-            if (!response.ok) {
+            const data = await api.delete<any>(`/threads/${threadToDelete}`)
+            if (!data.success) {
                 throw new Error('Failed to delete thread')
             }
 

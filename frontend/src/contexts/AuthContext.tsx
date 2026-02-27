@@ -27,23 +27,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const checkAuth = async () => {
         try {
-            const response = await fetch('/api/me', {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`,
-                    'Content-Type': 'application/json',
-                },
-            })
-            if (response.ok) {
-                const data = await response.json()
-                if (data.authenticated && data.user) {
-                    setUser({
-                        id: data.user.id,
-                        username: data.user.username,
-                        is_admin: data.user.is_admin,
-                        email: data.user.email,
-                    })
-                    return
-                }
+            const data = await api.get<any>('/me')
+            if (data.authenticated && data.user) {
+                setUser({
+                    id: data.user.id,
+                    username: data.user.username,
+                    is_admin: data.user.is_admin,
+                    email: data.user.email,
+                })
+                return
             }
             setUser(null)
         } catch (err) {
@@ -96,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const logout = async () => {
         try {
             // Call logout endpoint to invalidate session
-            await api.post('/api/v1/auth/logout', null, { requiresAuth: true })
+            await api.post('/auth/logout', null, { requiresAuth: true })
         } catch (err) {
             console.error('Logout error:', err)
         } finally {
@@ -131,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const changePassword = async (currentPassword: string, newPassword: string) => {
         try {
-            const data = await api.post<{ success: boolean; message?: string }>(
+            await api.post<{ success: boolean; message?: string }>(
                 '/api/v1/auth/change-password',
                 { current_password: currentPassword, new_password: newPassword },
                 { requiresAuth: true }

@@ -179,6 +179,94 @@ class UserAdmin(ModelView, model=User):
     icon = "fa-solid fa-user"
 
 
+@app.get("/api/v1/history")
+@app.get("/api/history")
+async def api_history(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    """API endpoint to fetch user message history grouped by date."""
+    from collections import defaultdict
+
+    history_by_date = defaultdict(list)
+
+    try:
+        # Get all messages for user
+        statement = select(MessageHistory).where(
+            MessageHistory.user_id == current_user.user_id
+        ).order_by(MessageHistory.timestamp.desc())
+        messages = db.exec(statement).all()
+
+        for msg in messages:
+            ts_obj = msg.timestamp
+            if ts_obj:
+                date_key = ts_obj.strftime("%Y-%m-%d")
+
+                # Add user message
+                history_by_date[date_key].append(
+                    {
+                        "message_id": msg.message_id,
+                        "role": "user",
+                        "message_text": msg.message,
+                        "timestamp": ts_obj.strftime("%H:%M:%S"),
+                        "thread_id": msg.thread_id,
+                    }
+                )
+
+                # Add assistant answer if present
+                if msg.answer:
+                    try:
+                        citations = json.loads(msg.citations) if msg.citations else []
+                    except:
+                        citations = []
+                    
+                    try:
+                        suggested_questions = json.loads(msg.suggested_questions) if msg.suggested_questions else []
+                    except:
+                        suggested_questions = []
+
+                    history_by_date[date_key].append(
+                        {
+                            "message_id": msg.message_id,
+                            "role": "assistant",
+                            "message_text": msg.answer,
+                            "timestamp": ts_obj.strftime("%H:%M:%S"),
+                            "thread_id": msg.thread_id,
+                            "citations": citations,
+                            "suggested_questions": suggested_questions,
+                        }
+                    )
+
+        # Convert to dict for JSON
+        return {"success": True, "history": dict(history_by_date)}
+
+    except Exception as e:
+        logging.error(f"Error fetching history: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/api/v1/counters")
+@app.get("/api/counters")
+async def api_counters(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    """Get message and document counters for user."""
+    msg_statement = select(func.count()).select_from(MessageHistory).where(
+        MessageHistory.user_id == current_user.user_id
+    )
+    doc_statement = select(func.count()).select_from(UploadedFile).where(
+        UploadedFile.user_id == current_user.user_id
+    )
+    
+    msg_count = db.exec(msg_statement).one()
+    doc_count = db.exec(doc_statement).one()
+    
+    return {
+        "message_count": msg_count,
+        "uploaded_docs_count": doc_count
+    }
+
+
+
 class GroupAdmin(ModelView, model=Group):
     column_list = [Group.group_id, Group.name, Group.created_by_user_id]
     icon = "fa-solid fa-users"
@@ -301,6 +389,7 @@ global_models = [
     (AppSettings, "/settings"),
     (LLMPrompt, "/prompts"),
     (LLMLanguage, "/languages"),
+    (UrlDownload, "/admin/downloads"),
 ]
 
 # Register user-owned models with filtering
@@ -1219,6 +1308,57 @@ def list_admin_models(
             "created_at": model.created_at.isoformat() if model.created_at else None,
             "provider_obj": provider_obj,
         })
+
+    return {"items": items, "total": total}
+
+
+@app.get("/api/v1/admin/models/api/available")
+@app.get("/api/admin/models/api/available")
+async def get_available_models(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    """Get list of active models for the frontend selector."""
+    statement = select(ModelConfig).order_by(ModelConfig.name)
+    result = db.exec(statement)
+    models = result.all()
+
+    # Get default model ID
+    default_model = db.exec(select(ModelConfig).where(ModelConfig.is_default == True)).first()
+    
+    return {
+        "status": "success",
+        "models": [
+            {
+                "id": m.id,
+                "name": m.name,
+                "provider": m.provider,
+                "is_default": m.is_default,
+                "is_multimodal": getattr(m, 'is_multimodal', False)
+            } for m in models
+        ],
+        "default_model_id": default_model.id if default_model else (models[0].id if models else None)
+    }
+
+
+@app.get("/api/v1/admin/models/api/default")
+@app.get("/api/admin/models/api/default")
+async def get_default_model(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    """Get the default model configuration."""
+    model = db.exec(select(ModelConfig).where(ModelConfig.is_default == True)).first()
+    if not model:
+        model = db.exec(select(ModelConfig).order_by(ModelConfig.id)).first()
+    
+    if not model:
+        return {"status": "error", "message": "No models configured"}
+        
+    return {
+        "status": "success",
+        "model_id": model.id,
+        "name": model.name
+    }
+
 
     return {
         "success": True,
@@ -3147,10 +3287,8 @@ def get_admin_stats(
 ):
     """
     Get system statistics (admin only).
-
-    Returns counts of users, files, libraries, etc.
     """
-    from sqlmodel import select, func
+    from sqlmodel import select, func, desc
     from modules.models import UploadedFile, Library, Knowledge, MessageHistory
 
     user_count = db.exec(select(func.count(User.user_id))).one()
@@ -3159,12 +3297,35 @@ def get_admin_stats(
     knowledge_count = db.exec(select(func.count(Knowledge.id))).one()
     message_count = db.exec(select(func.count(MessageHistory.message_id))).one()
 
+    # Get recent files
+    recent_files_objs = db.exec(
+        select(UploadedFile).order_by(desc(UploadedFile.created_at)).limit(5)
+    ).all()
+    recent_files = [
+        {"id": f.file_id, "filename": f.filename, "created_at": f.created_at.isoformat() if f.created_at else None}
+        for f in recent_files_objs
+    ]
+
+    # Get recent messages
+    recent_messages_objs = db.exec(
+        select(MessageHistory).order_by(desc(MessageHistory.created_at)).limit(5)
+    ).all()
+    recent_messages = [
+        {"id": str(m.message_id), "question": m.content[:100] if m.content else "", "created_at": m.created_at.isoformat() if m.created_at else None}
+        for m in recent_messages_objs
+    ]
+
     return {
-        "users": user_count,
-        "files": file_count,
-        "libraries": library_count,
-        "knowledges": knowledge_count,
-        "messages": message_count,
+        "success": True,
+        "data": {
+            "user_count": user_count,
+            "file_count": file_count,
+            "library_count": library_count,
+            "knowledge_count": knowledge_count,
+            "message_count": message_count,
+            "recent_files": recent_files,
+            "recent_messages": recent_messages,
+        }
     }
 
 
@@ -3464,6 +3625,7 @@ def get_user_group_ids(user_id: str, db) -> list:
 
 # --- Authentication Compatibility Endpoints ---
 
+from fastapi.responses import JSONResponse
 
 @app.post("/api/login")
 def api_login_flask_compat(request: Request, login_data: dict, db=Depends(get_db)):
@@ -3476,29 +3638,32 @@ def api_login_flask_compat(request: Request, login_data: dict, db=Depends(get_db
     password = login_data.get("password", "")
 
     if not username or not password:
-        return {"success": False, "error": "Username and password are required"}
+        return JSONResponse(
+            content={"success": False, "error": "Username and password are required"},
+            status_code=400
+        )
 
-    # Try email lookup first (FastAPI style), then username
+    # Try email lookup first (FastAPI style)
     user = authenticate_user_async(username, password, db)
-    if not user and "@" in username:
-        # Try by user_id (email)
-        statement = select(User).where(User.user_id == username)
+    if not user:
+        # Fallback: Try by user_id or username directly (legacy compatibility)
+        statement = select(User).where((User.user_id == username) | (User.username == username))
         result = db.exec(statement)
-        user_by_email = result.first()
-        if user_by_email and verify_password(password, user_by_email.password_hash):
-            user = user_by_email
+        user_match = result.first()
+        if user_match and verify_password(password, user_match.password_hash):
+            user = user_match
 
     if not user:
-        return {
-            "success": False,
-            "error": "Invalid username or password",
-        }, 401
+        return JSONResponse(
+            content={"success": False, "error": "Invalid username or password"},
+            status_code=401
+        )
 
     if user.is_disabled:
-        return {
-            "success": False,
-            "error": "Account is disabled",
-        }, 403
+        return JSONResponse(
+            content={"success": False, "error": "Account is disabled"},
+            status_code=403
+        )
 
     # Generate JWT token
     access_token = create_access_token(data={"sub": user.user_id})
@@ -3791,7 +3956,65 @@ def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+@app.post("/api/v1/embedding-compatibility")
+@app.post("/api/embedding-compatibility")
+async def api_embedding_compatibility(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Check embedding compatibility for a knowledge base."""
+    from modules.embedding_validation import (
+        validate_embedding_compatibility,
+        get_embedding_model_dimension,
+    )
+    from modules.llm_utils import get_embedding_model_name
+
+    try:
+        data = await request.json()
+        knowledge_id = data.get("knowledge_id")
+
+        if knowledge_id is None:
+            # No knowledge selected - will use default model
+            current_model = get_embedding_model_name()
+            current_dim = get_embedding_model_dimension(current_model) or 0
+            return {
+                "compatible": True,
+                "message": f"No knowledge base selected. Will use current default: {current_model}",
+                "current_model": current_model,
+                "current_dimension": current_dim,
+                "knowledge_model": None,
+                "knowledge_dimension": None,
+            }
+
+        # Check compatibility
+        current_model = get_embedding_model_name()
+        is_valid, message, info = validate_embedding_compatibility(
+            knowledge_id, current_model
+        )
+
+        return {
+            "compatible": is_valid,
+            "message": message,
+            "current_model": current_model,
+            "current_dimension": info.get("new_dim"),
+            "knowledge_model": info.get("existing_model"),
+            "knowledge_dimension": info.get("existing_dim"),
+        }
+
+    except Exception as e:
+        logging.error(f"Error checking embedding compatibility: {e}")
+        return {
+            "compatible": True,
+            "message": "Could not verify compatibility - proceeding anyway",
+            "error": str(e),
+        }
+
+
 @app.post("/api/v1/upload", response_model=UploadResponse)
+@app.post("/api/upload", response_model=UploadResponse)
+@app.post("/upload", response_model=UploadResponse)
+
 async def api_v1_upload(
     request: Request,
     files: List[UploadFile] = File(...),
@@ -4392,6 +4615,22 @@ app.include_router(visual_router, prefix="/api/v1")
 from api.v1.documents import router as documents_router
 
 app.include_router(documents_router, prefix="/api/v1")
+
+# Admin Downloads Router
+downloads_router = CRUDRouter(UrlDownload, prefix="/admin/downloads", tags=["Downloads"])
+
+@downloads_router.router.get("/list", response_model=List[UrlDownload])
+def list_downloads_compat(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Flask-compatible downloads list."""
+    from sqlmodel import select
+    return db.exec(select(UrlDownload)).all()
+
+app.include_router(downloads_router.router, prefix="/api")
+app.include_router(downloads_router.router, prefix="/api/v1")
+
 
 add_pagination(app)
 

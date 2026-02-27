@@ -18,6 +18,8 @@ import {
   ArrowLeft
 } from "lucide-react";
 
+import { api } from "@/utils/apiClient";
+
 interface UserData {
   user_id: string;
   username: string;
@@ -88,15 +90,7 @@ export function UserProfile() {
   const fetchProfileData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/user/profile', {
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to load profile');
-      }
-
-      const data = await response.json();
+      const data = await api.get<ProfileData>('/user/profile');
       setProfileData(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load profile');

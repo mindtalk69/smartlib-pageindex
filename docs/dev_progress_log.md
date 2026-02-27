@@ -1,5 +1,45 @@
 # SmartLib Dev Progress Log
 
+## 2026-02-27 – Single-Container Architecture & Frontend JWT Migration
+
+### Summary
+Successfully moved the entire stack (FastAPI, Nginx, Redis, Celery) into a single optimized Docker container and completely decoupled the frontends from legacy Flask authentication, migrating everything to JWT.
+
+### Key Changes
+1. **Single Docker Container Implementation**:
+   - Created `Dockerfile.single.cpu` and `Dockerfile.single.gpu` for unified deployments.
+   - Integrated **Nginx** for static file serving and API proxying.
+   - Used **Supervisord** to manage internal Redis, Celery, and Uvicorn processes.
+   - Optimized CPU image to use CPU-only PyTorch wheels.
+
+2. **Full JWT Authentication Migration**:
+   - Refactored `api-client.ts` to support diverse response types (streaming, blobs, JSON) with automatic JWT injection.
+   - Decoupled `App.tsx` and 15+ UI components from legacy Flask sessions and CSRF tokens.
+   - Migrated document uploads (`FileUploadTab`, `UrlDownloadTab`) to JWT-authenticated multipart handlers.
+   - Integrated `AuthContext` with JWT-based register/login/logout flows.
+
+3. **Backend Refactoring**:
+   - Updates `main_fastapi.py` to route all /app and /admin-app requests via the new JWT scheme.
+   - Ported legacy Flask admin downloads to `AdminDownloadsRouter` in FastAPI.
+   - Standardized error responses (401/403) across all migrated endpoints.
+
+4. **API Path Standardization & Parity**:
+   - Standardized all frontend API calls to use the `/api/v1` base path via `apiClient.ts`.
+   - Ported missing endpoints (History, Counters, Embedding Compatibility) to the FastAPI backend.
+   - Refactored 20+ hooks and components to use consistent relative paths (e.g., `/me`, `/threads`, `/admin/users`).
+   - Ported and integrated `embedding_validation.py` for cross-platform compatibility.
+
+### Files Modified
+- `smartlib-basic/Dockerfile.single.cpu`, `smartlib-basic/Dockerfile.single.gpu`
+- `smartlib-basic/nginx.single.conf`, `smartlib-basic/supervisord.single.conf`
+- `frontend/src/App.tsx`, `frontend/src/utils/apiClient.ts`
+- `frontend/src/contexts/AuthContext.tsx`, `frontend/src/components/NavigationMenu.tsx`
+- `main_fastapi.py`, `modules/admin_downloads.py` (migrated)
+- `frontend/src/admin-app/src/hooks/useUsers.ts`, `frontend/src/admin-app/src/hooks/useModels.ts`
+- `modules/embedding_validation.py` (ported)
+
+---
+
 ## 2026-02-21 – Migrated from ChromaDB to sqlite-vec for BASIC Edition
 
 ### Summary

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { fetchCSRFToken } from '@/lib/api-client'
+import { filesApi } from '@/lib/api-client'
 
 export interface File {
   id: number
@@ -31,31 +31,14 @@ export function useFiles(options: UseFilesOptions = {}) {
     setError(null)
 
     try {
-      const csrfToken = await fetchCSRFToken()
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      }
-      if (csrfToken) {
-        headers['X-CSRFToken'] = csrfToken
-      }
+      const response: any = await filesApi.getAll({ page, per_page })
 
-      const response = await fetch(`/api/admin/files?page=${page}&per_page=${per_page}`, {
-        method: 'GET',
-        headers,
-        credentials: 'include',
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch files: ${response.statusText}`)
-      }
-
-      const data = await response.json()
-      if (data.success) {
-        setFiles(data.items || [])
-        setTotal(data.total || 0)
-        setTotalPages(data.total_pages || 0)
+      if (response.success || response.items) {
+        setFiles(response.items || response.data?.items || [])
+        setTotal(response.total || response.data?.total || 0)
+        setTotalPages(response.total_pages || response.data?.total_pages || 0)
       } else {
-        setError(data.error || 'Failed to fetch files')
+        setError(response.error || 'Failed to fetch files')
         setFiles([])
       }
     } catch (err) {

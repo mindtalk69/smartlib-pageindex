@@ -15,9 +15,10 @@ interface ApiError {
 
 interface FetchOptions extends RequestInit {
     requiresAuth?: boolean
+    responseType?: 'json' | 'blob' | 'text'
 }
 
-const API_BASE = ''
+const API_BASE = '/api/v1'
 
 /**
  * Get the stored JWT token
@@ -52,7 +53,7 @@ function buildHeaders(customHeaders?: HeadersInit, requiresAuth: boolean = true)
 /**
  * Handle API response - check for errors and parse JSON
  */
-async function handleResponse<T>(response: Response): Promise<T> {
+async function handleResponse<T>(response: Response, responseType: 'json' | 'blob' | 'text' = 'json'): Promise<T> {
     const contentType = response.headers.get('content-type')
     const isJson = contentType?.includes('application/json')
 
@@ -73,6 +74,14 @@ async function handleResponse<T>(response: Response): Promise<T> {
         }
     }
 
+    if (responseType === 'blob') {
+        return response.blob() as unknown as T
+    }
+
+    if (responseType === 'text') {
+        return response.text() as unknown as T
+    }
+
     if (isJson) {
         return response.json()
     }
@@ -89,6 +98,7 @@ async function apiFetch<T>(
 ): Promise<T> {
     const {
         requiresAuth = true,
+        responseType = 'json',
         headers: customHeaders,
         ...fetchOptions
     } = options
@@ -102,7 +112,7 @@ async function apiFetch<T>(
         headers,
     })
 
-    return handleResponse<T>(response)
+    return handleResponse<T>(response, responseType)
 }
 
 /**

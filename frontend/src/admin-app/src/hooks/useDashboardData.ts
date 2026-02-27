@@ -45,7 +45,7 @@ export function useDashboardData(): UseDashboardDataReturn {
         setIsLoading(true)
         setError(null)
         try {
-            const data = await api.get<DashboardStats>('/api/v1/admin/stats')
+            const data = await api.get<DashboardStats>('/admin/stats')
             setStats(data)
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to fetch stats')

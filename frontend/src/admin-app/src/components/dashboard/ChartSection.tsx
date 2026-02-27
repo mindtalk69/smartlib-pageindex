@@ -139,7 +139,7 @@ const renderChart = (type: ChartType, data: any) => {
                             fill="#8884d8"
                             label
                         >
-                            {data.map((entry: LibraryRefData, index: number) => (
+                            {data.map((_: LibraryRefData, index: number) => (
                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                         </Pie>

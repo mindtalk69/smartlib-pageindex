@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Download, Copy, Eye, Loader2, FileImage, ZoomIn, ZoomOut } from "lucide-react"
+import { api } from '@/utils/apiClient'
 
 interface VisualEvidenceData {
     doclingJsonPath: string
@@ -62,17 +63,7 @@ export function VisualEvidenceContent({ evidence }: { evidence: VisualEvidenceDa
             document_id: evidence.documentId,
         })
 
-        fetch(`/api/visual_evidence?${params}`, {
-            credentials: 'include',
-        })
-            .then(response => {
-                if (!response.ok) {
-                    return response.text().then(text => {
-                        throw new Error(`Failed to load evidence image: ${response.status} ${text}`);
-                    });
-                }
-                return response.blob()
-            })
+        api.get<Blob>(`/visual_evidence?${params}`, { responseType: 'blob' })
             .then(blob => {
                 const url = URL.createObjectURL(blob)
                 setImageUrl(url)

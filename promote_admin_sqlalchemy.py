@@ -8,7 +8,7 @@ import sys
 from flask import Flask
 from extensions import db
 from modules.database import get_user_by_username_local, create_user, set_user_admin
-from werkzeug.security import generate_password_hash
+import bcrypt
 from app import create_app
 
 def promote_or_create_admin():
@@ -24,11 +24,18 @@ def promote_or_create_admin():
         if user:
             set_user_admin(user.user_id, True)
             print(f"User '{username}' promoted to admin.")
+            
+            # Optionally update password if requested, by converting to bcrypt
+            if password:
+                hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                user.password_hash = hashed_password
+                db.session.commit()
+                print(f"User '{username}' password updated with bcrypt hash.")
         else:
             if not password:
                 print("ERROR: ADMIN_PASSWORD environment variable not set. Cannot create admin user.", file=sys.stderr)
                 sys.exit(1)
-            hashed_password = generate_password_hash(password)
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
             create_user(
                 auth_provider=auth_provider,
                 user_id=user_id,

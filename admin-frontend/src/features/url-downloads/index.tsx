@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
+import { fetchApi } from '@/lib/api-client'
 import { Download, Link, CheckCircle, XCircle, Loader2, AlertCircle, Trash2 } from 'lucide-react'
 import {
   Table,
@@ -48,10 +49,10 @@ export function UrlDownloads() {
   const fetchDownloads = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch('/api/admin/downloads/')
-      const data = await response.json()
-      if (data.success || Array.isArray(data)) {
-        setDownloads(Array.isArray(data) ? data : data.data || [])
+      // Using /v1/admin/downloads prefix from FastAPI CRUDRouter
+      const response = await fetchApi<UrlDownload[]>('/v1/admin/downloads')
+      if (response.success && response.data) {
+        setDownloads(response.data)
       }
     } catch (error) {
       console.error('Error fetching downloads:', error)
@@ -66,16 +67,14 @@ export function UrlDownloads() {
 
     setDeleteId(id)
     try {
-      const response = await fetch(`/api/admin/downloads/delete/${id}`, {
+      const response = await fetchApi<any>(`/v1/admin/downloads/${id}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
       })
-      const data = await response.json()
-      if (data.status === 'success') {
+      if (response.success) {
         toast.success('Download record deleted')
         fetchDownloads()
       } else {
-        toast.error(data.message || 'Failed to delete')
+        toast.error(response.error || 'Failed to delete')
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete')

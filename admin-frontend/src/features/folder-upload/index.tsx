@@ -15,6 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
+import { fetchApi, apiClient } from '@/lib/api-client'
 import { Upload, Clock, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react'
 import {
   Table,
@@ -89,11 +90,10 @@ export function FolderUpload() {
 
   const fetchLibraryKnowledgePairs = async () => {
     try {
-      const response = await fetch('/api/admin/libraries')
-      const data = await response.json()
-      if (data.success) {
+      const response = await fetchApi<any>('/admin/libraries')
+      if (response.success && response.data) {
         const pairs: LibraryKnowledgePair[] = []
-        data.data.forEach((lib: any) => {
+        response.data.forEach((lib: any) => {
           if (lib.knowledges) {
             lib.knowledges.forEach((k: any) => {
               pairs.push({
@@ -123,10 +123,9 @@ export function FolderUpload() {
   const fetchJobs = async () => {
     setIsLoadingJobs(true)
     try {
-      const response = await fetch('/api/admin/folder_upload/jobs')
-      const data = await response.json()
-      if (data) {
-        setJobs(data)
+      const response = await fetchApi<FolderUploadJob[]>('/admin/folder_upload/jobs')
+      if (response.success && response.data) {
+        setJobs(response.data)
       }
     } catch (error) {
       console.error('Error fetching jobs:', error)
@@ -178,16 +177,8 @@ export function FolderUpload() {
         formData.append('folder_files', file)
       })
 
-      const response = await fetch('/api/admin/folder_upload/upload', {
-        method: 'POST',
-        body: formData,
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Upload failed')
-      }
+      const response = await apiClient.post('/admin/folder_upload/upload', formData)
+      const data = response.data
 
       if (data.job_id) {
         toast.success(`Upload job created: ${data.status}`)
@@ -209,12 +200,11 @@ export function FolderUpload() {
     if (!confirm('Are you sure you want to cancel this job?')) return
 
     try {
-      const response = await fetch(`/api/admin/folder_upload/job/${jobId}/cancel`, {
+      const response = await fetchApi<any>(`/admin/folder_upload/job/${jobId}/cancel`, {
         method: 'POST',
       })
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to cancel job')
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to cancel job')
       }
       toast.success('Job cancellation requested')
       fetchJobs()
