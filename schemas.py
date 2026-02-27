@@ -596,3 +596,16 @@ class ResumeRagRequest(BaseModel):
     """Resume RAG agent session request."""
     thread_id: str
     user_input: Optional[str] = None
+
+
+# File Management Admin Schemas (Phase 09 - CONTENT-04, CONTENT-05)
+class FileDetailsResponse(SmartLibBase):
+    """Response for file details endpoint."""
+    success: bool = True
+    file: Dict[str, Any] = {}
+
+
+class FileDeleteResponse(SmartLibBase):
+    """Response for file deletion endpoint."""
+    success: bool = True
+    message: str
