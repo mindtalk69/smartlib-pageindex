@@ -130,6 +130,12 @@ export function Providers() {
     }
   }, [updatePriorities])
 
+  // Handle health check from ProviderHealth component
+  const handleHealthCheck = useCallback(async (id: number) => {
+    // Refresh providers list to get updated health status
+    await refreshProviders()
+  }, [refreshProviders])
+
   // Handle add provider from dialog
   const handleAddProvider = useCallback(async (
     provider: Omit<LLMProvider, 'id' | 'created_at' | 'updated_at'>
@@ -196,6 +202,7 @@ export function Providers() {
         onTestConnection={handleTestConnection}
         onDiscoverModels={handleDiscoverModels}
         onPriorityChange={handlePriorityChange}
+        onHealthCheck={handleHealthCheck}
         onSuccess={handleSuccess}
         onError={handleError}
       />
