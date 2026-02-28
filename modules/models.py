@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import List, Optional, Dict, Any
+from pydantic import computed_field
 from sqlmodel import (
     SQLModel,
     Field,
@@ -79,6 +80,63 @@ knowledge_groups_association = Table(
 )
 
 
+# Association table for many-to-many between Knowledge and Library
+knowledge_libraries_association = Table(
+    "knowledge_libraries_association",
+    SQLModel.metadata,
+    Column(
+        "knowledge_id",
+        Integer,
+        ForeignKey("knowledges.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "library_id",
+        Integer,
+        ForeignKey("libraries.library_id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
+
+
+# Association table for many-to-many between Knowledge and Catalog
+knowledge_catalogs_table = Table(
+    "knowledge_catalogs",
+    SQLModel.metadata,
+    Column(
+        "knowledge_id",
+        Integer,
+        ForeignKey("knowledges.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "catalog_id",
+        Integer,
+        ForeignKey("catalogs.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
+
+
+# Association table for many-to-many between Knowledge and Category
+knowledge_category_association = Table(
+    "knowledge_category_association",
+    SQLModel.metadata,
+    Column(
+        "knowledge_id",
+        Integer,
+        ForeignKey("knowledges.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "category_id",
+        Integer,
+        ForeignKey("categories.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
+
+
 class Group(SQLModel, table=True):
     __tablename__ = "groups"
     group_id: Optional[int] = Field(default=None, primary_key=True)
@@ -119,6 +177,28 @@ class Library(SQLModel, table=True):
         sa_column=Column(DateTime(timezone=True), server_default=func.now()),
     )
 
+    # Many-to-many: libraries <-> knowledges via knowledge_libraries_association
+    knowledges: List["Knowledge"] = Relationship(
+        back_populates="libraries",
+        sa_relationship_kwargs={"secondary": knowledge_libraries_association},
+    )
+
+    @computed_field
+    @property
+    def knowledge_names(self) -> List[str]:
+        """Names of associated knowledges."""
+        if not hasattr(self, "knowledges") or self.knowledges is None:
+            return []
+        return sorted([k.name for k in self.knowledges if hasattr(k, "name") and k.name])
+
+    @computed_field
+    @property
+    def knowledge_ids(self) -> List[int]:
+        """IDs of associated knowledges."""
+        if not hasattr(self, "knowledges") or self.knowledges is None:
+            return []
+        return [k.id for k in self.knowledges if hasattr(k, "id") and k.id is not None]
+
 
 class Knowledge(SQLModel, table=True):
     __tablename__ = "knowledges"
@@ -133,12 +213,57 @@ class Knowledge(SQLModel, table=True):
         sa_column=Column(DateTime(timezone=True), server_default=func.now()),
     )
     embedding_model: Optional[str] = Field(default=None)
+    creator: Optional["User"] = Relationship()
 
     # Many-to-many: knowledge <-> groups via knowledge_groups_association
     groups: List["Group"] = Relationship(
         back_populates="knowledges",
         sa_relationship_kwargs={"secondary": knowledge_groups_association},
     )
+
+    # Many-to-many: knowledges <-> libraries via knowledge_libraries_association
+    libraries: List["Library"] = Relationship(
+        back_populates="knowledges",
+        sa_relationship_kwargs={"secondary": knowledge_libraries_association},
+    )
+
+    # Many-to-many: knowledges <-> catalogs via knowledge_catalogs_table
+    catalogs: List["Catalog"] = Relationship(
+        sa_relationship_kwargs={"secondary": knowledge_catalogs_table},
+    )
+
+    # Many-to-many: knowledges <-> categories via knowledge_category_association
+    categories: List["Category"] = Relationship(
+        sa_relationship_kwargs={"secondary": knowledge_category_association},
+    )
+
+    @computed_field
+    @property
+    def catalog_names(self) -> List[str]:
+        if not hasattr(self, "catalogs") or self.catalogs is None:
+            return []
+        return sorted([c.name for c in self.catalogs if hasattr(c, "name") and c.name])
+
+    @computed_field
+    @property
+    def category_names(self) -> List[str]:
+        if not hasattr(self, "categories") or self.categories is None:
+            return []
+        return sorted([c.name for c in self.categories if hasattr(c, "name") and c.name])
+
+    @computed_field
+    @property
+    def group_names(self) -> List[str]:
+        if not hasattr(self, "groups") or self.groups is None:
+            return []
+        return sorted([g.name for g in self.groups if hasattr(g, "name") and g.name])
+
+    @computed_field
+    @property
+    def library_names(self) -> List[str]:
+        if not hasattr(self, "libraries") or self.libraries is None:
+            return []
+        return sorted([l.name for l in self.libraries if hasattr(l, "name") and l.name])
 
 
 class UploadedFile(SQLModel, table=True):
@@ -361,3 +486,23 @@ class Document(SQLModel, table=True):
         default_factory=datetime.utcnow,
         sa_column=Column(DateTime(timezone=True), server_default=func.now()),
     )
+class FolderUploadJob(SQLModel, table=True):
+    __tablename__ = "folder_upload_jobs"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_by_user_id: str = Field(foreign_key="users.user_id")
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now()),
+    )
+    file_list: str = Field(sa_column=Column(Text, nullable=False))
+    file_types: Optional[str] = Field(default=None, sa_column=Column(Text))
+    background_enabled: bool = Field(default=True)
+    scheduled_time: Optional[datetime] = Field(
+        default=None, sa_column=Column(DateTime(timezone=True))
+    )
+    status: str = Field(default="pending")
+    log: Optional[str] = Field(default=None, sa_column=Column(Text))
+    task_id: Optional[str] = Field(default=None)
+    library_id: Optional[int] = Field(default=None, foreign_key="libraries.library_id")
+    knowledge_id: Optional[int] = Field(default=None, foreign_key="knowledges.id")
+    enable_visual_grounding_for_job: bool = Field(default=False)

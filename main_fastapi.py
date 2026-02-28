@@ -33,6 +33,7 @@ from modules.models import (
     Document,
     Catalog,
     Category,
+    FolderUploadJob,
 )
 from modules.crud_router import CRUDRouter
 from modules.auth import (
@@ -191,9 +192,11 @@ async def api_history(
 
     try:
         # Get all messages for user
-        statement = select(MessageHistory).where(
-            MessageHistory.user_id == current_user.user_id
-        ).order_by(MessageHistory.timestamp.desc())
+        statement = (
+            select(MessageHistory)
+            .where(MessageHistory.user_id == current_user.user_id)
+            .order_by(MessageHistory.timestamp.desc())
+        )
         messages = db.exec(statement).all()
 
         for msg in messages:
@@ -218,9 +221,13 @@ async def api_history(
                         citations = json.loads(msg.citations) if msg.citations else []
                     except:
                         citations = []
-                    
+
                     try:
-                        suggested_questions = json.loads(msg.suggested_questions) if msg.suggested_questions else []
+                        suggested_questions = (
+                            json.loads(msg.suggested_questions)
+                            if msg.suggested_questions
+                            else []
+                        )
                     except:
                         suggested_questions = []
 
@@ -250,21 +257,21 @@ async def api_counters(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """Get message and document counters for user."""
-    msg_statement = select(func.count()).select_from(MessageHistory).where(
-        MessageHistory.user_id == current_user.user_id
+    msg_statement = (
+        select(func.count())
+        .select_from(MessageHistory)
+        .where(MessageHistory.user_id == current_user.user_id)
     )
-    doc_statement = select(func.count()).select_from(UploadedFile).where(
-        UploadedFile.user_id == current_user.user_id
+    doc_statement = (
+        select(func.count())
+        .select_from(UploadedFile)
+        .where(UploadedFile.user_id == current_user.user_id)
     )
-    
+
     msg_count = db.exec(msg_statement).one()
     doc_count = db.exec(doc_statement).one()
-    
-    return {
-        "message_count": msg_count,
-        "uploaded_docs_count": doc_count
-    }
 
+    return {"message_count": msg_count, "uploaded_docs_count": doc_count}
 
 
 class GroupAdmin(ModelView, model=Group):
@@ -399,7 +406,10 @@ for model, prefix, user_field in user_owned_models:
 
 # Register global models (auth required but no user filtering)
 for model, prefix in global_models:
-    crud = CRUDRouter(model, prefix=prefix, require_auth=True)
+    eager_load = []
+    if model.__name__ == "Library":
+        eager_load = ["knowledges"]
+    crud = CRUDRouter(model, prefix=prefix, require_auth=True, eager_load=eager_load)
     app.include_router(crud.router, prefix="/api/v1")
 
 # Auth endpoints
@@ -863,8 +873,10 @@ from sqlalchemy.exc import IntegrityError
 def list_admin_providers(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
+    page: int = 1,
+    per_page: int = 10,
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 0,
 ):
     """
     List all LLM providers (admin only).
@@ -872,10 +884,19 @@ def list_admin_providers(
     Returns providers ordered by priority then name.
     Includes health status fields (last_health_check, health_status, error_message).
     """
-    statement = select(LLMProvider).order_by(
-        LLMProvider.priority,
-        LLMProvider.name
-    ).offset(skip).limit(limit)
+    if limit == 0:
+        actual_limit = per_page
+        actual_skip = (page - 1) * per_page
+    else:
+        actual_limit = limit
+        actual_skip = skip
+
+    statement = (
+        select(LLMProvider)
+        .order_by(LLMProvider.priority, LLMProvider.name)
+        .offset(actual_skip)
+        .limit(actual_limit)
+    )
     result = db.exec(statement)
     providers = result.all()
 
@@ -885,33 +906,42 @@ def list_admin_providers(
 
     items = []
     for p in providers:
-        items.append({
-            "id": p.id,
-            "name": p.name,
-            "provider_type": p.provider_type,
-            "base_url": p.base_url,
-            "api_key": p.api_key,
-            "is_active": p.is_active,
-            "is_default": p.is_default,
-            "priority": p.priority,
-            "config": p.config or {},
-            "last_health_check": p.last_health_check.isoformat() if p.last_health_check else None,
-            "health_status": p.health_status,
-            "error_message": p.error_message,
-            "created_at": p.created_at.isoformat() if p.created_at else None,
-            "updated_at": p.updated_at.isoformat() if p.updated_at else None,
-        })
+        items.append(
+            {
+                "id": p.id,
+                "name": p.name,
+                "provider_type": p.provider_type,
+                "base_url": p.base_url,
+                "api_key": p.api_key,
+                "is_active": p.is_active,
+                "is_default": p.is_default,
+                "priority": p.priority,
+                "config": p.config or {},
+                "last_health_check": p.last_health_check.isoformat()
+                if p.last_health_check
+                else None,
+                "health_status": p.health_status,
+                "error_message": p.error_message,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+                "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+            }
+        )
 
     return {
         "success": True,
         "data": {
             "items": items,
             "total": total,
+            "total_pages": max(1, -(-total // actual_limit)) if actual_limit else 1,
         },
     }
 
 
-@app.post("/api/v1/admin/providers", response_model=LLMProviderCreateResponse, status_code=status.HTTP_201_CREATED)
+@app.post(
+    "/api/v1/admin/providers",
+    response_model=LLMProviderCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_admin_provider(
     provider_data: LLMProviderCreateRequest,
     db: Session = Depends(get_db),
@@ -926,12 +956,14 @@ def create_admin_provider(
     """
     # Validate required fields
     name = provider_data.name.strip() if provider_data.name else ""
-    provider_type = provider_data.provider_type.strip() if provider_data.provider_type else ""
+    provider_type = (
+        provider_data.provider_type.strip() if provider_data.provider_type else ""
+    )
 
     if not name or not provider_type:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Name and provider_type are required"
+            detail="Name and provider_type are required",
         )
 
     # Check for duplicate name
@@ -939,7 +971,7 @@ def create_admin_provider(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f'Provider with name "{name}" already exists'
+            detail=f'Provider with name "{name}" already exists',
         )
 
     # Create provider
@@ -948,8 +980,12 @@ def create_admin_provider(
         provider_type=provider_type,
         base_url=provider_data.base_url.strip() if provider_data.base_url else None,
         api_key=provider_data.api_key.strip() if provider_data.api_key else None,
-        is_active=provider_data.is_active if provider_data.is_active is not None else True,
-        is_default=provider_data.is_default if provider_data.is_default is not None else False,
+        is_active=provider_data.is_active
+        if provider_data.is_active is not None
+        else True,
+        is_default=provider_data.is_default
+        if provider_data.is_default is not None
+        else False,
         priority=provider_data.priority if provider_data.priority is not None else 0,
         config=provider_data.config if provider_data.config else {},
     )
@@ -968,7 +1004,9 @@ def create_admin_provider(
         "is_default": provider.is_default,
         "priority": provider.priority,
         "config": provider.config or {},
-        "last_health_check": provider.last_health_check.isoformat() if provider.last_health_check else None,
+        "last_health_check": provider.last_health_check.isoformat()
+        if provider.last_health_check
+        else None,
         "health_status": provider.health_status,
         "error_message": provider.error_message,
         "created_at": provider.created_at.isoformat() if provider.created_at else None,
@@ -981,7 +1019,9 @@ def create_admin_provider(
     }
 
 
-@app.put("/api/v1/admin/providers/{provider_id}", response_model=LLMProviderUpdateResponse)
+@app.put(
+    "/api/v1/admin/providers/{provider_id}", response_model=LLMProviderUpdateResponse
+)
 def update_admin_provider(
     provider_id: int,
     provider_data: LLMProviderUpdateRequest,
@@ -1003,7 +1043,7 @@ def update_admin_provider(
     if not provider:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Provider with id {provider_id} not found"
+            detail=f"Provider with id {provider_id} not found",
         )
 
     # Update fields (only if provided)
@@ -1011,11 +1051,13 @@ def update_admin_provider(
         new_name = provider_data.name.strip()
         if new_name != provider.name:
             # Check for duplicate
-            existing = db.exec(select(LLMProvider).where(LLMProvider.name == new_name)).first()
+            existing = db.exec(
+                select(LLMProvider).where(LLMProvider.name == new_name)
+            ).first()
             if existing:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f'Provider with name "{new_name}" already exists'
+                    detail=f'Provider with name "{new_name}" already exists',
                 )
             provider.name = new_name
 
@@ -1055,7 +1097,9 @@ def update_admin_provider(
         "is_default": provider.is_default,
         "priority": provider.priority,
         "config": provider.config or {},
-        "last_health_check": provider.last_health_check.isoformat() if provider.last_health_check else None,
+        "last_health_check": provider.last_health_check.isoformat()
+        if provider.last_health_check
+        else None,
         "health_status": provider.health_status,
         "error_message": provider.error_message,
         "created_at": provider.created_at.isoformat() if provider.created_at else None,
@@ -1068,7 +1112,9 @@ def update_admin_provider(
     }
 
 
-@app.delete("/api/v1/admin/providers/{provider_id}", response_model=LLMProviderDeleteResponse)
+@app.delete(
+    "/api/v1/admin/providers/{provider_id}", response_model=LLMProviderDeleteResponse
+)
 def delete_admin_provider(
     provider_id: int,
     db: Session = Depends(get_db),
@@ -1089,7 +1135,7 @@ def delete_admin_provider(
     if not provider:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Provider with id {provider_id} not found"
+            detail=f"Provider with id {provider_id} not found",
         )
 
     # Check for associated models
@@ -1100,7 +1146,7 @@ def delete_admin_provider(
     if model_count > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot delete provider: {model_count} associated model(s) exist. Delete associated models first."
+            detail=f"Cannot delete provider: {model_count} associated model(s) exist. Delete associated models first.",
         )
 
     name = provider.name
@@ -1113,7 +1159,9 @@ def delete_admin_provider(
     }
 
 
-@app.post("/api/v1/admin/providers/{provider_id}/test", response_model=LLMProviderTestResponse)
+@app.post(
+    "/api/v1/admin/providers/{provider_id}/test", response_model=LLMProviderTestResponse
+)
 def test_admin_provider(
     provider_id: int,
     db: Session = Depends(get_db),
@@ -1137,7 +1185,7 @@ def test_admin_provider(
     if not provider:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Provider with id {provider_id} not found"
+            detail=f"Provider with id {provider_id} not found",
         )
 
     # Test connection
@@ -1145,23 +1193,28 @@ def test_admin_provider(
 
     # Update health status
     provider.last_health_check = datetime.utcnow()
-    provider.health_status = result.get('status', 'unknown')
-    provider.error_message = result.get('error') or result.get('message')
+    provider.health_status = result.get("status", "unknown")
+    provider.error_message = result.get("error") or result.get("message")
 
     db.add(provider)
     db.commit()
 
     return {
         "success": True,
-        "status": result.get('status', 'unknown'),
-        "message": result.get('message'),
-        "error": result.get('error'),
+        "status": result.get("status", "unknown"),
+        "message": result.get("message"),
+        "error": result.get("error"),
         "provider_id": provider_id,
-        "last_health_check": provider.last_health_check.isoformat() if provider.last_health_check else None,
+        "last_health_check": provider.last_health_check.isoformat()
+        if provider.last_health_check
+        else None,
     }
 
 
-@app.post("/api/v1/admin/providers/{provider_id}/discover-models", response_model=LLMProviderDiscoverModelsResponse)
+@app.post(
+    "/api/v1/admin/providers/{provider_id}/discover-models",
+    response_model=LLMProviderDiscoverModelsResponse,
+)
 def discover_admin_provider_models(
     provider_id: int,
     db: Session = Depends(get_db),
@@ -1182,7 +1235,7 @@ def discover_admin_provider_models(
     if not provider:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Provider with id {provider_id} not found"
+            detail=f"Provider with id {provider_id} not found",
         )
 
     # Discover models
@@ -1197,7 +1250,9 @@ def discover_admin_provider_models(
         "is_default": provider.is_default,
         "priority": provider.priority,
         "config": provider.config or {},
-        "last_health_check": provider.last_health_check.isoformat() if provider.last_health_check else None,
+        "last_health_check": provider.last_health_check.isoformat()
+        if provider.last_health_check
+        else None,
         "health_status": provider.health_status,
         "error_message": provider.error_message,
         "created_at": provider.created_at.isoformat() if provider.created_at else None,
@@ -1211,7 +1266,9 @@ def discover_admin_provider_models(
     }
 
 
-@app.post("/api/v1/admin/providers/priority", response_model=LLMProviderPriorityUpdateResponse)
+@app.post(
+    "/api/v1/admin/providers/priority", response_model=LLMProviderPriorityUpdateResponse
+)
 def update_admin_provider_priorities(
     priority_data: LLMProviderPriorityUpdateRequest,
     db: Session = Depends(get_db),
@@ -1225,14 +1282,14 @@ def update_admin_provider_priorities(
     if not priority_data.priorities:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Priorities array is required and cannot be empty"
+            detail="Priorities array is required and cannot be empty",
         )
 
     for item in priority_data.priorities:
-        if not hasattr(item, 'id') or not hasattr(item, 'priority'):
+        if not hasattr(item, "id") or not hasattr(item, "priority"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Each priority item must have 'id' and 'priority' fields"
+                detail="Each priority item must have 'id' and 'priority' fields",
             )
 
         statement = select(LLMProvider).where(LLMProvider.id == item.id)
@@ -1268,9 +1325,7 @@ def list_admin_models(
     Returns models with associated provider information (provider_obj field).
     Models are ordered by name for consistent display.
     """
-    statement = select(ModelConfig).order_by(
-        ModelConfig.name
-    ).offset(skip).limit(limit)
+    statement = select(ModelConfig).order_by(ModelConfig.name).offset(skip).limit(limit)
     result = db.exec(statement)
     models = result.all()
 
@@ -1283,7 +1338,9 @@ def list_admin_models(
         # Get associated provider
         provider_obj = None
         if model.provider_id:
-            provider_stmt = select(LLMProvider).where(LLMProvider.id == model.provider_id)
+            provider_stmt = select(LLMProvider).where(
+                LLMProvider.id == model.provider_id
+            )
             provider_result = db.exec(provider_stmt).first()
             if provider_result:
                 provider_obj = {
@@ -1293,21 +1350,25 @@ def list_admin_models(
                     "is_active": provider_result.is_active,
                 }
 
-        items.append({
-            "id": model.id,
-            "provider_id": model.provider_id,
-            "name": model.name,
-            "deployment_name": model.deployment_name,
-            "provider": model.provider,
-            "temperature": model.temperature,
-            "streaming": model.streaming,
-            "description": model.description,
-            "is_default": model.is_default,
-            "is_multimodal": getattr(model, 'is_multimodal', False),
-            "created_by": model.created_by,
-            "created_at": model.created_at.isoformat() if model.created_at else None,
-            "provider_obj": provider_obj,
-        })
+        items.append(
+            {
+                "id": model.id,
+                "provider_id": model.provider_id,
+                "name": model.name,
+                "deployment_name": model.deployment_name,
+                "provider": model.provider,
+                "temperature": model.temperature,
+                "streaming": model.streaming,
+                "description": model.description,
+                "is_default": model.is_default,
+                "is_multimodal": getattr(model, "is_multimodal", False),
+                "created_by": model.created_by,
+                "created_at": model.created_at.isoformat()
+                if model.created_at
+                else None,
+                "provider_obj": provider_obj,
+            }
+        )
 
     return {"items": items, "total": total}
 
@@ -1323,8 +1384,10 @@ async def get_available_models(
     models = result.all()
 
     # Get default model ID
-    default_model = db.exec(select(ModelConfig).where(ModelConfig.is_default == True)).first()
-    
+    default_model = db.exec(
+        select(ModelConfig).where(ModelConfig.is_default == True)
+    ).first()
+
     return {
         "status": "success",
         "models": [
@@ -1333,10 +1396,13 @@ async def get_available_models(
                 "name": m.name,
                 "provider": m.provider,
                 "is_default": m.is_default,
-                "is_multimodal": getattr(m, 'is_multimodal', False)
-            } for m in models
+                "is_multimodal": getattr(m, "is_multimodal", False),
+            }
+            for m in models
         ],
-        "default_model_id": default_model.id if default_model else (models[0].id if models else None)
+        "default_model_id": default_model.id
+        if default_model
+        else (models[0].id if models else None),
     }
 
 
@@ -1349,16 +1415,11 @@ async def get_default_model(
     model = db.exec(select(ModelConfig).where(ModelConfig.is_default == True)).first()
     if not model:
         model = db.exec(select(ModelConfig).order_by(ModelConfig.id)).first()
-    
+
     if not model:
         return {"status": "error", "message": "No models configured"}
-        
-    return {
-        "status": "success",
-        "model_id": model.id,
-        "name": model.name
-    }
 
+    return {"status": "success", "model_id": model.id, "name": model.name}
 
     return {
         "success": True,
@@ -1369,7 +1430,11 @@ async def get_default_model(
     }
 
 
-@app.post("/api/v1/admin/models/add", response_model=ModelConfigCreateResponse, status_code=status.HTTP_201_CREATED)
+@app.post(
+    "/api/v1/admin/models/add",
+    response_model=ModelConfigCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_admin_model(
     model_data: ModelConfigCreateRequest,
     db: Session = Depends(get_db),
@@ -1395,13 +1460,15 @@ def create_admin_model(
 
     # Validate required fields
     name = model_data.name.strip() if model_data.name else ""
-    deployment_name = model_data.deployment_name.strip() if model_data.deployment_name else ""
+    deployment_name = (
+        model_data.deployment_name.strip() if model_data.deployment_name else ""
+    )
     provider_id = model_data.provider_id
 
     if not name or not deployment_name or provider_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Name, deployment_name, and provider_id are required"
+            detail="Name, deployment_name, and provider_id are required",
         )
 
     # Get provider to validate it exists and get config
@@ -1411,23 +1478,24 @@ def create_admin_model(
     if not provider_result:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Provider with id {provider_id} not found"
+            detail=f"Provider with id {provider_id} not found",
         )
 
     # Validate streaming support
-    if model_data.streaming and not is_streaming_supported_for_deployment(deployment_name):
+    if model_data.streaming and not is_streaming_supported_for_deployment(
+        deployment_name
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Deployment '{deployment_name}' does not support streaming. Disable streaming or choose a compatible deployment."
+            detail=f"Deployment '{deployment_name}' does not support streaming. Disable streaming or choose a compatible deployment.",
         )
 
     # Validate temperature
-    temp_ok, _, temp_error = validate_temperature_for_deployment(deployment_name, model_data.temperature)
+    temp_ok, _, temp_error = validate_temperature_for_deployment(
+        deployment_name, model_data.temperature
+    )
     if not temp_ok:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=temp_error
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=temp_error)
 
     # Test connectivity
     try:
@@ -1441,7 +1509,7 @@ def create_admin_model(
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Could not initialize deployment '{deployment_name}': {exc}"
+            detail=f"Could not initialize deployment '{deployment_name}': {exc}",
         )
 
     # Check for duplicate name
@@ -1449,13 +1517,15 @@ def create_admin_model(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f'Model with name "{name}" already exists'
+            detail=f'Model with name "{name}" already exists',
         )
 
     # Clear other defaults if is_default=true
     if model_data.is_default:
         db.exec(
-            update(ModelConfig).where(ModelConfig.is_default == True).values(is_default=False)
+            update(ModelConfig)
+            .where(ModelConfig.is_default == True)
+            .values(is_default=False)
         )
         db.commit()
 
@@ -1468,7 +1538,9 @@ def create_admin_model(
         temperature=model_data.temperature,
         streaming=model_data.streaming,
         description=model_data.description.strip() if model_data.description else None,
-        is_default=model_data.is_default if model_data.is_default is not None else False,
+        is_default=model_data.is_default
+        if model_data.is_default is not None
+        else False,
         created_by=current_user.user_id,
     )
 
@@ -1494,9 +1566,11 @@ def create_admin_model(
         "streaming": model_config.streaming,
         "description": model_config.description,
         "is_default": model_config.is_default,
-        "is_multimodal": getattr(model_config, 'is_multimodal', False),
+        "is_multimodal": getattr(model_config, "is_multimodal", False),
         "created_by": model_config.created_by,
-        "created_at": model_config.created_at.isoformat() if model_config.created_at else None,
+        "created_at": model_config.created_at.isoformat()
+        if model_config.created_at
+        else None,
         "provider_obj": provider_obj,
     }
 
@@ -1511,7 +1585,9 @@ def create_admin_model(
 # ============================================================================
 
 
-@app.post("/api/v1/admin/models/edit/{model_id}", response_model=ModelConfigUpdateResponse)
+@app.post(
+    "/api/v1/admin/models/edit/{model_id}", response_model=ModelConfigUpdateResponse
+)
 def update_admin_model(
     model_id: int,
     model_data: ModelConfigUpdateRequest,
@@ -1534,11 +1610,13 @@ def update_admin_model(
     )
 
     # Validate model exists
-    existing_model = db.exec(select(ModelConfig).where(ModelConfig.id == model_id)).first()
+    existing_model = db.exec(
+        select(ModelConfig).where(ModelConfig.id == model_id)
+    ).first()
     if not existing_model:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Model with id {model_id} not found"
+            detail=f"Model with id {model_id} not found",
         )
 
     # Track which fields are being updated
@@ -1554,61 +1632,74 @@ def update_admin_model(
         new_name = model_data.name.strip()
         if new_name != existing_model.name:
             # Check for duplicate name (different model)
-            duplicate = db.exec(select(ModelConfig).where(
-                ModelConfig.name == new_name,
-                ModelConfig.id != model_id
-            )).first()
+            duplicate = db.exec(
+                select(ModelConfig).where(
+                    ModelConfig.name == new_name, ModelConfig.id != model_id
+                )
+            ).first()
             if duplicate:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f'Model with name "{new_name}" already exists'
+                    detail=f'Model with name "{new_name}" already exists',
                 )
-        update_values['name'] = new_name
+        update_values["name"] = new_name
 
     # Process deployment_name update
     if model_data.deployment_name is not None:
         deployment_name = model_data.deployment_name.strip()
         if deployment_name != existing_model.deployment_name:
             deployment_changed = True
-        update_values['deployment_name'] = deployment_name
+        update_values["deployment_name"] = deployment_name
 
     # Process provider_id update
-    if model_data.provider_id is not None and model_data.provider_id != existing_model.provider_id:
-        provider_stmt = select(LLMProvider).where(LLMProvider.id == model_data.provider_id)
+    if (
+        model_data.provider_id is not None
+        and model_data.provider_id != existing_model.provider_id
+    ):
+        provider_stmt = select(LLMProvider).where(
+            LLMProvider.id == model_data.provider_id
+        )
         provider_result = db.exec(provider_stmt).first()
         if not provider_result:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Provider with id {model_data.provider_id} not found"
+                detail=f"Provider with id {model_data.provider_id} not found",
             )
-        update_values['provider_id'] = model_data.provider_id
-        update_values['provider'] = provider_result.provider_type
+        update_values["provider_id"] = model_data.provider_id
+        update_values["provider"] = provider_result.provider_type
         provider_obj = provider_result
         deployment_changed = True  # Provider change requires re-validation
     else:
         # Get existing provider for validation
         if existing_model.provider_id:
-            provider_stmt = select(LLMProvider).where(LLMProvider.id == existing_model.provider_id)
+            provider_stmt = select(LLMProvider).where(
+                LLMProvider.id == existing_model.provider_id
+            )
             provider_obj = db.exec(provider_stmt).first()
 
     # Process description update
     if model_data.description is not None:
-        update_values['description'] = model_data.description.strip() if model_data.description else None
+        update_values["description"] = (
+            model_data.description.strip() if model_data.description else None
+        )
 
     # Process is_default update
-    if model_data.is_default is not None and model_data.is_default != existing_model.is_default:
-        update_values['is_default'] = model_data.is_default
+    if (
+        model_data.is_default is not None
+        and model_data.is_default != existing_model.is_default
+    ):
+        update_values["is_default"] = model_data.is_default
 
     # Process streaming update
     if model_data.streaming is not None:
         streaming = model_data.streaming
-        update_values['streaming'] = streaming
+        update_values["streaming"] = streaming
         deployment_changed = True  # Streaming change requires re-validation
 
     # Process temperature update
     if model_data.temperature is not None:
         temperature = model_data.temperature
-        update_values['temperature'] = temperature
+        update_values["temperature"] = temperature
         deployment_changed = True  # Temperature change requires re-validation
 
     # Validate deployment configuration if anything changed
@@ -1617,15 +1708,16 @@ def update_admin_model(
         if streaming and not is_streaming_supported_for_deployment(deployment_name):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Deployment '{deployment_name}' does not support streaming. Disable streaming or choose a compatible deployment."
+                detail=f"Deployment '{deployment_name}' does not support streaming. Disable streaming or choose a compatible deployment.",
             )
 
         # Validate temperature
-        temp_ok, _, temp_error = validate_temperature_for_deployment(deployment_name, temperature)
+        temp_ok, _, temp_error = validate_temperature_for_deployment(
+            deployment_name, temperature
+        )
         if not temp_ok:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=temp_error
+                status_code=status.HTTP_400_BAD_REQUEST, detail=temp_error
             )
 
         # Test connectivity
@@ -1640,16 +1732,15 @@ def update_admin_model(
         except Exception as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Could not initialize deployment '{deployment_name}': {exc}"
+                detail=f"Could not initialize deployment '{deployment_name}': {exc}",
             )
 
     # Clear other defaults if is_default=true
-    if update_values.get('is_default'):
+    if update_values.get("is_default"):
         db.exec(
-            update(ModelConfig).where(
-                ModelConfig.is_default == True,
-                ModelConfig.id != model_id
-            ).values(is_default=False)
+            update(ModelConfig)
+            .where(ModelConfig.is_default == True, ModelConfig.id != model_id)
+            .values(is_default=False)
         )
         db.commit()
 
@@ -1662,14 +1753,20 @@ def update_admin_model(
 
     # Get associated provider for response
     if existing_model.provider_id:
-        provider_stmt = select(LLMProvider).where(LLMProvider.id == existing_model.provider_id)
+        provider_stmt = select(LLMProvider).where(
+            LLMProvider.id == existing_model.provider_id
+        )
         provider_result = db.exec(provider_stmt).first()
-        provider_obj = {
-            "id": provider_result.id,
-            "name": provider_result.name,
-            "provider_type": provider_result.provider_type,
-            "is_active": provider_result.is_active,
-        } if provider_result else None
+        provider_obj = (
+            {
+                "id": provider_result.id,
+                "name": provider_result.name,
+                "provider_type": provider_result.provider_type,
+                "is_active": provider_result.is_active,
+            }
+            if provider_result
+            else None
+        )
     else:
         provider_obj = None
 
@@ -1683,9 +1780,11 @@ def update_admin_model(
         "streaming": existing_model.streaming,
         "description": existing_model.description,
         "is_default": existing_model.is_default,
-        "is_multimodal": getattr(existing_model, 'is_multimodal', False),
+        "is_multimodal": getattr(existing_model, "is_multimodal", False),
         "created_by": existing_model.created_by,
-        "created_at": existing_model.created_at.isoformat() if existing_model.created_at else None,
+        "created_at": existing_model.created_at.isoformat()
+        if existing_model.created_at
+        else None,
         "provider_obj": provider_obj,
     }
 
@@ -1700,7 +1799,9 @@ def update_admin_model(
 # ============================================================================
 
 
-@app.post("/api/v1/admin/models/delete/{model_id}", response_model=ModelConfigDeleteResponse)
+@app.post(
+    "/api/v1/admin/models/delete/{model_id}", response_model=ModelConfigDeleteResponse
+)
 def delete_admin_model(
     model_id: int,
     db: Session = Depends(get_db),
@@ -1721,13 +1822,13 @@ def delete_admin_model(
     if not model:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Model with id {model_id} not found"
+            detail=f"Model with id {model_id} not found",
         )
 
     # Check AppSettings for multimodal_model_id reference
     try:
         multimodal_setting = db.exec(
-            select(AppSettings).where(AppSettings.key == 'multimodal_model_id')
+            select(AppSettings).where(AppSettings.key == "multimodal_model_id")
         ).first()
         if multimodal_setting and multimodal_setting.value == str(model_id):
             logging.warning(
@@ -1735,18 +1836,19 @@ def delete_admin_model(
                 f"AppSettings multimodal_model_id will reference non-existent model."
             )
     except Exception as exc:
-        logging.warning(f"Could not check AppSettings for multimodal_model_id reference: {exc}")
+        logging.warning(
+            f"Could not check AppSettings for multimodal_model_id reference: {exc}"
+        )
 
     # Delete the model
     db.delete(model)
     db.commit()
 
-    logging.info(f"ModelConfig ID {model_id} ({model.name}) deleted by user {current_user.user_id}")
+    logging.info(
+        f"ModelConfig ID {model_id} ({model.name}) deleted by user {current_user.user_id}"
+    )
 
-    return {
-        "success": True,
-        "message": "Model deleted successfully"
-    }
+    return {"success": True, "message": "Model deleted successfully"}
 
 
 # ============================================================================
@@ -1754,7 +1856,10 @@ def delete_admin_model(
 # ============================================================================
 
 
-@app.post("/api/v1/admin/models/set-default/{model_id}", response_model=ModelConfigDefaultResponse)
+@app.post(
+    "/api/v1/admin/models/set-default/{model_id}",
+    response_model=ModelConfigDefaultResponse,
+)
 def set_default_model_endpoint(
     model_id: int,
     db: Session = Depends(get_db),
@@ -1771,27 +1876,31 @@ def set_default_model_endpoint(
     if not model:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Model with id {model_id} not found"
+            detail=f"Model with id {model_id} not found",
         )
 
     # Clear existing defaults in one statement
     db.exec(
-        update(ModelConfig).where(ModelConfig.is_default == True).values(is_default=False)
+        update(ModelConfig)
+        .where(ModelConfig.is_default == True)
+        .values(is_default=False)
     )
 
     # Set new default
     model.is_default = True
     db.commit()
 
-    logging.info(f"ModelConfig ID {model_id} set as default by user {current_user.user_id}")
+    logging.info(
+        f"ModelConfig ID {model_id} set as default by user {current_user.user_id}"
+    )
 
-    return {
-        "success": True,
-        "message": "Default model updated"
-    }
+    return {"success": True, "message": "Default model updated"}
 
 
-@app.post("/api/v1/admin/models/set-multimodal/{model_id}", response_model=ModelConfigMultimodalResponse)
+@app.post(
+    "/api/v1/admin/models/set-multimodal/{model_id}",
+    response_model=ModelConfigMultimodalResponse,
+)
 def set_multimodal_model_endpoint(
     model_id: int,
     db: Session = Depends(get_db),
@@ -1808,36 +1917,37 @@ def set_multimodal_model_endpoint(
     if not model:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Model with id {model_id} not found"
+            detail=f"Model with id {model_id} not found",
         )
 
     # Get deployment_name for reference
     deployment_name = model.deployment_name
 
     # Update AppSettings with multimodal_model_id
-    setting = db.get(AppSettings, 'multimodal_model_id')
+    setting = db.get(AppSettings, "multimodal_model_id")
     if not setting:
-        setting = AppSettings(key='multimodal_model_id', value=str(model_id))
+        setting = AppSettings(key="multimodal_model_id", value=str(model_id))
         db.add(setting)
     else:
         setting.value = str(model_id)
 
     # Also update multimodal_deployment_name for reference
-    deployment_setting = db.get(AppSettings, 'multimodal_deployment_name')
+    deployment_setting = db.get(AppSettings, "multimodal_deployment_name")
     if not deployment_setting:
-        deployment_setting = AppSettings(key='multimodal_deployment_name', value=deployment_name)
+        deployment_setting = AppSettings(
+            key="multimodal_deployment_name", value=deployment_name
+        )
         db.add(deployment_setting)
     else:
         deployment_setting.value = deployment_name
 
     db.commit()
 
-    logging.info(f"ModelConfig ID {model_id} set as multimodal model by user {current_user.user_id}")
+    logging.info(
+        f"ModelConfig ID {model_id} set as multimodal model by user {current_user.user_id}"
+    )
 
-    return {
-        "success": True,
-        "message": "Multimodal model updated"
-    }
+    return {"success": True, "message": "Multimodal model updated"}
 
 
 @app.post("/api/v1/admin/models/validate", response_model=ModelValidationResponse)
@@ -1867,7 +1977,9 @@ def validate_deployment_endpoint(
     streaming_supported = is_streaming_supported_for_deployment(deployment_name)
 
     # Validate temperature
-    temp_ok, _, temp_error = validate_temperature_for_deployment(deployment_name, temperature)
+    temp_ok, _, temp_error = validate_temperature_for_deployment(
+        deployment_name, temperature
+    )
     temperature_valid = temp_ok
 
     # Test connectivity
@@ -1901,7 +2013,9 @@ def validate_deployment_endpoint(
         if not streaming_supported:
             message = f"Deployment '{deployment_name}' does not support streaming"
         elif not temperature_valid:
-            message = temp_error or f"Invalid temperature for deployment '{deployment_name}'"
+            message = (
+                temp_error or f"Invalid temperature for deployment '{deployment_name}'"
+            )
         elif not connectivity_ok:
             message = f"Connectivity test failed: {connectivity_error}"
         else:
@@ -1915,7 +2029,7 @@ def validate_deployment_endpoint(
         "streaming_supported": streaming_supported,
         "temperature_valid": temperature_valid,
         "connectivity_ok": connectivity_ok,
-        "message": message
+        "message": message,
     }
 
 
@@ -1936,9 +2050,12 @@ def list_admin_languages(
 
     Returns languages ordered by language_name.
     """
-    statement = select(LLMLanguage).order_by(
-        LLMLanguage.language_name
-    ).offset(skip).limit(limit)
+    statement = (
+        select(LLMLanguage)
+        .order_by(LLMLanguage.language_name)
+        .offset(skip)
+        .limit(limit)
+    )
     result = db.exec(statement)
     languages = result.all()
 
@@ -1948,14 +2065,16 @@ def list_admin_languages(
 
     items = []
     for lang in languages:
-        items.append({
-            "id": lang.id,
-            "language_code": lang.language_code,
-            "language_name": lang.language_name,
-            "is_active": lang.is_active,
-            "created_by": lang.created_by,
-            "created_at": lang.created_at.isoformat() if lang.created_at else None,
-        })
+        items.append(
+            {
+                "id": lang.id,
+                "language_code": lang.language_code,
+                "language_name": lang.language_name,
+                "is_active": lang.is_active,
+                "created_by": lang.created_by,
+                "created_at": lang.created_at.isoformat() if lang.created_at else None,
+            }
+        )
 
     return {
         "success": True,
@@ -1966,7 +2085,11 @@ def list_admin_languages(
     }
 
 
-@app.post("/api/v1/admin/languages/add", response_model=LLMLanguageCreateResponse, status_code=status.HTTP_201_CREATED)
+@app.post(
+    "/api/v1/admin/languages/add",
+    response_model=LLMLanguageCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_admin_language(
     language_data: LLMLanguageCreateRequest,
     db: Session = Depends(get_db),
@@ -1981,20 +2104,26 @@ def create_admin_language(
     - language_name must be unique (returns 409 if duplicate)
     """
     # Validate required fields
-    language_code = language_data.language_code.strip() if language_data.language_code else ""
-    language_name = language_data.language_name.strip() if language_data.language_name else ""
+    language_code = (
+        language_data.language_code.strip() if language_data.language_code else ""
+    )
+    language_name = (
+        language_data.language_name.strip() if language_data.language_name else ""
+    )
 
     if not language_code or not language_name:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="language_code and language_name are required"
+            detail="language_code and language_name are required",
         )
 
     # Create language
     language = LLMLanguage(
         language_code=language_code,
         language_name=language_name,
-        is_active=language_data.is_active if language_data.is_active is not None else True,
+        is_active=language_data.is_active
+        if language_data.is_active is not None
+        else True,
         created_by=current_user.username,
     )
 
@@ -2006,7 +2135,7 @@ def create_admin_language(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Language code '{language_code}' or name '{language_name}' already exists"
+            detail=f"Language code '{language_code}' or name '{language_name}' already exists",
         )
 
     language_dict = {
@@ -2025,7 +2154,10 @@ def create_admin_language(
     }
 
 
-@app.post("/api/v1/admin/languages/edit/{language_id}", response_model=LLMLanguageUpdateResponse)
+@app.post(
+    "/api/v1/admin/languages/edit/{language_id}",
+    response_model=LLMLanguageUpdateResponse,
+)
 def update_admin_language(
     language_id: int,
     language_data: LLMLanguageUpdateRequest,
@@ -2043,10 +2175,14 @@ def update_admin_language(
     - is_active toggle supported (LANG-04)
     """
     # Validate required fields
-    if language_data.language_code is None or language_data.language_name is None or language_data.is_active is None:
+    if (
+        language_data.language_code is None
+        or language_data.language_name is None
+        or language_data.is_active is None
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="language_code, language_name, and is_active are required"
+            detail="language_code, language_name, and is_active are required",
         )
 
     language_code = language_data.language_code.strip()
@@ -2056,15 +2192,14 @@ def update_admin_language(
     if not language_code or not language_name:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="language_code and language_name must not be empty"
+            detail="language_code and language_name must not be empty",
         )
 
     # Check if language exists
     existing_language = db.get(LLMLanguage, language_id)
     if not existing_language:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Language not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Language not found"
         )
 
     # Update fields
@@ -2080,7 +2215,7 @@ def update_admin_language(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Language code '{language_code}' or name '{language_name}' already exists"
+            detail=f"Language code '{language_code}' or name '{language_name}' already exists",
         )
 
     language_dict = {
@@ -2089,7 +2224,9 @@ def update_admin_language(
         "language_name": existing_language.language_name,
         "is_active": existing_language.is_active,
         "created_by": existing_language.created_by,
-        "created_at": existing_language.created_at.isoformat() if existing_language.created_at else None,
+        "created_at": existing_language.created_at.isoformat()
+        if existing_language.created_at
+        else None,
     }
 
     return {
@@ -2099,7 +2236,10 @@ def update_admin_language(
     }
 
 
-@app.post("/api/v1/admin/languages/delete/{language_id}", response_model=LLMLanguageDeleteResponse)
+@app.post(
+    "/api/v1/admin/languages/delete/{language_id}",
+    response_model=LLMLanguageDeleteResponse,
+)
 def delete_admin_language(
     language_id: int,
     db: Session = Depends(get_db),
@@ -2115,8 +2255,7 @@ def delete_admin_language(
     existing_language = db.get(LLMLanguage, language_id)
     if not existing_language:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Language not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Language not found"
         )
 
     try:
@@ -2126,7 +2265,7 @@ def delete_admin_language(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error deleting language: {str(e)}"
+            detail=f"Error deleting language: {str(e)}",
         )
 
     return {
@@ -2138,6 +2277,7 @@ def delete_admin_language(
 # ============================================================================
 # Activity Log Endpoints (Phase 09 - CONTENT-01, CONTENT-02, CONTENT-03)
 # ============================================================================
+
 
 def build_knowledge_metadata_summary_fastapi(knowledge_ids, db):
     """
@@ -2181,7 +2321,7 @@ def build_knowledge_metadata_summary_fastapi(knowledge_ids, db):
         except Exception:
             pass
 
-        summary_map[kid] = '; '.join(parts) if parts else 'None'
+        summary_map[kid] = "; ".join(parts) if parts else "None"
 
     return summary_map
 
@@ -2208,7 +2348,9 @@ def list_upload_activities(
         .outerjoin(Library, UploadedFile.library_id == Library.library_id)
         .outerjoin(Knowledge, UploadedFile.knowledge_id == Knowledge.id)
     )
-    statement = statement.order_by(UploadedFile.upload_time.desc()).offset(skip).limit(limit)
+    statement = (
+        statement.order_by(UploadedFile.upload_time.desc()).offset(skip).limit(limit)
+    )
 
     results = db.exec(statement).all()
 
@@ -2222,19 +2364,25 @@ def list_upload_activities(
 
     items = []
     for uploaded_file, user, library, knowledge in results:
-        items.append({
-            "id": uploaded_file.file_id,
-            "type": "upload",
-            "filename": uploaded_file.original_filename,
-            "file_size": uploaded_file.file_size,
-            "upload_time": uploaded_file.upload_time.isoformat() if uploaded_file.upload_time else None,
-            "username": user.username if user else None,
-            "library_name": library.name if library else None,
-            "knowledge_name": knowledge.name if knowledge else None,
-            "metadata_summary": metadata_map.get(knowledge.id, 'None') if knowledge else 'N/A',
-            "is_ocr": uploaded_file.is_ocr,
-            "status": "success",
-        })
+        items.append(
+            {
+                "id": uploaded_file.file_id,
+                "type": "upload",
+                "filename": uploaded_file.original_filename,
+                "file_size": uploaded_file.file_size,
+                "upload_time": uploaded_file.upload_time.isoformat()
+                if uploaded_file.upload_time
+                else None,
+                "username": user.username if user else None,
+                "library_name": library.name if library else None,
+                "knowledge_name": knowledge.name if knowledge else None,
+                "metadata_summary": metadata_map.get(knowledge.id, "None")
+                if knowledge
+                else "N/A",
+                "is_ocr": uploaded_file.is_ocr,
+                "status": "success",
+            }
+        )
 
     return {
         "success": True,
@@ -2245,7 +2393,9 @@ def list_upload_activities(
     }
 
 
-@app.get("/api/v1/admin/activity/downloads", response_model=DownloadActivityListResponse)
+@app.get(
+    "/api/v1/admin/activity/downloads", response_model=DownloadActivityListResponse
+)
 def list_download_activities(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
@@ -2274,7 +2424,9 @@ def list_download_activities(
     if status:
         statement = statement.where(UrlDownload.status == status)
 
-    statement = statement.order_by(UrlDownload.processed_at.desc()).offset(skip).limit(limit)
+    statement = (
+        statement.order_by(UrlDownload.processed_at.desc()).offset(skip).limit(limit)
+    )
 
     results = db.exec(statement).all()
 
@@ -2290,20 +2442,26 @@ def list_download_activities(
 
     items = []
     for url_download, user, library, knowledge in results:
-        items.append({
-            "id": url_download.download_id,
-            "type": "download",
-            "url": url_download.url,
-            "status": url_download.status,
-            "content_type": url_download.content_type,
-            "error_message": url_download.error_message,
-            "processed_at": url_download.processed_at.isoformat() if url_download.processed_at else None,
-            "username": user.username if user else None,
-            "library_name": library.name if library else None,
-            "knowledge_name": knowledge.name if knowledge else None,
-            "metadata_summary": metadata_map.get(knowledge.id, 'None') if knowledge else 'N/A',
-            "is_ocr": url_download.is_ocr,
-        })
+        items.append(
+            {
+                "id": url_download.download_id,
+                "type": "download",
+                "url": url_download.url,
+                "status": url_download.status,
+                "content_type": url_download.content_type,
+                "error_message": url_download.error_message,
+                "processed_at": url_download.processed_at.isoformat()
+                if url_download.processed_at
+                else None,
+                "username": user.username if user else None,
+                "library_name": library.name if library else None,
+                "knowledge_name": knowledge.name if knowledge else None,
+                "metadata_summary": metadata_map.get(knowledge.id, "None")
+                if knowledge
+                else "N/A",
+                "is_ocr": url_download.is_ocr,
+            }
+        )
 
     return {
         "success": True,
@@ -2323,42 +2481,62 @@ def list_download_activities(
 def list_admin_catalogs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
+    page: int = 1,
+    per_page: int = 10,
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 0,
 ):
     """
     List all catalogs (admin only).
 
     Returns catalogs ordered by name.
     """
-    statement = select(Catalog).order_by(Catalog.name).offset(skip).limit(limit)
-    result = db.exec(statement)
-    catalogs = result.all()
+    if limit == 0:
+        actual_limit = per_page
+        actual_skip = (page - 1) * per_page
+    else:
+        actual_limit = limit
+        actual_skip = skip
 
     # Get total count
     count_statement = select(func.count(Catalog.id))
     total = db.exec(count_statement).one()
 
+    statement = (
+        select(Catalog).order_by(Catalog.name).offset(actual_skip).limit(actual_limit)
+    )
+    result = db.exec(statement)
+    catalogs = result.all()
+
     items = []
     for catalog in catalogs:
-        items.append({
-            "id": catalog.id,
-            "name": catalog.name,
-            "description": catalog.description,
-            "created_by": catalog.created_by_user_id,
-            "created_at": catalog.created_at.isoformat() if catalog.created_at else None,
-        })
+        items.append(
+            {
+                "id": catalog.id,
+                "name": catalog.name,
+                "description": catalog.description,
+                "created_by": catalog.created_by_user_id,
+                "created_at": catalog.created_at.isoformat()
+                if catalog.created_at
+                else None,
+            }
+        )
 
     return {
         "success": True,
         "data": {
             "items": items,
             "total": total,
+            "total_pages": max(1, -(-total // actual_limit)) if actual_limit else 1,
         },
     }
 
 
-@app.post("/api/v1/admin/catalogs/add", response_model=CatalogCreateResponse, status_code=status.HTTP_201_CREATED)
+@app.post(
+    "/api/v1/admin/catalogs/add",
+    response_model=CatalogCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_admin_catalog(
     catalog_data: CatalogCreateRequest,
     db: Session = Depends(get_db),
@@ -2376,8 +2554,7 @@ def create_admin_catalog(
 
     if not name:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="name is required"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="name is required"
         )
 
     # Check for duplicate name
@@ -2385,7 +2562,7 @@ def create_admin_catalog(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Catalog with name '{name}' already exists."
+            detail=f"Catalog with name '{name}' already exists.",
         )
 
     # Create catalog
@@ -2414,7 +2591,9 @@ def create_admin_catalog(
     }
 
 
-@app.post("/api/v1/admin/catalogs/edit/{catalog_id}", response_model=CatalogUpdateResponse)
+@app.post(
+    "/api/v1/admin/catalogs/edit/{catalog_id}", response_model=CatalogUpdateResponse
+)
 def update_admin_catalog(
     catalog_id: int,
     catalog_data: CatalogUpdateRequest,
@@ -2433,8 +2612,7 @@ def update_admin_catalog(
     catalog = db.get(Catalog, catalog_id)
     if not catalog:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Catalog not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Catalog not found"
         )
 
     # Validate name if provided
@@ -2442,21 +2620,17 @@ def update_admin_catalog(
         name = catalog_data.name.strip()
         if not name:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="name must not be empty"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="name must not be empty"
             )
 
         # Check for duplicate name (excluding current id)
         existing = db.exec(
-            select(Catalog).where(
-                Catalog.name == name,
-                Catalog.id != catalog_id
-            )
+            select(Catalog).where(Catalog.name == name, Catalog.id != catalog_id)
         ).first()
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Catalog with name '{name}' already exists."
+                detail=f"Catalog with name '{name}' already exists.",
             )
         catalog.name = name
 
@@ -2483,7 +2657,9 @@ def update_admin_catalog(
     }
 
 
-@app.delete("/api/v1/admin/catalogs/delete/{catalog_id}", response_model=CatalogDeleteResponse)
+@app.delete(
+    "/api/v1/admin/catalogs/delete/{catalog_id}", response_model=CatalogDeleteResponse
+)
 def delete_admin_catalog(
     catalog_id: int,
     db: Session = Depends(get_db),
@@ -2499,8 +2675,7 @@ def delete_admin_catalog(
     catalog = db.get(Catalog, catalog_id)
     if not catalog:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Catalog not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Catalog not found"
         )
 
     try:
@@ -2510,7 +2685,7 @@ def delete_admin_catalog(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error deleting catalog: {str(e)}"
+            detail=f"Error deleting catalog: {str(e)}",
         )
 
     return {
@@ -2528,42 +2703,62 @@ def delete_admin_catalog(
 def list_admin_categories(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
+    page: int = 1,
+    per_page: int = 10,
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 0,
 ):
     """
     List all categories (admin only).
 
     Returns categories ordered by name.
     """
-    statement = select(Category).order_by(Category.name).offset(skip).limit(limit)
-    result = db.exec(statement)
-    categories = result.all()
+    if limit == 0:
+        actual_limit = per_page
+        actual_skip = (page - 1) * per_page
+    else:
+        actual_limit = limit
+        actual_skip = skip
 
     # Get total count
     count_statement = select(func.count(Category.id))
     total = db.exec(count_statement).one()
 
+    statement = (
+        select(Category).order_by(Category.name).offset(actual_skip).limit(actual_limit)
+    )
+    result = db.exec(statement)
+    categories = result.all()
+
     items = []
     for category in categories:
-        items.append({
-            "id": category.id,
-            "name": category.name,
-            "description": category.description,
-            "created_by_user_id": category.created_by_user_id,
-            "created_at": category.created_at.isoformat() if category.created_at else None,
-        })
+        items.append(
+            {
+                "id": category.id,
+                "name": category.name,
+                "description": category.description,
+                "created_by_user_id": category.created_by_user_id,
+                "created_at": category.created_at.isoformat()
+                if category.created_at
+                else None,
+            }
+        )
 
     return {
         "success": True,
         "data": {
             "items": items,
             "total": total,
+            "total_pages": max(1, -(-total // actual_limit)) if actual_limit else 1,
         },
     }
 
 
-@app.post("/api/v1/admin/categories/add", response_model=CategoryCreateResponse, status_code=status.HTTP_201_CREATED)
+@app.post(
+    "/api/v1/admin/categories/add",
+    response_model=CategoryCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_admin_category(
     category_data: CategoryCreateRequest,
     db: Session = Depends(get_db),
@@ -2581,8 +2776,7 @@ def create_admin_category(
 
     if not name:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="name is required"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="name is required"
         )
 
     # Check for duplicate name
@@ -2590,7 +2784,7 @@ def create_admin_category(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Category with name '{name}' already exists."
+            detail=f"Category with name '{name}' already exists.",
         )
 
     # Create category
@@ -2619,7 +2813,9 @@ def create_admin_category(
     }
 
 
-@app.post("/api/v1/admin/categories/edit/{category_id}", response_model=CategoryUpdateResponse)
+@app.post(
+    "/api/v1/admin/categories/edit/{category_id}", response_model=CategoryUpdateResponse
+)
 def update_admin_category(
     category_id: int,
     category_data: CategoryUpdateRequest,
@@ -2638,8 +2834,7 @@ def update_admin_category(
     category = db.get(Category, category_id)
     if not category:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Category not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
         )
 
     # Validate name if provided
@@ -2647,21 +2842,17 @@ def update_admin_category(
         name = category_data.name.strip()
         if not name:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="name must not be empty"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="name must not be empty"
             )
 
         # Check for duplicate name (excluding current id)
         existing = db.exec(
-            select(Category).where(
-                Category.name == name,
-                Category.id != category_id
-            )
+            select(Category).where(Category.name == name, Category.id != category_id)
         ).first()
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Category with name '{name}' already exists."
+                detail=f"Category with name '{name}' already exists.",
             )
         category.name = name
 
@@ -2688,7 +2879,10 @@ def update_admin_category(
     }
 
 
-@app.delete("/api/v1/admin/categories/delete/{category_id}", response_model=CategoryDeleteResponse)
+@app.delete(
+    "/api/v1/admin/categories/delete/{category_id}",
+    response_model=CategoryDeleteResponse,
+)
 def delete_admin_category(
     category_id: int,
     db: Session = Depends(get_db),
@@ -2704,8 +2898,7 @@ def delete_admin_category(
     category = db.get(Category, category_id)
     if not category:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Category not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
         )
 
     try:
@@ -2715,7 +2908,7 @@ def delete_admin_category(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error deleting category: {str(e)}"
+            detail=f"Error deleting category: {str(e)}",
         )
 
     return {
@@ -2747,7 +2940,7 @@ def get_app_settings(
     for setting in settings:
         value = setting.value
         # Parse known numeric settings
-        if setting.key == 'max_active_users':
+        if setting.key == "max_active_users":
             try:
                 value = int(value)
             except (ValueError, TypeError):
@@ -2789,25 +2982,25 @@ def update_app_settings(
 
     for key, value in settings_data.settings.items():
         # Special validation for max_active_users
-        if key == 'max_active_users':
+        if key == "max_active_users":
             try:
                 max_users = int(value)
             except (ValueError, TypeError):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="max_active_users must be a valid integer."
+                    detail="max_active_users must be a valid integer.",
                 )
 
             if max_users < 1:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="max_active_users must be at least 1."
+                    detail="max_active_users must be at least 1.",
                 )
 
             if max_users < current_active:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Cannot set limit to {max_users} - currently have {current_active} active users."
+                    detail=f"Cannot set limit to {max_users} - currently have {current_active} active users.",
                 )
 
             # Store as integer for proper type handling
@@ -2829,7 +3022,7 @@ def update_app_settings(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update settings: {str(exc)}"
+            detail=f"Failed to update settings: {str(exc)}",
         )
 
     return {
@@ -2842,6 +3035,7 @@ def update_app_settings(
 # ============================================================================
 # File Management Endpoints (Phase 09 - CONTENT-04, CONTENT-05)
 # ============================================================================
+
 
 @app.get("/api/v1/admin/files/{file_id}", response_model=FileDetailsResponse)
 def get_file_details(
@@ -2870,16 +3064,21 @@ def get_file_details(
     uploaded_file = db.get(UploadedFile, file_id)
     if not uploaded_file:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File record not found."
+            status_code=status.HTTP_404_NOT_FOUND, detail="File record not found."
         )
 
     # Get user
     user = db.get(User, uploaded_file.user_id)
 
     # Get library and knowledge (optional)
-    library = db.get(Library, uploaded_file.library_id) if uploaded_file.library_id else None
-    knowledge = db.get(Knowledge, uploaded_file.knowledge_id) if uploaded_file.knowledge_id else None
+    library = (
+        db.get(Library, uploaded_file.library_id) if uploaded_file.library_id else None
+    )
+    knowledge = (
+        db.get(Knowledge, uploaded_file.knowledge_id)
+        if uploaded_file.knowledge_id
+        else None
+    )
 
     # Count documents associated with this file
     doc_count_statement = select(func.count(Document.id)).where(
@@ -2893,25 +3092,34 @@ def get_file_details(
     metadata_summary = "N/A"
     if knowledge:
         from modules.database import build_knowledge_metadata_summary
+
         metadata_map = build_knowledge_metadata_summary([knowledge.id])
-        metadata_summary = metadata_map.get(knowledge.id, 'N/A')
+        metadata_summary = metadata_map.get(knowledge.id, "N/A")
 
     # Build response dict
     file_dict = {
         "file_id": uploaded_file.file_id,
         "filename": uploaded_file.original_filename,
         "file_size": uploaded_file.file_size,
-        "upload_time": uploaded_file.upload_time.isoformat() if uploaded_file.upload_time else None,
+        "upload_time": uploaded_file.upload_time.isoformat()
+        if uploaded_file.upload_time
+        else None,
         "username": user.username if user else "Unknown",
         "library_name": library.name if library else None,
         "knowledge_name": knowledge.name if knowledge else None,
         "metadata_summary": metadata_summary,
-        "is_ocr": uploaded_file.is_ocr if hasattr(uploaded_file, 'is_ocr') else False,
-        "is_az_doci": uploaded_file.is_az_doci if hasattr(uploaded_file, 'is_az_doci') else False,
+        "is_ocr": uploaded_file.is_ocr if hasattr(uploaded_file, "is_ocr") else False,
+        "is_az_doci": uploaded_file.is_az_doci
+        if hasattr(uploaded_file, "is_az_doci")
+        else False,
         "document_count": document_count,
         "vector_count": 0,  # sqlite-vec handles vectors via cascade
-        "brand_manufacturer_organization": knowledge.brand_manufacturer_organization if knowledge else None,
-        "product_model_name_service": knowledge.product_model_name_service if knowledge else None,
+        "brand_manufacturer_organization": knowledge.brand_manufacturer_organization
+        if knowledge
+        else None,
+        "product_model_name_service": knowledge.product_model_name_service
+        if knowledge
+        else None,
     }
 
     return {
@@ -2948,8 +3156,7 @@ def delete_file(
     uploaded_file = db.get(UploadedFile, file_id)
     if not uploaded_file:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File record not found."
+            status_code=status.HTTP_404_NOT_FOUND, detail="File record not found."
         )
 
     try:
@@ -2973,8 +3180,8 @@ def delete_file(
 
         # Delete library references
         lr_statement = select(LibraryReference).where(
-            LibraryReference.reference_type == 'file',
-            LibraryReference.source_id == file_id
+            LibraryReference.reference_type == "file",
+            LibraryReference.source_id == file_id,
         )
         for lr in db.exec(lr_statement):
             db.delete(lr)
@@ -3001,7 +3208,7 @@ def delete_file(
         logging.error(f"Failed to delete file_id {file_id}: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete file."
+            detail="Failed to delete file.",
         )
 
 
@@ -3042,13 +3249,370 @@ async def get_branding():
     }
 
 
+# Admin Group Management endpoints
+@app.get("/api/v1/admin/groups")
+def list_admin_groups(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    page: int = 1,
+    per_page: int = 10,
+    skip: int = 0,
+    limit: int = 0,
+):
+    """List all groups (admin only)."""
+    # Support both page/per_page (frontend) and skip/limit (legacy)
+    if limit == 0:
+        actual_limit = per_page
+        actual_skip = (page - 1) * per_page
+    else:
+        actual_limit = limit
+        actual_skip = skip
+
+    count_statement = select(func.count(Group.group_id))
+    total = db.exec(count_statement).one()
+
+    statement = select(Group).offset(actual_skip).limit(actual_limit)
+    groups = db.exec(statement).all()
+
+    return {
+        "success": True,
+        "data": {
+            "items": [
+                {
+                    "id": g.group_id,
+                    "group_id": g.group_id,
+                    "name": g.name,
+                    "description": g.description,
+                    "created_by_user_id": g.created_by_user_id,
+                    "created_at": g.created_at,
+                }
+                for g in groups
+            ],
+            "total": total,
+            "total_pages": max(1, -(-total // actual_limit)) if actual_limit else 1,
+        },
+    }
+
+
+@app.post("/api/v1/admin/groups")
+def create_admin_group(
+    group_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Create a new group (admin only)."""
+    new_group = Group(
+        name=group_data["name"],
+        description=group_data.get("description"),
+        created_by_user_id=current_user.user_id,
+    )
+    db.add(new_group)
+    db.commit()
+    db.refresh(new_group)
+    return {"success": True, "group": new_group}
+
+
+@app.put("/api/v1/admin/groups/{group_id}")
+def update_admin_group(
+    group_id: int,
+    group_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Update a group (admin only)."""
+    group = db.get(Group, group_id)
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    if "name" in group_data:
+        group.name = group_data["name"]
+    if "description" in group_data:
+        group.description = group_data["description"]
+
+    db.add(group)
+    db.commit()
+    db.refresh(group)
+    return {"success": True, "group": group}
+
+
+@app.delete("/api/v1/admin/groups/{group_id}")
+def delete_admin_group(
+    group_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Delete a group (admin only)."""
+    group = db.get(Group, group_id)
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    db.delete(group)
+    db.commit()
+    return {"success": True, "message": "Group deleted successfully"}
+
+
+# Admin Library Management endpoints
+@app.get("/api/v1/admin/libraries")
+def list_admin_libraries(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    page: int = 1,
+    per_page: int = 10,
+    skip: int = 0,
+    limit: int = 0,
+):
+    """List all libraries (admin only)."""
+    if limit == 0:
+        actual_limit = per_page
+        actual_skip = (page - 1) * per_page
+    else:
+        actual_limit = limit
+        actual_skip = skip
+
+    count_statement = select(func.count(Library.library_id))
+    total = db.exec(count_statement).one()
+
+    # Get libraries with their nested knowledges
+    from sqlalchemy.orm import selectinload
+
+    statement = (
+        select(Library)
+        .options(selectinload(Library.knowledges))
+        .offset(actual_skip)
+        .limit(actual_limit)
+    )
+    libraries = db.exec(statement).all()
+
+    return {
+        "success": True,
+        "data": {
+            "items": [
+                {
+                    "id": l.library_id,
+                    "library_id": l.library_id,
+                    "name": l.name,
+                    "description": l.description,
+                    "created_by_user_id": l.created_by_user_id,
+                    "created_at": l.created_at,
+                    "knowledges": [
+                        {
+                            "id": k.id,
+                            "name": k.name,
+                        }
+                        for k in l.knowledges
+                    ],
+                    "knowledge_names": sorted([k.name for k in l.knowledges if k.name]),
+                    "knowledge_ids": [k.id for k in l.knowledges if k.id is not None],
+                }
+                for l in libraries
+            ],
+            "total": total,
+            "total_pages": max(1, -(-total // actual_limit)) if actual_limit else 1,
+        },
+    }
+
+
+@app.post("/api/v1/admin/libraries")
+def create_admin_library(
+    library_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Create a new library (admin only)."""
+    new_library = Library(
+        name=library_data["name"],
+        description=library_data.get("description"),
+        created_by_user_id=current_user.user_id,
+    )
+    db.add(new_library)
+    db.commit()
+    db.refresh(new_library)
+    return {"success": True, "library": new_library}
+
+
+@app.put("/api/v1/admin/libraries/{library_id}")
+def update_admin_library(
+    library_id: int,
+    library_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Update a library (admin only)."""
+    library = db.get(Library, library_id)
+    if not library:
+        raise HTTPException(status_code=404, detail="Library not found")
+
+    if "name" in library_data:
+        library.name = library_data["name"]
+    if "description" in library_data:
+        library.description = library_data["description"]
+
+    db.add(library)
+    db.commit()
+    db.refresh(library)
+    return {"success": True, "library": library}
+
+
+@app.delete("/api/v1/admin/libraries/{library_id}")
+def delete_admin_library(
+    library_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Delete a library (admin only)."""
+    library = db.get(Library, library_id)
+    if not library:
+        raise HTTPException(status_code=404, detail="Library not found")
+
+    db.delete(library)
+    db.commit()
+    return {"success": True, "message": "Library deleted successfully"}
+
+
+# Admin Knowledge Management endpoints
+@app.get("/api/v1/admin/knowledges")
+def list_admin_knowledges(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    page: int = 1,
+    per_page: int = 10,
+    skip: int = 0,
+    limit: int = 0,
+):
+    """List all knowledges (admin only)."""
+    if limit == 0:
+        actual_limit = per_page
+        actual_skip = (page - 1) * per_page
+    else:
+        actual_limit = limit
+        actual_skip = skip
+
+    count_statement = select(func.count(Knowledge.id))
+    total = db.exec(count_statement).one()
+
+    from sqlalchemy.orm import selectinload
+    statement = (
+        select(Knowledge)
+        .options(
+            selectinload(Knowledge.creator),
+            selectinload(Knowledge.catalogs),
+            selectinload(Knowledge.libraries),
+            selectinload(Knowledge.groups),
+            selectinload(Knowledge.categories),
+        )
+        .offset(actual_skip)
+        .limit(actual_limit)
+    )
+    knowledges = db.exec(statement).all()
+
+    return {
+        "success": True,
+        "data": {
+            "items": [
+                {
+                    "id": k.id,
+                    "name": k.name,
+                    "description": k.description,
+                    "brand_manufacturer_organization": k.brand_manufacturer_organization,
+                    "product_model_name_service": k.product_model_name_service,
+                    "created_by_user_id": k.created_by_user_id,
+                    "created_by_username": k.creator.username if k.creator else "Unknown",
+                    "created_at": k.created_at,
+                    "embedding_model": k.embedding_model,
+                    "catalog_names": k.catalog_names,
+                    "category_names": k.category_names,
+                    "group_names": k.group_names,
+                    "library_names": k.library_names,
+                }
+                for k in knowledges
+            ],
+            "total": total,
+            "total_pages": max(1, -(-total // actual_limit)) if actual_limit else 1,
+        },
+    }
+
+
+@app.post("/api/v1/admin/knowledges")
+def create_admin_knowledge(
+    knowledge_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Create a new knowledge base (admin only)."""
+    new_knowledge = Knowledge(
+        name=knowledge_data["name"],
+        description=knowledge_data.get("description"),
+        brand_manufacturer_organization=knowledge_data.get(
+            "brand_manufacturer_organization"
+        ),
+        product_model_name_service=knowledge_data.get("product_model_name_service"),
+        embedding_model=knowledge_data.get("embedding_model"),
+        created_by_user_id=current_user.user_id,
+    )
+    db.add(new_knowledge)
+    db.commit()
+    db.refresh(new_knowledge)
+    return {"success": True, "knowledge": new_knowledge}
+
+
+@app.put("/api/v1/admin/knowledges/{knowledge_id}")
+def update_admin_knowledge(
+    knowledge_id: int,
+    knowledge_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Update a knowledge base (admin only)."""
+    knowledge = db.get(Knowledge, knowledge_id)
+    if not knowledge:
+        raise HTTPException(status_code=404, detail="Knowledge not found")
+
+    if "name" in knowledge_data:
+        knowledge.name = knowledge_data["name"]
+    if "description" in knowledge_data:
+        knowledge.description = knowledge_data["description"]
+    if "brand_manufacturer_organization" in knowledge_data:
+        knowledge.brand_manufacturer_organization = knowledge_data[
+            "brand_manufacturer_organization"
+        ]
+    if "product_model_name_service" in knowledge_data:
+        knowledge.product_model_name_service = knowledge_data[
+            "product_model_name_service"
+        ]
+    if "embedding_model" in knowledge_data:
+        knowledge.embedding_model = knowledge_data["embedding_model"]
+
+    db.add(knowledge)
+    db.commit()
+    db.refresh(knowledge)
+    return {"success": True, "knowledge": knowledge}
+
+
+@app.delete("/api/v1/admin/knowledges/{knowledge_id}")
+def delete_admin_knowledge(
+    knowledge_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Delete a knowledge base (admin only)."""
+    knowledge = db.get(Knowledge, knowledge_id)
+    if not knowledge:
+        raise HTTPException(status_code=404, detail="Knowledge not found")
+
+    db.delete(knowledge)
+    db.commit()
+    return {"success": True, "message": "Knowledge deleted successfully"}
+
+
 # Admin User Management endpoints
 @app.get("/api/v1/admin/users")
 def list_admin_users(
     db=Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
+    page: int = 1,
+    per_page: int = 10,
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 0,
 ):
     """
     List all users (admin only).
@@ -3057,22 +3621,138 @@ def list_admin_users(
     """
     from sqlmodel import select
 
-    statement = select(User).offset(skip).limit(limit)
+    if limit == 0:
+        actual_limit = per_page
+        actual_skip = (page - 1) * per_page
+    else:
+        actual_limit = limit
+        actual_skip = skip
+
+    # Get total count first
+    count_result = db.exec(select(func.count(User.user_id))).one()
+
+    statement = select(User).offset(actual_skip).limit(actual_limit)
     result = db.exec(statement)
     users = result.all()
     return {
-        "users": [
+        "success": True,
+        "data": {
+            "items": [
+                {
+                    "user_id": u.user_id,
+                    "username": u.username,
+                    "email": u.email,
+                    "is_admin": u.is_admin,
+                    "is_disabled": u.is_disabled,
+                    "created_at": u.created_at,
+                }
+                for u in users
+            ],
+            "total": count_result,
+            "total_pages": max(1, -(-count_result // actual_limit))
+            if actual_limit
+            else 1,
+        },
+    }
+
+
+@app.get("/api/v1/admin/files")
+def list_admin_files(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    page: int = 1,
+    per_page: int = 10,
+):
+    """List all uploaded files (admin only)."""
+    actual_limit = per_page
+    actual_skip = (page - 1) * per_page
+
+    count_statement = select(func.count(UploadedFile.file_id))
+    total = db.exec(count_statement).one()
+
+    # Join with User, Library, Knowledge for details
+    from modules.models import Library, Knowledge
+
+    statement = (
+        select(UploadedFile, User.username, Library.name, Knowledge.name)
+        .join(User, UploadedFile.user_id == User.user_id)
+        .outerjoin(Library, UploadedFile.library_id == Library.library_id)
+        .outerjoin(Knowledge, UploadedFile.knowledge_id == Knowledge.id)
+        .order_by(UploadedFile.upload_time.desc())
+        .offset(actual_skip)
+        .limit(actual_limit)
+    )
+
+    results = db.exec(statement).all()
+
+    items = []
+    for f, username, lib_name, kn_name in results:
+        items.append(
             {
-                "user_id": u.user_id,
-                "username": u.username,
-                "email": u.email,
-                "is_admin": u.is_admin,
-                "is_disabled": u.is_disabled,
-                "created_at": u.created_at,
+                "id": f.file_id,
+                "file_id": f.file_id,
+                "filename": f.original_filename,
+                "file_size": f.file_size,
+                "upload_time": f.upload_time,
+                "username": username,
+                "library_name": lib_name,
+                "knowledge_name": kn_name,
+                "is_ocr": f.is_ocr,
             }
-            for u in users
-        ],
-        "total": len(users),
+        )
+
+    return {
+        "success": True,
+        "data": {
+            "items": items,
+            "total": total,
+            "total_pages": max(1, -(-total // actual_limit)) if actual_limit else 1,
+        },
+    }
+
+
+@app.get("/api/v1/admin/folder_upload/jobs")
+def list_admin_folder_upload_jobs(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    page: int = 1,
+    per_page: int = 10,
+):
+    """List all folder upload jobs (admin only)."""
+    actual_limit = per_page
+    actual_skip = (page - 1) * per_page
+
+    count_statement = select(func.count(FolderUploadJob.id))
+    total = db.exec(count_statement).one()
+
+    statement = (
+        select(FolderUploadJob)
+        .order_by(FolderUploadJob.created_at.desc())
+        .offset(actual_skip)
+        .limit(actual_limit)
+    )
+    jobs = db.exec(statement).all()
+
+    return {
+        "success": True,
+        "data": {
+            "items": [
+                {
+                    "id": j.id,
+                    "created_at": j.created_at,
+                    "file_list": j.file_list,
+                    "file_types": j.file_types,
+                    "background_enabled": j.background_enabled,
+                    "scheduled_time": j.scheduled_time,
+                    "status": j.status,
+                    "log": j.log,
+                    "task_id": j.task_id,
+                }
+                for j in jobs
+            ],
+            "total": total,
+            "total_pages": max(1, -(-total // actual_limit)) if actual_limit else 1,
+        },
     }
 
 
@@ -3302,16 +3982,24 @@ def get_admin_stats(
         select(UploadedFile).order_by(desc(UploadedFile.created_at)).limit(5)
     ).all()
     recent_files = [
-        {"id": f.file_id, "filename": f.filename, "created_at": f.created_at.isoformat() if f.created_at else None}
+        {
+            "id": f.file_id,
+            "filename": f.original_filename,
+            "created_at": f.upload_time.isoformat() if f.upload_time else None,
+        }
         for f in recent_files_objs
     ]
 
     # Get recent messages
     recent_messages_objs = db.exec(
-        select(MessageHistory).order_by(desc(MessageHistory.created_at)).limit(5)
+        select(MessageHistory).order_by(desc(MessageHistory.timestamp)).limit(5)
     ).all()
     recent_messages = [
-        {"id": str(m.message_id), "question": m.content[:100] if m.content else "", "created_at": m.created_at.isoformat() if m.created_at else None}
+        {
+            "id": str(m.message_id),
+            "question": m.message_text[:100] if m.message_text else "",
+            "created_at": m.timestamp.isoformat() if m.timestamp else None,
+        }
         for m in recent_messages_objs
     ]
 
@@ -3325,7 +4013,7 @@ def get_admin_stats(
             "message_count": message_count,
             "recent_files": recent_files,
             "recent_messages": recent_messages,
-        }
+        },
     }
 
 
@@ -3609,326 +4297,6 @@ async def delete_file(
 
 add_pagination(app)
 
-# ============================================================
-# FLASK COMPATIBILITY ENDPOINTS (/api/*)
-# ============================================================
-# These endpoints mirror Flask API response formats exactly
-# for gradual frontend migration.
-
-
-def get_user_group_ids(user_id: str, db) -> list:
-    """Get list of group IDs for a user."""
-    statement = select(UserGroup.group_id).where(UserGroup.user_id == user_id)
-    result = db.exec(statement)
-    return list(result.all())
-
-
-# --- Authentication Compatibility Endpoints ---
-
-from fastapi.responses import JSONResponse
-
-@app.post("/api/login")
-def api_login_flask_compat(request: Request, login_data: dict, db=Depends(get_db)):
-    """
-    Flask-compatible login endpoint.
-    Accepts {username, password} and returns {success, user}.
-    Also returns JWT token for gradual migration.
-    """
-    username = login_data.get("username", "").strip()
-    password = login_data.get("password", "")
-
-    if not username or not password:
-        return JSONResponse(
-            content={"success": False, "error": "Username and password are required"},
-            status_code=400
-        )
-
-    # Try email lookup first (FastAPI style)
-    user = authenticate_user_async(username, password, db)
-    if not user:
-        # Fallback: Try by user_id or username directly (legacy compatibility)
-        statement = select(User).where((User.user_id == username) | (User.username == username))
-        result = db.exec(statement)
-        user_match = result.first()
-        if user_match and verify_password(password, user_match.password_hash):
-            user = user_match
-
-    if not user:
-        return JSONResponse(
-            content={"success": False, "error": "Invalid username or password"},
-            status_code=401
-        )
-
-    if user.is_disabled:
-        return JSONResponse(
-            content={"success": False, "error": "Account is disabled"},
-            status_code=403
-        )
-
-    # Generate JWT token
-    access_token = create_access_token(data={"sub": user.user_id})
-
-    # Return Flask-compatible response with additional JWT token
-    return {
-        "success": True,
-        "user": {
-            "id": user.user_id,
-            "username": user.username,
-            "is_admin": user.is_admin,
-            "profile_picture_url": None,
-        },
-        "access_token": access_token,
-        "token_type": "bearer",
-    }
-
-
-@app.get("/api/me")
-async def api_me_flask_compat(
-    request: Request, current_user: User = Depends(get_current_user)
-):
-    """Flask-compatible /api/me endpoint."""
-    return {
-        "authenticated": True,
-        "user": {
-            "id": current_user.user_id,
-            "username": current_user.username,
-            "is_admin": current_user.is_admin,
-            "profile_picture_url": None,
-        },
-    }
-
-
-@app.post("/api/logout")
-async def api_logout_flask_compat(current_user: User = Depends(get_current_user)):
-    """Flask-compatible logout endpoint."""
-    return {"success": True}
-
-
-# --- Library & Knowledge Endpoints ---
-
-
-@app.get("/api/libraries")
-def api_libraries_flask_compat(
-    request: Request, db=Depends(get_db), current_user: User = Depends(get_current_user)
-):
-    """
-    Flask-compatible libraries endpoint.
-    Returns libraries with their knowledges, filtered by user permissions.
-    """
-    vector_store_mode = os.environ.get("VECTOR_STORE_MODE", "user")
-    user_group_ids = get_user_group_ids(current_user.user_id, db)
-
-    # Get all libraries
-    statement = select(Library).order_by(Library.name)
-    result = db.exec(statement)
-    libraries = result.all()
-
-    libraries_data = []
-    for library in libraries:
-        # Get knowledges for this library
-        # In knowledge mode, filter by user's groups
-        knowledges_data = []
-
-        # Get knowledges (simplified - no group filtering for now)
-        knowledge_statement = select(Knowledge).order_by(Knowledge.name)
-        knowledge_result = db.exec(knowledge_statement)
-        knowledges = knowledge_result.all()
-
-        for k in knowledges:
-            knowledges_data.append(
-                {
-                    "id": k.id,
-                    "name": k.name,
-                    "categories": [],
-                    "catalogs": [],
-                    "groups": [],
-                }
-            )
-
-        libraries_data.append(
-            {
-                "library_id": library.library_id,
-                "name": library.name,
-                "description": library.description or "",
-                "knowledges": knowledges_data,
-            }
-        )
-
-    return {"libraries": libraries_data}
-
-
-@app.get("/api/knowledges")
-def api_knowledges_flask_compat(
-    request: Request, db=Depends(get_db), current_user: User = Depends(get_current_user)
-):
-    """
-    Flask-compatible knowledges endpoint.
-    Returns knowledges with library mappings.
-    """
-    vector_store_mode = os.environ.get("VECTOR_STORE_MODE", "user")
-
-    knowledge_libraries_map = {}
-    knowledges_list = []
-
-    statement = select(Knowledge).order_by(Knowledge.name)
-    result = db.exec(statement)
-    knowledges = result.all()
-
-    for k in knowledges:
-        knowledges_list.append({"id": k.id, "name": k.name})
-
-        # Get libraries for this knowledge
-        # This requires a many-to-many relationship query
-        # For now, return all libraries
-        library_statement = select(Library).order_by(Library.name)
-        library_result = db.exec(library_statement)
-        all_libraries = library_result.all()
-
-        knowledge_libraries_map[str(k.id)] = {
-            "name": k.name,
-            "libraries": [
-                {"id": lib.library_id, "name": lib.name} for lib in all_libraries
-            ],
-        }
-
-    return {
-        "knowledges": knowledges_list,
-        "knowledge_libraries_map": knowledge_libraries_map,
-        "mode": vector_store_mode,
-    }
-
-
-# --- Upload Status Endpoints ---
-
-
-@app.get("/api/upload-status")
-def api_upload_status_flask_compat(
-    request: Request, db=Depends(get_db), current_user: User = Depends(get_current_user)
-):
-    """
-    Flask-compatible upload status endpoint.
-    Returns status of user's upload tasks from Redis.
-    """
-    broker_url = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
-
-    try:
-        redis_client = redis.from_url(broker_url)
-        task_key = f"user:{current_user.user_id}:upload_tasks"
-        task_meta_key = f"user:{current_user.user_id}:upload_task_meta"
-
-        task_ids = redis_client.lrange(task_key, 0, -1)
-        task_meta_raw = redis_client.hgetall(task_meta_key)
-
-        task_meta = {}
-        for k, v in task_meta_raw.items():
-            key = k.decode("utf-8") if isinstance(k, bytes) else k
-            try:
-                task_meta[key] = json.loads(
-                    v.decode("utf-8") if isinstance(v, bytes) else v
-                )
-            except:
-                task_meta[key] = {}
-
-        tasks = []
-        for task_id in task_ids:
-            task_id_str = (
-                task_id.decode("utf-8") if isinstance(task_id, bytes) else task_id
-            )
-            meta = task_meta.get(task_id_str, {})
-
-            # Get task status from Celery
-            try:
-                from celery.result import AsyncResult
-                from celery_app import celery
-
-                result = AsyncResult(task_id_str, app=celery)
-
-                if result.state == "PENDING" and result.info is None:
-                    # Skip orphaned PENDING tasks
-                    continue
-
-                task_info = {
-                    "task_id": task_id_str,
-                    "status": result.state,
-                    "filename": meta.get("filename", "Unknown"),
-                    "info": {},
-                }
-
-                if isinstance(result.info, dict):
-                    result_filename = result.info.get("filename")
-                    if result_filename and result_filename != "Unknown":
-                        task_info["filename"] = result_filename
-                    task_info["info"] = {
-                        "stage": result.info.get("stage"),
-                        "progress": result.info.get("progress"),
-                        "error": result.info.get("error") or result.info.get("message"),
-                    }
-
-                tasks.append(task_info)
-            except Exception as e:
-                # Task not found in Celery, skip
-                continue
-
-        return {"tasks": tasks}
-
-    except Exception as e:
-        return {"tasks": []}
-
-
-@app.post("/api/upload-status/{task_id}/dismiss")
-def api_dismiss_upload_task(
-    task_id: str, db=Depends(get_db), current_user: User = Depends(get_current_user)
-):
-    """Dismiss a completed upload task."""
-    broker_url = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
-
-    try:
-        redis_client = redis.from_url(broker_url)
-        task_key = f"user:{current_user.user_id}:upload_tasks"
-        redis_client.lrem(task_key, 0, task_id)
-        return {"success": True}
-    except:
-        return {"success": False, "error": "Failed to dismiss task"}, 500
-
-
-# --- Self-Retriever Questions Endpoint ---
-
-
-@app.post("/api/self-retriever-questions")
-def api_self_retriever_questions(
-    request: Request,
-    data: dict,
-    db=Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Generate suggested questions for the given knowledge/library context.
-    Simplified version - returns static questions for now.
-    """
-    knowledge_id = data.get("knowledge_id")
-    library_id = data.get("library_id")
-
-    # Get knowledge name for context
-    knowledge_name = "Knowledge"
-    if knowledge_id:
-        statement = select(Knowledge).where(Knowledge.id == knowledge_id)
-        result = db.exec(statement)
-        k = result.first()
-        if k:
-            knowledge_name = k.name
-
-    # Generate simple questions based on knowledge name
-    questions = [
-        f"What is {knowledge_name}?",
-        f"How do I use {knowledge_name}?",
-        f"What are the main features of {knowledge_name}?",
-        f"Where can I find documentation for {knowledge_name}?",
-        f"Who created {knowledge_name}?",
-        f"What are related resources for {knowledge_name}?",
-    ]
-
-    return {"questions": questions}
-
 
 # ============================================================
 # WAVE 3: DOCUMENT UPLOAD ENDPOINTS (/api/v1/*)
@@ -4014,7 +4382,6 @@ async def api_embedding_compatibility(
 @app.post("/api/v1/upload", response_model=UploadResponse)
 @app.post("/api/upload", response_model=UploadResponse)
 @app.post("/upload", response_model=UploadResponse)
-
 async def api_v1_upload(
     request: Request,
     files: List[UploadFile] = File(...),
@@ -4617,7 +4984,10 @@ from api.v1.documents import router as documents_router
 app.include_router(documents_router, prefix="/api/v1")
 
 # Admin Downloads Router
-downloads_router = CRUDRouter(UrlDownload, prefix="/admin/downloads", tags=["Downloads"])
+downloads_router = CRUDRouter(
+    UrlDownload, prefix="/admin/downloads", tags=["Downloads"]
+)
+
 
 @downloads_router.router.get("/list", response_model=List[UrlDownload])
 def list_downloads_compat(
@@ -4626,7 +4996,9 @@ def list_downloads_compat(
 ):
     """Flask-compatible downloads list."""
     from sqlmodel import select
+
     return db.exec(select(UrlDownload)).all()
+
 
 app.include_router(downloads_router.router, prefix="/api")
 app.include_router(downloads_router.router, prefix="/api/v1")

@@ -4,7 +4,6 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { formatDistanceToNow } from 'date-fns'
 import { type Knowledge } from '../data/schema'
 import { DataTableColumnHeader } from '@/components/data-table'
-import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DotsHorizontalIcon } from '@radix-ui/react-icons'
 import { Button } from '@/components/ui/button'
@@ -15,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useKnowledges } from './knowledges-provider'
+import { ExpandableList } from '@/components/expandable-text'
 
 type KnowledgesColumnsProps = {
   navigate: (opts: { to: string; search?: Record<string, unknown> }) => void
@@ -78,11 +78,13 @@ export function useKnowledgesColumns({ navigate }: KnowledgesColumnsProps): Colu
       ),
       cell: ({ row }) => {
         const catalogNames = row.getValue('catalog_names') as string[]
-        const count = catalogNames?.length || 0
         return (
-          <Badge variant='secondary'>
-            {count} {count === 1 ? 'Catalog' : 'Catalogs'}
-          </Badge>
+          <ExpandableList
+            items={catalogNames}
+            singularLabel='Catalog'
+            pluralLabel='Catalogs'
+            displayMode='badges'
+          />
         )
       },
     },
@@ -93,11 +95,13 @@ export function useKnowledgesColumns({ navigate }: KnowledgesColumnsProps): Colu
       ),
       cell: ({ row }) => {
         const libraryNames = row.getValue('library_names') as string[]
-        const count = libraryNames?.length || 0
         return (
-          <Badge variant='secondary'>
-            {count} {count === 1 ? 'Library' : 'Libraries'}
-          </Badge>
+          <ExpandableList
+            items={libraryNames}
+            singularLabel='Library'
+            pluralLabel='Libraries'
+            displayMode='badges'
+          />
         )
       },
     },
@@ -108,11 +112,13 @@ export function useKnowledgesColumns({ navigate }: KnowledgesColumnsProps): Colu
       ),
       cell: ({ row }) => {
         const groupNames = row.getValue('group_names') as string[]
-        const count = groupNames?.length || 0
         return (
-          <Badge variant='secondary'>
-            {count} {count === 1 ? 'Group' : 'Groups'}
-          </Badge>
+          <ExpandableList
+            items={groupNames}
+            singularLabel='Group'
+            pluralLabel='Groups'
+            displayMode='badges'
+          />
         )
       },
     },

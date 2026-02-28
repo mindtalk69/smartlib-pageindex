@@ -1,6 +1,7 @@
 from typing import Any, List, Type, TypeVar, Generic, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import SQLModel, select, Session
+from sqlalchemy.orm import selectinload
 from fastapi_pagination import Page, Params
 from fastapi_pagination.ext.sqlmodel import paginate
 from database_fastapi import get_db
@@ -28,10 +29,12 @@ class CRUDRouter(Generic[ModelType]):
         tags: List[str] = None,
         require_auth: bool = True,
         user_field: Optional[str] = None,
+        eager_load: List[str] = None,
     ):
         self.model = model
         self.require_auth = require_auth
         self.user_field = user_field
+        self.eager_load = eager_load or []
         self.router = APIRouter(prefix=prefix, tags=tags or [model.__name__])
         self._setup_routes()
 
@@ -59,6 +62,12 @@ class CRUDRouter(Generic[ModelType]):
                 )
             else:
                 query = select(self.model)
+
+            # Apply eager loading
+            for relation in self.eager_load:
+                if hasattr(self.model, relation):
+                    query = query.options(selectinload(getattr(self.model, relation)))
+
             return paginate(db, query, Params(page=page, size=size))
 
         @self.router.get("/{item_id}", response_model=self.model)
@@ -68,7 +77,14 @@ class CRUDRouter(Generic[ModelType]):
             current_user: Optional[User] = Depends(self._get_auth_dependency()),
         ):
             """Get a single item by ID."""
-            item = db.get(self.model, item_id)
+            query = select(self.model).where(getattr(self.model, list(self.model.__table__.primary_key.columns)[0].name) == item_id)
+            
+            # Apply eager loading
+            for relation in self.eager_load:
+                if hasattr(self.model, relation):
+                    query = query.options(selectinload(getattr(self.model, relation)))
+            
+            item = db.exec(query).first()
             if not item:
                 raise HTTPException(status_code=404, detail=f"{self.model.__name__} not found")
 

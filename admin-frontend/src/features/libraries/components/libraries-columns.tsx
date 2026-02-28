@@ -4,7 +4,6 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { formatDistanceToNow } from 'date-fns'
 import { type Library } from '../data/schema'
 import { DataTableColumnHeader } from '@/components/data-table'
-import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DotsHorizontalIcon } from '@radix-ui/react-icons'
 import { Button } from '@/components/ui/button'
@@ -15,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useLibraries } from './libraries-provider'
+import { ExpandableList } from '@/components/expandable-text'
 
 type LibrariesColumnsProps = {
   navigate: (opts: { to: string; search?: Record<string, unknown> }) => void
@@ -78,11 +78,14 @@ export function useLibrariesColumns({ navigate }: LibrariesColumnsProps): Column
       ),
       cell: ({ row }) => {
         const knowledgeNames = row.getValue('knowledge_names') as string[]
-        const count = knowledgeNames?.length || 0
         return (
-          <Badge variant='secondary'>
-            {count} {count === 1 ? 'Knowledge' : 'Knowledges'}
-          </Badge>
+          <ExpandableList
+            items={knowledgeNames}
+            singularLabel='Knowledge'
+            pluralLabel='Knowledges'
+            displayMode='badges'
+            maxVisible={3}
+          />
         )
       },
     },
