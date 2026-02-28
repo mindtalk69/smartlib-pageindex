@@ -87,7 +87,7 @@ export function UploadProgress({ tasks, onTaskComplete }: UploadProgressProps) {
 
     const handleDismiss = async (taskId: string) => {
         try {
-            await api.post(`/api/upload-status/${taskId}/dismiss`);
+            await api.post(`/upload-status/${taskId}/dismiss`);
             onTaskComplete(taskId)
         } catch (error) {
             console.error('Failed to dismiss task:', error)

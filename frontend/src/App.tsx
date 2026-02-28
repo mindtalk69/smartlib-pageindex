@@ -2459,7 +2459,7 @@ export function App() {
                                       className="h-8 w-8 text-muted-foreground hover:text-green-500 hover:bg-green-500/10 transition-colors"
                                       onClick={async () => {
                                         try {
-                                          const data = await api.post<any>('/api/message_feedback', {
+                                          const data = await api.post<any>('/message_feedback', {
                                             message_id: message.id,
                                             feedback_type: 'like'
                                           });
@@ -2486,7 +2486,7 @@ export function App() {
                                       className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
                                       onClick={async () => {
                                         try {
-                                          const data = await api.post<any>('/api/message_feedback', {
+                                          const data = await api.post<any>('/message_feedback', {
                                             message_id: message.id,
                                             feedback_type: 'dislike'
                                           });

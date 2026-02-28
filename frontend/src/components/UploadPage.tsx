@@ -75,7 +75,7 @@ export function UploadPage() {
                 autoDismissedRef.current.add(task.task_id);
                 setTimeout(() => {
                     handleTaskComplete(task.task_id);
-                    api.post(`/api/upload-status/${task.task_id}/dismiss`).catch(console.error);
+                    api.post(`/upload-status/${task.task_id}/dismiss`).catch(console.error);
                 }, 5000);
             }
         });

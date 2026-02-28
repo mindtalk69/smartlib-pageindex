@@ -81,7 +81,7 @@ export function UploadStatusBadge({ className }: UploadStatusBadgeProps) {
 
   const dismissTask = async (taskId: string) => {
     try {
-      await api.post(`/api/upload-status/${taskId}/dismiss`);
+      await api.post(`/upload-status/${taskId}/dismiss`);
       setTasks((prev) => prev.filter((t) => t.task_id !== taskId));
     } catch (err) {
       console.error("Failed to dismiss task:", err);

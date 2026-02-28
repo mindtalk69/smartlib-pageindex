@@ -314,11 +314,6 @@
 
   {% block page_scripts %}{% endblock %}
 
-  <!-- Upload Status Tracker - Load for all authenticated users -->
-  {% if current_user.is_authenticated %}
-  <script src="{{ url_for('static', filename='js/upload-status.js') }}?v={{ config['APP_VERSION'] }}"></script>
-  {% endif %}
-
   {% block scripts %}
   {% if asset_bundle is defined %}
   {% set bundle = asset_bundle('chat') %}

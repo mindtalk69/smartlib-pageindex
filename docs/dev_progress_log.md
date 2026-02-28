@@ -1,5 +1,66 @@
 # SmartLib Dev Progress Log
 
+## 2026-02-28 – Fix 401 Unauthorized & Remove Flask Legacy Code
+
+### Summary
+Fixed 401 Unauthorized errors on `/api/upload-status` endpoint and completely removed Flask legacy authentication code from the FastAPI-only single-container setup.
+
+### Root Cause
+The 401 error was caused by authentication mismatch:
+- Flask-compat endpoint `/api/upload-status` used JWT authentication
+- Legacy JavaScript `static/js/upload-status.js` sent CSRF tokens (Flask session auth)
+- These two auth methods are incompatible → 401 Unauthorized
+
+### Changes Made
+
+**1. Removed Flask-Compatibility Endpoints (main_fastapi.py)**
+Removed ~280 lines of duplicate endpoints that used wrong auth:
+- `/api/login`, `/api/me`, `/api/logout`
+- `/api/libraries`, `/api/knowledges`
+- `/api/upload-status`, `/api/upload-status/{id}/dismiss`
+- `/api/self-retriever-questions`
+
+These were duplicates of existing `/api/v1/*` endpoints with JWT auth.
+
+**2. Added Missing V1 Endpoint**
+- `/api/v1/message_feedback` - for message like/dislike feedback functionality
+
+**3. Fixed Frontend Path Issues**
+Fixed 4 React components that incorrectly used `/api/` prefix:
+- `UploadStatusBadge.tsx` - dismiss path
+- `UploadPage.tsx` - dismiss path
+- `UploadProgress.tsx` - dismiss path
+- `App.tsx` - message_feedback paths
+
+The `apiClient.ts` already prepends `/api/v1`, so these were creating double paths like `/api/v1/api/upload-status`.
+
+**4. Deleted Legacy Files**
+- `static/js/upload-status.js` - Flask-based upload status tracker (replaced by React component)
+- `frontend/src/utils/csrf.ts` - CSRF utility (not needed for JWT auth)
+
+**5. Updated Templates**
+- Removed upload-status.js script tag from `templates/base.html`
+
+### Files Modified
+- `main_fastapi.py` - Removed Flask-compat endpoints, added message_feedback endpoint
+- `frontend/src/components/UploadStatusBadge.tsx` - Fixed API path
+- `frontend/src/components/UploadPage.tsx` - Fixed API path
+- `frontend/src/components/upload/UploadProgress.tsx` - Fixed API path
+- `frontend/src/App.tsx` - Fixed message_feedback paths
+- `templates/base.html` - Removed legacy script tag
+
+### Files Deleted
+- `static/js/upload-status.js`
+- `frontend/src/utils/csrf.ts`
+
+### Result
+- All API endpoints now use clean `/api/v1/*` paths with JWT-only authentication
+- No more 401 errors from auth mismatch
+- Simplified codebase by removing Flask legacy code
+- TypeScript compiles successfully with no errors
+
+---
+
 ## 2026-02-27 – Single-Container Architecture & Frontend JWT Migration
 
 ### Summary

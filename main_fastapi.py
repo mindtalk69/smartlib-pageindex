@@ -10,6 +10,7 @@ from fastapi import (
     Form,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from sqladmin import Admin, ModelView
 from database_fastapi import engine, init_db, get_db, Session
 from modules.models import (
@@ -594,6 +595,90 @@ async def logout(current_user: User = Depends(get_current_user)):
         "success": True,
         "message": "Successfully logged out. Please discard your token.",
     }
+
+
+@app.post("/api/v1/message_feedback")
+async def api_message_feedback(
+    request: Request,
+    data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Submit like/dislike feedback for a message.
+    """
+    from modules.database import MessageFeedback as DBMessageFeedback
+    from sqlmodel import select
+
+    message_id = data.get("message_id")
+    feedback_type = data.get("feedback_type")
+
+    # Validate parameters
+    try:
+        message_id = int(message_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid message_id format")
+
+    if not message_id or feedback_type not in ("like", "dislike"):
+        raise HTTPException(status_code=400, detail="Invalid parameters")
+
+    # Get message
+    statement = select(MessageHistory).where(MessageHistory.message_id == message_id)
+    result = db.exec(statement)
+    message = result.first()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    # Check for existing feedback
+    existing_statement = select(DBMessageFeedback).where(
+        DBMessageFeedback.message_id == message_id,
+        DBMessageFeedback.user_id == current_user.user_id,
+    )
+    existing_result = db.exec(existing_statement)
+    feedback = existing_result.first()
+
+    if feedback:
+        # Update if changed
+        if feedback.feedback_type != feedback_type:
+            feedback.feedback_type = feedback_type
+            db.add(feedback)
+            db.commit()
+    else:
+        # Add new feedback
+        feedback = DBMessageFeedback(
+            message_id=message_id,
+            user_id=current_user.user_id,
+            feedback_type=feedback_type,
+        )
+        db.add(feedback)
+        db.commit()
+
+    # Aggregate counts
+    like_statement = (
+        select(func.count())
+        .select_from(DBMessageFeedback)
+        .where(
+            DBMessageFeedback.message_id == message_id,
+            DBMessageFeedback.feedback_type == "like",
+        )
+    )
+    dislike_statement = (
+        select(func.count())
+        .select_from(DBMessageFeedback)
+        .where(
+            DBMessageFeedback.message_id == message_id,
+            DBMessageFeedback.feedback_type == "dislike",
+        )
+    )
+
+    like_count = db.exec(like_statement).one()
+    dislike_count = db.exec(dislike_statement).one()
+
+    logging.info(
+        f"Feedback saved: user={current_user.user_id}, message_id={message_id}, type={feedback_type}"
+    )
+
+    return {"success": True, "like_count": like_count, "dislike_count": dislike_count}
 
 
 @app.post("/api/v1/auth/forgot-password")
@@ -3491,6 +3576,7 @@ def list_admin_knowledges(
     total = db.exec(count_statement).one()
 
     from sqlalchemy.orm import selectinload
+
     statement = (
         select(Knowledge)
         .options(
@@ -3516,7 +3602,9 @@ def list_admin_knowledges(
                     "brand_manufacturer_organization": k.brand_manufacturer_organization,
                     "product_model_name_service": k.product_model_name_service,
                     "created_by_user_id": k.created_by_user_id,
-                    "created_by_username": k.creator.username if k.creator else "Unknown",
+                    "created_by_username": k.creator.username
+                    if k.creator
+                    else "Unknown",
                     "created_at": k.created_at,
                     "embedding_model": k.embedding_model,
                     "catalog_names": k.catalog_names,
@@ -4015,6 +4103,271 @@ def get_admin_stats(
             "recent_messages": recent_messages,
         },
     }
+
+
+# ============================================================
+# ADMIN VECTOR REFERENCES ENDPOINTS
+# ============================================================
+
+import os
+import glob
+import json
+
+
+def _get_vector_log_directory() -> str:
+    """Get the directory for vector reference logs."""
+    data_volume = os.environ.get("DATA_VOLUME_PATH")
+    if not data_volume:
+        # Default to data/logs in project root
+        base_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "data", "logs"
+        )
+    else:
+        base_dir = os.path.join(data_volume, "logs")
+    os.makedirs(base_dir, exist_ok=True)
+    return base_dir
+
+
+@app.get("/api/v1/admin/vector-references")
+def list_vector_reference_logs(
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    List all available vector reference log files (admin only).
+    """
+    log_dir = _get_vector_log_directory()
+    log_pattern = os.path.join(log_dir, "vector_references_*.log")
+    log_files_paths = glob.glob(log_pattern)
+
+    log_files = [os.path.basename(p) for p in log_files_paths]
+    log_files.sort(reverse=True)  # Show newest first
+
+    return {
+        "success": True,
+        "log_files": log_files,
+        "log_directory": log_dir,
+    }
+
+
+@app.get("/api/v1/admin/vector-references/{log_filename}")
+def view_vector_reference_log(
+    log_filename: str,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    View content of a specific vector reference log file (admin only).
+    """
+    log_dir = _get_vector_log_directory()
+
+    # Security check to prevent directory traversal
+    if ".." in log_filename or not log_filename.startswith("vector_references_"):
+        raise HTTPException(status_code=400, detail="Invalid log filename")
+
+    log_file_path = os.path.join(log_dir, log_filename)
+
+    if not os.path.exists(log_file_path):
+        raise HTTPException(status_code=404, detail="Log file not found")
+
+    references = []
+    try:
+        with open(log_file_path, "r") as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        references.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading log file: {str(e)}")
+
+    log_stats = {}
+    if references:
+        log_stats["total_entries"] = len(references)
+        log_stats["unique_files"] = len(
+            {ref.get("file_id") for ref in references if ref.get("file_id")}
+        )
+
+        file_counts = {}
+        for ref in references:
+            file_id = ref.get("file_id")
+            if file_id:
+                file_counts[str(file_id)] = file_counts.get(str(file_id), 0) + 1
+        log_stats["file_counts"] = file_counts
+
+        timestamps = [
+            ref.get("timestamp") for ref in references if ref.get("timestamp")
+        ]
+        if timestamps:
+            timestamps.sort()
+            log_stats["date_range"] = f"{timestamps[0][:10]} to {timestamps[-1][:10]}"
+        else:
+            log_stats["date_range"] = "N/A"
+
+    return {
+        "success": True,
+        "references": references,
+        "log_filename": log_filename,
+        "log_stats": log_stats,
+        "log_directory": log_dir,
+    }
+
+
+@app.delete("/api/v1/admin/vector-references/{log_filename}")
+def delete_vector_reference_log(
+    log_filename: str,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Delete a specific vector reference log file (admin only).
+    """
+    log_dir = _get_vector_log_directory()
+
+    # Security check to prevent directory traversal
+    if ".." in log_filename or not log_filename.startswith("vector_references_"):
+        raise HTTPException(status_code=400, detail="Invalid log filename")
+
+    log_file_path = os.path.join(log_dir, log_filename)
+
+    if not os.path.exists(log_file_path):
+        raise HTTPException(status_code=404, detail="Log file not found")
+
+    try:
+        os.remove(log_file_path)
+        return {
+            "success": True,
+            "message": f"Log file {log_filename} deleted successfully",
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error deleting log file: {str(e)}"
+        )
+
+
+# ============================================================
+# ADMIN VECTOR SETTINGS ENDPOINTS
+# ============================================================
+
+from sqlmodel import select
+
+
+class VectorSettingsResponse(BaseModel):
+    success: bool
+    sqlite_table_name: str
+    vector_store_mode: str
+
+
+class VectorSettingsUpdate(BaseModel):
+    sqlite_table_name: Optional[str] = None
+    vector_store_mode: Optional[str] = None
+
+
+@app.get("/api/v1/admin/vector-settings", response_model=VectorSettingsResponse)
+def get_vector_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    settings_keys = [
+        "SQLITE_VECTOR_TABLE_NAME",
+        "VECTOR_STORE_MODE",
+    ]
+
+    settings = {}
+    for key in settings_keys:
+        statement = select(AppSettings).where(AppSettings.key == key)
+        result = db.exec(statement)
+        setting = result.first()
+        if setting:
+            settings[key] = setting.value
+
+    vector_store_mode = settings.get(
+        "VECTOR_STORE_MODE", os.environ.get("VECTOR_STORE_MODE", "user")
+    )
+
+    return VectorSettingsResponse(
+        success=True,
+        sqlite_table_name=settings.get("SQLITE_VECTOR_TABLE_NAME", "document_vectors"),
+        vector_store_mode=vector_store_mode,
+    )
+
+
+@app.post("/api/v1/admin/vector-settings", response_model=VectorSettingsResponse)
+def update_vector_settings(
+    settings_update: VectorSettingsUpdate,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    vector_store_mode = settings_update.vector_store_mode or "user"
+    if vector_store_mode not in ["user", "global", "knowledge"]:
+        raise HTTPException(status_code=400, detail="Invalid vector store mode")
+
+    settings_to_update = {
+        "SQLITE_VECTOR_TABLE_NAME": settings_update.sqlite_table_name
+        or "document_vectors",
+        "VECTOR_STORE_MODE": vector_store_mode,
+    }
+
+    for key, value in settings_to_update.items():
+        statement = select(AppSettings).where(AppSettings.key == key)
+        result = db.exec(statement)
+        existing = result.first()
+
+        if existing:
+            existing.value = value
+            db.add(existing)
+        else:
+            new_setting = AppSettings(key=key, value=value)
+            db.add(new_setting)
+
+    db.commit()
+
+    return VectorSettingsResponse(
+        success=True,
+        sqlite_table_name=settings_to_update["SQLITE_VECTOR_TABLE_NAME"],
+        vector_store_mode=vector_store_mode,
+    )
+
+
+@app.post("/api/v1/admin/vector-settings/reset")
+async def reset_vector_store(
+    request: Request,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    statement = select(AppSettings).where(AppSettings.key == "SQLITE_VECTOR_TABLE_NAME")
+    result = db.exec(statement)
+    table_setting = result.first()
+    table_name = table_setting.value if table_setting else "document_vectors"
+
+    try:
+        body = await request.body()
+        data = json.loads(body) if body else {}
+    except:
+        data = {}
+
+    confirm_text = data.get("confirm_text", "").strip()
+
+    if confirm_text != "RESET VECTORS":
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid confirmation text. Type 'RESET VECTORS' to confirm.",
+        )
+
+    try:
+        from sqlmodel import text
+
+        db.exec(text(f"DELETE FROM {table_name}"))
+        db.commit()
+
+        return {
+            "success": True,
+            "message": f"Vector store has been reset. All vectors deleted from {table_name}.",
+        }
+
+    except Exception as e:
+        logging.error(f"Error resetting vector store: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error resetting vector store: {str(e)}"
+        )
 
 
 # ============================================================
