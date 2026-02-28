@@ -49,10 +49,12 @@ export function UrlDownloads() {
   const fetchDownloads = async () => {
     setIsLoading(true)
     try {
-      // Using /v1/admin/downloads prefix from FastAPI CRUDRouter
-      const response = await fetchApi<UrlDownload[]>('/v1/admin/downloads')
+      // API_BASE is already /api/v1, so we just need /admin/downloads
+      const response = await fetchApi<any>('/admin/downloads')
       if (response.success && response.data) {
-        setDownloads(response.data)
+        // Handle paginated response structure
+        const items = response.data.items || response.data
+        setDownloads(Array.isArray(items) ? items : [])
       }
     } catch (error) {
       console.error('Error fetching downloads:', error)
@@ -67,7 +69,7 @@ export function UrlDownloads() {
 
     setDeleteId(id)
     try {
-      const response = await fetchApi<any>(`/v1/admin/downloads/${id}`, {
+      const response = await fetchApi<any>(`/admin/downloads/${id}`, {
         method: 'DELETE',
       })
       if (response.success) {
@@ -153,60 +155,63 @@ export function UrlDownloads() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {downloads.map((download) => (
-                    <TableRow key={download.id}>
-                      <TableCell className="font-mono text-sm">#{download.id}</TableCell>
-                      <TableCell>
-                        <a
-                          href={download.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline max-w-md block truncate"
-                          title={download.url}
-                        >
-                          <Link className="inline h-3 w-3 mr-1" />
-                          {download.url.substring(0, 60)}
-                          {download.url.length > 60 && '...'}
-                        </a>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{download.library_name || 'N/A'}</div>
-                          {download.knowledge_name && (
-                            <div className="text-muted-foreground text-xs">{download.knowledge_name}</div>
+                  {downloads.map((download) => {
+                    const id = download.id || (download as any).download_id
+                    return (
+                      <TableRow key={id}>
+                        <TableCell className="font-mono text-sm">#{id}</TableCell>
+                        <TableCell>
+                          <a
+                            href={download.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline max-w-md block truncate"
+                            title={download.url}
+                          >
+                            <Link className="inline h-3 w-3 mr-1" />
+                            {download.url.substring(0, 60)}
+                            {download.url.length > 60 && '...'}
+                          </a>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{download.library_name || 'N/A'}</div>
+                            {download.knowledge_name && (
+                              <div className="text-muted-foreground text-xs">{download.knowledge_name}</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {getStatusBadge(download.status)}
+                          {download.error_message && (
+                            <span className="text-muted-foreground text-xs block mt-1">
+                              {download.error_message.substring(0, 50)}
+                            </span>
                           )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(download.status)}
-                        {download.error_message && (
-                          <span className="text-muted-foreground text-xs block mt-1">
-                            {download.error_message.substring(0, 50)}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>{download.content_type || 'N/A'}</TableCell>
-                      <TableCell>
-                        {download.processed_at
-                          ? new Date(download.processed_at).toLocaleDateString()
-                          : 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={deleteId === download.id}
-                          onClick={() => handleDelete(download.id)}
-                        >
-                          {deleteId === download.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell>{download.content_type || 'N/A'}</TableCell>
+                        <TableCell>
+                          {download.processed_at
+                            ? new Date(download.processed_at).toLocaleDateString()
+                            : 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={deleteId === id}
+                            onClick={() => handleDelete(id)}
+                          >
+                            {deleteId === id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
             )}

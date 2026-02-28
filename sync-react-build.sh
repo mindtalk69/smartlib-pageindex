@@ -23,9 +23,9 @@ if docker ps | grep -q smartlib-basic-web; then
     echo "🔄 Restarting web container..."
     docker compose restart web > /dev/null 2>&1
     echo "✅ Web container restarted!"
-elif docker ps | grep -q "smartlib-basic$"; then
+elif docker ps | grep -q "smartlib-basic"; then
     echo "🐳 Single container detected, syncing..."
-    docker cp static/react/. smartlib-basic:/app/static/react/
+    docker cp static/react/. smartlib-basic-app-1:/app/static/react/
     echo "✅ Synced to single container!"
 elif docker ps | grep -q "smartlib-gpu$"; then
     echo "🐳 Single container detected, syncing..."

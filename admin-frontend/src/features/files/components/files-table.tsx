@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   type SortingState,
   type VisibilityState,
@@ -47,32 +47,11 @@ export function FilesTable({ search, navigate }: DataTableProps) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const columns = useFilesColumns()
 
-  // Pagination state
-  const [pagination, setPagination] = useState({
-    pageIndex: 0,
-    pageSize: 10,
-  })
-
-  // Sync pagination with URL
-  useEffect(() => {
-    const pageFromUrl = typeof search.page === 'number' ? search.page : 1
-    const pageSizeFromUrl = typeof search.pageSize === 'number' ? search.pageSize : 10
-    setPagination({
-      pageIndex: pageFromUrl - 1,
-      pageSize: pageSizeFromUrl,
-    })
-  }, [search.page, search.pageSize])
-
-  // Sync URL when pagination changes
-  useEffect(() => {
-    navigate({
-      search: {
-        ...search,
-        page: pagination.pageIndex + 1 > 1 ? pagination.pageIndex + 1 : undefined,
-        pageSize: pagination.pageSize !== 10 ? pagination.pageSize : undefined,
-      },
-    })
-  }, [pagination]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Pagination state - controlled by URL
+  const pagination = {
+    pageIndex: (typeof search.page === 'number' ? search.page : 1) - 1,
+    pageSize: typeof search.pageSize === 'number' ? search.pageSize : 10,
+  }
 
   const table = useReactTable({
     data: files,
@@ -83,7 +62,16 @@ export function FilesTable({ search, navigate }: DataTableProps) {
       columnFilters,
       columnVisibility,
     },
-    onPaginationChange: setPagination,
+    onPaginationChange: (updater) => {
+      const newPagination = typeof updater === 'function' ? updater(pagination) : updater
+      navigate({
+        search: {
+          ...search,
+          page: newPagination.pageIndex + 1 > 1 ? newPagination.pageIndex + 1 : undefined,
+          pageSize: newPagination.pageSize !== 10 ? newPagination.pageSize : undefined,
+        },
+      })
+    },
     onColumnFiltersChange: setColumnFilters,
     onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,

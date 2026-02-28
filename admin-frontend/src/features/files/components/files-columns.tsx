@@ -14,10 +14,12 @@ export function useFilesColumns(): ColumnDef<File>[] {
         <DataTableColumnHeader column={column} title='Filename' />
       ),
       cell: ({ row }) => (
-        <div className='font-medium max-w-[200px] truncate'>
+        <div className='font-medium max-w-[400px] truncate'>
           {row.getValue('filename')}
         </div>
       ),
+      size: 300,
+      minSize: 200,
     },
     {
       accessorKey: 'file_size',

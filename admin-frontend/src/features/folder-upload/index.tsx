@@ -92,22 +92,23 @@ export function FolderUpload() {
     try {
       const response = await fetchApi<any>('/admin/libraries')
       if (response.success && response.data) {
+        const items = response.data.items || []
         const pairs: LibraryKnowledgePair[] = []
-        response.data.forEach((lib: any) => {
-          if (lib.knowledges) {
+        items.forEach((lib: any) => {
+          if (lib.knowledges && lib.knowledges.length > 0) {
             lib.knowledges.forEach((k: any) => {
               pairs.push({
-                library_id: lib.library_id,
+                library_id: String(lib.library_id),
                 library_name: lib.name,
-                knowledge_id: k.id,
+                knowledge_id: String(k.id),
                 knowledge_name: k.name,
               })
             })
           } else {
             pairs.push({
-              library_id: lib.library_id,
+              library_id: String(lib.library_id),
               library_name: lib.name,
-              knowledge_id: '',
+              knowledge_id: 'no-knowledge', // Use a non-empty fallback
               knowledge_name: 'No Knowledge',
             })
           }
@@ -123,9 +124,10 @@ export function FolderUpload() {
   const fetchJobs = async () => {
     setIsLoadingJobs(true)
     try {
-      const response = await fetchApi<FolderUploadJob[]>('/admin/folder_upload/jobs')
+      const response = await fetchApi<any>('/admin/folder_upload/jobs')
       if (response.success && response.data) {
-        setJobs(response.data)
+        const items = response.data.items || response.data
+        setJobs(Array.isArray(items) ? items : [])
       }
     } catch (error) {
       console.error('Error fetching jobs:', error)
@@ -165,7 +167,12 @@ export function FolderUpload() {
 
     try {
       const formData = new FormData()
-      formData.append('library_id', selectedLibrary)
+      // Parse composite ID
+      const [libraryId, knowledgeId] = selectedLibrary.split(':')
+      formData.append('library_id', libraryId)
+      if (knowledgeId && knowledgeId !== 'no-knowledge') {
+        formData.append('knowledge_id', knowledgeId)
+      }
       formData.append('file_types', fileTypes.join(','))
       formData.append('background_enabled', backgroundEnabled.toString())
       if (scheduledTime && backgroundEnabled) {
@@ -277,9 +284,9 @@ export function FolderUpload() {
                       {libraryKnowledgePairs.map((pair) => (
                         <SelectItem
                           key={`${pair.library_id}-${pair.knowledge_id}`}
-                          value={pair.library_id}
+                          value={`${pair.library_id}:${pair.knowledge_id}`}
                         >
-                          {pair.library_name}
+                          {pair.library_name} {pair.knowledge_name !== 'No Knowledge' ? `(${pair.knowledge_name})` : ''}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -291,8 +298,7 @@ export function FolderUpload() {
                   <Input
                     id="folder-input"
                     type="file"
-                    webkitdirectory=""
-                    directory=""
+                    {...({ webkitdirectory: '', directory: '' } as any)}
                     multiple
                     onChange={handleFileChange}
                     required

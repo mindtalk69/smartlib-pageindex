@@ -16,7 +16,7 @@ export function Files() {
   const navigate = route.useNavigate()
 
   return (
-    <FilesProvider>
+    <FilesProvider search={search} navigate={navigate}>
       <Header fixed>
         <Search />
         <div className='ms-auto flex items-center space-x-4'>

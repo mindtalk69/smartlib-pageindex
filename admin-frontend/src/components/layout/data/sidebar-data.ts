@@ -64,11 +64,6 @@ export const sidebarData: SidebarData = {
           icon: RotateCcw,
         },
         {
-          title: 'User Groups',
-          url: '/user-groups',
-          icon: Users,
-        },
-        {
           title: 'Groups',
           url: '/groups',
           icon: Users,

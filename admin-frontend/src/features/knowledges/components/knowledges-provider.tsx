@@ -16,8 +16,8 @@ interface KnowledgesContextType {
   selectedRows: string[]
   setSelectedRows: (rows: string[]) => void
   refresh: () => Promise<void>
-  updateKnowledge: (id: number, data: Partial<Knowledge>) => Promise<boolean>
-  deleteKnowledge: (id: number) => Promise<boolean>
+  updateKnowledge: (id: string, data: Partial<Knowledge>) => Promise<boolean>
+  deleteKnowledge: (id: string) => Promise<boolean>
   createKnowledge: (data: {
     name: string
     description?: string
@@ -87,10 +87,10 @@ export function KnowledgesProvider({ children }: { children: React.ReactNode }) 
         librariesApi.getAll({ page: 1, per_page: 100 }),
         groupsApi.getAll({ page: 1, per_page: 100 }),
       ])
-      if (catsRes.success && catsRes.data) setCategories(catsRes.data)
-      if (catsRes2.success && catsRes2.data) setCatalogs(catsRes2.data)
-      if (libsRes.success && libsRes.data) setLibraries(libsRes.data)
-      if (groupsRes.success && groupsRes.data) setGroups(groupsRes.data)
+      if (catsRes.success && catsRes.data) setCategories(catsRes.data.items || [])
+      if (catsRes2.success && catsRes2.data) setCatalogs(catsRes2.data.items || [])
+      if (libsRes.success && libsRes.data) setLibraries(libsRes.data.items || [])
+      if (groupsRes.success && groupsRes.data) setGroups(groupsRes.data.items || [])
     } catch (err) {
       console.error('Failed to fetch related data:', err)
     }

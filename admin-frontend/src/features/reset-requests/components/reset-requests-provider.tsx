@@ -43,7 +43,7 @@ export function ResetRequestsProvider({ children, search, navigate }: ResetReque
     setIsLoading(true)
     setError(null)
     try {
-      const params: { status?: 'pending' | 'completed' | 'denied' } = statusFilter ? { status: statusFilter as any } : {}
+      const params: { status?: 'pending' | 'completed' | 'denied' | 'all' } = statusFilter && statusFilter !== 'all' ? { status: statusFilter as any } : {}
       const response = await resetRequestsApi.getAll(params)
       if (response.success && response.data) {
         const data = Array.isArray(response.data) ? response.data : []

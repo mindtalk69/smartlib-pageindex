@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useCatalogs } from './catalogs-provider'
+import { ExpandableText } from '@/components/expandable-text'
 
 type CatalogsColumnsProps = {
   navigate: (opts: { to: string; search?: Record<string, unknown> }) => void
@@ -64,9 +65,7 @@ export function useCatalogsColumns({ navigate }: CatalogsColumnsProps): ColumnDe
       cell: ({ row }) => {
         const description = row.getValue('description') as string
         return (
-          <span className='max-w-[300px] truncate text-muted-foreground'>
-            {description || 'N/A'}
-          </span>
+          <ExpandableText text={description} maxLength={50} className='max-w-[200px]' />
         )
       },
     },

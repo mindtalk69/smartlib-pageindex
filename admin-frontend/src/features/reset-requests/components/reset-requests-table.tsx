@@ -83,7 +83,7 @@ export function ResetRequestsTable({ search, navigate }: ResetRequestsTableProps
               <SelectValue placeholder='Filter by status' />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value=''>All</SelectItem>
+              <SelectItem value='all'>All</SelectItem>
               <SelectItem value='pending'>Pending</SelectItem>
               <SelectItem value='completed'>Completed</SelectItem>
               <SelectItem value='denied'>Denied</SelectItem>

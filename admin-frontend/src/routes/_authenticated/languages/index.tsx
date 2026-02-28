@@ -1,17 +1,13 @@
+import z from 'zod'
 import { createFileRoute } from '@tanstack/react-router'
-import { PlaceholderPage } from '@/components/placeholder-page'
+import { Languages } from '@/features/languages'
+
+const languagesSearchSchema = z.object({
+  page: z.number().optional().catch(1),
+  pageSize: z.number().optional().catch(10),
+})
 
 export const Route = createFileRoute('/_authenticated/languages/')({
-  component: () => (
-    <PlaceholderPage
-      title="LLM Languages"
-      description="Manage supported languages for LLM responses."
-      features={[
-        "Configure available languages",
-        "Set default language",
-        "Language-specific prompts",
-        "Translation settings",
-      ]}
-    />
-  ),
+  validateSearch: languagesSearchSchema,
+  component: Languages,
 })

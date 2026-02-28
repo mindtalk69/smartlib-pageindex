@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return names
             .map(
                 (name) =>
-                    `<span class="badge rounded-pill bg-info text-dark me-1">${name}</span>`,
+                    `<span class="badge rounded-pill bg-info text-dark me-1" style="font-size: 0.75rem;">${name}</span>`,
             )
             .join('');
     }

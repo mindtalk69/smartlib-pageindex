@@ -47,6 +47,7 @@ import { Route as AuthenticatedLibrariesIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedLanguagesIndexRouteImport } from './routes/_authenticated/languages/index'
 import { Route as AuthenticatedKnowledgesIndexRouteImport } from './routes/_authenticated/knowledges/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
+import { Route as AuthenticatedGroupsIndexRouteImport } from './routes/_authenticated/groups/index'
 import { Route as AuthenticatedFolderUploadIndexRouteImport } from './routes/_authenticated/folder-upload/index'
 import { Route as AuthenticatedFilesIndexRouteImport } from './routes/_authenticated/files/index'
 import { Route as AuthenticatedFeedbackIndexRouteImport } from './routes/_authenticated/feedback/index'
@@ -274,6 +275,12 @@ const AuthenticatedHelpCenterIndexRoute =
     path: '/help-center/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedGroupsIndexRoute =
+  AuthenticatedGroupsIndexRouteImport.update({
+    id: '/groups/',
+    path: '/groups/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedFolderUploadIndexRoute =
   AuthenticatedFolderUploadIndexRouteImport.update({
     id: '/folder-upload/',
@@ -410,6 +417,7 @@ export interface FileRoutesByFullPath {
   '/feedback/': typeof AuthenticatedFeedbackIndexRoute
   '/files/': typeof AuthenticatedFilesIndexRoute
   '/folder-upload/': typeof AuthenticatedFolderUploadIndexRoute
+  '/groups/': typeof AuthenticatedGroupsIndexRoute
   '/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/knowledges/': typeof AuthenticatedKnowledgesIndexRoute
   '/languages/': typeof AuthenticatedLanguagesIndexRoute
@@ -464,6 +472,7 @@ export interface FileRoutesByTo {
   '/feedback': typeof AuthenticatedFeedbackIndexRoute
   '/files': typeof AuthenticatedFilesIndexRoute
   '/folder-upload': typeof AuthenticatedFolderUploadIndexRoute
+  '/groups': typeof AuthenticatedGroupsIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/knowledges': typeof AuthenticatedKnowledgesIndexRoute
   '/languages': typeof AuthenticatedLanguagesIndexRoute
@@ -523,6 +532,7 @@ export interface FileRoutesById {
   '/_authenticated/feedback/': typeof AuthenticatedFeedbackIndexRoute
   '/_authenticated/files/': typeof AuthenticatedFilesIndexRoute
   '/_authenticated/folder-upload/': typeof AuthenticatedFolderUploadIndexRoute
+  '/_authenticated/groups/': typeof AuthenticatedGroupsIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/_authenticated/knowledges/': typeof AuthenticatedKnowledgesIndexRoute
   '/_authenticated/languages/': typeof AuthenticatedLanguagesIndexRoute
@@ -580,6 +590,7 @@ export interface FileRouteTypes {
     | '/feedback/'
     | '/files/'
     | '/folder-upload/'
+    | '/groups/'
     | '/help-center/'
     | '/knowledges/'
     | '/languages/'
@@ -634,6 +645,7 @@ export interface FileRouteTypes {
     | '/feedback'
     | '/files'
     | '/folder-upload'
+    | '/groups'
     | '/help-center'
     | '/knowledges'
     | '/languages'
@@ -692,6 +704,7 @@ export interface FileRouteTypes {
     | '/_authenticated/feedback/'
     | '/_authenticated/files/'
     | '/_authenticated/folder-upload/'
+    | '/_authenticated/groups/'
     | '/_authenticated/help-center/'
     | '/_authenticated/knowledges/'
     | '/_authenticated/languages/'
@@ -999,6 +1012,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHelpCenterIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/groups/': {
+      id: '/_authenticated/groups/'
+      path: '/groups'
+      fullPath: '/groups/'
+      preLoaderRoute: typeof AuthenticatedGroupsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/folder-upload/': {
       id: '/_authenticated/folder-upload/'
       path: '/folder-upload'
@@ -1165,6 +1185,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFeedbackIndexRoute: typeof AuthenticatedFeedbackIndexRoute
   AuthenticatedFilesIndexRoute: typeof AuthenticatedFilesIndexRoute
   AuthenticatedFolderUploadIndexRoute: typeof AuthenticatedFolderUploadIndexRoute
+  AuthenticatedGroupsIndexRoute: typeof AuthenticatedGroupsIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
   AuthenticatedKnowledgesIndexRoute: typeof AuthenticatedKnowledgesIndexRoute
   AuthenticatedLanguagesIndexRoute: typeof AuthenticatedLanguagesIndexRoute
@@ -1203,6 +1224,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFeedbackIndexRoute: AuthenticatedFeedbackIndexRoute,
   AuthenticatedFilesIndexRoute: AuthenticatedFilesIndexRoute,
   AuthenticatedFolderUploadIndexRoute: AuthenticatedFolderUploadIndexRoute,
+  AuthenticatedGroupsIndexRoute: AuthenticatedGroupsIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
   AuthenticatedKnowledgesIndexRoute: AuthenticatedKnowledgesIndexRoute,
   AuthenticatedLanguagesIndexRoute: AuthenticatedLanguagesIndexRoute,

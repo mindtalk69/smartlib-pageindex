@@ -57,11 +57,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Initialize DataTable (disable sorting on Actions column)
   $('#librariesTable').DataTable({
-    columnDefs: [{ orderable: false, targets: 4 }]
+    columnDefs: [{ orderable: false, targets: 6 }] // Actions is now column 7 (index 6)
   });
 
   // Explicit form submission for add/edit library
-  form.addEventListener('submit', async function(event) {
+  form.addEventListener('submit', async function (event) {
     event.preventDefault();
     const editId = form.dataset.editId;
     const url = editId ? `/admin/libraries/edit/${editId}` : '/admin/libraries/add';

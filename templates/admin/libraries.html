@@ -44,7 +44,7 @@
                             <td class="library-knowledges">
                                 {% if library.knowledges %}
                                 {% for knowledge in library.knowledges %}
-                                <span class="badge bg-info text-dark me-1">{{ knowledge.name }}</span>
+                                <span class="badge rounded-pill bg-info text-dark me-1" style="font-size: 0.75rem;">{{ knowledge.name }}</span>
                                 {% endfor %}
                                 {% else %}
                                 <span class="text-muted">None</span>
