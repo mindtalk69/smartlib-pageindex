@@ -1,5 +1,53 @@
 # SmartLib Dev Progress Log
 
+## 2026-03-01 – Legacy Flask Database File Cleanup
+
+### Summary
+Cleaned up legacy Flask database code by moving the deprecated `modules/database.py` file to a `legacy/` folder for reference, ensuring the codebase clearly distinguishes between the FastAPI/SQLModel implementation and the old Flask/SQLAlchemy patterns.
+
+### Root Cause
+During the FastAPI migration, the project created `database_fastapi.py` (22 lines) using SQLModel for the new FastAPI app. However, the original `modules/database.py` (97.7KB Flask + SQLAlchemy code) was kept in place, creating potential confusion about which database module to use.
+
+### Analysis Results
+
+**FastAPI App (Correct - SQLModel):**
+- `database_fastapi.py` - Clean 22-line SQLModel implementation
+  - Uses `SQLModel, Session, create_engine` from sqlmodel
+  - `get_db()` yields `Session(engine)`
+  - `init_db()` calls `SQLModel.metadata.create_all(engine)`
+- `modules/models.py` - All 20+ models inherit from `SQLModel`
+- `main_fastapi.py` - Imports from `database_fastapi`
+
+**Legacy Flask App (Deprecated - SQLAlchemy):**
+- `modules/database.py` - 97.7KB legacy Flask code
+  - Uses `db.Model`, `db.Column`, `db.ForeignKey` patterns
+  - NOT used by the FastAPI app
+  - Kept for historical reference only
+
+### Solution Applied
+
+Moved the legacy file to a dedicated `legacy/` folder:
+```
+modules/database.py → legacy/database_flask.py
+```
+
+This approach:
+1. Preserves the legacy code for reference if needed
+2. Makes it clear which database module is active
+3. Prevents accidental imports from the wrong module
+4. Keeps the FastAPI codebase clean and focused
+
+### Files Modified
+- `modules/database.py` - Moved to `legacy/database_flask.py`
+- Created `legacy/` directory for deprecated code
+
+### Verification
+- FastAPI app continues to use `database_fastapi.py` (SQLModel)
+- All imports reference `database_fastapi` not the legacy file
+- Legacy Flask code preserved for migration reference
+
+---
+
 ## 2026-02-28 – Fix 401 Unauthorized & Remove Flask Legacy Code
 
 ### Summary
