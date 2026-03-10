@@ -1,38 +1,34 @@
 #!/bin/bash
-# Sync React build from frontend/dist to static/react for local development
+# Sync React builds (frontend + admin-frontend) to running container
 
-echo "🏗️ Building React frontend..."
+set -e
+
+# ── User frontend (/app) ─────────────────────────────────────────────────────
+echo "🏗️  Building React user frontend (frontend/)..."
 cd frontend
 npm run build
 cd ..
-echo "✅ Frontend build complete!"
+echo "✅ User frontend build complete!"
 
-echo "🔄 Syncing React build from frontend/dist to static/react..."
+# ── Admin frontend (/admin) ──────────────────────────────────────────────────
+echo "🏗️  Building React admin frontend (admin-frontend/)..."
+cd admin-frontend
+pnpm build 2>/dev/null || npm run build
+cd ..
+echo "✅ Admin frontend build complete!"
 
-# Remove old build and copy new one
-rm -rf static/react/*
-cp -r frontend/dist/* static/react/
+# ── Sync to running Docker container ────────────────────────────────────────
+CONTAINER_NAME=$(docker ps --format "{{.Names}}" | grep -E 'smartlib-gpu|smartlib-basic|smartlib-pageindex' | head -n 1)
 
-echo "✅ React build synced to static/react/"
-
-# Check if Docker container is running and sync to it
-if docker ps | grep -q smartlib-basic-web; then
-    echo "🐳 3-container setup detected, syncing to web container..."
-    docker cp static/react/. smartlib-basic-web-1:/app/static/react/
-    echo "✅ Synced to Docker container!"
-    echo "🔄 Restarting web container..."
-    docker compose restart web > /dev/null 2>&1
-    echo "✅ Web container restarted!"
-elif docker ps | grep -q "smartlib-basic"; then
-    echo "🐳 Single container detected, syncing..."
-    docker cp static/react/. smartlib-basic-app-1:/app/static/react/
-    echo "✅ Synced to single container!"
-elif docker ps | grep -q "smartlib-gpu$"; then
-    echo "🐳 Single container detected, syncing..."
-    docker cp static/react/. smartlib-gpu:/app/static/react/
-    echo "✅ Synced to single container!"
+if [ -n "$CONTAINER_NAME" ]; then
+    echo "🐳 Container detected: $CONTAINER_NAME — syncing builds..."
+    docker cp frontend/dist/. $CONTAINER_NAME:/app/frontend/dist/
+    docker cp admin-frontend/dist/. $CONTAINER_NAME:/app/admin-frontend/dist/
+    echo "✅ Synced frontend builds to container!"
 else
     echo "ℹ️  No Docker container running, skipping container sync"
 fi
 
-echo "✅ Done! You can now access the app at http://localhost:8000/app"
+echo "✅ Done! Access the app at:"
+echo "   http://localhost/app   → User chat"
+echo "   http://localhost/admin → Admin panel"

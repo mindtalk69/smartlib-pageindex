@@ -1,12 +1,5 @@
 # syntax=docker/dockerfile:1.5
 
-FROM node:20-alpine AS assets
-WORKDIR /app
-COPY package.json ./
-RUN npm install --silent
-COPY vite.config.js ./
-COPY static ./static
-RUN npm run build
 
 FROM node:20-alpine AS frontend
 WORKDIR /app
@@ -79,7 +72,6 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     fi
 
 COPY . /app
-COPY --from=assets /app/static/dist /app/static/dist
 COPY --from=frontend /app/dist /app/frontend/dist
 COPY --from=admin_frontend /app/dist /app/admin-frontend/dist
 

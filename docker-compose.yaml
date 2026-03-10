@@ -38,7 +38,7 @@ services:
       - IS_ENABLED_OCR=1
       - IS_OCR_LOCAL=false
       - DOCLING_EXPORT_TYPE=MARKDOWN
-      - APP_MODULE=app:app
+      - APP_MODULE=main_fastapi:app
     command: ["web"]
     depends_on:
       redis:

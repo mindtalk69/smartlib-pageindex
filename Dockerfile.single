@@ -4,14 +4,7 @@
 # One image, one container, no external dependencies.
 # ============================================================================
 
-# ─── Stage 1a: Build root static assets (chat/admin embeds) ─────────────────
-FROM node:20-alpine AS assets
-WORKDIR /app
-COPY package.json ./
-RUN npm install --silent
-COPY vite.config.js ./
-COPY static ./static
-RUN npm run build
+
 
 # ─── Stage 1b: Build frontend/ React app (served at /app/) ───────────────────
 FROM node:20-alpine AS frontend
@@ -80,8 +73,7 @@ FROM python AS final
 # Copy application code
 COPY . /app
 
-# Copy built root static assets
-COPY --from=assets /app/static/dist /app/static/dist
+
 
 # Copy built frontend/ React app (served at /app/)
 COPY --from=frontend /app/dist /app/frontend/dist

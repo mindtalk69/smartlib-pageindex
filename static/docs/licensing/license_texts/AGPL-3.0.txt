@@ -1,8 +1,0 @@
-GNU Affero General Public License v3 (Summary)
-
-This program is free software: you can redistribute it and/or modify it under
-the terms of the GNU Affero General Public License as published by the Free
-Software Foundation, either version 3 of the License, or (at your option) any
-later version. If you modify the program, or deploy it on a network server, you
-must make the complete corresponding source code available to users who interact
-with it over the network.

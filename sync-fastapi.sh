@@ -1,29 +1,36 @@
 #!/bin/bash
-# Sync FastAPI backend to running container (hot-patch without rebuild)
+# Hot-patch FastAPI backend files to running container (no full rebuild needed)
 
-echo "🔄 Syncing main_fastapi.py to running container..."
+CONTAINER_NAME=$(docker ps --format "{{.Names}}" | grep -E 'smartlib-gpu|smartlib-basic|smartlib-pageindex' | head -n 1)
 
-# Check if Docker container is running and sync to it
-if docker ps | grep -q smartlib-basic-web; then
-    echo "🐳 3-container setup detected, syncing to worker/web container..."
-    docker cp main_fastapi.py smartlib-basic-fastapi-1:/app/main_fastapi.py
-    echo "✅ Synced to Docker container!"
-    echo "🔄 Restarting FastAPI service..."
-    docker exec smartlib-basic-fastapi-1 supervisorctl -s http://localhost:9001 restart fastapi > /dev/null 2>&1
-    echo "✅ FastAPI restarted!"
-elif docker ps | grep -q 'smartlib-gpu\|smartlib-basic'; then
-    echo "🐳 Single container detected, syncing..."
-    CONTAINER_NAME=$(docker ps --format "{{.Names}}" | grep 'smartlib-gpu\|smartlib-basic' | head -n 1)
-    docker cp main_fastapi.py $CONTAINER_NAME:/app/main_fastapi.py
-    docker cp modules/models.py $CONTAINER_NAME:/app/modules/models.py
-    echo "✅ Synced to single container ($CONTAINER_NAME)!"
-    echo "🔄 Restarting FastAPI via supervisord..."
-    docker exec $CONTAINER_NAME bash -c "curl -s -L 'http://127.0.0.1:9001/index.html?processname=fastapi&action=restart' > /dev/null" 2>/dev/null || true
-    echo "⏳ Waiting for FastAPI to restart..."
-    sleep 5
-    echo "✅ FastAPI restarted!"
-else
+if [ -z "$CONTAINER_NAME" ]; then
     echo "ℹ️  No Docker container running, skipping container sync"
+    exit 0
 fi
 
-echo "✅ Done! Backend API is now updated at http://localhost:8000/api/v1"
+echo "🐳 Container: $CONTAINER_NAME"
+
+# ── Sync core FastAPI files ──────────────────────────────────────────────────
+echo "🔄 Syncing FastAPI backend files..."
+docker cp main_fastapi.py   $CONTAINER_NAME:/app/main_fastapi.py
+docker cp database_fastapi.py $CONTAINER_NAME:/app/database_fastapi.py
+docker cp config.py         $CONTAINER_NAME:/app/config.py
+docker cp schemas.py        $CONTAINER_NAME:/app/schemas.py
+docker cp celery_app.py     $CONTAINER_NAME:/app/celery_app.py
+
+# ── Sync modules/ (backend logic only) ──────────────────────────────────────
+echo "🔄 Syncing modules/..."
+docker cp modules/ $CONTAINER_NAME:/app/modules/
+
+echo "✅ Backend files synced!"
+
+# ── Restart FastAPI via supervisord ─────────────────────────────────────────
+echo "🔄 Restarting FastAPI..."
+docker exec $CONTAINER_NAME bash -c \
+    "supervisorctl restart fastapi 2>/dev/null || \
+     curl -s 'http://127.0.0.1:9001/index.html?processname=fastapi&action=restart' > /dev/null" || true
+
+echo "⏳ Waiting 3s for FastAPI to restart..."
+sleep 3
+
+echo "✅ Done! API available at http://localhost/api/v1"
